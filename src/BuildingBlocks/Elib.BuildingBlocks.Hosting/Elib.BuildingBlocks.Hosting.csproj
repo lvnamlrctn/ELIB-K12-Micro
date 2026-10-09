@@ -7,5 +7,6 @@
     <ProjectReference Include="..\Elib.BuildingBlocks.Domain\Elib.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
     <ProjectReference Include="..\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Observability\Elib.BuildingBlocks.Observability.csproj" />
   </ItemGroup>
 </Project>

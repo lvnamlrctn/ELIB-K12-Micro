@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Elib.BuildingBlocks.Authorization;
+using Elib.BuildingBlocks.Observability;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Gateway;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
+builder.AddElibObservability("gateway"); // gốc của trace: gateway → service → consumer
 
 services.Configure<GatewayOptions>(builder.Configuration.GetSection(GatewayOptions.SectionName));
 services.Configure<TenancyOptions>(builder.Configuration.GetSection(TenancyOptions.SectionName));

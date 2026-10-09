@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, identity, tenant, notification, audit, media, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -14,6 +14,9 @@ x-dotnet-env: &dotnet-env
   Messaging__Host: rabbitmq
   Messaging__Username: ${RABBITMQ_USER:-elib}
   Messaging__Password: ${RABBITMQ_PASSWORD:?chạy ./init-env.sh trước}
+  # Trace/metrics/log qua OTLP. Mặc định tắt; bật: OTEL_ENDPOINT=http://otel-lgtm:4317 trong .env + `--profile observability`.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_ENDPOINT:-}
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
 
 x-service-build: &service-build
   context: ../..
@@ -89,6 +92,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+
+  # Quan sát (docs 06): Grafana + Tempo (trace) + Loki (log) + Prometheus (metrics) + OTel collector trong một container.
+  # Chỉ DEV — production dùng stack Grafana riêng. Giao diện chỉ bind 127.0.0.1 (vào qua SSH tunnel), dữ liệu không giữ qua lần tạo lại container.
+  # Tuỳ chọn (image ~3,7 GB): docker compose --profile observability up -d, kèm OTEL_ENDPOINT=http://otel-lgtm:4317 trong .env.
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.35.0
+    profiles: ["observability"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
 
   rabbitmq:
     image: rabbitmq:4-management-alpine

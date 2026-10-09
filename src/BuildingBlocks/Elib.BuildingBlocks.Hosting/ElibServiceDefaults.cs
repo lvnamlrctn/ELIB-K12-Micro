@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Elib.BuildingBlocks.Authorization;
+using Elib.BuildingBlocks.Observability;
 using Elib.BuildingBlocks.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -32,13 +33,15 @@ public static class ElibServiceDefaults
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
         var services = builder.Services;
 
+        builder.AddElibObservability(serviceName);
         services.AddElibTenancy(builder.Configuration);
         services.AddElibAuth(builder.Configuration);
 
         services.AddProblemDetails(options => options.CustomizeProblemDetails = ctx =>
         {
             ctx.ProblemDetails.Extensions["service"] = serviceName;
-            ctx.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
+            // Mã trace W3C (32 hex) — dán thẳng vào ô tìm của Grafana/Tempo; không có trace thì dùng mã request.
+            ctx.ProblemDetails.Extensions["traceId"] = Activity.Current?.TraceId.ToHexString() ?? ctx.HttpContext.TraceIdentifier;
             // Mọi problem đều có "code" ổn định — kể cả lỗi do framework sinh (401, 404 route, 405…).
             ctx.ProblemDetails.Extensions.TryAdd("code", ctx.ProblemDetails.Status switch
             {
@@ -79,6 +82,11 @@ public static class ElibServiceDefaults
         app.UseStatusCodePages();
         app.UseAuthentication();
         app.UseElibTenancy();
+        app.Use((ctx, next) =>
+        {
+            ElibObservability.TagTenant(ctx.RequestServices.GetRequiredService<ITenantContext>().TenantId);
+            return next(ctx);
+        });
         app.UseAuthorization();
 
         app.MapElibHealthChecks();

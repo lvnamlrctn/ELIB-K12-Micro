@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
+using Elib.BuildingBlocks.Observability;
 using Elib.BuildingBlocks.Tenancy;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Model;
@@ -89,6 +91,7 @@ public sealed partial class GatewayTenantMiddleware(
 
         if (tenant is not null)
         {
+            ElibObservability.TagTenant(tenant.TenantId);
             request.Headers[options.TenantHeader] = tenant.TenantId.ToString(CultureInfo.InvariantCulture);
             request.Headers[options.SignatureHeader] = GatewaySignature.Compute(options.GatewaySigningKey, tenant.TenantId);
         }
@@ -107,7 +110,7 @@ internal static class GatewayProblem
     {
         http.Response.StatusCode = status;
         return http.Response.WriteAsJsonAsync(
-            new { type = "about:blank", status, code, detail, service = "gateway", traceId = http.TraceIdentifier },
+            new { type = "about:blank", status, code, detail, service = "gateway", traceId = Activity.Current?.TraceId.ToHexString() ?? http.TraceIdentifier },
             options: null, contentType: "application/problem+json");
     }
 }

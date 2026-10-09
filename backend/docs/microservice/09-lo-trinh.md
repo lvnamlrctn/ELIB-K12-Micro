@@ -30,6 +30,13 @@
 **Tiêu chí hoàn thành**
 - Tạo một đơn vị mới bằng UI, saga chạy xong, admin đầu tiên đăng nhập được qua `<madonvi>.thuvientn.vn/admin`, và thấy đúng menu theo license.
 - Tenant-leak test chạy xanh trong CI; trace từ gateway tới service tới consumer hiển thị trên Grafana.
+
+**Trạng thái (2026-10-09, môi trường DEV docker-compose)**
+- ✅ Tạo đơn vị bằng UI → saga → admin đầu tiên đăng nhập trên host đơn vị, menu theo license (e2e `deploy/dev/e2e_gd0.py`).
+- ✅ Tenant-leak test (`src/Tests/Elib.Platform.LeakTests`) chạy trên PostgreSQL thật trong CI (`.github/workflows/ci.yml`).
+- ✅ Kiểm tra tương thích contract: `src/Contracts/tests` so với `contracts.snapshot.txt` — xoá/đổi kiểu/thêm `required` làm CI đỏ.
+- ✅ OpenTelemetry (building block Observability, bật bằng `OTEL_EXPORTER_OTLP_ENDPOINT`); đã thấy trace gateway → tenant trên Grafana/Tempo (`grafana/otel-lgtm`, profile `observability` của compose DEV — tắt mặc định vì image ~3,7 GB).
+- ⏳ Cluster K8s dev/staging, operator, ArgoCD, library chart, deploy một service qua PR — chờ có hạ tầng.
 - Deploy một service lên staging bằng PR trong `deploy/` mà không ảnh hưởng service khác.
 
 ### GĐ1 — MVP Sách in

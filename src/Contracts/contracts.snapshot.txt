@@ -1,0 +1,97 @@
+# Bề mặt public của Elib.Contracts.Events — sinh bởi ContractCompatibilityTests, KHÔNG sửa tay.
+# Dòng bị xoá/đổi trong diff của PR = thay đổi phá vỡ contract.
+type Elib.Contracts.Events.EventActor class
+  Id : Nullable<System.Int64>
+  Kind : System.String
+type Elib.Contracts.Events.IntegrationEvent abstract
+  Actor : Elib.Contracts.Events.EventActor
+  EventId : System.Guid
+  OccurredAt : System.DateTimeOffset
+  TenantId : System.Int64 required
+type Elib.Contracts.Events.Platform.AuditRecorded class : Elib.Contracts.Events.IntegrationEvent
+  Action : System.String required
+  ActorName : System.String?
+  ChangesJson : System.String?
+  CorrelationId : System.String?
+  EntityId : System.String?
+  EntityType : System.String required
+  IpAddress : System.String?
+  Service : System.String required
+  Summary : System.String?
+type Elib.Contracts.Events.Platform.ModuleLicense class
+  ModuleCode : System.String
+  Status : System.String
+  ValidFrom : Nullable<System.DateOnly>
+  ValidTo : Nullable<System.DateOnly>
+type Elib.Contracts.Events.Platform.ModuleLicenseChanged class : Elib.Contracts.Events.IntegrationEvent
+  Modules : IReadOnlyList<Elib.Contracts.Events.Platform.ModuleLicense> required
+  SourceVersion : System.Int64 required
+type Elib.Contracts.Events.Platform.NotificationRecipient class
+  DisplayName : System.String?
+  Email : System.String?
+  Phone : System.String?
+  ReaderId : Nullable<System.Int64>
+  UserId : Nullable<System.Int64>
+type Elib.Contracts.Events.Platform.NotificationRequested class : Elib.Contracts.Events.IntegrationEvent
+  Channels : IReadOnlyList<System.String>
+  Data : IReadOnlyDictionary<System.String, System.String>
+  DeduplicationKey : System.String?
+  Recipient : Elib.Contracts.Events.Platform.NotificationRecipient required
+  TemplateCode : System.String required
+type Elib.Contracts.Events.Platform.PermissionChanged class : Elib.Contracts.Events.IntegrationEvent
+  AllUsersOfTenant : System.Boolean
+  UserIds : IReadOnlyList<System.Int64>
+type Elib.Contracts.Events.Platform.SystemAuditRecorded class : Elib.Contracts.Events.SystemEvent
+  Action : System.String required
+  ActorName : System.String?
+  EntityId : System.String?
+  EntityType : System.String required
+  IpAddress : System.String?
+  Service : System.String required
+  Summary : System.String?
+  TenantId : Nullable<System.Int64>
+type Elib.Contracts.Events.Platform.SystemNotificationRequested class : Elib.Contracts.Events.SystemEvent
+  Data : IReadOnlyDictionary<System.String, System.String>
+  Recipient : Elib.Contracts.Events.Platform.NotificationRecipient required
+  TemplateCode : System.String required
+type Elib.Contracts.Events.Platform.SystemParameterChanged class : Elib.Contracts.Events.IntegrationEvent
+  Keys : IReadOnlyList<System.String> required
+  Service : System.String required
+type Elib.Contracts.Events.Platform.SystemPermissionChanged class : Elib.Contracts.Events.SystemEvent
+  UserIds : IReadOnlyList<System.Int64> required
+type Elib.Contracts.Events.Platform.TenantProvisioned class : Elib.Contracts.Events.IntegrationEvent
+  Code : System.String required
+  Modules : IReadOnlyList<Elib.Contracts.Events.Platform.ModuleLicense> required
+  Name : System.String required
+  ParentOrgId : Nullable<System.Int64>
+  Subdomain : System.String required
+  TimeZone : System.String
+type Elib.Contracts.Events.Platform.TenantSeeded class : Elib.Contracts.Events.IntegrationEvent
+  Error : System.String?
+  Service : System.String required
+  Succeeded : System.Boolean
+type Elib.Contracts.Events.Platform.TenantStatus enum
+  Provisioning = 0
+  Active = 1
+  Suspended = 2
+  ProvisioningFailed = 3
+type Elib.Contracts.Events.Platform.TenantSuspended class : Elib.Contracts.Events.IntegrationEvent
+  Reason : System.String?
+type Elib.Contracts.Events.Platform.TenantUpdated class : Elib.Contracts.Events.IntegrationEvent
+  Code : System.String required
+  Name : System.String required
+  ParentOrgId : Nullable<System.Int64>
+  SourceVersion : System.Int64 required
+  Status : Elib.Contracts.Events.Platform.TenantStatus required
+  Subdomain : System.String required
+  TimeZone : System.String required
+type Elib.Contracts.Events.Platform.UserUpserted class : Elib.Contracts.Events.IntegrationEvent
+  FullName : System.String required
+  IsActive : System.Boolean
+  SourceVersion : System.Int64 required
+  UserId : System.Int64 required
+  UserName : System.String required
+type Elib.Contracts.Events.SystemEvent abstract
+  Actor : Elib.Contracts.Events.EventActor
+  EventId : System.Guid
+  OccurredAt : System.DateTimeOffset

@@ -96,6 +96,20 @@ case "$hdr" in
   *) bad "/s3 thiếu header bảo vệ" ;;
 esac
 
+echo "Quan sát (OpenTelemetry → Grafana/Tempo)"
+if [ -n "${OTEL_ENDPOINT:-}" ]; then
+  GF="http://127.0.0.1:${GRAFANA_PORT:-3000}"
+  # Các request phía trên đã sinh trace; exporter gửi theo lô vài giây một lần.
+  q='{resource.service.name="elib-gateway"} && {resource.service.name="elib-tenant"}'
+  n=0
+  for i in $(seq 1 12); do
+    n=$(curl -s -G "$GF/api/datasources/proxy/uid/tempo/api/search" --data-urlencode "q=$q" --data-urlencode "limit=5" \
+        | grep -o '"traceID"' | wc -l)
+    [ "$n" -ge 1 ] && break; sleep 5
+  done
+  [ "$n" -ge 1 ] && ok "Tempo có trace đi xuyên gateway → tenant ($n trace)" || bad "chưa thấy trace gateway → tenant trên Tempo"
+fi
+
 echo "RabbitMQ"
 q=$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name 2>/dev/null | grep -c -E '^(identity|tenant|notification|audit)-' || true)
 [ "${q:-0}" -ge 1 ] && ok "$q queue của identity/tenant/notification/audit đã khai báo" || bad "chưa thấy queue của service"

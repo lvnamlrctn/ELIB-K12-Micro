@@ -33,6 +33,9 @@
     <Project Path="src/Services/Audit/Elib.Audit.Infrastructure/Elib.Audit.Infrastructure.csproj" />
     <Project Path="src/Services/Audit/tests/Elib.Audit.Tests/Elib.Audit.Tests.csproj" />
   </Folder>
+  <Folder Name="/Contracts/tests/">
+    <Project Path="src/Contracts/tests/Elib.Contracts.Tests/Elib.Contracts.Tests.csproj" />
+  </Folder>
   <Folder Name="/Tests/">
     <Project Path="src/Tests/Elib.Platform.LeakTests/Elib.Platform.LeakTests.csproj" />
   </Folder>
