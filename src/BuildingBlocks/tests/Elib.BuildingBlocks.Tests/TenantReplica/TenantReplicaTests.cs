@@ -61,6 +61,8 @@ public sealed class TenantReplicaTests : IAsyncLifetime
         services.AddMassTransitTestHarness(x =>
         {
             x.AddTenantReplicaConsumers<ReplicaDb>();
+            // CI chạy nhiều assembly test song song: mặc định harness coi bus "rảnh" quá sớm → Consumed.Any() trả false dù consumer chưa chạy xong.
+            x.SetTestTimeouts(testTimeout: TimeSpan.FromSeconds(30), testInactivityTimeout: TimeSpan.FromSeconds(10));
             x.UsingInMemory((context, bus) =>
             {
                 bus.UseElibFilters(context);
