@@ -61,6 +61,20 @@ jobs:
           done
       - name: Test
         run: dotnet test Elib.Platform.slnx --no-build -c Release --logger "trx" --results-directory TestResults
+      - name: Test hỏng → annotation
+        if: failure()
+        shell: python
+        run: |
+          import glob, xml.etree.ElementTree as ET
+          ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          for path in glob.glob("TestResults/*.trx"):
+              root = ET.parse(path).getroot()
+              for r in root.iterfind(".//t:UnitTestResult", ns):
+                  if r.get("outcome") != "Failed":
+                      continue
+                  msg = " ".join((r.findtext(".//t:Message", "", ns) or "").split())[:900]
+                  stack = " | ".join(l.strip() for l in (r.findtext(".//t:StackTrace", "", ns) or "").splitlines()[:4])[:600]
+                  print(f"::error title={r.get('testName')}::{msg} || {stack}")
       - name: Kết quả test
         if: always()
         uses: actions/upload-artifact@v4
