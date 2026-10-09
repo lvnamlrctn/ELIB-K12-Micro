@@ -6,6 +6,7 @@ import { Home } from './pages/home';
 import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSITIONS, SYSTEM_PARAMETERS } from './pages/tenant/catalogs';
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
+import { BIB_TYPES } from './pages/catalog/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -53,6 +54,11 @@ export const routes: Routes = [
       catalog('courses', COURSES),
       catalog('reader-groups', READER_GROUPS),
       { path: 'readers', loadComponent: () => import('./pages/patron/readers').then((m) => m.Readers), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'Bạn đọc' },
+      catalog('bib-types', BIB_TYPES),
+      { path: 'worksheets', loadComponent: () => import('./pages/catalog/worksheets').then((m) => m.Worksheets), canActivate: [tenantGuard, permissionGuard('WORKSHEETS')], title: 'Biểu mẫu biên mục' },
+      { path: 'catalog-bibs', loadComponent: () => import('./pages/catalog/bibs').then((m) => m.Bibs), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'Biên mục biểu ghi' },
+      // ":mfn" = "new" khi biên mục mới (monolith: /catalog-bibs/new và /catalog-bibs/edit/:mfn).
+      { path: 'catalog-bibs/:mfn', loadComponent: () => import('./pages/catalog/bib-edit').then((m) => m.BibEdit), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'Biên mục' },
       {
         path: 'system-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
         canActivate: [tenantGuard, permissionGuard('SYSTEM_LOG')], data: { scope: 'tenant' }, title: 'Nhật ký hệ thống',

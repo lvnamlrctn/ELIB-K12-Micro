@@ -121,10 +121,17 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
         return ToDto(entity);
     }
 
+    /// <summary>Áp request vào entity khi cập nhật. Override khi cần tra DB — <see cref="Update"/> khi đó không được gọi.</summary>
+    protected virtual Task UpdateAsync(TEntity entity, TRequest request, CancellationToken ct)
+    {
+        Update(entity, request);
+        return Task.CompletedTask;
+    }
+
     public virtual async Task<TDto> UpdateAsync(Guid publicId, TRequest request, CancellationToken ct)
     {
         var entity = await LoadAsync(publicId, ct);
-        Update(entity, request);
+        await UpdateAsync(entity, request, ct);
         await ValidateAsync(entity, ct);
         await OnSavingAsync(entity, CrudChange.Updated, ct);
         await AuditAsync(entity, CrudChange.Updated, ct);

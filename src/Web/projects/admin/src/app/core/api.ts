@@ -48,6 +48,24 @@ export interface ReaderBulkUpdate {
   issueDate?: string | null; expireDate?: string | null; status?: number | null;
 }
 
+// ── Biên mục (service catalog) ──
+export interface MarcSubfield { code: string; value: string; }
+/** Trường điều khiển (001–009) chỉ có value; trường dữ liệu có ind1/ind2 + subfields. */
+export interface MarcField { tag: string; ind1?: string | null; ind2?: string | null; value?: string | null; subfields?: MarcSubfield[] | null; }
+export interface MarcSubfieldDef { code: string; name: string; repeatable: boolean; }
+export interface MarcFieldDef { tag: string; name: string; repeatable: boolean; ind1: string | null; ind2: string | null; subfields: MarcSubfieldDef[]; }
+export interface BibType { id: number; publicId: string; name: string; code: string; recordType: string; bibLevel: string; }
+export interface Worksheet { id: number; publicId: string; name: string; bibTypeId: number | null; fields: MarcField[]; updatedAt: string | null; }
+/** status: 2 = hiện trên OPAC, 1 = ẩn. mfn = id. */
+export interface Bib {
+  id: number; mfn: number; publicId: string; bibTypeId: number | null; worksheetId: number | null; leader: string; fields: MarcField[];
+  title: string; author: string | null; publisher: string | null; publishYear: string | null; isbns: string[]; ddc: string | null;
+  keywords: string | null; status: number; version: number; createdAt: string; updatedAt: string | null;
+}
+export interface BibSearch extends CrudSearch { bibTypeId?: number | null; isbn?: string | null; ddc?: string | null; }
+export interface BibInput { bibTypeId: number | null; worksheetId?: number | null; leader?: string | null; fields: MarcField[]; status?: number | null; }
+export interface IsbnMatch { publicId: string; mfn: number; title: string; }
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -265,6 +283,12 @@ export class Api {
   lockReader(publicId: string, reason: string | null) { return this.post<Reader>(`/api/admin/patron/readers/Lock/${publicId}`, { reason }); }
   unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
+  // Biên mục (catalog): 8 endpoint chuẩn qua crud('bibs' | 'bib-types' | 'worksheets', 'catalog')
+  marc21Fields() { return this.get<MarcFieldDef[]>('/api/admin/catalog/marc21/fields'); }
+  worksheetsByBibType(bibTypeId: number) { return this.get<Worksheet[]>(`/api/admin/catalog/worksheets/GetByBibType/${bibTypeId}`); }
+  bibByMfn(mfn: number) { return this.get<Bib>(`/api/admin/catalog/bibs/GetByMfn/${mfn}`); }
+  checkIsbn(isbn: string, excludePublicId?: string) { return this.get<IsbnMatch[]>('/api/admin/catalog/bibs/CheckIsbn', { isbn, excludePublicId }); }
+  restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */
   assignReaderPhotos(items: { cardNo: string; fileId: string }[]) { return this.post<ReaderPhotosResult>('/api/admin/patron/readers/Photos', { items }); }

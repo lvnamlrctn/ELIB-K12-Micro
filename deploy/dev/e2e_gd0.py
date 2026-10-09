@@ -20,6 +20,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
  14. OPAC ở gốc host đơn vị; host hệ thống "/" → app Admin.
  15. bạn đọc (patron): danh mục, thêm, trùng số thẻ, tìm, khoá/mở thẻ, sửa hàng loạt, nhập Excel, nhật ký,
      ảnh thẻ (media, riêng tư) + gán ảnh theo số thẻ, xuất Excel theo bộ lọc.
+ 16. biên mục (catalog): loại biểu ghi + biểu mẫu mặc định (tự dựng bản sao đơn vị khi service mới triển khai), từ điển MARC21,
+     biên mục biểu ghi theo biểu mẫu (001/003/005/008 tự sinh), tìm không dấu, trùng ISBN, ẩn khỏi OPAC, nhật ký, xoá.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -599,6 +601,51 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         tb.request("DELETE", f"{P}/readers/Delete/{r['publicId']}", token=token)
     s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": card})
     expect(s == 200 and json.loads(body)["totalCount"] == 0, "đã dọn bạn đọc thử")
+
+    print("16. Biên mục (service catalog)")
+    C = "/api/admin/catalog"
+    types = []
+    for _ in range(30):  # catalog vừa triển khai: chờ tự dựng bản sao đơn vị + seed mặc định
+        s, _, body = tb.request("POST", f"{C}/bib-types/SearchAll", token=token, json_body={})
+        types = json.loads(body) if s == 200 else []
+        if any(t["code"] == "SACH" for t in types): break
+        time.sleep(2)
+    book = next((t for t in types if t["code"] == "SACH"), None)
+    expect(book is not None and len(types) >= 7, f"loại biểu ghi mặc định ({len(types)} loại, có Sách)", f"{s} {body[:200]}")
+    s, _, body = tb.request("GET", f"{C}/worksheets/GetByBibType/{book['id']}", token=token)
+    sheet = (json.loads(body) or [None])[0] if s == 200 else None
+    expect(sheet is not None and any(f["tag"] == "245" for f in sheet["fields"]), f"biểu mẫu mặc định của Sách: {sheet and sheet['name']}", body[:200])
+    s, _, body = tb.request("GET", f"{C}/marc21/fields", token=token)
+    expect(s == 200 and any(f["tag"] == "650" for f in json.loads(body)), "từ điển MARC21 (tên trường tiếng Việt)", body[:200])
+
+    tag = secrets.token_hex(3)
+    isbn = "978604" + str(int(tag, 16) % 10_000_000).zfill(7)
+    values = {"020": {"a": isbn}, "100": {"a": "Tô Hoài"}, "245": {"a": f"Dế Mèn phiêu lưu ký {tag} /", "c": "Tô Hoài"},
+              "260": {"a": "H. :", "b": "Kim Đồng,", "c": "2020"}, "650": {"a": "Văn học thiếu nhi"}}
+    fields = []
+    for f in sheet["fields"]:  # điền vào biểu mẫu như cán bộ biên mục
+        subs = [{"code": sf["code"], "value": values.get(f["tag"], {}).get(sf["code"], sf["value"])} for sf in (f.get("subfields") or [])]
+        fields.append({**f, "subfields": subs})
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "worksheetId": sheet["id"], "fields": fields})
+    bib = json.loads(body) if s == 201 else {}
+    tags = {f["tag"]: f for f in bib.get("fields", [])}
+    expect(s == 201 and tags.get("001", {}).get("value") == str(bib.get("mfn")) and tags.get("003", {}).get("value") == TENANT_CODE
+           and "005" in tags and tags.get("008", {}).get("value", "")[7:11] == "2020",
+           f"biên mục biểu ghi MFN {bib.get('mfn')} (001/003/005/008 tự sinh)", body[:300])
+    expect(bib.get("title") == f"Dế Mèn phiêu lưu ký {tag}" and bib.get("isbns") == [isbn] and bib.get("leader", "")[6:8] == "am",
+           "tóm tắt: nhan đề bỏ dấu ISBD, ISBN chuẩn hoá, Leader theo loại", json.dumps({k: bib.get(k) for k in ("title", "isbns", "leader")}, ensure_ascii=False))
+    s, _, body = tb.request("POST", f"{C}/bibs/Search", token=token, json_body={"keyword": f"de men phieu luu ky {tag}"})
+    expect(s == 200 and [b["mfn"] for b in json.loads(body)["items"]] == [bib["mfn"]], "tìm không dấu", body[:200])
+    s, _, body = tb.request("GET", f"{C}/bibs/CheckIsbn?isbn={isbn[:3]}-{isbn[3:]}", token=token)
+    expect(s == 200 and [m["mfn"] for m in json.loads(body)] == [bib["mfn"]], "cảnh báo trùng ISBN (gõ có gạch nối)", body[:200])
+    s, _, body = tb.request("PUT", f"{C}/bibs/ChangeStatus", token=token, json_body={"publicId": bib["publicId"], "status": 1})
+    s2, _, body2 = tb.request("GET", f"{C}/bibs/GetByMfn/{bib['mfn']}", token=token)
+    expect(s == 204 and s2 == 200 and json.loads(body2)["status"] == 1, "ẩn biểu ghi khỏi OPAC", f"{s} {body[:100]}")
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"Dế Mèn phiêu lưu ký {tag}")
+    step("nhật ký có biên mục biểu ghi (catalog → audit)")
+    s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{bib['publicId']}", token=token)
+    s2, _, _ = tb.request("GET", f"{C}/bibs/GetByMfn/{bib['mfn']}", token=token)
+    expect(s == 204 and s2 == 404, "xoá biểu ghi thử")
 
 
 if __name__ == "__main__":

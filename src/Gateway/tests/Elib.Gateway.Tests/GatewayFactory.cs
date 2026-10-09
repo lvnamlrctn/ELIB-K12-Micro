@@ -80,6 +80,7 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Clusters:audit:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:media:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:patron:Destinations:d1:Address"] = backendAddress,
+            ["ReverseProxy:Clusters:catalog:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:minio:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:search:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:admin-web:Destinations:d1:Address"] = backendAddress,

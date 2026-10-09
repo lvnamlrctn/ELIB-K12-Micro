@@ -65,6 +65,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddElibPostgres<IdentityDbContext>(connectionString, o => o.UseOpenIddict());
         services.AddScoped<IIdentityDb>(sp => sp.GetRequiredService<IdentityDbContext>());
         services.AddTenantReplica<IdentityDbContext>(ServiceName);
+        services.AddTenantReplicaBootstrap<IdentityDbContext>(configuration);
         services.AddElibMessaging<IdentityDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<IdentityDbContext>();

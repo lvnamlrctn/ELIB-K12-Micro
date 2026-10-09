@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -14,6 +14,8 @@ x-dotnet-env: &dotnet-env
   Messaging__Host: rabbitmq
   Messaging__Username: ${RABBITMQ_USER:-elib}
   Messaging__Password: ${RABBITMQ_PASSWORD:?chạy ./init-env.sh trước}
+  # Service triển khai sau khi đã có đơn vị: lúc khởi động tự dựng bản sao đơn vị từ service tenant (bản sao trống mới chạy).
+  TenantReplica__TenantUrl: http://tenant:8080
   # Trace/metrics/log qua OTLP. Mặc định tắt; bật: OTEL_ENDPOINT=http://otel-lgtm:4317 trong .env + `--profile observability`.
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_ENDPOINT:-}
   OTEL_METRIC_EXPORT_INTERVAL: "15000"
@@ -35,6 +37,7 @@ services:
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:?chạy ./init-env.sh trước}
       MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD:?chạy ./init-env.sh trước}
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD:?chạy ./init-env.sh trước}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -64,6 +67,7 @@ services:
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD}
       MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD}
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -147,6 +151,7 @@ services:
       Identity__Clients__svc-notification__ClientSecret: ${SVC_NOTIFICATION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-audit__ClientSecret: ${SVC_AUDIT_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-patron__ClientSecret: ${SVC_PATRON_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-catalog__ClientSecret: ${SVC_CATALOG_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -183,6 +188,7 @@ services:
       Provisioning__DeployedServices__0: identity
       Provisioning__DeployedServices__1: notification
       Provisioning__DeployedServices__2: patron
+      Provisioning__DeployedServices__3: catalog
 
   notification:
     build:
@@ -267,6 +273,25 @@ services:
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PATRON_SECRET}
 
+  # GĐ1: biên mục MARC21 — loại biểu ghi, biểu mẫu, biểu ghi (phát BibChanged cho kho/lưu thông/tra cứu…).
+  catalog:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Catalog/Elib.Catalog.Api/Elib.Catalog.Api.csproj
+        ASSEMBLY: Elib.Catalog.Api
+    image: elib/catalog:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__CatalogDb: Host=postgres;Database=elib_catalog;Username=catalog_app;Password=${CATALOG_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_CATALOG_SECRET}
+
   admin-web:
     build:
       context: ../..
@@ -302,6 +327,7 @@ services:
       audit: { condition: service_started }
       media: { condition: service_started }
       patron: { condition: service_started }
+      catalog: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

@@ -61,6 +61,10 @@ public static class TenantEndpoints
         app.MapGet("/internal/tenants/by-host/{host}", (string host, TenantQueries q, CancellationToken ct) => q.ByHostAsync(host, ct))
             .WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
+        // Service mới triển khai (bản sao đơn vị còn trống) dựng bản sao từ đây thay vì chờ quản trị bấm "Đồng bộ lại".
+        app.MapGet("/internal/tenants/replicas", (TenantQueries q, CancellationToken ct) => q.ReplicaSnapshotsAsync(ct))
+            .WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
         return app;
     }
 }

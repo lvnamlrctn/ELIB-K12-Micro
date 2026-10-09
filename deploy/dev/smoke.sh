@@ -61,7 +61,7 @@ case "$body" in
 esac
 
 echo "PostgreSQL: role service và RLS"
-for role in identity_app tenant_app notification_app audit_app media_app patron_app; do
+for role in identity_app tenant_app notification_app audit_app media_app patron_app catalog_app; do
   r=$(psql_q postgres "SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname='$role'")
   [ "$r" = f ] && ok "$role không phải superuser, không BYPASSRLS" || bad "$role: superuser/bypassrls='$r'"
 done
@@ -69,7 +69,7 @@ n=$(psql_q elib_identity "SELECT count(*) FROM pg_class c JOIN pg_policy p ON p.
 [ "${n:-0}" -ge 2 ] && ok "elib_identity: $n bảng có FORCE RLS" || bad "elib_identity: bảng có FORCE RLS = '${n:-?}'"
 # Mọi bảng (schema public) có cột tenant_id phải có FORCE RLS + policy. Bỏ qua bảng bước khởi tạo của service tenant
 # (tenant_provisioning_steps: tenant_id là khoá ngoại tới đơn vị đang tạo, chỉ ngữ cảnh hệ thống ghi).
-for db in elib_tenant elib_notification elib_audit elib_media elib_patron; do
+for db in elib_tenant elib_notification elib_audit elib_media elib_patron elib_catalog; do
   t=$(psql_q $db "SELECT count(*) FROM information_schema.columns col JOIN pg_class c ON c.relname=col.table_name AND c.relkind='r' LEFT JOIN pg_policy p ON p.polrelid=c.oid AND p.polname='elib_tenant_isolation' WHERE col.table_schema='public' AND col.column_name='tenant_id' AND col.table_name NOT LIKE '%provisioning%' AND (NOT c.relforcerowsecurity OR p.oid IS NULL)")
   [ "${t:-1}" = 0 ] && ok "$db: mọi bảng có tenant_id đều FORCE RLS" || bad "$db: $t bảng có tenant_id thiếu FORCE RLS"
   m=$(psql_q $db "SELECT count(*) FROM \"__EFMigrationsHistory\"")
@@ -79,7 +79,7 @@ done
 echo "Notification"
 code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${MAILPIT_UI_PORT:-8025}/api/v1/info")
 [ "$code" = 200 ] && ok "Mailpit (SMTP nền tảng của DEV) chạy" || bad "Mailpit API → $code"
-for svc in notification audit media patron minio; do
+for svc in notification audit media patron catalog minio; do
   st=$(docker compose ps --format '{{.State}}' $svc 2>/dev/null)
   [ "$st" = running ] && ok "$svc đang chạy" || bad "$svc: '$st'"
 done
@@ -111,7 +111,7 @@ if [ -n "${OTEL_ENDPOINT:-}" ]; then
 fi
 
 echo "RabbitMQ"
-q=$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name 2>/dev/null | grep -c -E '^(identity|tenant|notification|audit|patron)-' || true)
-[ "${q:-0}" -ge 1 ] && ok "$q queue của identity/tenant/notification/audit/patron đã khai báo" || bad "chưa thấy queue của service"
+q=$(docker compose exec -T rabbitmq rabbitmqctl -q list_queues name 2>/dev/null | grep -c -E '^(identity|tenant|notification|audit|patron|catalog)-' || true)
+[ "${q:-0}" -ge 1 ] && ok "$q queue của identity/tenant/notification/audit/patron/catalog đã khai báo" || bad "chưa thấy queue của service"
 
-[ "$fail" = 0 ] && echo "TẤT CẢ ĐẠT" || { echo "CÓ MỤC KHÔNG ĐẠT — xem: docker compose logs identity tenant notification audit media patron gateway"; exit 1; }
+[ "$fail" = 0 ] && echo "TẤT CẢ ĐẠT" || { echo "CÓ MỤC KHÔNG ĐẠT — xem: docker compose logs identity tenant notification audit media patron catalog gateway"; exit 1; }

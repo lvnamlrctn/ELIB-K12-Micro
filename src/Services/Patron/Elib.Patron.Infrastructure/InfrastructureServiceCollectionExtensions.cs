@@ -21,6 +21,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddElibPostgres<PatronDbContext>(connectionString);
         services.AddCrudDbContext<PatronDbContext>(ServiceName);
         services.AddTenantReplica<PatronDbContext>(ServiceName);
+        services.AddTenantReplicaBootstrap<PatronDbContext>(configuration);
         services.AddScoped<ITenantSeeder, PatronTenantSeeder>();
         services.AddElibMessaging<PatronDbContext>(ServiceName, configuration, x =>
         {

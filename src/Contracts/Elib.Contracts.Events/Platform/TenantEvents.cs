@@ -61,3 +61,9 @@ public sealed record SystemParameterChanged : IntegrationEvent
     public required string Service { get; init; }
     public required IReadOnlyList<string> Keys { get; init; }
 }
+
+/// <summary>
+/// Trạng thái hiện tại của một đơn vị dạng event (không phải event phát qua bus): GET /internal/tenants/replicas của service tenant.
+/// Service triển khai sau khi đơn vị đã có dựng bản sao từ đây — cùng quy tắc SourceVersion như khi nhận event.
+/// </summary>
+public sealed record TenantReplicaSnapshot(TenantUpdated Tenant, ModuleLicenseChanged Licenses);

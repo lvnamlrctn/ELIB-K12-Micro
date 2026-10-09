@@ -25,6 +25,8 @@ public static class PermissionCatalog
     private const string ReaderParams = "Quản lý bạn đọc / Tham số bạn đọc";
     private const string SystemGroup = "Hệ thống";
     private const string NotifyGroup = "Hệ thống / Gửi thông báo";
+    private const string CatalogGroup = "Biên mục";
+    private const string CatalogLicense = "CATALOG";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -39,6 +41,10 @@ public static class PermissionCatalog
         new("DEGREES", "Trình độ", ReaderParams, Crud),
         new("POSITIONS", "Chức vụ", ReaderParams, Crud),
         new("ORGS", "Phòng ban", ReaderParams, Crud),
+
+        new("CATALOG_BIBS", "Biên mục biểu ghi", CatalogGroup, Crud, CatalogLicense),
+        new("WORKSHEETS", "Biểu mẫu biên mục", CatalogGroup, Crud, CatalogLicense),
+        new("BIB_TYPES", "Loại biểu ghi", CatalogGroup, Crud, CatalogLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

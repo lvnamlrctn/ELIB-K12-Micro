@@ -1,5 +1,18 @@
 # Bề mặt public của Elib.Contracts.Events — sinh bởi ContractCompatibilityTests, KHÔNG sửa tay.
 # Dòng bị xoá/đổi trong diff của PR = thay đổi phá vỡ contract.
+type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.IntegrationEvent
+  Author : System.String?
+  BibPublicId : System.Guid required
+  BibTypeId : Nullable<System.Int64>
+  Ddc : System.String?
+  Deleted : System.Boolean
+  Isbns : IReadOnlyList<System.String>
+  Mfn : System.Int64 required
+  PublishYear : System.String?
+  Publisher : System.String?
+  Status : System.Int32
+  Title : System.String required
+  Version : System.Int64
 type Elib.Contracts.Events.EventActor class
   Id : Nullable<System.Int64>
   Kind : System.String
@@ -77,6 +90,9 @@ type Elib.Contracts.Events.Platform.TenantProvisioned class : Elib.Contracts.Eve
   ParentOrgId : Nullable<System.Int64>
   Subdomain : System.String required
   TimeZone : System.String
+type Elib.Contracts.Events.Platform.TenantReplicaSnapshot class
+  Licenses : Elib.Contracts.Events.Platform.ModuleLicenseChanged
+  Tenant : Elib.Contracts.Events.Platform.TenantUpdated
 type Elib.Contracts.Events.Platform.TenantSeeded class : Elib.Contracts.Events.IntegrationEvent
   Error : System.String?
   Service : System.String required

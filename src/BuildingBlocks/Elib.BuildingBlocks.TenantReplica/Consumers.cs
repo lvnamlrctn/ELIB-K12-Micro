@@ -81,27 +81,9 @@ public sealed class TenantUpdatedConsumer<TDbContext>(TDbContext db, TimeProvide
 {
     public async Task Consume(ConsumeContext<TenantUpdated> context)
     {
-        var m = context.Message;
-        var replica = await db.Set<TenantReplicaRecord>().FirstOrDefaultAsync(t => t.TenantId == m.TenantId, context.CancellationToken);
-        if (replica is null)
-        {
-            replica = new TenantReplicaRecord { TenantId = m.TenantId };
-            db.Add(replica);
-        }
-        else if (replica.SourceVersion >= m.SourceVersion)
-        {
-            return; // event cũ hơn bản đang có (đến trễ / gửi lại)
-        }
-
-        replica.Code = m.Code;
-        replica.Name = m.Name;
-        replica.Subdomain = m.Subdomain;
-        replica.TimeZone = m.TimeZone;
-        replica.Status = m.Status.ToString();
-        replica.SourceVersion = m.SourceVersion;
-        replica.SyncedAt = clock.GetUtcNow();
+        if (!await ReplicaWriter.ApplyTenantAsync(db, context.Message, clock.GetUtcNow(), context.CancellationToken)) return;
         await db.SaveChangesAsync(context.CancellationToken);
-        await ReplicaWriter.InvalidateAsync(cache, m.TenantId, context.CancellationToken);
+        await ReplicaWriter.InvalidateAsync(cache, context.Message.TenantId, context.CancellationToken);
     }
 }
 
@@ -110,9 +92,44 @@ public sealed class ModuleLicenseChangedConsumer<TDbContext>(TDbContext db, Time
 {
     public async Task Consume(ConsumeContext<ModuleLicenseChanged> context)
     {
-        var m = context.Message;
-        var replica = await db.Set<TenantReplicaRecord>().Include(t => t.Modules)
-            .FirstOrDefaultAsync(t => t.TenantId == m.TenantId, context.CancellationToken);
+        if (!await ReplicaWriter.ApplyLicensesAsync(db, context.Message, clock.GetUtcNow(), context.CancellationToken)) return;
+        await db.SaveChangesAsync(context.CancellationToken);
+        await ReplicaWriter.InvalidateAsync(cache, context.Message.TenantId, context.CancellationToken);
+    }
+}
+
+internal static class ReplicaWriter
+{
+    public static string CacheTag(long tenantId) => $"tenant-replica:{tenantId}";
+
+    /// <summary>Ghi thông tin đơn vị vào bản sao nếu mới hơn bản đang có. false = bỏ qua (event cũ / gửi lại). Chưa SaveChanges.</summary>
+    public static async Task<bool> ApplyTenantAsync(DbContext db, TenantUpdated m, DateTimeOffset now, CancellationToken ct)
+    {
+        var replica = await db.Set<TenantReplicaRecord>().FirstOrDefaultAsync(t => t.TenantId == m.TenantId, ct);
+        if (replica is null)
+        {
+            replica = new TenantReplicaRecord { TenantId = m.TenantId };
+            db.Add(replica);
+        }
+        else if (replica.SourceVersion >= m.SourceVersion)
+        {
+            return false; // event cũ hơn bản đang có (đến trễ / gửi lại)
+        }
+
+        replica.Code = m.Code;
+        replica.Name = m.Name;
+        replica.Subdomain = m.Subdomain;
+        replica.TimeZone = m.TimeZone;
+        replica.Status = m.Status.ToString();
+        replica.SourceVersion = m.SourceVersion;
+        replica.SyncedAt = now;
+        return true;
+    }
+
+    /// <summary>Ghi tập license vào bản sao nếu mới hơn bản đang có. false = bỏ qua. Chưa SaveChanges.</summary>
+    public static async Task<bool> ApplyLicensesAsync(DbContext db, ModuleLicenseChanged m, DateTimeOffset now, CancellationToken ct)
+    {
+        var replica = await db.Set<TenantReplicaRecord>().Include(t => t.Modules).FirstOrDefaultAsync(t => t.TenantId == m.TenantId, ct);
         if (replica is null)
         {
             replica = new TenantReplicaRecord { TenantId = m.TenantId };
@@ -120,20 +137,14 @@ public sealed class ModuleLicenseChangedConsumer<TDbContext>(TDbContext db, Time
         }
         else if (replica.LicenseVersion >= m.SourceVersion)
         {
-            return;
+            return false;
         }
 
-        ReplicaWriter.ReplaceModules(replica, m.Modules);
+        ReplaceModules(replica, m.Modules);
         replica.LicenseVersion = m.SourceVersion;
-        replica.SyncedAt = clock.GetUtcNow();
-        await db.SaveChangesAsync(context.CancellationToken);
-        await ReplicaWriter.InvalidateAsync(cache, m.TenantId, context.CancellationToken);
+        replica.SyncedAt = now;
+        return true;
     }
-}
-
-internal static class ReplicaWriter
-{
-    public static string CacheTag(long tenantId) => $"tenant-replica:{tenantId}";
 
     /// <summary>Thay tập module bằng cập nhật tại chỗ — xoá rồi thêm cùng khoá (TenantId, ModuleCode) sẽ trùng entity đang theo dõi.</summary>
     public static void ReplaceModules(TenantReplicaRecord replica, IEnumerable<ModuleLicense> modules)

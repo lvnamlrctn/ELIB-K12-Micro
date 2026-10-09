@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.Catalog.Application\Elib.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Persistence\Elib.BuildingBlocks.Persistence.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Messaging\Elib.BuildingBlocks.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Hosting\Elib.BuildingBlocks.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.TenantReplica\Elib.BuildingBlocks.TenantReplica.csproj" />
+  </ItemGroup>
+</Project>

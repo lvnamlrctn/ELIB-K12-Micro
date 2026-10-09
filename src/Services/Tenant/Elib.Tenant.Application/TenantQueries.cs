@@ -1,6 +1,8 @@
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Tenancy;
+using Elib.Contracts.Events;
+using Elib.Contracts.Events.Platform;
 using Elib.Tenant.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -84,6 +86,16 @@ public sealed class TenantQueries(ITenantDb db, ITenantContext tenantContext, Ti
         ".webp" => "image/webp",
         _ => "image/png",
     };
+
+    /// <summary>Mọi đơn vị (thông tin + license) dạng event — service mới triển khai dựng bản sao đơn vị từ đây.</summary>
+    public async Task<IReadOnlyList<TenantReplicaSnapshot>> ReplicaSnapshotsAsync(CancellationToken ct)
+    {
+        var tenants = await db.Tenants.AsNoTracking().OrderBy(t => t.Id).ToListAsync(ct);
+        var licenses = (await db.Licenses.IgnoreQueryFilters([ElibQueryFilters.Tenant]).AsNoTracking().ToListAsync(ct))
+            .ToLookup(l => l.TenantId);
+        return [.. tenants.Select(t => new TenantReplicaSnapshot(
+            EventFactory.Updated(t, EventActor.System), EventFactory.LicenseChanged(t, licenses[t.Id], EventActor.System)))];
+    }
 
     /// <summary>Ánh xạ host → đơn vị cho gateway. Chấp nhận "truong-a" hoặc "truong-a.thuvientn.vn".</summary>
     public async Task<TenantHostDto> ByHostAsync(string host, CancellationToken ct)

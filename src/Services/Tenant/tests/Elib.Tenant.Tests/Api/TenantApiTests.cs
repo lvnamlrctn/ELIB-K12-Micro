@@ -250,6 +250,22 @@ public sealed class TenantApiTests : IClassFixture<TenantApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Replica_snapshots_give_new_services_every_tenant_with_licenses()
+    {
+        var tenant = await CreateActiveAsync("CATALOG", "HOLDINGS");
+        var path = new Uri("/internal/tenants/replicas", UriKind.Relative);
+
+        var snapshots = await Read<List<TenantReplicaSnapshot>>(await _factory.CreateClient().WithClaims(TestClaims.Service).GetAsync(path));
+        var mine = Assert.Single(snapshots, s => s.Tenant.TenantId == tenant.Id);
+        Assert.Equal((tenant.Code, TenantStatus.Active), (mine.Tenant.Code, mine.Tenant.Status));
+        Assert.Equal(["CATALOG", "HOLDINGS"], mine.Licenses.Modules.Select(m => m.ModuleCode));
+        Assert.Equal(mine.Tenant.SourceVersion, mine.Licenses.SourceVersion);
+
+        // Chỉ service gọi trong cluster — cán bộ/quản trị nền tảng không đọc được.
+        Assert.Equal(HttpStatusCode.Forbidden, (await Admin().GetAsync(path)).StatusCode);
+    }
+
+    [Fact]
     public async Task Retry_after_failure_restarts_provisioning()
     {
         var tenant = await CreateAsync("SEARCH");

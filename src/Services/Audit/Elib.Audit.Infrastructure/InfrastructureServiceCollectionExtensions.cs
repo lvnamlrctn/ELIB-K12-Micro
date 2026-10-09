@@ -21,6 +21,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddElibPostgres<AuditDbContext>(connectionString);
         services.AddScoped<IAuditDb>(sp => sp.GetRequiredService<AuditDbContext>());
         services.AddTenantReplica<AuditDbContext>(ServiceName);
+        services.AddTenantReplicaBootstrap<AuditDbContext>(configuration);
         services.AddElibMessaging<AuditDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<AuditDbContext>();

@@ -7,6 +7,8 @@ export interface MenuItem {
   link?: string;
   /** Mã module quyền (USER, ORGS…) — hiện khi có quyền MODULE:view. */
   perm?: string;
+  /** Phân hệ license (CATALOG…) — nhóm chỉ hiện khi đơn vị đã mua. */
+  module?: string;
   children?: MenuItem[];
 }
 
@@ -78,6 +80,16 @@ export class Menu {
         ],
       },
       {
+        title: 'Biên mục',
+        icon: 'edit_note',
+        module: 'CATALOG',
+        children: [
+          { title: 'Biên mục biểu ghi', icon: 'menu_book', link: '/catalog-bibs', perm: 'CATALOG_BIBS' },
+          { title: 'Biểu mẫu biên mục', icon: 'list_alt', link: '/worksheets', perm: 'WORKSHEETS' },
+          { title: 'Loại biểu ghi', icon: 'category', link: '/bib-types', perm: 'BIB_TYPES' },
+        ],
+      },
+      {
         title: 'Phân hệ đã mua',
         icon: 'apps',
         children: modules.map((code) => ({ title: MODULE_NAMES[code] ?? code, icon: MODULE_ICONS[code] ?? 'extension', link: `/phan-he/${code}` })),
@@ -107,7 +119,9 @@ export class Menu {
 
   private filter(items: MenuItem[]): MenuItem[] {
     const out: MenuItem[] = [];
+    const modules = this.session.features()?.modules ?? [];
     for (const item of items) {
+      if (item.module && !modules.includes(item.module)) continue;
       if (item.children) {
         const kids = this.filter(item.children);
         if (kids.length) out.push({ ...item, children: kids });

@@ -46,6 +46,13 @@
     <Project Path="src/Services/Patron/Elib.Patron.Infrastructure/Elib.Patron.Infrastructure.csproj" />
     <Project Path="src/Services/Patron/tests/Elib.Patron.Tests/Elib.Patron.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Catalog/">
+    <Project Path="src/Services/Catalog/Elib.Catalog.Api/Elib.Catalog.Api.csproj" />
+    <Project Path="src/Services/Catalog/Elib.Catalog.Application/Elib.Catalog.Application.csproj" />
+    <Project Path="src/Services/Catalog/Elib.Catalog.Domain/Elib.Catalog.Domain.csproj" />
+    <Project Path="src/Services/Catalog/Elib.Catalog.Infrastructure/Elib.Catalog.Infrastructure.csproj" />
+    <Project Path="src/Services/Catalog/tests/Elib.Catalog.Tests/Elib.Catalog.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />

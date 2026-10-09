@@ -17,7 +17,9 @@ export interface CrudColumn {
 export interface CrudField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox';
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select';
+  /** Lựa chọn của ô 'select'. */
+  options?: { value: string | number; label: string }[];
   required?: boolean;
   placeholder?: string;
   hint?: string;
@@ -216,6 +218,11 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                   @case ('number') {
                     <input [id]="'f-' + f.key" [name]="f.key" type="number" step="any" class="input" [(ngModel)]="item[f.key]"
                            [placeholder]="f.placeholder ?? ''" [required]="!!f.required" [disabled]="locked(f, item)" />
+                  }
+                  @case ('select') {
+                    <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)">
+                      @for (o of f.options ?? []; track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                    </select>
                   }
                   @case ('status') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]">

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.Catalog.Domain\Elib.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Crud\Elib.BuildingBlocks.Crud.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.TenantReplica\Elib.BuildingBlocks.TenantReplica.csproj" />
+  </ItemGroup>
+</Project>

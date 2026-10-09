@@ -24,6 +24,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<INotificationDb>(sp => sp.GetRequiredService<NotificationDbContext>());
         services.AddCrudDbContext<NotificationDbContext>(ServiceName);
         services.AddTenantReplica<NotificationDbContext>(ServiceName);
+        services.AddTenantReplicaBootstrap<NotificationDbContext>(configuration);
         services.AddScoped<ITenantSeeder, NotificationTenantSeeder>();
         services.AddElibMessaging<NotificationDbContext>(ServiceName, configuration, x =>
         {
