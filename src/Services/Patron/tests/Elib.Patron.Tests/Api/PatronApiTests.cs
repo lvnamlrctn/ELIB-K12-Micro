@@ -226,6 +226,79 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Export_writes_selected_fields_with_catalog_names_and_reimports_into_another_tenant()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        var c = await AddNamed(staff, "classes", "9B");
+        await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("007", "Vũ", "Lan", Sex: 0, ClassId: c.Id,
+            BirthDate: new DateOnly(2012, 1, 20), IssueDate: new DateOnly(2026, 9, 1), ExpireDate: new DateOnly(2027, 8, 31))));
+        await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("008", null, "Tùng")));
+
+        var fields = await Read<IReadOnlyList<CrudExportField>>(await staff.GetAsync(U("/api/readers/GetExportFields")));
+        Assert.Contains(fields, f => f is { Code: "class", Name: "Lớp" });
+
+        var response = await staff.PostAsJsonAsync(U("/api/readers/Export"),
+            new ReaderExportRequest(new ReaderSearch { ClassId = c.Id }, ["cardno", "lastname", "firstname", "sex", "class", "birthdate", "issuedate", "expiredate"]), Json);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using (var workbook = new XLWorkbook(new MemoryStream(bytes)))
+        {
+            var sheet = workbook.Worksheet(1);
+            // Thứ tự cột theo khai báo, không theo thứ tự gửi lên.
+            Assert.Equal(["STT", "Số thẻ", "Họ đệm", "Tên", "Ngày sinh", "Giới tính", "Lớp", "Ngày cấp thẻ", "Ngày hết hạn"],
+                Enumerable.Range(1, 9).Select(i => sheet.Cell(1, i).GetString()));
+            Assert.Equal(["1", "007", "Vũ", "Lan", "20/01/2012", "Nữ", "9B"], Enumerable.Range(1, 7).Select(i => sheet.Cell(2, i).GetFormattedString()));
+            Assert.Equal(new DateTime(2012, 1, 20), sheet.Cell(2, 5).GetDateTime());
+            Assert.True(sheet.Cell(3, 2).IsEmpty(), "chỉ xuất bạn đọc lớp 9B");
+        }
+
+        Assert.Equal("EXPORT_FIELD_INVALID", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/Export"), new ReaderExportRequest(null, ["password"]), Json)));
+
+        // File xuất nhập lại được (đơn vị khác có lớp cùng tên): số thẻ giữ số 0 đầu, ngày và giới tính đọc đúng.
+        var other = Staff(Interlocked.Increment(ref _nextTenantId));
+        await AddNamed(other, "classes", "9B");
+        var form = new MultipartFormDataContent { { new ByteArrayContent(bytes), "file", "export.xlsx" } };
+        Assert.Equal(1, (await Read<CrudImportResult>(await other.PostAsync(U("/api/readers/Import"), form))).Imported);
+        var lan = Assert.Single((await Read<CrudPage<ReaderDto>>(await other.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch(), Json))).Items);
+        Assert.Equal(("007", "Vũ Lan", 0, new DateOnly(2012, 1, 20), new DateOnly(2027, 8, 31)),
+            (lan.CardNo, lan.FullName, lan.Sex, lan.BirthDate, lan.ExpireDate));
+    }
+
+    [Fact]
+    public async Task Photos_are_set_per_reader_and_in_bulk_by_card_number()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        var r1 = await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("PH-1", null, "Một")));
+        await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("PH-2", null, "Hai")));
+
+        var photo = Guid.NewGuid();
+        var set = await Read<ReaderDto>(await staff.PutAsJsonAsync(U($"/api/readers/Photo/{r1.PublicId}"), new ReaderPhotoRequest(photo), Json));
+        Assert.Equal(photo, set.PhotoId);
+        var before = _factory.PublishedOf<ReaderChanged>().Count(e => e.ReaderPublicId == r1.PublicId);
+
+        var (p1, p2) = (Guid.NewGuid(), Guid.NewGuid());
+        var result = await Read<ReaderPhotosResult>(await staff.PostAsJsonAsync(U("/api/readers/Photos"),
+            new ReaderPhotosRequest([new(" ph-1 ", p1), new("PH-2", p2), new("PH-404", Guid.NewGuid())]), Json));
+        Assert.Equal(2, result.Matched);
+        Assert.Equal(["PH-404"], result.NotFound);
+
+        var page = await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { Keyword = "PH-" }, Json));
+        Assert.Equal(["PH-1", "PH-2"], page.Items.OrderBy(r => r.CardNo).Select(r => r.CardNo));
+        Assert.Equal([p1, p2], page.Items.OrderBy(r => r.CardNo).Select(r => r.PhotoId!.Value));
+        Assert.Equal(before, _factory.PublishedOf<ReaderChanged>().Count(e => e.ReaderPublicId == r1.PublicId)); // ảnh không phát ReaderChanged
+
+        // Đơn vị khác không gán được ảnh cho bạn đọc của đơn vị này.
+        var other = Staff(Interlocked.Increment(ref _nextTenantId));
+        var foreign = await Read<ReaderPhotosResult>(await other.PostAsJsonAsync(U("/api/readers/Photos"), new ReaderPhotosRequest([new("PH-1", Guid.NewGuid())]), Json));
+        Assert.Equal(0, foreign.Matched);
+
+        var cleared = await Read<ReaderDto>(await staff.PutAsJsonAsync(U($"/api/readers/Photo/{r1.PublicId}"), new ReaderPhotoRequest(null), Json));
+        Assert.Null(cleared.PhotoId);
+    }
+
+    [Fact]
     public async Task Permissions_follow_monolith_module_codes()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

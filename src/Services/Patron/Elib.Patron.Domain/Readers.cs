@@ -93,6 +93,9 @@ public sealed partial class Reader : TenantEntity, IHasStatus
     public string? LockReason { get; private set; }
     public long Version { get; private set; }
 
+    /// <summary>Ảnh thẻ (monolith: Reader.Photo) — id file ở service media (mục đích reader-photo, bucket riêng tư).</summary>
+    public Guid? PhotoId { get; private set; }
+
     /// <summary>"Họ đệm Tên" như monolith (LastName + FirstName).</summary>
     public string FullName => string.IsNullOrWhiteSpace(LastName) ? FirstName : $"{LastName} {FirstName}";
 
@@ -125,6 +128,9 @@ public sealed partial class Reader : TenantEntity, IHasStatus
     }
 
     public void Unlock() => ChangeStatus(IHasStatus.Active);
+
+    /// <summary>Đổi/xoá ảnh thẻ. Không tăng <see cref="Version"/>: ảnh không nằm trong bản sao bạn đọc ở service khác.</summary>
+    public void SetPhoto(Guid? photoId) => PhotoId = photoId == Guid.Empty ? null : photoId;
 
     /// <summary>Sửa hàng loạt (monolith: BulkUpdate/BatchUpdate) — chỉ các trường được gửi.</summary>
     public void ApplyBulk(long? readerTypeId, long? classId, long? courseId, DateOnly? issueDate, DateOnly? expireDate)

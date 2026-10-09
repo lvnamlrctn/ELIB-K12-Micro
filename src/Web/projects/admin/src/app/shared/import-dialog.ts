@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, ImportClient, ImportError, ImportResult, errorMessage } from '../core/api';
+import { Api, ImportClient, ImportError, ImportResult, errorMessage, saveFile } from '../core/api';
 import { ToastrService } from './toastr';
 import { Modal } from './ui';
 
@@ -85,13 +85,7 @@ export class ImportDialog implements OnInit {
 
   protected async downloadTemplate(): Promise<void> {
     try {
-      const blob = await this.client.template();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Mau nhap ${this.title()}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      saveFile(await this.client.template(), `Mau nhap ${this.title()}.xlsx`);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     }

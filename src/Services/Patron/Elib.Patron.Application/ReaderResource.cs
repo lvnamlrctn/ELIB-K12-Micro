@@ -43,7 +43,7 @@ public sealed record ReaderDto(
     long Id, Guid PublicId, string CardNo, string? LastName, string FirstName, string FullName, string? CitizenId, string? CardUid,
     string? Email, string? Phone, string? Address, DateOnly? BirthDate, int? Sex, long? ReaderTypeId, long? ClassId, long? CourseId,
     long? OrgId, long? DegreeId, long? EthnicityId, long? AcademicTitleId, DateOnly? IssueDate, DateOnly? ExpireDate,
-    int Status, string? LockReason, DateTimeOffset CreatedAt);
+    int Status, string? LockReason, DateTimeOffset CreatedAt, Guid? PhotoId);
 
 public sealed record LockReaderRequest(string? Reason);
 
@@ -53,6 +53,20 @@ public sealed record ReaderBulkUpdateRequest(
     DateOnly? IssueDate = null, DateOnly? ExpireDate = null, int? Status = null);
 
 public sealed record CardNoCheck(bool Exists);
+
+/// <summary>Ảnh thẻ: id file đã upload xong ở media (mục đích reader-photo); null = xoá ảnh.</summary>
+public sealed record ReaderPhotoRequest(Guid? FileId);
+
+/// <summary>Gán ảnh hàng loạt theo số thẻ (monolith: UploadPhotosZip — app Admin giải nén, upload từng ảnh lên media rồi gửi danh sách).</summary>
+public sealed record ReaderPhotoAssignment(string CardNo, Guid FileId);
+
+public sealed record ReaderPhotosRequest(IReadOnlyList<ReaderPhotoAssignment> Items);
+
+/// <summary>matched: số bạn đọc đã đổi ảnh; notFound: số thẻ không có trong đơn vị.</summary>
+public sealed record ReaderPhotosResult(int Matched, IReadOnlyList<string> NotFound);
+
+/// <summary>Xuất Excel (monolith: Reader/Export) — điều kiện lọc như màn danh sách, Fields rỗng = mọi trường.</summary>
+public sealed record ReaderExportRequest(ReaderSearch? Search, IReadOnlyList<string>? Fields);
 
 /// <summary>
 /// Bạn đọc (monolith: ReaderController). Ngoài 8 endpoint chuẩn: Lock/Unlock, CheckExist, BulkUpdate, ImportTemplate/Import.
@@ -71,7 +85,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         x.Id, x.PublicId, x.CardNo, x.LastName, x.FirstName,
         x.LastName == null || x.LastName == "" ? x.FirstName : x.LastName + " " + x.FirstName,
         x.CitizenId, x.CardUid, x.Email, x.Phone, x.Address, x.BirthDate, x.Sex, x.ReaderTypeId, x.ClassId, x.CourseId,
-        x.OrgId, x.DegreeId, x.EthnicityId, x.AcademicTitleId, x.IssueDate, x.ExpireDate, x.Status, x.LockReason, x.CreatedAt);
+        x.OrgId, x.DegreeId, x.EthnicityId, x.AcademicTitleId, x.IssueDate, x.ExpireDate, x.Status, x.LockReason, x.CreatedAt, x.PhotoId);
 
     protected override Reader Create(ReaderRequest request)
     {
@@ -181,6 +195,86 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         return readers.Count;
     }
 
+    public async Task<ReaderDto> SetPhotoAsync(Guid publicId, Guid? fileId, CancellationToken ct)
+    {
+        var reader = await LoadAsync(publicId, ct);
+        reader.SetPhoto(fileId);
+        await AuditAsync(reader, CrudChange.Updated, ct);
+        await Db.SaveChangesAsync(ct);
+        return ToDto(reader);
+    }
+
+    /// <summary>Số thẻ so khớp như khi lưu (in hoa, bỏ khoảng trắng); số thẻ lặp trong danh sách thì ảnh sau thắng.</summary>
+    public async Task<ReaderPhotosResult> SetPhotosAsync(ReaderPhotosRequest request, CancellationToken ct)
+    {
+        if (request.Items.Count is 0 or > MaxBulk)
+            throw new BusinessRuleException("READER_BULK_SIZE", $"Mỗi lần gán từ 1 đến {MaxBulk} ảnh.");
+        var byCard = new Dictionary<string, Guid>();
+        var notFound = new List<string>();
+        foreach (var item in request.Items)
+        {
+            var card = (item.CardNo ?? "").Trim().ToUpperInvariant();
+            if (card.Length is 0 or > 50 || item.FileId == Guid.Empty) notFound.Add(item.CardNo ?? "");
+            else byCard[card] = item.FileId;
+        }
+
+        var cards = byCard.Keys.ToList();
+        var readers = await Set.Where(x => cards.Contains(x.CardNo)).ToListAsync(ct);
+        foreach (var reader in readers) reader.SetPhoto(byCard[reader.CardNo]);
+        notFound.AddRange(cards.Except(readers.Select(r => r.CardNo)));
+        if (AuditSink is not null && readers.Count > 0)
+            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Reader), EntityName, Guid.Empty, CrudChange.Updated,
+                $"cập nhật ảnh {readers.Count} bạn đọc"), ct);
+        await Db.SaveChangesAsync(ct);
+        return new ReaderPhotosResult(readers.Count, notFound);
+    }
+
+    // ── Xuất Excel (monolith: GetExportFields / Export) — tiêu đề cột trùng file nhập nên file xuất nhập lại được ──
+
+    private static readonly IReadOnlyList<CrudExportColumn<ReaderExportRow>> ExportColumns =
+    [
+        new("cardno", "Số thẻ", r => r.Reader.CardNo),
+        new("lastname", "Họ đệm", r => r.Reader.LastName),
+        new("firstname", "Tên", r => r.Reader.FirstName),
+        new("birthdate", "Ngày sinh", r => r.Reader.BirthDate),
+        new("sex", "Giới tính", r => r.Reader.Sex switch { Sex.Male => "Nam", Sex.Female => "Nữ", _ => null }),
+        new("readertype", "Loại bạn đọc", r => r.ReaderType),
+        new("class", "Lớp", r => r.Class),
+        new("course", "Khoá", r => r.Course),
+        new("email", "Email", r => r.Reader.Email),
+        new("phone", "Điện thoại", r => r.Reader.Phone),
+        new("address", "Địa chỉ", r => r.Reader.Address),
+        new("citizenid", "Số CCCD", r => r.Reader.CitizenId),
+        new("carduid", "UID thẻ", r => r.Reader.CardUid),
+        new("issuedate", "Ngày cấp thẻ", r => r.Reader.IssueDate),
+        new("expiredate", "Ngày hết hạn", r => r.Reader.ExpireDate),
+        new("status", "Trạng thái", r => r.Reader.Status == IHasStatus.Active ? "Hoạt động" : "Khoá"),
+        new("lockreason", "Lý do khoá", r => r.Reader.LockReason),
+    ];
+
+    public static IReadOnlyList<CrudExportField> ExportFields => [.. ExportColumns.Select(c => new CrudExportField(c.Key, c.Header))];
+
+    public async Task<byte[]> ExportAsync(ReaderExportRequest request, CancellationToken ct)
+    {
+        var columns = CrudExcel.Select(ExportColumns, request.Fields?.ToList());
+        var query = Query(request.Search ?? new ReaderSearch());
+        if (await query.CountAsync(ct) > CrudExcel.MaxExportRows)
+            throw new BusinessRuleException("EXPORT_TOO_MANY_ROWS", $"Mỗi lần xuất tối đa {CrudExcel.MaxExportRows} bạn đọc — lọc thêm theo lớp, khoá… rồi xuất từng phần.");
+        var readers = await query.ToListAsync(ct);
+        var types = await NamesAsync<ReaderType>(ct);
+        var classes = await NamesAsync<SchoolClass>(ct);
+        var courses = await NamesAsync<Course>(ct);
+        return CrudExcel.Export("Bạn đọc", columns, readers.Select(r => new ReaderExportRow(r,
+            Name(types, r.ReaderTypeId), Name(classes, r.ClassId), Name(courses, r.CourseId))));
+    }
+
+    private sealed record ReaderExportRow(Reader Reader, string? ReaderType, string? Class, string? Course);
+
+    private async Task<Dictionary<long, string>> NamesAsync<T>(CancellationToken ct) where T : NamedCatalogItem =>
+        await Db.Set<T>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+
+    private static string? Name(Dictionary<long, string> names, long? id) => id is { } v ? names.GetValueOrDefault(v) : null;
+
     // ── Nhập Excel (monolith: Reader/Import — bố cục cột cố định; ghép cột tuỳ chọn để sau) ──
 
     public IReadOnlyList<CrudImportColumn> ImportColumns =>
@@ -198,6 +292,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         new("phone", "Điện thoại", false, null, "Phone", "So dien thoai"),
         new("address", "Địa chỉ", false, null, "Address"),
         new("citizenid", "Số CCCD", false, null, "CitizenId", "CCCD"),
+        new("carduid", "UID thẻ", false, "Mã chip/RFID của thẻ; không trùng.", "CardUid", "UID"),
         new("issuedate", "Ngày cấp thẻ", false, "Bỏ trống = hôm nay.", "IssueDate", "Ngay cap"),
         new("expiredate", "Ngày hết hạn", false, "Bỏ trống = 1 năm sau ngày cấp.", "ExpireDate", "Han the"),
     ];
@@ -214,7 +309,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         return new ReaderRequest(
             row.Required("cardno", "Số thẻ"), lastName,
             firstName ?? throw new BusinessRuleException("IMPORT_VALUE_REQUIRED", "Thiếu Tên (hoặc Họ và tên)."),
-            CitizenId: row.Get("citizenid"), Email: row.Get("email"), Phone: row.Get("phone"), Address: row.Get("address"),
+            CitizenId: row.Get("citizenid"), CardUid: row.Get("carduid"), Email: row.Get("email"), Phone: row.Get("phone"), Address: row.Get("address"),
             BirthDate: row.Date("birthdate", "Ngày sinh"), Sex: ParseSex(row.Get("sex")),
             IssueDate: issue, ExpireDate: row.Date("expiredate", "Ngày hết hạn") ?? issue.AddYears(1),
             ReaderTypeName: row.Get("readertype"), ClassName: row.Get("class"), CourseName: row.Get("course"));

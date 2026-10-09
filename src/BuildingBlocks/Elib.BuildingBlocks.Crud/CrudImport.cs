@@ -61,7 +61,7 @@ public sealed record CrudImportResult(int Imported, int Skipped, IReadOnlyList<C
 }
 
 /// <summary>Đọc/ghi file .xlsx cho import — không phụ thuộc DB, test được riêng.</summary>
-public static class CrudExcel
+public static partial class CrudExcel
 {
     public const string ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 

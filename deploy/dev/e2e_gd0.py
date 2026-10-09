@@ -18,7 +18,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      logo đơn vị trên bucket công khai + manifest.json (phần logo cần mật khẩu sysadmin).
  13. nhập danh mục từ Excel: file mẫu, file có dòng trùng bị từ chối cả file (báo số dòng), bỏ qua dòng trùng, nhật ký IMPORT.
  14. OPAC ở gốc host đơn vị; host hệ thống "/" → app Admin.
- 15. bạn đọc (patron): danh mục, thêm, trùng số thẻ, tìm, khoá/mở thẻ, sửa hàng loạt, nhập Excel, nhật ký.
+ 15. bạn đọc (patron): danh mục, thêm, trùng số thẻ, tìm, khoá/mở thẻ, sửa hàng loạt, nhập Excel, nhật ký,
+     ảnh thẻ (media, riêng tư) + gán ảnh theo số thẻ, xuất Excel theo bộ lọc.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -568,6 +569,32 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(len(mine) == 3 and mai.get("lastName") == "Trần Thị" and mai.get("classId") == cls["id"], "dòng nhập có đủ họ tên tách đúng, lớp theo tên")
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "CHANGE_STATUS", card)
     step("nhật ký có khoá/mở thẻ bạn đọc (patron → audit)")
+
+    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==")
+    s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,
+                            json_body={"purpose": "reader-photo", "fileName": f"{card}.png", "contentType": "image/png", "size": len(png)})
+    photo = json.loads(body) if s == 200 else {}
+    tb.request("PUT", photo.get("uploadUrl", "/s3/none"), raw=(png, "image/png"))
+    s, _, body = tb.request("POST", f"/api/admin/media/files/{photo.get('fileId')}/complete", token=token)
+    expect(s == 200 and json.loads(body)["url"] is None, "upload ảnh thẻ (bucket riêng tư, không có URL công khai)", body)
+    s, _, body = tb.request("PUT", f"{P}/readers/Photo/{reader['publicId']}", token=token, json_body={"fileId": photo["fileId"]})
+    expect(s == 200 and json.loads(body)["photoId"] == photo["fileId"], "gắn ảnh thẻ cho bạn đọc", body)
+    s, _, body = tb.request("GET", f"/api/admin/media/files/{photo['fileId']}/download", token=token)
+    s, _, content = Browser(GATEWAY, host=host, proto="https").request("GET", json.loads(body)["url"], binary=True) if s == 200 else (s, {}, b"")
+    expect(s == 200 and content == png, "xem ảnh thẻ qua URL ký có hạn", f"{s}")
+    s, _, body = tb.request("POST", f"{P}/readers/Photos", token=token,
+                            json_body={"items": [{"cardNo": f"{card}-2".lower(), "fileId": photo["fileId"]}, {"cardNo": "KHONG-CO-" + tag, "fileId": photo["fileId"]}]})
+    res = json.loads(body) if s == 200 else {}
+    expect(res.get("matched") == 1 and res.get("notFound") == ["KHONG-CO-" + tag], f"gán ảnh hàng loạt theo số thẻ: {res}", body)
+
+    s, h, content = tb.request("POST", f"{P}/readers/Export", token=token, binary=True,
+                               json_body={"search": {"keyword": card}, "fields": ["cardno", "lastname", "firstname", "class"]})
+    strings = ""
+    if s == 200 and content[:2] == b"PK":
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            strings = z.read("xl/sharedStrings.xml").decode("utf-8")
+    expect(all(x in strings for x in (f"{card}-2", "Trần Thị", "E2E-6A", "Số thẻ")) and "Ngày sinh" not in strings,
+           f"xuất Excel theo bộ lọc, chỉ các cột đã chọn ({len(content)} byte)", f"{s} {h.get('Content-Type')}")
     for r in mine:  # dọn bạn đọc thử
         tb.request("DELETE", f"{P}/readers/Delete/{r['publicId']}", token=token)
     s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": card})

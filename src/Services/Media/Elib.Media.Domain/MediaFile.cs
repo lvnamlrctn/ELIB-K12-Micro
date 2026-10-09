@@ -29,7 +29,11 @@ public sealed record MediaPurpose(string Code, string Name, bool Public, IReadOn
     public static readonly MediaPurpose Attachment =
         new("attachment", "Tệp đính kèm", Public: false, ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"], 20 * MB, SystemOnly: false);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment];
+    /// <summary>Ảnh thẻ bạn đọc — phần lớn là học sinh nên để riêng tư, chỉ xem qua URL ký có hạn.</summary>
+    public static readonly MediaPurpose ReaderPhoto =
+        new("reader-photo", "Ảnh bạn đọc", Public: false, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
+
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))

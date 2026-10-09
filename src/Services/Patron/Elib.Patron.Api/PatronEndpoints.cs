@@ -26,6 +26,13 @@ public static class PatronEndpoints
             => r.UnlockAsync(publicId, ct));
         readers.MapPut("/BulkUpdate", [Permission("READERS", "edit")] async (ReaderBulkUpdateRequest request, ReaderResource r, CancellationToken ct)
             => Results.Ok(new { updatedCount = await r.BulkUpdateAsync(request, ct) }));
+        readers.MapPut("/Photo/{publicId:guid}", [Permission("READERS", "edit")] (Guid publicId, ReaderPhotoRequest request, ReaderResource r, CancellationToken ct)
+            => r.SetPhotoAsync(publicId, request.FileId, ct));
+        readers.MapPost("/Photos", [Permission("READERS", "edit")] (ReaderPhotosRequest request, ReaderResource r, CancellationToken ct)
+            => r.SetPhotosAsync(request, ct));
+        readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
+        readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
+            => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));
         return app;
     }
 }

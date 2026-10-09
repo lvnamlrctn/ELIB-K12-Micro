@@ -6,8 +6,9 @@ import { Session } from '../../core/session';
 import { ImportDialog } from '../../shared/import-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
+import { ReaderExport, ReaderPhotos } from './reader-tools';
 
-type ReaderForm = Omit<Reader, 'id' | 'publicId' | 'fullName' | 'status' | 'lockReason' | 'createdAt'> & { publicId: string | null };
+type ReaderForm = Omit<Reader, 'id' | 'publicId' | 'fullName' | 'status' | 'lockReason' | 'createdAt' | 'photoId'> & { publicId: string | null };
 
 const BLANK: ReaderForm = {
   publicId: null, cardNo: '', lastName: '', firstName: '', citizenId: null, cardUid: null, email: null, phone: null, address: null,
@@ -15,10 +16,10 @@ const BLANK: ReaderForm = {
   academicTitleId: null, issueDate: null, expireDate: null,
 };
 
-/** Bạn đọc (monolith: pages/admin/reader) — tìm theo bộ lọc, thêm/sửa, khoá/mở thẻ, sửa hàng loạt, nhập Excel. */
+/** Bạn đọc (monolith: pages/admin/reader) — tìm theo bộ lọc, thêm/sửa, ảnh thẻ, khoá/mở thẻ, sửa hàng loạt, nhập/xuất Excel. */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, DatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ImportDialog],
+  imports: [FormsModule, DatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ImportDialog, ReaderExport, ReaderPhotos],
   template: `
     <div class="mb-5"><h4 class="page-title">Bạn đọc</h4></div>
 
@@ -70,7 +71,9 @@ const BLANK: ReaderForm = {
           <button (click)="openForm(null)" class="btn-add"><span class="material-icons text-[18px]">add</span> Thêm bạn đọc</button>
           <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> Nhập Excel</button>
         }
+        <button (click)="exporting.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">download</span> Xuất Excel</button>
         @if (can('edit')) {
+          <button (click)="uploadingPhotos.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">photo_library</span> Tải ảnh hàng loạt</button>
           <button (click)="openBulk()" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
             <span class="material-icons text-[18px]">tune</span> Sửa hàng loạt ({{ selected().size }})
           </button>
@@ -142,6 +145,28 @@ const BLANK: ReaderForm = {
 
     @if (form(); as f) {
       <app-modal [title]="f.publicId ? 'Cập nhật bạn đọc' : 'Thêm bạn đọc'" widthClass="max-w-3xl" (closed)="form.set(null)">
+        @if (photo(); as ph) {
+          <div class="flex items-center gap-4 mb-5 pb-5 border-b border-gray-100">
+            <div class="w-24 h-32 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+              @if (ph.url) { <img [src]="ph.url" alt="Ảnh thẻ" class="w-full h-full object-cover" /> }
+              @else { <span class="material-icons text-gray-300 text-[48px]">person</span> }
+            </div>
+            <div class="text-sm text-gray-600 space-y-2">
+              <div class="font-medium text-gray-800">Ảnh thẻ</div>
+              <div class="flex gap-2">
+                <label class="btn-secondary !py-1.5 !px-3 cursor-pointer" [class.opacity-50]="photoBusy()">
+                  <span class="material-icons text-[18px]">{{ photoBusy() ? 'autorenew' : 'photo_camera' }}</span> {{ ph.photoId ? 'Đổi ảnh' : 'Chọn ảnh' }}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" [disabled]="photoBusy()" (change)="changePhoto($event)" />
+                </label>
+                @if (ph.photoId) {
+                  <button type="button" class="btn-secondary !py-1.5 !px-3 !text-red-600" [disabled]="photoBusy()" (click)="setPhoto(null)">
+                    <span class="material-icons text-[18px]">delete</span> Xoá ảnh</button>
+                }
+              </div>
+              <p class="text-xs text-gray-500">JPG, PNG, WEBP, tối đa 2 MB. Ảnh được lưu ngay, không cần bấm Cập nhật.</p>
+            </div>
+          </div>
+        }
         <form id="reader-form" (ngSubmit)="save(f)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label class="form-label" for="r-card">Số thẻ <span class="text-red-500">*</span></label>
             <input id="r-card" name="card" class="input font-mono uppercase" [(ngModel)]="f.cardNo" required (blur)="checkCard(f)" />
@@ -221,6 +246,14 @@ const BLANK: ReaderForm = {
       <app-confirm-delete [busy]="saving()" [message]="'Xoá bạn đọc ' + r.cardNo + ' — ' + r.fullName + '?'" (confirmed)="remove(r)" (cancelled)="deleting.set(null)" />
     }
 
+    @if (exporting()) {
+      <app-reader-export [search]="search" [total]="page()?.totalCount ?? 0" (closed)="exporting.set(false)" />
+    }
+
+    @if (uploadingPhotos()) {
+      <app-reader-photos (closed)="uploadingPhotos.set(false)" (uploaded)="load()" />
+    }
+
     @if (importing()) {
       <app-import-dialog title="Bạn đọc" resource="readers" service="patron" (closed)="importing.set(false)" (imported)="find()" />
     }
@@ -246,6 +279,11 @@ export class Readers implements OnInit {
   protected readonly locking = signal<Reader | null>(null);
   protected readonly deleting = signal<Reader | null>(null);
   protected readonly importing = signal(false);
+  protected readonly exporting = signal(false);
+  protected readonly uploadingPhotos = signal(false);
+  /** Ảnh thẻ của bạn đọc đang sửa (url: link ký có hạn từ media). */
+  protected readonly photo = signal<{ publicId: string; photoId: string | null; url: string | null } | null>(null);
+  protected readonly photoBusy = signal(false);
   protected readonly bulk = signal<{ readerTypeId: number | null; classId: number | null; courseId: number | null; status: number | null; issueDate: string | null; expireDate: string | null } | null>(null);
   protected lockReason = '';
 
@@ -307,13 +345,15 @@ export class Readers implements OnInit {
 
   protected openForm(r: Reader | null): void {
     this.cardTaken.set(false);
+    this.photo.set(r ? { publicId: r.publicId, photoId: r.photoId, url: null } : null);
+    if (r?.photoId) void this.showPhoto(r.publicId, r.photoId);
     if (!r) {
       const today = new Date();
       const nextYear = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
       this.form.set({ ...BLANK, issueDate: iso(today), expireDate: iso(nextYear) });
       return;
     }
-    const { id: _id, fullName: _fn, status: _s, lockReason: _l, createdAt: _c, ...rest } = r;
+    const { id: _id, fullName: _fn, status: _s, lockReason: _l, createdAt: _c, photoId: _ph, ...rest } = r;
     this.form.set({ ...rest });
   }
 
@@ -344,6 +384,53 @@ export class Readers implements OnInit {
       this.toastr.error(errorMessage(e));
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  protected async changePhoto(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      this.toastr.warning('Ảnh tối đa 2 MB.');
+      return;
+    }
+    this.photoBusy.set(true);
+    try {
+      const uploaded = await this.api.upload('reader-photo', file);
+      await this.setPhoto(uploaded.id);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.photoBusy.set(false);
+    }
+  }
+
+  protected async setPhoto(fileId: string | null): Promise<void> {
+    const current = this.photo();
+    if (!current) return;
+    this.photoBusy.set(true);
+    try {
+      const reader = await this.api.setReaderPhoto(current.publicId, fileId);
+      this.photo.set({ publicId: reader.publicId, photoId: reader.photoId, url: null });
+      if (reader.photoId) await this.showPhoto(reader.publicId, reader.photoId);
+      this.toastr.success(fileId ? 'Đã cập nhật ảnh thẻ.' : 'Đã xoá ảnh thẻ.');
+      void this.load();
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.photoBusy.set(false);
+    }
+  }
+
+  private async showPhoto(publicId: string, photoId: string): Promise<void> {
+    try {
+      const url = await this.api.fileUrl(photoId);
+      // Người dùng có thể đã mở bạn đọc khác trong lúc chờ.
+      if (this.photo()?.publicId === publicId) this.photo.set({ publicId, photoId, url });
+    } catch {
+      /* ảnh không còn ở media — giữ khung trống */
     }
   }
 
@@ -385,7 +472,7 @@ export class Readers implements OnInit {
     }
   }
 
-  private async load(): Promise<void> {
+  protected async load(): Promise<void> {
     this.loading.set(true);
     try {
       this.page.set(await this.client.search({ ...this.search, keyword: this.search.keyword?.trim() || undefined }) as unknown as CrudPage<Reader>);

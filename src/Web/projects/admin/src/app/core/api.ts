@@ -35,7 +35,11 @@ export interface Reader {
   birthDate: string | null; sex: number | null; readerTypeId: number | null; classId: number | null; courseId: number | null;
   orgId: number | null; degreeId: number | null; ethnicityId: number | null; academicTitleId: number | null;
   issueDate: string | null; expireDate: string | null; status: number; lockReason: string | null; createdAt: string;
+  /** Ảnh thẻ: id file ở media (riêng tư) — xem qua fileUrl(). */
+  photoId: string | null;
 }
+export interface ExportField { code: string; name: string; }
+export interface ReaderPhotosResult { matched: number; notFound: string[]; }
 export interface ReaderSearch extends CrudSearch {
   readerTypeId?: number | null; classId?: number | null; courseId?: number | null; expired?: boolean | null;
 }
@@ -136,6 +140,30 @@ async function putToStorage(uploadUrl: string, file: File): Promise<void> {
   }
 }
 
+/** Lưu blob thành file tải về. */
+export function saveFile(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Yêu cầu trả file: lỗi problem+json đến dưới dạng Blob → đọc lại thành JSON để errorMessage() hiện đúng thông báo. */
+async function blobRequest(request: Promise<Blob>): Promise<Blob> {
+  try {
+    return await request;
+  } catch (e) {
+    if (e instanceof HttpErrorResponse && e.error instanceof Blob) {
+      let body: unknown = null;
+      try { body = JSON.parse(await e.error.text()); } catch { /* không phải JSON */ }
+      throw new HttpErrorResponse({ status: e.status, statusText: e.statusText, url: e.url ?? undefined, error: body });
+    }
+    throw e;
+  }
+}
+
 /** Thông báo lỗi tiếng Việt từ problem+json của service ({ code, detail, title }). */
 export function errorMessage(error: unknown): string {
   if (error instanceof HttpErrorResponse) {
@@ -207,6 +235,19 @@ export class Api {
     await putToStorage(ticket.uploadUrl, file);
     return this.post<MediaFile>(`/api/system/media/files/${tenantId}/${ticket.fileId}/complete`);
   }
+
+  /** Cán bộ đơn vị upload file: xin URL → PUT nội dung lên kho → media kiểm tra nội dung. */
+  async upload(purpose: string, file: File): Promise<MediaFile> {
+    const ticket = await this.post<UploadTicket>('/api/admin/media/files/uploads', {
+      purpose, fileName: file.name, contentType: file.type, size: file.size,
+    });
+    await putToStorage(ticket.uploadUrl, file);
+    return this.post<MediaFile>(`/api/admin/media/files/${ticket.fileId}/complete`);
+  }
+  /** URL xem file: cố định với file công khai, ký có hạn (vài phút) với file riêng tư. */
+  async fileUrl(fileId: string): Promise<string> {
+    return (await this.get<{ url: string }>(`/api/admin/media/files/${fileId}/download`)).url;
+  }
   retryProvisioning(publicId: string) { return this.post<Tenant>(`/api/system/tenant/tenants/${publicId}/provisioning/retry`); }
   createTenantAdmin(tenantId: number, body: { userName: string; fullName: string; email?: string | null; password: string }) {
     return this.post<User>(`/api/system/identity/tenants/${tenantId}/admins`, body);
@@ -224,6 +265,13 @@ export class Api {
   lockReader(publicId: string, reason: string | null) { return this.post<Reader>(`/api/admin/patron/readers/Lock/${publicId}`, { reason }); }
   unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
+  setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
+  /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */
+  assignReaderPhotos(items: { cardNo: string; fileId: string }[]) { return this.post<ReaderPhotosResult>('/api/admin/patron/readers/Photos', { items }); }
+  readerExportFields() { return this.get<ExportField[]>('/api/admin/patron/readers/GetExportFields'); }
+  exportReaders(search: ReaderSearch, fields: string[]) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/patron/readers/Export', { search, fields }, { responseType: 'blob' })));
+  }
   cardNoExists(cardNo: string, excludePublicId?: string) {
     return this.get<{ exists: boolean }>('/api/admin/patron/readers/CheckExist', { cardNo, excludePublicId });
   }
