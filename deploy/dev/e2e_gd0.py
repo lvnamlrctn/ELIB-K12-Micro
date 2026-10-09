@@ -18,6 +18,7 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      logo đơn vị trên bucket công khai + manifest.json (phần logo cần mật khẩu sysadmin).
  13. nhập danh mục từ Excel: file mẫu, file có dòng trùng bị từ chối cả file (báo số dòng), bỏ qua dòng trùng, nhật ký IMPORT.
  14. OPAC ở gốc host đơn vị; host hệ thống "/" → app Admin.
+ 15. bạn đọc (patron): danh mục, thêm, trùng số thẻ, tìm, khoá/mở thẻ, sửa hàng loạt, nhập Excel, nhật ký.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -528,6 +529,49 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(s == 200 and json.loads(body)["status"] == "Active", "OPAC đọc features ẩn danh", body)
     s, h, _ = sysb.request("GET", "/")
     expect(s == 302 and h.get("Location") == "/admin/", "host hệ thống: / → /admin/", f"{s}")
+
+    print("15. Bạn đọc (service patron)")
+    P = "/api/admin/patron"
+    def named(resource, name):
+        s, _, body = tb.request("POST", f"{P}/{resource}/SearchAll", token=token, json_body={"keyword": name})
+        found = next((x for x in json.loads(body) if x["name"] == name), None) if s == 200 else None
+        if found: return found
+        s, _, body = tb.request("POST", f"{P}/{resource}/Add", token=token, json_body={"name": name})
+        expect(s == 201, f"thêm {resource} '{name}'", body)
+        return json.loads(body)
+    rtype, cls = named("reader-types", "Học sinh"), named("classes", "E2E-6A")
+    tag = secrets.token_hex(3).upper()
+    card = f"E2E{tag}"
+    s, _, body = tb.request("POST", f"{P}/readers/Add", token=token, json_body={
+        "cardNo": card.lower(), "lastName": "Nguyễn Văn", "firstName": "Thử", "sex": 1, "birthDate": "2014-05-02",
+        "readerTypeId": rtype["id"], "classId": cls["id"], "issueDate": "2026-09-05", "expireDate": "2027-06-30"})
+    reader = json.loads(body) if s == 201 else {}
+    expect(s == 201 and reader.get("cardNo") == card and reader.get("fullName") == "Nguyễn Văn Thử", f"thêm bạn đọc {card}", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Add", token=token, json_body={"cardNo": card, "firstName": "Trùng"})
+    expect(s == 409 and "READER_CARDNO_EXISTS" in body, "số thẻ trùng bị từ chối", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": "văn thử", "classId": cls["id"]})
+    expect(s == 200 and any(r["cardNo"] == card for r in json.loads(body)["items"]), "tìm theo họ tên + lớp", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Lock/{reader['publicId']}", token=token, json_body={"reason": "E2E mất thẻ"})
+    expect(s == 200 and json.loads(body)["status"] == 1, "khoá thẻ", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Unlock/{reader['publicId']}", token=token)
+    expect(s == 200 and json.loads(body)["status"] == 2, "mở khoá thẻ", body)
+    s, _, body = tb.request("PUT", f"{P}/readers/BulkUpdate", token=token, json_body={"publicIds": [reader["publicId"]], "expireDate": "2028-06-30"})
+    expect(s == 200 and json.loads(body)["updatedCount"] == 1, "sửa hàng loạt hạn thẻ", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Import", token=token, raw=multipart("file", "bandoc.xlsx", xlsx([
+        ["Số thẻ", "Họ và tên", "Giới tính", "Loại bạn đọc", "Lớp"],
+        [f"{card}-2", "Trần Thị Mai", "Nữ", "học sinh", "E2E-6A"],
+        [f"{card}-3", "Lê Bình", "Nam", None, None]]), XLSX))
+    expect(s == 200 and json.loads(body)["imported"] == 2, f"nhập bạn đọc từ Excel: {json.loads(body).get('detail') if s in (200, 400) else s}", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": card, "pageSize": 10})
+    mine = json.loads(body)["items"] if s == 200 else []
+    mai = next((r for r in mine if r["cardNo"] == f"{card}-2"), {})
+    expect(len(mine) == 3 and mai.get("lastName") == "Trần Thị" and mai.get("classId") == cls["id"], "dòng nhập có đủ họ tên tách đúng, lớp theo tên")
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "CHANGE_STATUS", card)
+    step("nhật ký có khoá/mở thẻ bạn đọc (patron → audit)")
+    for r in mine:  # dọn bạn đọc thử
+        tb.request("DELETE", f"{P}/readers/Delete/{r['publicId']}", token=token)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": card})
+    expect(s == 200 and json.loads(body)["totalCount"] == 0, "đã dọn bạn đọc thử")
 
 
 if __name__ == "__main__":

@@ -111,23 +111,15 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options, I
             e.HasIndex(c => new { c.TenantId, c.Code }).IsUnique().HasFilter("is_deleted = false");
         });
 
-        NamedCatalog<Nationality>(modelBuilder, "nationalities", 150);
-        NamedCatalog<Ethnicity>(modelBuilder, "ethnicities", 250);
-        NamedCatalog<AcademicTitle>(modelBuilder, "academic_titles", 250);
-        NamedCatalog<Degree>(modelBuilder, "degrees", 150);
-        NamedCatalog<Position>(modelBuilder, "positions", 100);
+        modelBuilder.NamedCatalog<Nationality>("nationalities", 150);
+        modelBuilder.NamedCatalog<Ethnicity>("ethnicities", 250);
+        modelBuilder.NamedCatalog<AcademicTitle>("academic_titles", 250);
+        modelBuilder.NamedCatalog<Degree>("degrees", 150);
+        modelBuilder.NamedCatalog<Position>("positions", 100);
 
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
     }
-
-    private static void NamedCatalog<T>(ModelBuilder modelBuilder, string table, int maxName) where T : NamedCatalogItem =>
-        modelBuilder.Entity<T>(e =>
-        {
-            e.ToTable(table);
-            e.Property(x => x.Name).HasMaxLength(maxName);
-            e.HasIndex(x => new { x.TenantId, x.Name }).IsUnique().HasFilter("is_deleted = false");
-        });
 }
 
 /// <summary>Cho `dotnet ef migrations` — không kết nối DB khi chỉ sinh migration.</summary>

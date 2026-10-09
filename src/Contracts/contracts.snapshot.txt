@@ -8,6 +8,17 @@ type Elib.Contracts.Events.IntegrationEvent abstract
   EventId : System.Guid
   OccurredAt : System.DateTimeOffset
   TenantId : System.Int64 required
+type Elib.Contracts.Events.Patron.ReaderChanged class : Elib.Contracts.Events.IntegrationEvent
+  CardNo : System.String required
+  ClassId : Nullable<System.Int64>
+  CourseId : Nullable<System.Int64>
+  Deleted : System.Boolean
+  ExpireDate : Nullable<System.DateOnly>
+  FullName : System.String required
+  ReaderPublicId : System.Guid required
+  ReaderTypeId : Nullable<System.Int64>
+  Status : System.Int32
+  Version : System.Int64
 type Elib.Contracts.Events.Platform.AuditRecorded class : Elib.Contracts.Events.IntegrationEvent
   Action : System.String required
   ActorName : System.String?

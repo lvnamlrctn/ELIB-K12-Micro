@@ -1,10 +1,11 @@
 import { CrudConfig } from '../../shared/crud-page';
 
 /** Danh mục chỉ có tên — như các trang dùng app-base-entity của admin cũ (nationality.ts, chuc-vu.ts…). */
-function named(title: string, resource: string, perm: string, nameLabel: string, placeholder: string): CrudConfig {
+export function named(title: string, resource: string, perm: string, nameLabel: string, placeholder: string, service?: string): CrudConfig {
   return {
     title,
     resource,
+    service,
     perm,
     searchLabel: nameLabel,
     searchPlaceholder: placeholder,

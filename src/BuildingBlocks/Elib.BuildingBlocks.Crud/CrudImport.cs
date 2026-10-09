@@ -27,6 +27,15 @@ public sealed class CrudImportRow(int number, IReadOnlyDictionary<string, string
         : int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Cột \"{header}\" phải là số nguyên (đang là \"{text}\").");
+
+    /// <summary>Ô kiểu ngày của Excel (đọc thành yyyy-MM-dd) hoặc chữ dạng dd/MM/yyyy, d/M/yyyy, yyyy-MM-dd như người dùng gõ.</summary>
+    public DateOnly? Date(string key, string header) => Get(key) is not { } text
+        ? null
+        : DateOnly.TryParseExact(text, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var value)
+            ? value
+            : throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Cột \"{header}\" phải là ngày dạng dd/MM/yyyy (đang là \"{text}\").");
+
+    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "dd.MM.yyyy"];
 }
 
 /// <summary>Danh mục cho phép nhập từ Excel (thay action Import của từng controller monolith). Resource cài interface này thì có thêm 2 endpoint.</summary>
@@ -121,7 +130,7 @@ public static class CrudExcel
             var rows = new List<CrudImportRow>();
             for (var r = 2; r <= lastRow; r++)
             {
-                var values = positions.ToDictionary(p => p.Key, p => Clean(sheet.Cell(r, p.Value).GetFormattedString()));
+                var values = positions.ToDictionary(p => p.Key, p => Clean(CellText(sheet.Cell(r, p.Value))));
                 if (values.Values.All(v => v is null)) continue;
                 rows.Add(new CrudImportRow(r, values));
             }
@@ -132,6 +141,12 @@ public static class CrudExcel
 
     private static HashSet<string> Names(CrudImportColumn column) =>
         [.. new[] { column.Header, column.Key }.Concat(column.Aliases).Select(Normalize)];
+
+    /// <summary>Ô ngày → yyyy-MM-dd (không phụ thuộc định dạng hiển thị/locale của máy); ô khác → chữ như Excel hiển thị.</summary>
+    private static string CellText(IXLCell cell) =>
+        cell.DataType == XLDataType.DateTime
+            ? cell.GetDateTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : cell.GetFormattedString();
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 

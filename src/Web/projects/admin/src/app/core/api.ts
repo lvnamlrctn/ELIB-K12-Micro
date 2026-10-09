@@ -27,6 +27,23 @@ export interface Tenant extends TenantSummary {
   provisioningSteps: ProvisioningStep[]; licenses: License[]; logoUrl: string | null; logoText: string | null;
 }
 
+// ── Bạn đọc (service patron) ──
+/** Ngày dạng yyyy-MM-dd. status: 2 = hoạt động, 1 = bị khoá. sex: 1 = nam, 0 = nữ. */
+export interface Reader {
+  id: number; publicId: string; cardNo: string; lastName: string | null; firstName: string; fullName: string;
+  citizenId: string | null; cardUid: string | null; email: string | null; phone: string | null; address: string | null;
+  birthDate: string | null; sex: number | null; readerTypeId: number | null; classId: number | null; courseId: number | null;
+  orgId: number | null; degreeId: number | null; ethnicityId: number | null; academicTitleId: number | null;
+  issueDate: string | null; expireDate: string | null; status: number; lockReason: string | null; createdAt: string;
+}
+export interface ReaderSearch extends CrudSearch {
+  readerTypeId?: number | null; classId?: number | null; courseId?: number | null; expired?: boolean | null;
+}
+export interface ReaderBulkUpdate {
+  publicIds: string[]; readerTypeId?: number | null; classId?: number | null; courseId?: number | null;
+  issueDate?: string | null; expireDate?: string | null; status?: number | null;
+}
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -202,6 +219,14 @@ export class Api {
   // Danh mục của đơn vị (service tenant)
   crud<T extends { publicId: string }>(resource: string, service = 'tenant') { return new CrudClient<T>(this.http, `/api/admin/${service}/${resource}`); }
   importer(resource: string, service = 'tenant') { return new ImportClient(this.http, `/api/admin/${service}/${resource}`); }
+
+  // Bạn đọc (patron): 8 endpoint chuẩn qua crud('readers', 'patron') + khoá/mở thẻ, sửa hàng loạt
+  lockReader(publicId: string, reason: string | null) { return this.post<Reader>(`/api/admin/patron/readers/Lock/${publicId}`, { reason }); }
+  unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
+  bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
+  cardNoExists(cardNo: string, excludePublicId?: string) {
+    return this.get<{ exists: boolean }>('/api/admin/patron/readers/CheckExist', { cardNo, excludePublicId });
+  }
   orgTree(keyword?: string) { return this.post<OrgNode[]>('/api/admin/tenant/orgs/GetTree', { keyword }); }
   moveOrg(publicId: string, newParentId: number | null, newOrder: number) {
     return this.put<Org>(`/api/admin/tenant/orgs/Move/${publicId}`, { newParentId, newOrder });

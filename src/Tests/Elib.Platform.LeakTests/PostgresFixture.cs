@@ -4,6 +4,7 @@ using Elib.BuildingBlocks.Tenancy;
 using Elib.Identity.Infrastructure;
 using Elib.Media.Infrastructure;
 using Elib.Notification.Infrastructure;
+using Elib.Patron.Infrastructure;
 using Elib.Tenant.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -49,6 +50,8 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new AuditDbContext(Options<AuditDbContext>(cs, t), t)),
         new("media", "elib_leak_media", ["media_files"],
             (cs, t) => new MediaDbContext(Options<MediaDbContext>(cs, t), t)),
+        new("patron", "elib_leak_patron", ["readers", "reader_types", "classes", "courses", "reader_groups"],
+            (cs, t) => new PatronDbContext(Options<PatronDbContext>(cs, t), t)),
     ];
 
     public static ServiceDatabase Get(string service) => Services.Single(s => s.Service == service);

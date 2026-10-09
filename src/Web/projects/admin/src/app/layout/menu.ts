@@ -58,10 +58,15 @@ export class Menu {
         title: 'Quản lý bạn đọc',
         icon: 'people',
         children: [
+          { title: 'Bạn đọc', icon: 'people', link: '/readers', perm: 'READERS' },
+          { title: 'Nhóm bạn đọc', icon: 'groups', link: '/reader-groups', perm: 'GROUPREADER' },
           {
             title: 'Tham số bạn đọc',
             icon: 'tune',
             children: [
+              { title: 'Khoá', icon: 'school', link: '/courses', perm: 'COURSES' },
+              { title: 'Lớp', icon: 'class', link: '/academic-classes', perm: 'CLASSES' },
+              { title: 'Loại bạn đọc', icon: 'local_library', link: '/reader-types', perm: 'READER_TYPES' },
               { title: 'Quốc tịch', icon: 'flag', link: '/nationalities', perm: 'NATIONALITIES' },
               { title: 'Học hàm học vị', icon: 'workspace_premium', link: '/profs', perm: 'PROFS' },
               { title: 'Dân tộc', icon: 'diversity_3', link: '/ethnics', perm: 'ETHNICS' },

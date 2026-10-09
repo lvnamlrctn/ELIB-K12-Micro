@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -34,6 +34,7 @@ services:
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?chạy ./init-env.sh trước}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:?chạy ./init-env.sh trước}
       MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD:?chạy ./init-env.sh trước}
+      PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -62,6 +63,7 @@ services:
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
       AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD}
       MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD}
+      PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -144,6 +146,7 @@ services:
       Identity__Clients__svc-tenant__ClientSecret: ${SVC_TENANT_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-notification__ClientSecret: ${SVC_NOTIFICATION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-audit__ClientSecret: ${SVC_AUDIT_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-patron__ClientSecret: ${SVC_PATRON_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -179,6 +182,7 @@ services:
       # Provisioning chỉ chờ TenantSeeded từ các service đang chạy trong môi trường này.
       Provisioning__DeployedServices__0: identity
       Provisioning__DeployedServices__1: notification
+      Provisioning__DeployedServices__2: patron
 
   notification:
     build:
@@ -244,6 +248,25 @@ services:
       Storage__AccessKey: ${MINIO_ROOT_USER:-elib}
       Storage__SecretKey: ${MINIO_ROOT_PASSWORD}
 
+  # GĐ1: bạn đọc, loại bạn đọc, lớp, khoá, nhóm (phát ReaderChanged cho các service lưu thông/số…).
+  patron:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Patron/Elib.Patron.Api/Elib.Patron.Api.csproj
+        ASSEMBLY: Elib.Patron.Api
+    image: elib/patron:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__PatronDb: Host=postgres;Database=elib_patron;Username=patron_app;Password=${PATRON_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_PATRON_SECRET}
+
   admin-web:
     build:
       context: ../..
@@ -278,6 +301,7 @@ services:
       notification: { condition: service_started }
       audit: { condition: service_started }
       media: { condition: service_started }
+      patron: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

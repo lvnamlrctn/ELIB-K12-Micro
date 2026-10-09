@@ -39,6 +39,13 @@
   <Folder Name="/Tests/">
     <Project Path="src/Tests/Elib.Platform.LeakTests/Elib.Platform.LeakTests.csproj" />
   </Folder>
+  <Folder Name="/Services/Patron/">
+    <Project Path="src/Services/Patron/Elib.Patron.Api/Elib.Patron.Api.csproj" />
+    <Project Path="src/Services/Patron/Elib.Patron.Application/Elib.Patron.Application.csproj" />
+    <Project Path="src/Services/Patron/Elib.Patron.Domain/Elib.Patron.Domain.csproj" />
+    <Project Path="src/Services/Patron/Elib.Patron.Infrastructure/Elib.Patron.Infrastructure.csproj" />
+    <Project Path="src/Services/Patron/tests/Elib.Patron.Tests/Elib.Patron.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />

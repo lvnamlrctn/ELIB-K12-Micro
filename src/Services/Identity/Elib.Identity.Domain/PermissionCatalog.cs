@@ -21,12 +21,18 @@ public static class PermissionCatalog
     public const string Delete = "delete";
 
     private static readonly string[] Crud = [View, Add, Edit, Delete];
+    private const string ReaderGroup = "Quản lý bạn đọc";
     private const string ReaderParams = "Quản lý bạn đọc / Tham số bạn đọc";
     private const string SystemGroup = "Hệ thống";
     private const string NotifyGroup = "Hệ thống / Gửi thông báo";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
+        new("READERS", "Bạn đọc", ReaderGroup, Crud),
+        new("GROUPREADER", "Nhóm bạn đọc", ReaderGroup, Crud),
+        new("READER_TYPES", "Loại bạn đọc", ReaderParams, Crud),
+        new("CLASSES", "Lớp", ReaderParams, Crud),
+        new("COURSES", "Khoá", ReaderParams, Crud),
         new("NATIONALITIES", "Quốc tịch", ReaderParams, Crud),
         new("PROFS", "Học hàm học vị", ReaderParams, Crud),
         new("ETHNICS", "Dân tộc", ReaderParams, Crud),

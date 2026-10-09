@@ -59,6 +59,7 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
             ["Identity:Clients:svc-notification:ClientSecret"] = "notification-secret-for-tests",
             ["Identity:Clients:svc-identity:ClientSecret"] = "identity-secret-for-tests",
             ["Identity:Clients:svc-audit:ClientSecret"] = "audit-secret-for-tests",
+            ["Identity:Clients:svc-patron:ClientSecret"] = "patron-secret-for-tests",
             ["Tenancy:GatewaySigningKey"] = GatewayKey,
             ["Identity:BootstrapAdmin:UserName"] = "sysadmin",
             ["Identity:BootstrapAdmin:Password"] = "Sysadmin123",

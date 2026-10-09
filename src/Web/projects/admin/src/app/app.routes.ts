@@ -5,6 +5,7 @@ import { Callback } from './pages/callback';
 import { Home } from './pages/home';
 import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSITIONS, SYSTEM_PARAMETERS } from './pages/tenant/catalogs';
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
+import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -47,6 +48,11 @@ export const routes: Routes = [
       catalog('currencies', CURRENCIES),
       catalog('system-parameters', SYSTEM_PARAMETERS),
       catalog('email-templates', EMAIL_TEMPLATES),
+      catalog('reader-types', READER_TYPES),
+      catalog('academic-classes', CLASSES),
+      catalog('courses', COURSES),
+      catalog('reader-groups', READER_GROUPS),
+      { path: 'readers', loadComponent: () => import('./pages/patron/readers').then((m) => m.Readers), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'Bạn đọc' },
       {
         path: 'system-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
         canActivate: [tenantGuard, permissionGuard('SYSTEM_LOG')], data: { scope: 'tenant' }, title: 'Nhật ký hệ thống',
