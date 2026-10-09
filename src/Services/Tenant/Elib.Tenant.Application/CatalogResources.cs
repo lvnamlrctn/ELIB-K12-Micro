@@ -12,10 +12,16 @@ public sealed record NamedItemDto(long Id, Guid PublicId, string Name, DateTimeO
 
 /// <summary>Danh mục chỉ có tên: tìm theo tên, sắp theo tên, tên không trùng trong đơn vị.</summary>
 public abstract class NamedCatalogResource<TSelf, TItem>(ICrudDbContext db)
-    : CrudResource<TSelf, TItem, CrudSearch, NameRequest, NamedItemDto>(db)
+    : CrudResource<TSelf, TItem, CrudSearch, NameRequest, NamedItemDto>(db), ICrudImportable<NameRequest>
     where TSelf : NamedCatalogResource<TSelf, TItem>
     where TItem : NamedCatalogItem, new()
 {
+    /// <summary>Import như monolith: một cột tên (file cũ tiêu đề "Name" vẫn nhận).</summary>
+    public IReadOnlyList<CrudImportColumn> ImportColumns =>
+        [new("name", "Tên", Required: true, Note: "Mỗi dòng một mục, không trùng với mục đã có.", "Name", "Ten " + EntityName)];
+
+    public NameRequest MapImportRow(CrudImportRow row) => new(row.Required("name", "Tên"));
+
     protected override Expression<Func<TItem, NamedItemDto>> Projection =>
         x => new NamedItemDto(x.Id, x.PublicId, x.Name, x.CreatedAt, x.UpdatedAt);
 

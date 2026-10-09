@@ -25,6 +25,9 @@
   "references": [
     {
       "path": "./projects/admin/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/opac/tsconfig.app.json"
     }
   ]
 }

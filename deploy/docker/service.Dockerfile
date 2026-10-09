@@ -9,7 +9,8 @@ ARG PROJECT
 WORKDIR /repo
 COPY global.json ./
 COPY src/ src/
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+# sharing=locked: compose build nhiều service song song cùng cache — tránh hai tiến trình cùng giải nén một gói NuGet.
+RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "src/${PROJECT}" -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

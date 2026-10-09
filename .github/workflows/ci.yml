@@ -1,0 +1,122 @@
+# CI của nền tảng microservice (src/). Monolith cũ (backend/, frontend/) không build ở đây.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["backend/**", "frontend/**", "**/*.md"]
+  pull_request:
+    paths-ignore: ["backend/**", "frontend/**", "**/*.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  dotnet:
+    name: .NET build + test (gồm tenant-leak trên PostgreSQL thật)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      # Có biến này thì Elib.Platform.LeakTests chạy (không có → bỏ qua): migration thật của mọi service + kiểm RLS.
+      ELIB_TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('src/Directory.Packages.props', 'src/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Restore
+        run: dotnet restore Elib.Platform.slnx
+      # TreatWarningsAsErrors + analyzer đặt ở src/Directory.Build.props.
+      - name: Build
+        run: dotnet build Elib.Platform.slnx --no-restore -c Release
+      - name: Kiểm tra migration khớp model (không quên sinh migration)
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.*
+          for p in Identity Tenant Notification Audit Media; do
+            dotnet ef migrations has-pending-model-changes --no-build --configuration Release \
+              -p src/Services/$p/Elib.$p.Infrastructure -s src/Services/$p/Elib.$p.Infrastructure
+          done
+      - name: Test
+        run: dotnet test Elib.Platform.slnx --no-build -c Release --logger "trx" --results-directory TestResults
+      - name: Kết quả test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+
+  web:
+    name: Angular build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx ng build admin --configuration production
+      - run: npx ng build opac --configuration production
+
+  images:
+    name: Docker image ${{ matrix.name }}
+    needs: [dotnet, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: gateway, dockerfile: service, project: Gateway/Elib.Gateway/Elib.Gateway.csproj, assembly: Elib.Gateway }
+          - { name: identity, dockerfile: service, project: Services/Identity/Elib.Identity.Api/Elib.Identity.Api.csproj, assembly: Elib.Identity.Api }
+          - { name: tenant, dockerfile: service, project: Services/Tenant/Elib.Tenant.Api/Elib.Tenant.Api.csproj, assembly: Elib.Tenant.Api }
+          - { name: notification, dockerfile: service, project: Services/Notification/Elib.Notification.Api/Elib.Notification.Api.csproj, assembly: Elib.Notification.Api }
+          - { name: audit, dockerfile: service, project: Services/Audit/Elib.Audit.Api/Elib.Audit.Api.csproj, assembly: Elib.Audit.Api }
+          - { name: media, dockerfile: service, project: Services/Media/Elib.Media.Api/Elib.Media.Api.csproj, assembly: Elib.Media.Api }
+          - { name: admin-web, dockerfile: web, app: admin }
+          - { name: opac-web, dockerfile: web, app: opac, nginx: web.opac.nginx.conf }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/${{ matrix.dockerfile }}.Dockerfile
+          build-args: |
+            PROJECT=${{ matrix.project }}
+            ASSEMBLY=${{ matrix.assembly }}
+            APP=${{ matrix.app }}
+            NGINX_CONF=${{ matrix.nginx || 'web.nginx.conf' }}
+          push: false
+          tags: elib/${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

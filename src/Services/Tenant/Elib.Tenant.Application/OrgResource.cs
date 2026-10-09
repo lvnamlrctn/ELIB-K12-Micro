@@ -27,8 +27,18 @@ public sealed record UpdateOrderRequest(Guid PublicId, int NewOrder);
 public sealed record MoveOrgRequest(long? NewParentId, int NewOrder);
 
 /// <summary>Cơ cấu tổ chức (monolith: OrgController). Ngoài 8 endpoint chuẩn: GetTree, UpdateOrder, Move, DeleteWithChildren.</summary>
-public sealed class OrgResource(ICrudDbContext db) : CrudResource<OrgResource, Org, OrgSearch, OrgRequest, OrgDto>(db)
+public sealed class OrgResource(ICrudDbContext db) : CrudResource<OrgResource, Org, OrgSearch, OrgRequest, OrgDto>(db), ICrudImportable<OrgRequest>
 {
+    /// <summary>Import (monolith: cột Name, nút gốc) — thêm cột thứ tự tuỳ chọn. Nhập vào cấp gốc; xếp cây bằng kéo thả sau.</summary>
+    public IReadOnlyList<CrudImportColumn> ImportColumns =>
+    [
+        new("name", "Tên phòng ban", Required: true, Note: "Mỗi dòng một phòng ban, nhập vào cấp gốc.", "Name", "Ten"),
+        new("order", "Thứ tự", false, "Số nguyên, bỏ trống = 0.", "SortOrder"),
+    ];
+
+    public OrgRequest MapImportRow(CrudImportRow row) =>
+        new(row.Required("name", "Tên phòng ban"), null, row.WholeNumber("order", "Thứ tự"), null, null);
+
     protected override string EntityName => "Phòng ban";
 
     protected override string? Describe(Org entity) => entity.Name;
@@ -36,7 +46,7 @@ public sealed class OrgResource(ICrudDbContext db) : CrudResource<OrgResource, O
     protected override Expression<Func<Org, OrgDto>> Projection =>
         x => new OrgDto(x.Id, x.PublicId, x.Name, x.ParentId, x.Level, x.SortOrder, x.Status, x.Link);
 
-    // Tạo/sửa cần tra nút cha trong DB — override AddAsync/UpdateAsync, hai hook đồng bộ dưới đây không được gọi.
+    // Tạo/sửa cần tra nút cha trong DB — override CreateAsync/UpdateAsync, hai hook đồng bộ dưới đây không được gọi.
     protected override Org Create(OrgRequest request) => throw new NotSupportedException();
 
     protected override void Update(Org entity, OrgRequest request) => throw new NotSupportedException();
@@ -58,14 +68,10 @@ public sealed class OrgResource(ICrudDbContext db) : CrudResource<OrgResource, O
             throw new ConflictException("ORG_HAS_CHILDREN", "Tổ chức còn đơn vị con — xoá cả nhánh bằng DeleteWithChildren.");
     }
 
-    public override async Task<OrgDto> AddAsync(OrgRequest request, CancellationToken ct)
+    protected override async Task<Org> CreateAsync(OrgRequest request, CancellationToken ct)
     {
         var parent = await ParentAsync(request.ParentId, ct);
-        var org = Org.Create(request.Name, parent, request.SortOrder ?? 0, request.Status, request.Link);
-        Set.Add(org);
-        await AuditAsync(org, CrudChange.Added, ct);
-        await Db.SaveChangesAsync(ct);
-        return ToDto(org);
+        return Org.Create(request.Name, parent, request.SortOrder ?? 0, request.Status, request.Link);
     }
 
     /// <summary>Sửa thông tin; đổi cha thì đi qua <see cref="MoveAsync"/> để cập nhật Level của cả nhánh.</summary>

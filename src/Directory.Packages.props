@@ -43,6 +43,11 @@
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.12" />
   </ItemGroup>
 
+  <!-- Import/xuất Excel trong building block Crud — cùng thư viện với monolith (MIT). -->
+  <ItemGroup Label="Excel">
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
+  </ItemGroup>
+
   <!-- Cùng nhánh 6.x với monolith (Minio 6.0.4). -->
   <ItemGroup Label="Storage">
     <PackageVersion Include="Minio" Version="6.0.5" />

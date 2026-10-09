@@ -203,6 +203,27 @@ public sealed class GatewayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Opac_is_served_at_the_root_of_tenant_hosts_only()
+    {
+        var tenantHost = _gateway.ClientFor("truong-b.thuvientn.vn");
+        var root = (await tenantHost.GetFromJsonAsync<Echo>(U("/")))!;
+        Assert.Equal("/", root.Path);
+        Assert.Equal("12", root.Headers["X-Tenant-Id"]);
+        Assert.Equal("/tim-kiem", (await tenantHost.GetFromJsonAsync<Echo>(U("/tim-kiem?q=toan")))!.Path); // route SPA
+
+        // Route cụ thể vẫn ưu tiên hơn route bắt mọi đường dẫn của OPAC.
+        Assert.Equal("/api/features", (await tenantHost.GetFromJsonAsync<Echo>(U("/api/opac/tenant/features")))!.Path);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await tenantHost.GetAsync(U("/api/admin/identity/users"))).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await tenantHost.PostAsync(U("/khong-co"), null)).StatusCode);
+
+        // Host hệ thống: gốc → Admin; đường dẫn lạ không có OPAC. Đơn vị tạm ngưng: OPAC bị chặn.
+        var system = await _gateway.ClientFor("quantri.thuvientn.vn").GetAsync(U("/"));
+        Assert.Equal("/admin/", system.Headers.Location!.OriginalString);
+        Assert.Equal("TENANT_NOT_FOUND", await Code(await _gateway.ClientFor("quantri.thuvientn.vn").GetAsync(U("/tim-kiem"))));
+        Assert.Equal("TENANT_SUSPENDED", await Code(await _gateway.ClientFor("truong-c.thuvientn.vn").GetAsync(U("/"))));
+    }
+
+    [Fact]
     public async Task Media_and_manifest_routes_are_mapped()
     {
         var admin = (await _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Staff(11)).GetFromJsonAsync<Echo>(U("/api/admin/media/files/abc")))!;

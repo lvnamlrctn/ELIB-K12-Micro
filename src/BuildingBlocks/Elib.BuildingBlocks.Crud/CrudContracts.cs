@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Elib.BuildingBlocks.Crud;
 
@@ -31,6 +32,9 @@ public enum CrudChange
     Updated,
     Deleted,
     StatusChanged,
+
+    /// <summary>Nhập hàng loạt từ Excel — một dòng nhật ký cho cả lần nhập.</summary>
+    Imported,
 }
 
 /// <summary>DbContext của service — <see cref="DbContext"/> đã có sẵn hai method này, chỉ cần khai báo interface.</summary>
@@ -41,4 +45,7 @@ public interface ICrudDbContext
 #pragma warning restore CA1716
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Transaction + execution strategy (import Excel ghi nhiều dòng trong một transaction).</summary>
+    DatabaseFacade Database { get; }
 }

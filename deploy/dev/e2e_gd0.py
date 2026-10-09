@@ -16,12 +16,15 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      nhật ký nền tảng có đồng bộ đơn vị + vào xem đơn vị (cần mật khẩu sysadmin).
  12. media: upload qua URL ký (PUT thẳng vào MinIO qua gateway /s3), kiểm tra magic bytes, tải lại qua URL ký;
      logo đơn vị trên bucket công khai + manifest.json (phần logo cần mật khẩu sysadmin).
+ 13. nhập danh mục từ Excel: file mẫu, file có dòng trùng bị từ chối cả file (báo số dòng), bỏ qua dòng trùng, nhật ký IMPORT.
+ 14. OPAC ở gốc host đơn vị; host hệ thống "/" → app Admin.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
 Bước 4 gọi gateway qua 127.0.0.1:<GATEWAY_PORT> với Host của đơn vị (chưa có DNS wildcard), coi như đi qua nginx https.
 """
-import base64, hashlib, html, http.cookiejar, json, os, re, secrets, sys, time, urllib.error, urllib.parse, urllib.request
+import base64, hashlib, html, http.cookiejar, io, json, os, re, secrets, sys, time, urllib.error, urllib.parse, urllib.request, zipfile
+from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENV = dict(l.strip().split("=", 1) for l in open(os.path.join(HERE, ".env"), encoding="utf-8") if "=" in l and not l.startswith("#"))
@@ -124,6 +127,39 @@ def pkce_login(b, origin, user, password, tenant_hint=None, otp_code=None):
                                                           "client_id": "elib-admin", "code_verifier": verifier})
     expect(s == 200, "đổi code lấy token (PKCE)", f"{s} {body}")
     return json.loads(body)["access_token"]
+
+
+def xlsx(rows):
+    """File .xlsx tối thiểu (chuỗi inline) — máy DEV không có thư viện Excel cho Python."""
+    def col(i): return chr(ord("A") + i)
+    sheet = "".join(
+        f'<row r="{r + 1}">' + "".join(f'<c r="{col(c)}{r + 1}" t="inlineStr"><is><t>{escape(v)}</t></is></c>' for c, v in enumerate(row) if v is not None) + "</row>"
+        for r, row in enumerate(rows))
+    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+    rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    files = {
+        "[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+        "_rels/.rels": f'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="{rel}/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+        "xl/workbook.xml": f'<?xml version="1.0" encoding="UTF-8"?><workbook {ns}><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        "xl/_rels/workbook.xml.rels": f'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="{rel}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+        "xl/worksheets/sheet1.xml": f'<?xml version="1.0" encoding="UTF-8"?><worksheet {ns}><sheetData>{sheet}</sheetData></worksheet>',
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for name, content in files.items(): z.writestr(name, content)
+    return buf.getvalue()
+
+
+def multipart(field, filename, content, ctype):
+    boundary = "e2e" + secrets.token_hex(8)
+    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{filename}"\r\nContent-Type: {ctype}\r\n\r\n').encode() \
+        + content + f"\r\n--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
 
 
 ACCOUNTS_FILE = os.path.join(HERE, "demo-accounts.txt")
@@ -460,6 +496,38 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         expect(s == 200 and content == png and h.get("Content-Type") == "image/png", "OPAC tải logo ẩn danh (Content-Type theo nội dung thật)", f"{s}")
         s, _, body = opac.request("GET", "/api/opac/tenant/manifest.json")
         expect(s == 200 and json.loads(body)["icons"][0]["src"] == url, "manifest.json của đơn vị có logo", body)
+
+    print("13. Nhập danh mục từ Excel (building block Crud)")
+    XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    s, h, content = tb.request("GET", "/api/admin/tenant/ethnicities/ImportTemplate", token=token, binary=True)
+    expect(s == 200 and content[:2] == b"PK" and XLSX in h.get("Content-Type", ""), f"tải file mẫu .xlsx ({len(content)} byte)")
+    tag = secrets.token_hex(3)
+    names = [f"E2E dân tộc {tag} A", f"E2E dân tộc {tag} B"]
+    s, _, body = tb.request("POST", "/api/admin/tenant/ethnicities/Import", token=token,
+                            raw=multipart("file", "dantoc.xlsx", xlsx([["Tên"], ["Kinh"], [names[0]], [names[0]]]), XLSX))
+    errors = json.loads(body).get("errors", []) if s == 400 else []
+    expect(s == 400 and [e["row"] for e in errors] == [2, 4], f"file có dòng trùng → không nhập, báo lỗi dòng {[e['row'] for e in errors]}", body)
+    s, _, body = tb.request("POST", "/api/admin/tenant/ethnicities/Import?skipDuplicates=true", token=token,
+                            raw=multipart("file", "dantoc.xlsx", xlsx([["Name"], ["Kinh"], [names[0]], [None], [names[1]]]), XLSX))
+    result = json.loads(body) if s == 200 else {}
+    expect(s == 200 and (result.get("imported"), result.get("skipped")) == (2, 1), f"nhập Excel: {result.get('detail')}", body)
+    s, _, body = tb.request("POST", "/api/admin/tenant/ethnicities/Search", token=token, json_body={"keyword": f"E2E dân tộc {tag}"})
+    found = json.loads(body)["items"] if s == 200 else []
+    expect(sorted(i["name"] for i in found) == names, "dòng đã nhập có trong danh mục")
+    for item in found:  # dọn để lần chạy sau không tích luỹ dữ liệu thử
+        tb.request("DELETE", f"/api/admin/tenant/ethnicities/Delete/{item['publicId']}", token=token)
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "IMPORT", "2 bản ghi")
+    step("nhật ký có một dòng IMPORT cho cả lần nhập")
+
+    print("14. OPAC ở gốc host đơn vị")
+    s, _, page = opac.request("GET", "/")
+    expect(s == 200 and "<opac-root>" in page and "/api/opac/tenant/manifest.json" in page, "trang chủ OPAC (index.html có manifest của đơn vị)", page[:200])
+    s, _, page = opac.request("GET", "/tim-kiem?q=toan")
+    expect(s == 200 and "<opac-root>" in page, "route SPA của OPAC trả index.html")
+    s, _, body = opac.request("GET", "/api/opac/tenant/features")
+    expect(s == 200 and json.loads(body)["status"] == "Active", "OPAC đọc features ẩn danh", body)
+    s, h, _ = sysb.request("GET", "/")
+    expect(s == 302 and h.get("Location") == "/admin/", "host hệ thống: / → /admin/", f"{s}")
 
 
 if __name__ == "__main__":

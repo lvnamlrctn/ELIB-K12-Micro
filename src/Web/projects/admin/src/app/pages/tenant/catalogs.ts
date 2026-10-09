@@ -10,6 +10,7 @@ function named(title: string, resource: string, perm: string, nameLabel: string,
     searchPlaceholder: placeholder,
     columns: [{ key: 'name', label: nameLabel }],
     fields: [{ key: 'name', label: nameLabel, type: 'text', required: true, placeholder }],
+    importable: true,
   };
 }
 

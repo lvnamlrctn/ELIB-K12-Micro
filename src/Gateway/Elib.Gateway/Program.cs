@@ -66,7 +66,10 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapHealthChecks("/healthz");
-app.MapGet("/", () => Results.Redirect("/admin/")).AllowAnonymous(); // tạm thời: trang gốc → Admin (OPAC sẽ thay ở GĐ1)
+// Host hệ thống: trang gốc → app Admin. Host đơn vị: "/" đi tiếp vào route opac-web (OPAC ở gốc host của thư viện).
+var systemHosts = builder.Configuration.GetSection(GatewayOptions.SectionName).Get<GatewayOptions>()?.SystemHosts ?? [];
+if (systemHosts.Count > 0)
+    app.MapGet("/", () => Results.Redirect("/admin/")).AllowAnonymous().RequireHost([.. systemHosts]);
 app.MapReverseProxy(proxy => proxy.UseMiddleware<GatewayTenantMiddleware>());
 app.Run();
 

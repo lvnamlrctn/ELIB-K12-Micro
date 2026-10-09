@@ -82,6 +82,7 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Clusters:minio:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:search:Destinations:d1:Address"] = backendAddress,
             ["ReverseProxy:Clusters:admin-web:Destinations:d1:Address"] = backendAddress,
+            ["ReverseProxy:Clusters:opac-web:Destinations:d1:Address"] = backendAddress,
             // Route mẫu của một service nghiệp vụ có license: OPAC tra cứu (ẩn danh) và quản trị lưu thông (cần đăng nhập).
             ["ReverseProxy:Routes:search-opac:ClusterId"] = "search",
             ["ReverseProxy:Routes:search-opac:AuthorizationPolicy"] = "anonymous",

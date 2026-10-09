@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Api, CrudClient, CrudPage as Page, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
+import { ImportDialog } from './import-dialog';
 import { ToastrService } from './toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from './ui';
 
@@ -47,6 +48,8 @@ export interface CrudConfig {
   badge?: (item: Row) => string | null;
   /** Nút thêm trên thanh công cụ (ví dụ "Khôi phục mẫu mặc định"). */
   toolbar?: CrudToolbarAction[];
+  /** Danh mục có endpoint ImportTemplate/Import (resource cài ICrudImportable) → hiện nút "Nhập Excel" (quyền add). */
+  importable?: boolean;
 }
 
 export interface CrudToolbarAction {
@@ -66,7 +69,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, DecimalPipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge],
+  imports: [FormsModule, DecimalPipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -104,6 +107,9 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
       <div class="flex gap-2">
         @if (can('add')) {
           <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">add</span> Thêm mới</button>
+          @if (c.importable) {
+            <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> Nhập Excel</button>
+          }
         }
         @if (can('delete')) {
           <button (click)="confirmBulk()" [disabled]="selected().size === 0" class="btn-outline-danger">
@@ -237,6 +243,10 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
       </app-modal>
     }
 
+    @if (importing()) {
+      <app-import-dialog [title]="c.title" [resource]="c.resource" [service]="c.service ?? 'tenant'" (closed)="importing.set(false)" (imported)="search()" />
+    }
+
     @if (deleting().length) {
       <app-confirm-delete [busy]="saving()"
                           [message]="deleting().length > 1 ? 'Xoá ' + deleting().length + ' mục đã chọn? Thao tác này không thể hoàn tác.' : 'Bạn có chắc chắn muốn xoá mục này? Thao tác này không thể hoàn tác.'"
@@ -263,6 +273,7 @@ export class CrudPage implements OnInit {
   protected readonly selected = signal<Set<string>>(new Set());
   protected readonly editing = signal<Row | null>(null);
   protected readonly deleting = signal<string[]>([]);
+  protected readonly importing = signal(false);
 
   protected readonly colspan = computed(() => this.config().columns.length + (this.config().hasStatus ? 4 : 3));
   protected readonly allSelected = computed(() => {

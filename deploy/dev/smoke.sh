@@ -43,6 +43,15 @@ case "$admin" in
   *"<app-root>"*) ok "app Admin (route SPA trả index.html)" ;;
   *) bad "app Admin không phục vụ /admin/" ;;
 esac
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $DEV_DOMAIN" "$GW/")
+[ "$code" = 302 ] && ok "host hệ thống: / → /admin/" || bad "host hệ thống / → $code (mong 302)"
+for h in $(docker compose exec -T postgres psql -U postgres -d elib_tenant -tAc "SELECT subdomain FROM tenants WHERE status = 1 LIMIT 1" 2>/dev/null); do
+  opac=$(curl -s -H "Host: $h.$DEV_DOMAIN" "$GW/tim-kiem")
+  case "$opac" in
+    *"<opac-root>"*) ok "OPAC ở gốc host đơn vị $h (route SPA trả index.html)" ;;
+    *) bad "OPAC không phục vụ trên $h.$DEV_DOMAIN" ;;
+  esac
+done
 
 echo "Gateway → tenant"
 body=$(curl -s -H "Host: khong-ton-tai.$DEV_DOMAIN" "$GW/api/opac/tenant/features")

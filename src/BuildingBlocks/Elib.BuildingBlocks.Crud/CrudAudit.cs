@@ -45,6 +45,7 @@ public sealed class PublishingCrudAuditSink(
             CrudChange.Added => ("ADD", "Thêm"),
             CrudChange.Updated => ("UPDATE", "Sửa"),
             CrudChange.Deleted => ("DELETE", "Xoá"),
+            CrudChange.Imported => ("IMPORT", "Nhập từ Excel"),
             _ => ("CHANGE_STATUS", "Đổi trạng thái"),
         };
         return publisher.Publish(new AuditRecorded

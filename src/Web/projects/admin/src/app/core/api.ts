@@ -94,6 +94,23 @@ export class CrudClient<T extends { publicId: string }> {
   changeStatus(publicId: string, status: number) { return firstValueFrom(this.http.put<void>(`${this.base}/ChangeStatus`, { publicId, status })); }
 }
 
+// ── Nhập Excel (building block Crud: ImportTemplate + Import) ──
+export interface ImportError { row: number; message: string; }
+export interface ImportResult { imported: number; skipped: number; errors: ImportError[]; detail: string; }
+
+/** Nhập Excel cho danh mục ở <base> (vd /api/admin/tenant/ethnicities). Lỗi theo dòng trả về trong body 400 (ImportResult). */
+export class ImportClient {
+  constructor(private readonly http: HttpClient, readonly base: string) {}
+
+  template() { return firstValueFrom(this.http.get(`${this.base}/ImportTemplate`, { responseType: 'blob' })); }
+
+  run(file: File, skipDuplicates: boolean) {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return firstValueFrom(this.http.post<ImportResult>(`${this.base}/Import`, form, { params: { skipDuplicates } }));
+  }
+}
+
 /** PUT nội dung file vào URL ký sẵn của MinIO — dùng fetch (không qua HttpClient) để không gắn Authorization: chữ ký nằm trong URL. */
 async function putToStorage(uploadUrl: string, file: File): Promise<void> {
   const response = await fetch(uploadUrl, { method: 'PUT', body: file, credentials: 'omit' });
@@ -184,6 +201,7 @@ export class Api {
 
   // Danh mục của đơn vị (service tenant)
   crud<T extends { publicId: string }>(resource: string, service = 'tenant') { return new CrudClient<T>(this.http, `/api/admin/${service}/${resource}`); }
+  importer(resource: string, service = 'tenant') { return new ImportClient(this.http, `/api/admin/${service}/${resource}`); }
   orgTree(keyword?: string) { return this.post<OrgNode[]>('/api/admin/tenant/orgs/GetTree', { keyword }); }
   moveOrg(publicId: string, newParentId: number | null, newOrder: number) {
     return this.put<Org>(`/api/admin/tenant/orgs/Move/${publicId}`, { newParentId, newOrder });

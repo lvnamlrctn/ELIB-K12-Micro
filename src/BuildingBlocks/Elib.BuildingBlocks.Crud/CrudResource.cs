@@ -107,10 +107,12 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
         await Set.AsNoTracking().Where(e => e.PublicId == publicId).Select(Projection).FirstOrDefaultAsync(ct)
         ?? throw new NotFoundException(EntityName, publicId);
 
-    /// <summary>Override khi tạo entity cần tra DB (ví dụ nút cha của cây) — <see cref="Create"/> khi đó không được gọi.</summary>
+    /// <summary>Tạo entity từ request. Override khi cần tra DB (ví dụ nút cha của cây) — <see cref="Create"/> khi đó không được gọi.</summary>
+    protected virtual Task<TEntity> CreateAsync(TRequest request, CancellationToken ct) => Task.FromResult(Create(request));
+
     public virtual async Task<TDto> AddAsync(TRequest request, CancellationToken ct)
     {
-        var entity = Create(request);
+        var entity = await CreateAsync(request, ct);
         await ValidateAsync(entity, ct);
         Set.Add(entity);
         await OnSavingAsync(entity, CrudChange.Added, ct);
@@ -148,6 +150,70 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
         await AuditAsync(entity, CrudChange.StatusChanged, ct);
         await Db.SaveChangesAsync(ct);
     }
+
+    /// <summary>File mẫu .xlsx của danh mục (chỉ khi resource cài <see cref="ICrudImportable{TRequest}"/>).</summary>
+    public byte[] ImportTemplate() => CrudExcel.Template(EntityName, Importable.ImportColumns);
+
+    public string ImportTemplateName => $"Mau nhap {EntityName}.xlsx";
+
+    /// <summary>
+    /// Nhập từ Excel (monolith: action Import). Mỗi dòng đi đúng đường Thêm mới (tạo entity → ValidateAsync → OnSavingAsync) trong
+    /// MỘT transaction, lưu từng dòng để dòng sau thấy dòng trước (trùng tên trong cùng file cũng bị bắt).
+    /// Có dòng lỗi → huỷ cả lần nhập, trả danh sách lỗi theo số dòng. <paramref name="skipDuplicates"/>: dòng trùng (409) bị bỏ qua thay vì lỗi.
+    /// </summary>
+    public async Task<CrudImportResult> ImportAsync(Stream file, bool skipDuplicates, CancellationToken ct)
+    {
+        var importable = Importable;
+        var rows = CrudExcel.Read(file, importable.ImportColumns);
+        var strategy = Db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async token =>
+        {
+            await using var transaction = await Db.Database.BeginTransactionAsync(token);
+            var errors = new List<CrudImportError>();
+            int imported = 0, skipped = 0;
+            foreach (var row in rows)
+            {
+                TEntity? entity = null;
+                try
+                {
+                    entity = await CreateAsync(importable.MapImportRow(row), token);
+                    await ValidateAsync(entity, token);
+                    Set.Add(entity);
+                    await OnSavingAsync(entity, CrudChange.Added, token);
+                    await Db.SaveChangesAsync(token);
+                    imported++;
+                }
+                catch (BusinessRuleException ex)
+                {
+                    if (entity is not null) Set.Entry(entity).State = EntityState.Detached;
+                    if (skipDuplicates && ex is ConflictException) skipped++;
+                    else if (errors.Count < MaxImportErrors) errors.Add(new CrudImportError(row.Number, ex.Message));
+                    else break;
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                await transaction.RollbackAsync(token);
+                return new CrudImportResult(0, 0, errors);
+            }
+            if (imported > 0 && AuditSink is not null)
+            {
+                await AuditSink.RecordAsync(
+                    new CrudAuditEntry(typeof(TEntity).Name, EntityName, Guid.Empty, CrudChange.Imported,
+                        $"{imported} bản ghi" + (skipped > 0 ? $", bỏ qua {skipped} dòng đã có" : "")), token);
+                await Db.SaveChangesAsync(token);
+            }
+            await transaction.CommitAsync(token);
+            return new CrudImportResult(imported, skipped, []);
+        }, ct);
+    }
+
+    /// <summary>Báo tối đa chừng này dòng lỗi — file sai hàng loạt thì người dùng sửa theo mẫu rồi nhập lại.</summary>
+    public const int MaxImportErrors = 200;
+
+    private ICrudImportable<TRequest> Importable => this as ICrudImportable<TRequest>
+        ?? throw new NotSupportedException($"{EntityName} không hỗ trợ nhập từ Excel.");
 
     protected async Task<TEntity> LoadAsync(Guid publicId, CancellationToken ct) =>
         await Set.FirstOrDefaultAsync(e => e.PublicId == publicId, ct) ?? throw new NotFoundException(EntityName, publicId);
@@ -198,6 +264,25 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
                 await r.ChangeStatusAsync(request, ct);
                 return Results.NoContent();
             }).RequireAuthorization(new PermissionAttribute(permissionModule, "edit"));
+        }
+
+        if (typeof(ICrudImportable<TRequest>).IsAssignableFrom(typeof(TSelf)))
+        {
+            var add = new PermissionAttribute(permissionModule, "add");
+            group.MapGet("/ImportTemplate", ([FromServices] TSelf r) => Results.File(r.ImportTemplate(), CrudExcel.ContentType, r.ImportTemplateName))
+                .RequireAuthorization(add);
+
+            // multipart/form-data, trường "file". API xác thực bằng Bearer token (không cookie) → không cần antiforgery.
+            group.MapPost("/Import", async ([FromServices] TSelf r, IFormFile file, bool? skipDuplicates, CancellationToken ct) =>
+            {
+                if (file.Length is 0 or > CrudExcel.MaxFileBytes)
+                    throw new BusinessRuleException("IMPORT_FILE_SIZE", $"File rỗng hoặc lớn hơn {CrudExcel.MaxFileBytes / 1024 / 1024} MB.");
+                using var buffer = new MemoryStream();
+                await file.CopyToAsync(buffer, ct);
+                buffer.Position = 0;
+                var result = await r.ImportAsync(buffer, skipDuplicates ?? false, ct);
+                return result.Errors.Count > 0 ? Results.Json(result, statusCode: StatusCodes.Status400BadRequest) : Results.Ok(result);
+            }).RequireAuthorization(add).DisableAntiforgery();
         }
     }
 }

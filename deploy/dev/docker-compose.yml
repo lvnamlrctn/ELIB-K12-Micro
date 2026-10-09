@@ -240,6 +240,17 @@ services:
     image: elib/admin-web:dev
     restart: unless-stopped
 
+  # OPAC ở gốc host của đơn vị (https://<đơn vị>.<DEV_DOMAIN>/).
+  opac-web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+      args:
+        APP: opac
+        NGINX_CONF: web.opac.nginx.conf
+    image: elib/opac-web:dev
+    restart: unless-stopped
+
   gateway:
     build:
       <<: *service-build
@@ -254,6 +265,7 @@ services:
       notification: { condition: service_started }
       audit: { condition: service_started }
       media: { condition: service_started }
+      opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env
       # Nghe đúng cổng công khai: URL trong discovery (jwks_uri…) dùng cổng này và phải gọi được cả từ trong mạng docker.

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Api, OrgNode, STATUS_ACTIVE, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
+import { ImportDialog } from '../../shared/import-dialog';
 import { ConfirmDelete, Loading, Modal, StatusBadge } from '../../shared/ui';
 
 interface FlatNode {
@@ -23,7 +24,7 @@ interface OrgForm {
 /** Phòng ban (cơ cấu tổ chức dạng cây) — giao diện như pages/admin/system/org của admin cũ. */
 @Component({
   selector: 'app-orgs',
-  imports: [FormsModule, Modal, ConfirmDelete, Loading, StatusBadge],
+  imports: [FormsModule, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
   template: `
     <div class="mb-5"><h4 class="page-title">Phòng ban</h4></div>
 
@@ -41,7 +42,12 @@ interface OrgForm {
           </button>
         </div>
         @if (can('add')) {
-          <button (click)="openCreate(null)" class="btn-add w-full !py-2"><span class="material-icons text-[16px]">add</span>Thêm phòng ban gốc</button>
+          <div class="flex gap-2">
+            <button (click)="openCreate(null)" class="btn-add flex-1 !py-2"><span class="material-icons text-[16px]">add</span>Thêm phòng ban gốc</button>
+            <button (click)="importing.set(true)" class="btn-secondary !py-2 !px-3 bg-white" title="Nhập danh sách phòng ban từ Excel">
+              <span class="material-icons text-[16px]">upload_file</span>Nhập Excel
+            </button>
+          </div>
         }
       </div>
     </div>
@@ -171,6 +177,10 @@ interface OrgForm {
       </app-modal>
     }
 
+    @if (importing()) {
+      <app-import-dialog title="Phòng ban" resource="orgs" (closed)="importing.set(false)" (imported)="load()" />
+    }
+
     @if (deleting(); as d) {
       <app-confirm-delete [busy]="saving()" [message]="'Xoá phòng ban “' + d.name + '”?'"
                           [warning]="d.children.length ? 'Phòng ban này có ' + d.childCount + ' đơn vị con — toàn bộ nhánh sẽ bị xoá.' : null"
@@ -191,6 +201,7 @@ export class Orgs implements OnInit {
   protected readonly saving = signal(false);
   protected readonly form = signal<OrgForm | null>(null);
   protected readonly deleting = signal<OrgNode | null>(null);
+  protected readonly importing = signal(false);
 
   private readonly flat = computed(() => {
     const out: FlatNode[] = [];
