@@ -1,0 +1,17 @@
+<div class="flex items-center justify-center gap-2" [class.opacity-60]="disabled">
+  @for (d of digits; track $index; let i = $index) {
+    <input
+      #box
+      type="text"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      maxlength="1"
+      [value]="d"
+      [disabled]="disabled"
+      (input)="onInput(i, $event)"
+      (keydown)="onKeydown(i, $event)"
+      (paste)="onPaste(i, $event)"
+      (focus)="onFocus($event)"
+      class="w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-bold bg-gray-50 border border-gray-200 rounded-xl outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:cursor-not-allowed {{ boxClass }}">
+  }
+</div>

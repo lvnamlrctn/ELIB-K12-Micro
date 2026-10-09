@@ -1,0 +1,170 @@
+<!-- Header -->
+<div class="mb-5 flex items-center gap-3">
+  <button (click)="goBack()" class="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 transition-colors flex-shrink-0">
+    <mat-icon class="text-[20px]">arrow_back</mat-icon>
+  </button>
+  <div class="min-w-0">
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'EBOOK_LOAN.TITLE' | translate }}</h4>
+    @if (ebookTitle) {
+      <p class="text-sm text-gray-500 mt-0.5 truncate">{{ ebookTitle }}</p>
+    }
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center justify-between">
+  <span class="text-sm text-gray-500">
+    {{ 'EBOOK_LOAN.TOTAL' | translate }}: <strong class="text-gray-700">{{ totalCount }}</strong>
+    &nbsp;·&nbsp;
+    {{ 'EBOOK_LOAN.ACTIVE_COUNT' | translate }}: <strong class="text-green-700">{{ activeCount }}</strong>
+  </span>
+  @if (activeCount > 0) {
+    <button *appCan="'edit'; url: '/admin/ebooks'" (click)="openRecallAll()"
+            class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">assignment_return</mat-icon> {{ 'EBOOK_LOAN.RECALL_ALL' | translate }}
+    </button>
+  }
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse min-w-[680px]">
+
+      <!-- STT -->
+      <ng-container matColumnDef="stt">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-12 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">STT</th>
+        <td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-center text-sm text-gray-600 border-b border-gray-100">{{ i + 1 }}</td>
+      </ng-container>
+
+      <!-- Reader -->
+      <ng-container matColumnDef="reader">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_LOAN.READER' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 border-b border-gray-100">
+          <p class="text-sm font-medium text-gray-800">{{ element.readerName || '—' }}</p>
+          @if (element.readerCardNo) {
+            <p class="text-xs text-gray-500 mt-0.5">{{ element.readerCardNo }}</p>
+          }
+        </td>
+      </ng-container>
+
+      <!-- Checked out at -->
+      <ng-container matColumnDef="checkedOutAt">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_LOAN.CHECKED_OUT_AT' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">
+          {{ element.checkedOutAt ? (element.checkedOutAt | appDate:'datetime') : '—' }}
+        </td>
+      </ng-container>
+
+      <!-- Expires at -->
+      <ng-container matColumnDef="expiresAt">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_LOAN.EXPIRES_AT' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">
+          {{ element.expiresAt ? (element.expiresAt | appDate:'datetime') : ('EBOOK_LOAN.UNLIMITED' | translate) }}
+        </td>
+      </ng-container>
+
+      <!-- Status -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-28 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_LOAN.STATUS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-center border-b border-gray-100">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ statusColor(element) }}">
+            {{ statusLabel(element) }}
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Actions -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-20 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 border-b border-gray-100">
+          <div class="flex items-center justify-center gap-1">
+            @if (uiStatus(element) === 'active') {
+              <button *appCan="'edit'; url: '/admin/ebooks'" (click)="openRecall(element)"
+                      class="w-7 h-7 rounded bg-red-500 text-white hover:bg-red-600 flex items-center justify-center transition-colors"
+                      title="{{ 'EBOOK_LOAN.RECALL' | translate }}">
+                <mat-icon class="text-[15px]">assignment_return</mat-icon>
+              </button>
+            } @else {
+              <span class="text-gray-300 text-xs">—</span>
+            }
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50/50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="py-10 px-4 text-center text-gray-400" [attr.colspan]="displayedColumns.length">
+          <mat-icon class="text-4xl mb-2 block mx-auto">assignment_return</mat-icon>
+          {{ 'COMMON.NO_DATA' | translate }}
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- Confirm Recall (single) -->
+@if (showConfirmRecall()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl">assignment_return</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'EBOOK_LOAN.RECALL_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-4">
+          {{ 'EBOOK_LOAN.RECALL_CONFIRM_MSG' | translate }}
+          @if (recallTarget()?.readerName) {
+            <strong class="text-gray-800">{{ recallTarget()?.readerName }}</strong>
+          }
+        </p>
+        <input type="text" [formControl]="recallReason" placeholder="{{ 'EBOOK_LOAN.RECALL_REASON_PLACEHOLDER' | translate }}"
+               class="w-full mb-5 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        <div class="flex gap-3">
+          <button (click)="closeRecall()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmRecall()"
+                  class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 text-sm transition-colors shadow-sm">
+            {{ 'EBOOK_LOAN.RECALL' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirm Recall All -->
+@if (showConfirmRecallAll()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl">warning</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'EBOOK_LOAN.RECALL_ALL_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-4">{{ 'EBOOK_LOAN.RECALL_ALL_CONFIRM_MSG' | translate: { count: activeCount } }}</p>
+        <input type="text" [formControl]="recallReason" placeholder="{{ 'EBOOK_LOAN.RECALL_REASON_PLACEHOLDER' | translate }}"
+               class="w-full mb-5 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        <div class="flex gap-3">
+          <button (click)="closeRecallAll()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmRecallAll()"
+                  class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 text-sm transition-colors shadow-sm">
+            {{ 'EBOOK_LOAN.RECALL_ALL' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,222 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'METADATA_SCHEMA.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filters -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div>
+      <label for="schemaSearch" class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.SEARCH' | translate }}</label>
+      <input id="schemaSearch" type="text" (keydown.enter)="triggerSearch()"
+             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+             [placeholder]="'METADATA_SCHEMA.SEARCH_PLACEHOLDER' | translate">
+    </div>
+    @if (isPrivileged) {
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.TENANT' | translate }}</label>
+        <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+                   [(ngModel)]="tenantId" (change)="onTenantChange()"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div class="hidden xl:block"></div>
+    } @else {
+      <div class="hidden xl:block xl:col-span-2"></div>
+    }
+    <div class="flex items-end">
+      <button (click)="triggerSearch()"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm shadow-sm transition-colors">
+        <mat-icon class="text-[18px] mr-2">search</mat-icon> {{ 'COMMON.SEARCH_BTN' | translate }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Action Bar -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex gap-3 items-center flex-wrap">
+  <button *appCan="'add'" (click)="openAddModal()"
+          class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-1.5 px-3 rounded-lg flex items-center text-sm shadow-sm transition-colors">
+    <mat-icon class="text-sm mr-1.5 pt-0.5">add</mat-icon> {{ 'COMMON.ADD_BTN' | translate }}
+  </button>
+  <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0"
+          class="border border-red-500 text-red-500 hover:bg-red-50 font-medium py-1.5 px-3 rounded-lg flex items-center text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+    <mat-icon class="text-sm mr-1.5 pt-0.5">delete</mat-icon> {{ 'COMMON.DELETE_SELECTED' | translate }}
+  </button>
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full min-h-[200px]">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left">
+
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 w-12 text-center bg-gray-50 border-b border-gray-200">
+          <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded"
+                 (change)="$event ? masterToggle() : null"
+                 [checked]="selection.hasValue() && isAllSelected()"
+                 [indeterminate]="selection.hasValue() && !isAllSelected()">
+        </th>
+        <td mat-cell *matCellDef="let row" class="py-3 px-4 w-12 border-b border-gray-100" (click)="$event.stopPropagation()">
+          <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded"
+                 (change)="$event ? selection.toggle(row) : null"
+                 [checked]="selection.isSelected(row)">
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">{{ 'COMMON.ID' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm font-medium text-gray-900 border-b border-gray-100">{{ element.metadataSchemaId }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="nameSpace">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">{{ 'METADATA_SCHEMA.NAMESPACE' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-800 border-b border-gray-100">{{ element.nameSpace }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="shortId">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 w-36">{{ 'METADATA_SCHEMA.SHORT_ID' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100">
+          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-mono">{{ element.shortId }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="descriptionVn">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">{{ 'METADATA_SCHEMA.DESCRIPTION_VN' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ element.descriptionVn }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="tenant">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">{{ 'COMMON.TENANT' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ element.tenantName ?? '—' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-center text-sm text-gray-600 bg-gray-50 border-b border-gray-200 w-36">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100">
+          <div class="flex items-center justify-center space-x-2">
+            <button (click)="goToFields(element.publicId); $event.stopPropagation()"
+                    class="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 flex items-center justify-center transition-colors"
+                    [title]="'METADATA_SCHEMA.CONFIGURE_FIELDS' | translate">
+              <mat-icon class="text-[18px]">tune</mat-icon>
+            </button>
+            <button *appCan="'edit'" (click)="openEditModal(element); $event.stopPropagation()"
+                    class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors"
+                    [title]="'COMMON.EDIT' | translate">
+              <mat-icon class="text-[18px]">edit</mat-icon>
+            </button>
+            <button *appCan="'delete'" (click)="handleDelete(element.publicId); $event.stopPropagation()"
+                    class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                    [title]="'COMMON.DELETE' | translate">
+              <mat-icon class="text-[18px]">delete</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns" class="bg-gray-50"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+          class="hover:bg-gray-50/50 transition-colors cursor-pointer"
+          (click)="selection.toggle(row)"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="py-8 text-center text-gray-400" [attr.colspan]="displayedColumns.length">{{ 'COMMON.NO_DATA' | translate }}</td>
+      </tr>
+    </table>
+
+    <mat-paginator [length]="totalRecords"
+                   [pageSize]="pageSize" [pageIndex]="pageIndex"
+                   [pageSizeOptions]="pageSizeOptions"
+                   aria-label="Chọn trang"
+                   class="border-t border-gray-100"
+                   (page)="onPageChange($event)">
+    </mat-paginator>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ editMode() ? ('METADATA_SCHEMA.MODAL_EDIT_TITLE' | translate) : ('METADATA_SCHEMA.MODAL_ADD_TITLE' | translate) }}
+        </h3>
+        <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="p-6 space-y-4">
+
+        <div>
+          <label for="sNameSpace" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ 'METADATA_SCHEMA.NAMESPACE' | translate }} <span class="text-red-500">*</span>
+          </label>
+          <input id="sNameSpace" type="text" formControlName="NameSpace"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                 [placeholder]="'METADATA_SCHEMA.NAMESPACE_PLACEHOLDER' | translate">
+          @if (dataForm.get('NameSpace')?.invalid && dataForm.get('NameSpace')?.touched) {
+            <p class="text-red-500 text-xs mt-1">{{ 'METADATA_SCHEMA.VALIDATION_NAMESPACE_REQUIRED' | translate }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="sShortId" class="block text-sm font-medium text-gray-700 mb-1">{{ 'METADATA_SCHEMA.SHORT_ID' | translate }}</label>
+          <input id="sShortId" type="text" formControlName="ShortId"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+                 [placeholder]="'METADATA_SCHEMA.SHORT_ID_PLACEHOLDER' | translate">
+        </div>
+
+        <div>
+          <label for="sDescriptionVn" class="block text-sm font-medium text-gray-700 mb-1">{{ 'METADATA_SCHEMA.DESCRIPTION_VN' | translate }}</label>
+          <textarea id="sDescriptionVn" formControlName="DescriptionVn" rows="3"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none"
+                    [placeholder]="'METADATA_SCHEMA.DESCRIPTION_VN_PLACEHOLDER' | translate"></textarea>
+        </div>
+
+        <div class="pt-2 flex gap-3">
+          <button type="button" (click)="closeModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button type="submit" [disabled]="dataForm.invalid || isSaving()"
+                  class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            @if (isSaving()) { <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> }
+            {{ 'COMMON.SAVE' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Confirm Delete -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+          <mat-icon class="text-3xl">warning</mat-icon>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'COMMON.DELETE_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-500 mb-6">{{ 'COMMON.DELETE_CONFIRM_MSG' | translate }}</p>
+        <div class="flex gap-3">
+          <button (click)="closeConfirm()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmActionExecute()" class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+            {{ 'COMMON.DELETE_CONFIRM_BTN' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

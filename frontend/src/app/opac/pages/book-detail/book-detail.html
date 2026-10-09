@@ -1,0 +1,212 @@
+<div class="container mx-auto px-4 py-8">
+  <nav class="flex items-center text-sm text-gray-500 mb-8 bg-white p-3 rounded shadow-sm border-l-4 border-main">
+    <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <span class="text-main font-semibold">Chi tiết tài liệu số</span>
+  </nav>
+
+  @if (book(); as b) {
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-8">
+      <div class="flex flex-col md:flex-row gap-10">
+        <div class="w-full md:w-64 shrink-0">
+          <img [src]="b.imageUrl" [alt]="b.title" class="w-full rounded-lg shadow-lg">
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center justify-between xl:justify-start gap-4 mb-4">
+            <span class="bg-blue-50 text-blue-600 text-xs font-bold px-3 py-1 rounded-full inline-block">TÀI LIỆU SỐ</span>
+            
+            <div class="flex gap-2">
+              <button (click)="authService.toggleSaveBook(b)" class="text-gray-500 hover:text-main text-sm font-semibold transition-colors flex items-center gap-1" title="Lưu tài liệu">
+                 @if (authService.isBookSaved(b.id)) {
+                   <i class="fas fa-bookmark text-main"></i> <span class="text-main">Đã lưu</span>
+                 } @else {
+                   <i class="far fa-bookmark"></i> Lưu tài liệu
+                 }
+              </button>
+              <button (click)="shareContent()" class="text-gray-500 hover:text-main text-sm font-semibold transition-colors flex items-center gap-1" title="Chia sẻ">
+                 <i class="fas fa-share-alt"></i> Chia sẻ
+              </button>
+            </div>
+          </div>
+          <h2 class="text-3xl font-bold text-dark mb-6">{{ b.title }}</h2>
+          
+          @if (avgRating() > 0) {
+            <div class="flex items-center gap-2 mb-6">
+              <div class="flex text-yellow-400">
+                <i class="fas fa-star"></i>
+                <span class="ml-1 font-bold text-dark">{{ avgRating() }}</span>
+              </div>
+              <span class="text-sm text-gray-500">({{ ratingCount() }} đánh giá)</span>
+            </div>
+          }
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 border-t border-gray-100 pt-6">
+            <div class="text-sm text-gray-600"><span>Tác giả:</span> <strong class="text-dark ml-1">{{ b.author }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Nhà xuất bản:</span> <strong class="text-dark ml-1">{{ b.publisher }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Năm xuất bản:</span> <strong class="text-dark ml-1">{{ b.year }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Lượt xem:</span> <strong class="text-dark ml-1">{{ b.views }} lượt</strong></div>
+            <div class="text-sm text-gray-600"><span>Lượt tải:</span> <strong class="text-dark ml-1">{{ b.downloads }} lượt</strong></div>
+          </div>
+
+          <div class="mt-8">
+            <h4 class="text-lg font-bold text-dark mb-3">Mô tả tài liệu</h4>
+            <p class="text-gray-600 leading-relaxed text-justify">{{ b.description }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-8">
+      <h3 class="text-lg font-bold text-dark mb-6 flex items-center gap-2">
+        <i class="fas fa-paperclip text-gray-400"></i> Danh sách tệp tin đính kèm
+      </h3>
+      
+      <div class="flex flex-col gap-4">
+        @for (file of b.files; track file.id) {
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border border-gray-100 rounded-lg hover:border-main hover:shadow-sm transition-all bg-gray-50/50">
+            <div class="flex items-center gap-4 mb-4 sm:mb-0">
+              @if (file.type === 'pdf') {
+                <i class="far fa-file-pdf text-4xl text-red-500"></i>
+              } @else if (file.type === 'audio') {
+                <i class="far fa-file-audio text-4xl text-blue-500"></i>
+              } @else if (file.type === 'video') {
+                <i class="far fa-file-video text-4xl text-purple-500"></i>
+              } @else {
+                <i class="far fa-file-alt text-4xl text-gray-500"></i>
+              }
+              <div>
+                <div class="font-semibold text-dark">{{ file.name }}</div>
+                <div class="text-xs text-gray-500 mt-1">Dung lượng: {{ (file.size / 1024 / 1024).toFixed(2) }} MB</div>
+              </div>
+            </div>
+            <div class="flex gap-3 w-full sm:w-auto items-center">
+              @if (b.free === 2 || authService.isAuthenticated()) {
+                <a [routerLink]="['/reader', file.id]" [queryParams]="{type: file.type, free: b.free, allowDownload: b.allowDownload, title: b.title, ebookId: b.id}" class="flex-1 sm:flex-none text-center bg-blue-50 text-main border border-main px-4 py-2 rounded font-semibold text-sm hover:bg-main hover:text-white transition-colors">
+                  <i class="fas fa-eye mr-1"></i> Đọc tài liệu
+                </a>
+              } @else {
+                <span class="text-sm text-amber-600 font-medium flex items-center gap-1.5">
+                  <i class="fas fa-lock"></i>
+                  Yêu cầu <a routerLink="/login" class="underline hover:text-amber-700">đăng nhập</a> để đọc tài liệu
+                </span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Comments and Rating Section -->
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+      <h3 class="text-lg font-bold text-dark mb-6 flex items-center gap-2">
+        <i class="fas fa-star text-yellow-400"></i> Đánh giá & Bình luận
+      </h3>
+
+      <div class="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
+        <h4 class="font-semibold text-dark mb-4">Gửi đánh giá của bạn</h4>
+        
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-sm text-gray-600">Đánh giá:</span>
+          <div class="flex text-xl cursor-pointer">
+            @for (star of [1,2,3,4,5]; track star) {
+              <i class="fas fa-star outline-none"
+                 tabindex="0"
+                 [class.text-yellow-400]="star <= commentRating()"
+                 [class.text-gray-300]="star > commentRating()"
+                 (click)="setRating(star)"
+                 (keydown.enter)="setRating(star)"
+                 (keydown.space)="setRating(star); $event.preventDefault()">
+              </i>
+            }
+          </div>
+        </div>
+
+        <form (ngSubmit)="submitComment()" class="flex flex-col gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <input type="text" [(ngModel)]="commentAuthor" name="author" placeholder="Tên hiển thị (VD: Nguyễn Văn A)" class="w-full p-3 border border-gray-300 rounded focus:border-main focus:ring-1 focus:ring-main outline-none transition-all" required>
+            <input type="email" [(ngModel)]="commentEmail" name="email" placeholder="Email (không bắt buộc)" class="w-full p-3 border border-gray-300 rounded focus:border-main focus:ring-1 focus:ring-main outline-none transition-all">
+          </div>
+          <textarea [(ngModel)]="commentContent" name="content" rows="4" placeholder="Nội dung bình luận..." class="w-full p-3 border border-gray-300 rounded focus:border-main focus:ring-1 focus:ring-main outline-none transition-all" required></textarea>
+
+          @if (pendingNotice()) {
+            <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm rounded p-3 flex items-center gap-2">
+              <i class="fas fa-clock"></i> Cảm ơn bạn! Bình luận đã được gửi và sẽ hiển thị sau khi được duyệt.
+            </div>
+          }
+          @if (submitError()) {
+            <div class="bg-red-50 border border-red-200 text-red-600 text-sm rounded p-3 flex items-center gap-2">
+              <i class="fas fa-circle-exclamation"></i> Gửi bình luận thất bại. Vui lòng thử lại.
+            </div>
+          }
+
+          <div class="text-right">
+            <button type="submit" [disabled]="!commentAuthor() || !commentContent() || submitting()" class="bg-main text-white px-6 py-2.5 rounded font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              @if (submitting()) {
+                <i class="fas fa-spinner fa-spin mr-2"></i> Đang gửi...
+              } @else {
+                <i class="fas fa-paper-plane mr-2"></i> Gửi bình luận
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        @if (reviews().length > 0) {
+          @for (r of reviews(); track r.id) {
+            <div class="flex gap-4 p-4 border-b border-gray-50 last:border-0">
+              <div class="w-12 h-12 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-main font-bold">
+                {{ r.displayName.charAt(0) }}
+              </div>
+              <div class="flex-1">
+                <div class="flex justify-between items-start mb-1">
+                  <h5 class="font-bold text-dark">{{ r.displayName }}</h5>
+                  <span class="text-xs text-gray-500">{{ r.createdRowDate | date:'dd/MM/yyyy' }}</span>
+                </div>
+
+                @if (r.rating) {
+                  <div class="flex text-xs text-yellow-400 mb-2">
+                    @for (star of [1,2,3,4,5]; track star) {
+                      <i class="fas fa-star" [class.text-gray-200]="star > r.rating"></i>
+                    }
+                  </div>
+                }
+
+                <p class="text-gray-600 text-sm leading-relaxed">{{ r.content }}</p>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="text-center py-8 text-gray-500">
+            <i class="far fa-comments text-4xl mb-3 text-gray-300"></i>
+            <p>Chưa có bình luận nào. Hãy là người đầu tiên đánh giá tài liệu này!</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Đợt 22.2 — Có thể bạn quan tâm -->
+    @if (related().length > 0) {
+      <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mt-8">
+        <h3 class="text-lg font-bold text-dark mb-6 flex items-center gap-2">
+          <i class="fas fa-layer-group text-gray-400"></i> Có thể bạn quan tâm
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          @for (it of related(); track it.groupId) {
+            <a [routerLink]="it.docType === 'print' ? ['/tai-lieu-in', it.publicId] : ['/book', it.publicId]"
+               class="block group">
+              <div class="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden mb-2">
+                @if (it.imageUrl) {
+                  <img [src]="it.imageUrl" [alt]="it.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                } @else {
+                  <div class="w-full h-full flex items-center justify-center text-3xl">{{ it.docType === 'print' ? '📕' : '💻' }}</div>
+                }
+              </div>
+              <p class="text-xs font-medium text-dark line-clamp-2 group-hover:text-main">{{ it.title }}</p>
+            </a>
+          }
+        </div>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,130 @@
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap items-end gap-3">
+  <label class="flex flex-col gap-1 text-xs font-semibold text-gray-600">{{ 'STUDY_ROOM_BOOKING.FROM_DATE' | translate }}
+    <app-date-input class="block w-40" [(ngModel)]="from"></app-date-input>
+  </label>
+  <label class="flex flex-col gap-1 text-xs font-semibold text-gray-600">{{ 'STUDY_ROOM_BOOKING.TO_DATE' | translate }}
+    <app-date-input class="block w-40" [(ngModel)]="to"></app-date-input>
+  </label>
+  <label class="flex flex-col gap-1 text-xs font-semibold text-gray-600">{{ 'STUDY_ROOM_BOOKING.COL_ROOM' | translate }}
+    <select [(ngModel)]="mapObjectId" class="min-w-[160px] px-3 py-2 border border-gray-300 rounded-lg text-sm font-normal bg-white">
+      <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+      @for (r of rooms(); track r.id) { <option [ngValue]="r.id">{{ r.name }}</option> }
+    </select>
+  </label>
+  <label class="flex flex-col gap-1 text-xs font-semibold text-gray-600">{{ 'STUDY_ROOM_BOOKING.CATEGORY' | translate }}
+    <select [(ngModel)]="category" class="min-w-[160px] px-3 py-2 border border-gray-300 rounded-lg text-sm font-normal bg-white">
+      <option [ngValue]="null">{{ 'STUDY_ROOM_BOOKING.ALL_CATEGORIES' | translate }}</option>
+      @for (c of categories; track c.value) { <option [ngValue]="c.value">{{ c.label }}</option> }
+    </select>
+  </label>
+  <button type="button" (click)="load()" [disabled]="loading()" class="py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+    <mat-icon class="text-[18px] w-[18px] h-[18px]">bar_chart</mat-icon>{{ 'STUDY_ROOM_BOOKING.VIEW_REPORT' | translate }}
+  </button>
+  <button type="button" (click)="exportExcel()" [disabled]="exporting() || !report()" class="py-2 px-4 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+    <mat-icon class="text-[18px] w-[18px] h-[18px]">download</mat-icon>{{ 'STUDY_ROOM_BOOKING.EXPORT_EXCEL' | translate }}
+  </button>
+</div>
+
+@if (error()) { <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ error() }}</div> }
+@if (loading()) { <div class="py-10 text-center"><mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon></div> }
+
+@if (report(); as r) {
+  <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.R_TOTAL' | translate }}</p><p class="text-2xl font-bold text-gray-800">{{ r.total }}</p></div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.R_USED_HOURS' | translate }}</p><p class="text-2xl font-bold text-blue-700">{{ r.usedHours }}</p></div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.R_UTILIZATION' | translate }}</p><p class="text-2xl font-bold text-emerald-700">{{ r.utilization }}%</p></div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.R_NOSHOW_RATE' | translate }}</p><p class="text-2xl font-bold text-red-600">{{ r.noShowRate }}%</p></div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.R_CANCEL_RATE' | translate }}</p><p class="text-2xl font-bold text-amber-600">{{ r.cancelRate }}%</p></div>
+  </div>
+
+  <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2">
+    @for (s of statuses; track s) {
+      <span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-700">{{ ('STUDY_ROOM_BOOKING.STATUS_' + s) | translate }}: {{ statusCount(s) }}</span>
+    }
+    <span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-50 text-blue-700">{{ 'STUDY_ROOM_BOOKING.R_VISITORS' | translate }}: {{ r.visitors }}</span>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <h3 class="px-4 py-3 font-bold text-gray-800 border-b border-gray-100">{{ 'STUDY_ROOM_BOOKING.R_BY_ROOM' | translate }}</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[560px] text-sm">
+          <thead><tr class="bg-gray-50 text-left text-gray-600">
+            <th class="py-2 px-3">{{ 'STUDY_ROOM_BOOKING.COL_ROOM' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.R_BOOKINGS' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.STATUS_7' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.R_USED_HOURS' | translate }}</th>
+            <th class="py-2 px-3">{{ 'STUDY_ROOM_BOOKING.R_UTILIZATION' | translate }}</th>
+          </tr></thead>
+          <tbody>
+            @for (x of r.byRoom; track x.mapObjectId) {
+              <tr class="border-t border-gray-100">
+                <td class="py-2 px-3 font-medium text-gray-800">{{ x.roomName }}</td>
+                <td class="py-2 px-3 text-right">{{ x.bookings }}</td>
+                <td class="py-2 px-3 text-right text-red-600">{{ x.noShows }}</td>
+                <td class="py-2 px-3 text-right">{{ x.usedHours }} / {{ x.openHours }}</td>
+                <td class="py-2 px-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden"><div class="h-full bg-emerald-500" [style.width.%]="x.utilization > 100 ? 100 : x.utilization"></div></div>
+                    <span class="text-xs w-12 text-right">{{ x.utilization }}%</span>
+                  </div>
+                </td>
+              </tr>
+            } @empty { <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <h3 class="px-4 py-3 font-bold text-gray-800 border-b border-gray-100">{{ 'STUDY_ROOM_BOOKING.R_TOP_READERS' | translate }}</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[480px] text-sm">
+          <thead><tr class="bg-gray-50 text-left text-gray-600">
+            <th class="py-2 px-3">{{ 'STUDY_ROOM_BOOKING.COL_READER' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.R_BOOKINGS' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.R_USED_HOURS' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'STUDY_ROOM_BOOKING.STATUS_7' | translate }}</th>
+          </tr></thead>
+          <tbody>
+            @for (x of r.topReaders; track x.readerId) {
+              <tr class="border-t border-gray-100">
+                <td class="py-2 px-3"><div class="text-gray-800">{{ x.name }}</div><div class="text-xs text-gray-400 font-mono">{{ x.cardNo }}</div></td>
+                <td class="py-2 px-3 text-right">{{ x.bookings }}</td>
+                <td class="py-2 px-3 text-right">{{ x.usedHours }}</td>
+                <td class="py-2 px-3 text-right text-red-600">{{ x.noShows }}</td>
+              </tr>
+            } @empty { <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h3 class="font-bold text-gray-800 mb-3">{{ 'STUDY_ROOM_BOOKING.R_BY_HOUR' | translate }}</h3>
+      <div class="flex items-end gap-1 h-40">
+        @for (h of hours(); track h) {
+          <div class="flex-1 flex flex-col items-center justify-end h-full" [title]="pad(h) + ':00 — ' + r.byHour[h]">
+            <span class="text-[10px] text-gray-500">{{ r.byHour[h] || '' }}</span>
+            <div class="w-full rounded-t bg-blue-500" [style.height.%]="r.byHour[h] * 85 / maxHour()"></div>
+            <span class="text-[10px] text-gray-500 mt-1">{{ pad(h) }}</span>
+          </div>
+        }
+      </div>
+    </section>
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <h3 class="font-bold text-gray-800 mb-3">{{ 'STUDY_ROOM_BOOKING.R_BY_WEEKDAY' | translate }}</h3>
+      <div class="space-y-2">
+        @for (d of weekdays; track d) {
+          <div class="flex items-center gap-2 text-sm">
+            <span class="w-20 text-gray-600">{{ weekdayLabel(d) }}</span>
+            <div class="flex-1 h-3 rounded-full bg-gray-100 overflow-hidden"><div class="h-full bg-indigo-500" [style.width.%]="r.byWeekday[d] * 100 / maxWeekday()"></div></div>
+            <span class="w-10 text-right text-gray-700">{{ r.byWeekday[d] }}</span>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+}

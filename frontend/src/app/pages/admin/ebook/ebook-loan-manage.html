@@ -1,0 +1,190 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'EBOOK_LOAN_MANAGE.TITLE' | translate }}</h4>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-1 mb-4 border-b border-gray-200">
+  <button (click)="setTab('loan')" [class.text-blue-600]="tab() === 'loan'" [class.border-blue-600]="tab() === 'loan'"
+          class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+    {{ 'EBOOK_LOAN_MANAGE.TAB_LOAN' | translate }}
+  </button>
+  <button (click)="setTab('reservation')" [class.text-blue-600]="tab() === 'reservation'" [class.border-blue-600]="tab() === 'reservation'"
+          class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+    {{ 'EBOOK_LOAN_MANAGE.TAB_RESERVATION' | translate }}
+  </button>
+</div>
+
+@if (tab() === 'loan') {
+  <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+    <input [(ngModel)]="loanKeyword" (keydown.enter)="loadLoans()" type="text" placeholder="{{ 'COMMON.SEARCH' | translate }}"
+           class="flex-1 min-w-[180px] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <ng-select [items]="[{value:1,label:'EBOOK_LOAN.STATUS_ACTIVE'},{value:2,label:'EBOOK_LOAN.STATUS_RECALLED'}]"
+               bindValue="value" [(ngModel)]="loanStatus" (change)="loadLoans()"
+               class="min-w-[180px]"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'COMMON.ALL' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate">
+      <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+    </ng-select>
+    <button (click)="loadLoans()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 text-sm">
+      <mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+    </button>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (isLoadingLoans()) {
+      <div class="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
+        <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+      </div>
+    }
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left border-collapse min-w-[720px]">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="py-2 px-3 w-12 text-center text-xs font-medium text-gray-600 border-b border-gray-200">STT</th>
+            <th class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.READER' | translate }}</th>
+            <th class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN_MANAGE.EBOOK_TITLE' | translate }}</th>
+            <th class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.CHECKED_OUT_AT' | translate }}</th>
+            <th class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.EXPIRES_AT' | translate }}</th>
+            <th class="py-2 px-3 w-28 text-center text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.STATUS' | translate }}</th>
+            <th class="py-2 px-3 w-20 text-center text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'COMMON.ACTIONS' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (loan of loanData; track loan.id; let i = $index) {
+            <tr class="hover:bg-gray-50/50 transition-colors">
+              <td class="py-2 px-3 text-center text-sm text-gray-600 border-b border-gray-100">{{ i + 1 }}</td>
+              <td class="py-2 px-3 border-b border-gray-100">
+                <p class="text-sm font-medium text-gray-800">{{ loan.readerName || '—' }}</p>
+                @if (loan.readerCardNo) { <p class="text-xs text-gray-500 mt-0.5">{{ loan.readerCardNo }}</p> }
+              </td>
+              <td class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ loan.ebookTitle || '—' }}</td>
+              <td class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ loan.checkedOutAt ? (loan.checkedOutAt | appDate:'datetime') : '—' }}</td>
+              <td class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ loan.expiresAt ? (loan.expiresAt | appDate:'datetime') : ('EBOOK_LOAN.UNLIMITED' | translate) }}</td>
+              <td class="py-2 px-3 text-center border-b border-gray-100">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ statusColor(loan) }}">{{ statusLabel(loan) }}</span>
+              </td>
+              <td class="py-2 px-3 border-b border-gray-100">
+                <div class="flex items-center justify-center gap-1">
+                  @if (uiStatus(loan) === 'active') {
+                    <button *appCan="'edit'; url: '/admin/ebooks'" (click)="openRecall(loan)"
+                            class="w-7 h-7 rounded bg-red-500 text-white hover:bg-red-600 flex items-center justify-center transition-colors"
+                            title="{{ 'EBOOK_LOAN.RECALL' | translate }}">
+                      <mat-icon class="text-[15px]">assignment_return</mat-icon>
+                    </button>
+                  } @else { <span class="text-gray-300 text-xs">—</span> }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="py-10 px-4 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}
+
+@if (tab() === 'reservation') {
+  <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+    <input [(ngModel)]="reservationKeyword" (keydown.enter)="loadReservations()" type="text" placeholder="{{ 'COMMON.SEARCH' | translate }}"
+           class="flex-1 min-w-[180px] px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <ng-select [items]="[{value:1,label:'EBOOK_LOAN_MANAGE.RES_PENDING'},{value:2,label:'EBOOK_LOAN_MANAGE.RES_READY'},{value:3,label:'EBOOK_LOAN_MANAGE.RES_FULFILLED'},{value:4,label:'EBOOK_LOAN_MANAGE.RES_CANCELLED'},{value:5,label:'EBOOK_LOAN_MANAGE.RES_EXPIRED'}]"
+               bindValue="value" [(ngModel)]="reservationStatus" (change)="loadReservations()"
+               class="min-w-[180px]"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'COMMON.ALL' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate">
+      <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+    </ng-select>
+    <button (click)="loadReservations()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 text-sm">
+      <mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+    </button>
+  </div>
+
+  <p class="text-xs text-gray-400 mb-2">{{ 'EBOOK_LOAN_MANAGE.RES_READONLY_NOTE' | translate }}</p>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (isLoadingReservations()) {
+      <div class="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
+        <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+      </div>
+    }
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left border-collapse min-w-[680px]">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="py-2 px-3 w-12 text-center text-xs font-medium text-gray-600 border-b border-gray-200">STT</th>
+            <th class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.READER' | translate }}</th>
+            <th class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN_MANAGE.EBOOK_TITLE' | translate }}</th>
+            <th class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN_MANAGE.REQUESTED_AT' | translate }}</th>
+            <th class="py-2 px-3 w-36 text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN_MANAGE.READY_EXPIRES_AT' | translate }}</th>
+            <th class="py-2 px-3 w-28 text-center text-xs font-medium text-gray-600 border-b border-gray-200">{{ 'EBOOK_LOAN.STATUS' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of reservationData; track r.id; let i = $index) {
+            <tr class="hover:bg-gray-50/50 transition-colors">
+              <td class="py-2 px-3 text-center text-sm text-gray-600 border-b border-gray-100">{{ i + 1 }}</td>
+              <td class="py-2 px-3 border-b border-gray-100">
+                <p class="text-sm font-medium text-gray-800">{{ r.readerName || '—' }}</p>
+                @if (r.readerCardNo) { <p class="text-xs text-gray-500 mt-0.5">{{ r.readerCardNo }}</p> }
+              </td>
+              <td class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ r.ebookTitle || '—' }}</td>
+              <td class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ r.requestedAt ? (r.requestedAt | appDate:'datetime') : '—' }}</td>
+              <td class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ r.readyExpiresAt ? (r.readyExpiresAt | appDate:'datetime') : '—' }}</td>
+              <td class="py-2 px-3 text-center border-b border-gray-100">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ reservationStatusColor(r) }}">{{ reservationStatusLabel(r) }}</span>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6" class="py-10 px-4 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (reservationTotal > reservationPageSize) {
+      <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 text-sm text-gray-500">
+        <span>{{ reservationPageIndex * reservationPageSize + 1 }}–{{ Math.min((reservationPageIndex + 1) * reservationPageSize, reservationTotal) }} / {{ reservationTotal }}</span>
+        <div class="flex gap-1">
+          <button (click)="reservationPrevPage()" [disabled]="reservationPageIndex === 0" class="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center">
+            <mat-icon class="text-[18px]">chevron_left</mat-icon>
+          </button>
+          <button (click)="reservationNextPage()" [disabled]="(reservationPageIndex + 1) * reservationPageSize >= reservationTotal" class="w-8 h-8 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 flex items-center justify-center">
+            <mat-icon class="text-[18px]">chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- Confirm Recall -->
+@if (showConfirmRecall()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl">assignment_return</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'EBOOK_LOAN.RECALL_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-4">
+          {{ 'EBOOK_LOAN.RECALL_CONFIRM_MSG' | translate }}
+          @if (recallTarget()?.readerName) { <strong class="text-gray-800">{{ recallTarget()?.readerName }}</strong> }
+        </p>
+        <input type="text" [(ngModel)]="recallReason" placeholder="{{ 'EBOOK_LOAN.RECALL_REASON_PLACEHOLDER' | translate }}"
+               class="w-full mb-5 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        <div class="flex gap-3">
+          <button (click)="closeRecall()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmRecall()" class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 text-sm transition-colors shadow-sm">
+            {{ 'EBOOK_LOAN.RECALL' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

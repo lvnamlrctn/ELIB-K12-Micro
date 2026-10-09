@@ -1,0 +1,100 @@
+# Stack mới — dùng chung postgres container, join elibapi-network (external)
+# File mới hoàn toàn — không chạm docker-compose.production.yml
+#
+# Triển khai:
+#   docker compose -f docker-compose.new.yml --env-file .env.new up -d elibapi-new admin-website-new
+#
+# Test API (port 8091):
+#   curl http://localhost:8091/api/Auth/Login -X POST ...
+#
+# Switch nginx (khi sẵn sàng):
+#   docker stop elibapi-nginx
+#   docker compose -f docker-compose.new.yml --env-file .env.new --profile switch up -d nginx-new
+#
+# Rollback:
+#   docker stop elibapi-nginx-new
+#   docker start elibapi-nginx
+
+services:
+
+  # ── Backend API (.NET) ──────────────────────────────────────────────────────
+  elibapi-new:
+    build:
+      context: .
+      dockerfile: ELIBAPI.API/Dockerfile
+    image: elibapi-internal:new
+    container_name: elibapi-new
+    restart: unless-stopped
+    ports:
+      - "8091:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - DatabaseProvider=PostgreSQL
+      - ConnectionStrings__PostgreSQL=Host=elibapi-postgres;Port=5432;Database=${PG_DATABASE:-tvxa_moi};Username=${PG_USER:-lvnam};Password=${PG_PASSWORD};Timeout=30;Command Timeout=60
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER:-ELIBAPI}
+      - Jwt__Audience=${JWT_AUDIENCE:-ELIBAPI_CLIENTS}
+      - Jwt__ExpireMinutes=${JWT_EXPIRE_MINUTES:-60}
+      - MinioSettings__Endpoint=${MINIO_ENDPOINT:-103.124.95.249:9000}
+      - MinioSettings__AccessKey=${MINIO_ACCESS_KEY:-minioadmin}
+      - MinioSettings__SecretKey=${MINIO_SECRET_KEY}
+      - MinioSettings__BucketName=${MINIO_BUCKET:-elibapi}
+      - MinioSettings__PrivateBucketName=${MINIO_PRIVATE_BUCKET:-elibapi-private}
+      - MinioSettings__UseSSL=${MINIO_USE_SSL:-false}
+      - MinioSettings__PublicBaseUrl=${MINIO_PUBLIC_URL:-https://thuvientn.vn/api/public/media}
+      - ElasticsearchSettings__Uri=${ES_URI:-http://103.124.95.249:9200}
+      - ElasticsearchSettings__Username=${ES_USERNAME:-elastic}
+      - ElasticsearchSettings__Password=${ES_PASSWORD}
+      - ElasticsearchSettings__IndexName=${ES_INDEX_NAME:-ebook_items_moi}
+      - ElasticsearchSettings__ChunkIndexName=${ES_CHUNK_INDEX_NAME:-ebook_chunks_moi}
+      - PathSettings__PathEbook=/app/ebook-data
+      - LLMSettings__Provider=${LLM_PROVIDER:-gemini}
+      - LLMSettings__ApiKey=${GEMINI_API_KEY:-}
+      - LLMSettings__Model=${LLM_MODEL:-gemini-3.1-flash-lite}
+      - Hangfire__User=${HANGFIRE_USER:-admin}
+      - Hangfire__Password=${HANGFIRE_PASSWORD}
+    volumes:
+      - ${EBOOK_DATA_PATH:-./data/ebook}:/app/ebook-data
+    networks:
+      - elibapi-network
+
+  # ── Angular Admin Website (SSR Node.js) ────────────────────────────────────
+  admin-website-new:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: admin-website:new
+    container_name: admin-website-new
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    networks:
+      - elibapi-network
+    depends_on:
+      - elibapi-new
+
+  # ── Nginx Reverse Proxy — chỉ start khi switch (--profile switch) ──────────
+  nginx-new:
+    image: nginx:alpine
+    container_name: elibapi-nginx-new
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx-new.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${SSL_CERT_PATH:-./nginx/ssl}:/etc/nginx/ssl:ro
+    networks:
+      - elibapi-network
+    depends_on:
+      - elibapi-new
+      - admin-website-new
+    profiles:
+      - switch
+
+networks:
+  elibapi-network:
+    external: true
+    name: backend_elibapi-network

@@ -1,0 +1,77 @@
+<div class="mb-5">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'NOTIFICATION_CHANNEL_CONFIG.TITLE' | translate }}</h4>
+  <p class="text-sm text-gray-500 mt-1">{{ 'NOTIFICATION_CHANNEL_CONFIG.SUBTITLE' | translate }}</p>
+</div>
+
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] rounded-xl">
+      <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+    </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <div class="mb-6">
+      <h5 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+        <mat-icon class="text-[18px] text-blue-600">sms</mat-icon>
+        {{ 'NOTIFICATION_CHANNEL_CONFIG.SMS_SECTION' | translate }}
+      </h5>
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_CHANNEL_CONFIG.SMS_ACCESS_TOKEN' | translate }}</label>
+          <input type="password" formControlName="smsAccessToken" autocomplete="new-password"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            [placeholder]="hasSmsToken() ? ('NOTIFICATION_CHANNEL_CONFIG.KEEP_CURRENT' | translate) : ''">
+          @if (hasSmsToken()) {
+            <p class="text-xs text-emerald-600 mt-1">{{ 'NOTIFICATION_CHANNEL_CONFIG.ALREADY_CONFIGURED' | translate }}</p>
+          }
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_CHANNEL_CONFIG.SMS_SENDER' | translate }}</label>
+          <input type="text" formControlName="smsSender"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_CHANNEL_CONFIG.SMS_API_URL' | translate }}</label>
+          <input type="text" formControlName="smsApiUrl" placeholder="https://api.speedsms.vn/index.php/sms/send"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h5 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+        <mat-icon class="text-[18px] text-purple-600">forum</mat-icon>
+        {{ 'NOTIFICATION_CHANNEL_CONFIG.ZALO_SECTION' | translate }}
+      </h5>
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_CHANNEL_CONFIG.ZALO_ACCESS_TOKEN' | translate }}</label>
+          <input type="password" formControlName="zaloAccessToken" autocomplete="new-password"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            [placeholder]="hasZaloToken() ? ('NOTIFICATION_CHANNEL_CONFIG.KEEP_CURRENT' | translate) : ''">
+          @if (hasZaloToken()) {
+            <p class="text-xs text-emerald-600 mt-1">{{ 'NOTIFICATION_CHANNEL_CONFIG.ALREADY_CONFIGURED' | translate }}</p>
+          }
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_CHANNEL_CONFIG.ZALO_API_URL' | translate }}</label>
+          <input type="text" formControlName="zaloApiUrl" placeholder="https://business.openapi.zalo.me/message/template"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mb-4">{{ 'NOTIFICATION_CHANNEL_CONFIG.HINT' | translate }}</p>
+
+    <button type="submit" [disabled]="isSaving()"
+      class="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center transition-colors shadow-sm text-sm">
+      @if (isSaving()) {
+        <mat-icon class="text-[18px] mr-2 animate-spin">autorenew</mat-icon>
+      } @else {
+        <mat-icon class="text-[18px] mr-2">save</mat-icon>
+      }
+      {{ 'COMMON.SAVE' | translate }}
+    </button>
+  </form>
+</div>

@@ -1,0 +1,135 @@
+<div class="mb-5">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'MAP_SHELVING.TITLE' | translate }}</h4>
+  <p class="text-sm text-gray-500 mt-1">{{ 'MAP_SHELVING.HINT' | translate }}</p>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+    <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="storeId" (change)="onStoreChange()"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'MAP_SHELVING.SELECT_STORE' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+    </ng-select>
+    <input formControlName="receiptCode" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.RECEIPT_CODE' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="barcodeFrom" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.BARCODE_FROM' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    <input formControlName="barcodeTo" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.BARCODE_TO' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button (click)="triggerSearch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+  </div>
+  @if (!searchForm.value.storeId) {
+    <p class="text-xs text-amber-600 mt-2 flex items-center gap-1"><mat-icon class="text-[14px]">info</mat-icon> {{ 'MAP_SHELVING.SELECT_STORE_HINT' | translate }}</p>
+  }
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+  <!-- Danh sách chưa xếp giá -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+    <div class="overflow-x-auto w-full">
+      <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-12 border-b border-gray-200 bg-gray-50">
+            <input type="checkbox" (change)="toggleAllRows()" [checked]="selection.hasValue() && isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+          </th>
+          <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100">
+            <input type="checkbox" (click)="$event.stopPropagation()" (change)="selection.toggle(row)" [checked]="selection.isSelected(row)" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="barcode"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SHELVING.BARCODE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-mono font-medium text-gray-800 border-b border-gray-100">{{ row.barcode || '—' }}</td></ng-container>
+        <ng-container matColumnDef="bibTitle"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'BIB.COL_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-800 border-b border-gray-100">{{ row.bibTitle || '—' }}</td></ng-container>
+        <ng-container matColumnDef="ddc"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">DDC</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-mono text-gray-700 border-b border-gray-100">{{ row.ddc || '—' }}</td></ng-container>
+        <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+        <ng-container matColumnDef="suggestion">
+          <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'MAP_SHELVING.SUGGESTION' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm border-b border-gray-100">
+            @if (row.suggestedMapObjectId) {
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                <mat-icon class="text-[13px]">place</mat-icon> {{ suggestionLabel(row) }}
+              </span>
+            } @else {
+              <span class="text-xs text-gray-400">{{ 'MAP_SHELVING.NO_SUGGESTION' | translate }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors cursor-pointer" (click)="selection.toggle(row)"></tr>
+        <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">inventory_2</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+  </div>
+
+  <!-- Sơ đồ chọn vị trí -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5 flex flex-col">
+    @if (!searchForm.value.storeId) {
+      <div class="flex-1 flex items-center justify-center text-gray-400 text-sm py-16">
+        {{ 'MAP_SHELVING.SELECT_STORE_HINT' | translate }}
+      </div>
+    } @else {
+      <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-2">
+        @for (f of floors(); track f.id) {
+          <button type="button" (click)="onFloorChange(f.id)"
+                  [class]="selectedFloorId() === f.id ? 'bg-blue-600 text-white font-bold border-blue-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'"
+                  class="flex-shrink-0 px-3 py-1.5 rounded-xl border transition-all text-xs cursor-pointer">
+            {{ f.name }}
+          </button>
+        }
+        @if (floors().length === 0) {
+          <span class="text-sm text-gray-400">{{ 'MAP_SHELVING.NO_SHELVES' | translate }}</span>
+        }
+      </div>
+
+      @if (currentFloor(); as floor) {
+        <div class="relative w-full bg-gray-50 border-2 border-gray-200 rounded-xl overflow-hidden shadow-inner select-none" style="aspect-ratio: 3 / 2;">
+          <div class="absolute inset-0 opacity-40 pointer-events-none"
+               style="background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px); background-size: 30px 30px;"></div>
+
+          @for (shelf of floor.shelves; track shelf.id) {
+            <div class="absolute rounded-lg border-2 flex flex-col items-center justify-center text-center px-1 cursor-pointer hover:z-20 hover:shadow-lg transition-shadow overflow-hidden"
+                 [style.left.%]="geomFor(shelf).x"
+                 [style.top.%]="geomFor(shelf).y"
+                 [style.width.%]="geomFor(shelf).w"
+                 [style.height.%]="geomFor(shelf).h"
+                 [style.borderColor]="selectedShelfId() === shelf.id ? '#16a34a' : (shelf.colorHex || '#3b82f6')"
+                 [style.borderWidth.px]="selectedShelfId() === shelf.id ? 3 : 2"
+                 [style.backgroundColor]="(selectedShelfId() === shelf.id ? '#16a34a' : (shelf.colorHex || '#3b82f6')) + '1a'"
+                 (click)="selectShelf(shelf)">
+              <mat-icon class="text-base leading-none" [style.color]="shelf.colorHex || '#3b82f6'">menu_book</mat-icon>
+              <span class="text-[10px] font-bold leading-tight line-clamp-2 text-gray-800">{{ shelf.name }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      @if (selectedShelf(); as shelf) {
+        <div class="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <p class="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+            <mat-icon class="text-[16px]">check_circle</mat-icon> {{ shelf.name }}
+          </p>
+          @if (shelf.shelfDetail?.rows?.length) {
+            <div class="mt-2">
+              <label class="block text-xs font-semibold text-gray-600 mb-1">{{ 'MAP_SHELVING.SELECT_ROW' | translate }}</label>
+              <ng-select [items]="shelf.shelfDetail!.rows" bindValue="id"
+                         [ngModel]="selectedRowId()" (ngModelChange)="selectedRowId.set($event)"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'MAP_SHELVING.WHOLE_SHELF' | translate"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                <ng-template ng-label-tmp let-item="item">{{ 'MAP_SHELVING.ROW' | translate }} {{ item.rowIndex }} ({{ item.ddcStart }} – {{ item.ddcEnd }})</ng-template>
+                <ng-template ng-option-tmp let-item="item">{{ 'MAP_SHELVING.ROW' | translate }} {{ item.rowIndex }} ({{ item.ddcStart }} – {{ item.ddcEnd }})</ng-template>
+              </ng-select>
+            </div>
+          }
+        </div>
+      }
+
+      <button (click)="placeSelected()" [disabled]="selection.selected.length === 0 || !selectedShelfId() || isPlacing()"
+              class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+        @if (isPlacing()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">inventory_2</mat-icon> }
+        {{ 'MAP_SHELVING.PLACE_BTN' | translate }} ({{ selection.selected.length }})
+      </button>
+    }
+  </div>
+</div>

@@ -1,0 +1,149 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'MARC_DICT.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-3 items-center justify-between">
+  <input [ngModel]="keyword()" (ngModelChange)="keyword.set($event)" [ngModelOptions]="{standalone:true}" type="text" placeholder="{{ 'COMMON.SEARCH' | translate }}..." class="flex-1 min-w-[220px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+  <button *appCan="'add'" (click)="openAddField()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[18px]">add</mat-icon> {{ 'MARC_DICT.ADD_FIELD' | translate }}</button>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] rounded-xl">
+      <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+    </div>
+  }
+  @for (f of filteredFields(); track f.id) {
+    <div class="border border-gray-200 rounded-lg mb-2 overflow-hidden">
+      <div class="flex items-center gap-2 px-3 py-2 bg-gray-50">
+        <button type="button" (click)="toggleExpand(f.id)" class="p-1 rounded text-gray-500 hover:bg-gray-200">
+          <mat-icon class="text-[20px]">{{ isExpanded(f.id) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+        </button>
+        <span class="font-mono font-bold text-blue-700 w-14">{{ f.field }}</span>
+        <span class="flex-1 text-sm text-gray-700 truncate">{{ f.vndescription || f.description || '—' }}</span>
+        @if ((f.mandatory ?? 0) === 1) { <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold">{{ 'MARC_DICT.MANDATORY' | translate }}</span> }
+        @if ((f.repeatable ?? 0) === 1) { <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold">{{ 'MARC_DICT.REPEATABLE' | translate }}</span> }
+        <button *appCan="'edit'" (click)="openEditField(f)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50" [title]="'COMMON.EDIT' | translate"><mat-icon class="text-[16px]">edit</mat-icon></button>
+        <button *appCan="'delete'" (click)="handleDelete('field', f.publicId)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[16px]">delete</mat-icon></button>
+      </div>
+
+      @if (isExpanded(f.id)) {
+        <div class="px-4 py-3 pl-10 space-y-4">
+          <!-- Trường con -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-bold text-gray-500 uppercase">{{ 'MARC_DICT.SUBFIELDS' | translate }}</span>
+              <button *appCan="'add'" type="button" (click)="openAddSubfield(f)" class="text-xs text-blue-600 hover:underline flex items-center gap-0.5"><mat-icon class="text-[14px]">add</mat-icon>{{ 'MARC_DICT.ADD_SUBFIELD' | translate }}</button>
+            </div>
+            <div class="space-y-1">
+              @for (s of subfieldsOf(f.field); track s.id) {
+                <div class="flex items-center gap-2 text-sm py-1 px-2 rounded hover:bg-gray-50">
+                  <span class="font-mono text-gray-500">${{ s.subfield }}</span>
+                  <span class="flex-1 text-gray-700 truncate">{{ s.vndescription || s.description || '—' }}</span>
+                  <button *appCan="'edit'" (click)="openEditSubfield(s)" class="p-1 rounded text-blue-600 hover:bg-blue-50"><mat-icon class="text-[15px]">edit</mat-icon></button>
+                  <button *appCan="'delete'" (click)="handleDelete('subfield', s.publicId)" class="p-1 rounded text-red-500 hover:bg-red-50"><mat-icon class="text-[15px]">delete</mat-icon></button>
+                </div>
+              }
+              @if (!subfieldsOf(f.field).length) { <p class="text-xs text-gray-400 py-1">{{ 'COMMON.NO_DATA' | translate }}</p> }
+            </div>
+          </div>
+
+          <!-- Chỉ thị -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-bold text-gray-500 uppercase">{{ 'MARC_DICT.INDICATORS' | translate }}</span>
+              <button *appCan="'add'" type="button" (click)="openAddIndicator(f)" class="text-xs text-blue-600 hover:underline flex items-center gap-0.5"><mat-icon class="text-[14px]">add</mat-icon>{{ 'MARC_DICT.ADD_INDICATOR' | translate }}</button>
+            </div>
+            <div class="space-y-1">
+              @for (i of indicatorsOf(f.field); track i.id) {
+                <div class="flex items-center gap-2 text-sm py-1 px-2 rounded hover:bg-gray-50">
+                  <span class="font-mono text-gray-500">{{ i.indicator }}@if (i.value) {<span> = {{ i.value }}</span>}</span>
+                  <span class="flex-1 text-gray-700 truncate">{{ i.vndescription || i.description || '—' }}</span>
+                  <button *appCan="'edit'" (click)="openEditIndicator(i)" class="p-1 rounded text-blue-600 hover:bg-blue-50"><mat-icon class="text-[15px]">edit</mat-icon></button>
+                  <button *appCan="'delete'" (click)="handleDelete('indicator', i.publicId)" class="p-1 rounded text-red-500 hover:bg-red-50"><mat-icon class="text-[15px]">delete</mat-icon></button>
+                </div>
+              }
+              @if (!indicatorsOf(f.field).length) { <p class="text-xs text-gray-400 py-1">{{ 'COMMON.NO_DATA' | translate }}</p> }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+  @if (!filteredFields().length && !isLoading()) { <p class="text-center text-gray-400 py-10">{{ 'COMMON.NO_DATA' | translate }}</p> }
+</div>
+
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ (editMode() ? 'COMMON.EDIT' : 'COMMON.ADD') | translate }} —
+          {{ (modalKind() === 'field' ? 'MARC_DICT.FIELD' : modalKind() === 'subfield' ? 'MARC_DICT.SUBFIELD' : 'MARC_DICT.INDICATOR') | translate }}
+          @if (modalKind() !== 'field') { <span class="text-sm text-gray-400 font-normal">({{ parentFieldTag() }})</span> }
+        </h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><mat-icon>close</mat-icon></button>
+      </div>
+
+      @if (modalKind() === 'field') {
+        <form [formGroup]="fieldForm" (ngSubmit)="onSubmit()" class="px-6 py-5 grid grid-cols-1 gap-3">
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.TAG' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Field" type="text" maxlength="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.VNDESC' | translate }}</label>
+            <input formControlName="Vndescription" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.DESC' | translate }}</label>
+            <input formControlName="Description" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" formControlName="Repeatable"> {{ 'MARC_DICT.REPEATABLE' | translate }}</label>
+            <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" formControlName="MANDATORY"> {{ 'MARC_DICT.MANDATORY' | translate }}</label>
+          </div>
+        </form>
+      }
+      @if (modalKind() === 'subfield') {
+        <form [formGroup]="subfieldForm" (ngSubmit)="onSubmit()" class="px-6 py-5 grid grid-cols-1 gap-3">
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.SUBFIELD_CODE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Subfield" type="text" maxlength="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.VNDESC' | translate }}</label>
+            <input formControlName="Vndescription" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.DESC' | translate }}</label>
+            <input formControlName="Description" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" formControlName="Repeatable"> {{ 'MARC_DICT.REPEATABLE' | translate }}</label>
+            <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" formControlName="MANDATORY"> {{ 'MARC_DICT.MANDATORY' | translate }}</label>
+          </div>
+        </form>
+      }
+      @if (modalKind() === 'indicator') {
+        <form [formGroup]="indicatorForm" (ngSubmit)="onSubmit()" class="px-6 py-5 grid grid-cols-1 gap-3">
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.INDICATOR_NO' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="INDICATOR" type="text" maxlength="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.INDICATOR_VALUE' | translate }}</label>
+            <input formControlName="Value" type="text" maxlength="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.VNDESC' | translate }}</label>
+            <input formControlName="VNDESCRIPTION" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'MARC_DICT.DESC' | translate }}</label>
+            <input formControlName="Description" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </form>
+      }
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,265 @@
+@if (!activeInventory()) {
+  <!-- ===== Danh sách phiên kiểm kê ===== -->
+  <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'INVENTORY.TITLE' | translate }}</h4>
+  </div>
+
+  <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5">
+    <form [formGroup]="searchForm" (ngSubmit)="triggerSearch()" class="flex flex-wrap gap-2 items-end">
+      <button *appCan="'add'" type="button" (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'INVENTORY.NEW_SESSION' | translate }}</button>
+      <input formControlName="keyword" [placeholder]="'COMMON.SEARCH' | translate" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48">
+      <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.FROM' | translate }}</label><app-date-input formControlName="dateFrom"></app-date-input></div>
+      <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.TO' | translate }}</label><app-date-input formControlName="dateTo"></app-date-input></div>
+      @if (isPrivileged) { <div class="w-56"><app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /></div> }
+      <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">search</mat-icon></button>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+    <div class="overflow-x-auto w-full">
+      <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+        <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+        <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'INVENTORY.NAME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.inventoryName }}</td></ng-container>
+        <ng-container matColumnDef="date"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'INVENTORY.DATE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.inventoryDate ? (row.inventoryDate | appDate) : '—' }}</td></ng-container>
+        <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.STATUS' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100"><span class="px-2 py-0.5 rounded-full text-xs font-medium" [class]="row.status === 2 ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700'">{{ getStatusLabel(row.status) }}</span></td></ng-container>
+        <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right"><div class="flex items-center justify-end gap-1">
+            <button (click)="openScan(row)" class="px-2 py-1 rounded-lg text-green-600 hover:bg-green-50 transition-colors text-sm inline-flex items-center gap-1" [title]="'INVENTORY.OPEN_SCAN' | translate"><mat-icon class="text-[18px]">qr_code_scanner</mat-icon> {{ 'INVENTORY.SCAN' | translate }}</button>
+            <button *appCan="'edit'" (click)="openEditModal(row)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" [title]="'COMMON.EDIT' | translate"><mat-icon class="text-[18px]">edit</mat-icon></button>
+            <button *appCan="'delete'" (click)="handleDelete(row)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+          </div></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+        <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">inventory</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+  </div>
+} @else {
+  <!-- ===== Chế độ quét kiểm kê ===== -->
+  <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+    <div>
+      <button (click)="closeScan()" class="text-sm text-blue-600 hover:underline flex items-center gap-1 mb-1"><mat-icon class="text-[16px]">arrow_back</mat-icon> {{ 'INVENTORY.TITLE' | translate }}</button>
+      <h4 class="text-2xl font-bold text-gray-800">{{ activeInventory()?.inventoryName }}</h4>
+    </div>
+    <div class="flex gap-2">
+      <button *appCan="'add'" (click)="openImportModal()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">file_upload</mat-icon> {{ 'INVENTORY.IMPORT_BULK' | translate }}</button>
+      <button *appCan="'export'" (click)="exportReport()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">download</mat-icon> {{ 'INVENTORY.EXPORT_REPORT' | translate }}</button>
+    </div>
+  </div>
+
+  @if (summary(); as s) {
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center"><p class="text-2xl font-bold text-blue-600">{{ s.scanned }}</p><p class="text-xs text-gray-500 mt-0.5">{{ 'INVENTORY.SCANNED' | translate }}</p></div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center"><p class="text-2xl font-bold text-amber-600">{{ s.notCorrectStore }}</p><p class="text-xs text-gray-500 mt-0.5">{{ 'INVENTORY.NOT_CORRECT_STORE' | translate }}</p></div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center"><p class="text-2xl font-bold text-orange-500">{{ s.notRegister }}</p><p class="text-xs text-gray-500 mt-0.5">{{ 'INVENTORY.NOT_REGISTER' | translate }}</p></div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 text-center"><p class="text-2xl font-bold text-red-600">{{ s.lost }}</p><p class="text-xs text-gray-500 mt-0.5">{{ 'INVENTORY.LOST' | translate }}</p></div>
+    </div>
+  }
+
+  <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-end">
+    <div class="flex-1 min-w-[200px]"><label class="block text-xs text-gray-500 mb-1">{{ 'INVENTORY.SCAN_BARCODE' | translate }}</label>
+      <input [(ngModel)]="scanInput" (keyup.enter)="submitScan()" [placeholder]="'INVENTORY.SCAN_PLACEHOLDER' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+    <div><label class="block text-xs text-gray-500 mb-1">{{ 'STORE.TITLE' | translate }}</label>
+      <ng-select [items]="stores()" bindLabel="name" bindValue="id" [(ngModel)]="scanStoreId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'COMMON.ALL' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <button (click)="submitScan()" [disabled]="isScanning()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50">
+      @if (isScanning()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add_task</mat-icon> } {{ 'INVENTORY.DO_SCAN' | translate }}
+    </button>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-3 py-2 border-b border-gray-100 flex flex-wrap gap-1 items-center">
+      <span class="text-xs text-gray-500 mr-1">{{ 'INVENTORY.FILTER_STORE' | translate }}:</span>
+      @for (o of filterOptions; track o.id) {
+        <button (click)="setFilterCheckStore(o.id)" class="px-2 py-1 rounded-lg text-xs font-medium transition-colors" [class]="filterCheckStore() === o.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">{{ 'INVENTORY.FILTER_' + o.label | translate }}</button>
+      }
+    </div>
+    <div class="overflow-x-auto w-full">
+      <table mat-table [dataSource]="barcodes" class="w-full text-left border-collapse">
+        <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getBcRowIndex(i) }}</td></ng-container>
+        <ng-container matColumnDef="barcode"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'INVENTORY.BARCODE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-mono text-gray-800 border-b border-gray-100">{{ row.barcode }}</td></ng-container>
+        <ng-container matColumnDef="bibTitle"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'BIB.COL_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.bibTitle || '—' }}</td></ng-container>
+        <ng-container matColumnDef="store"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'STORE.TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.storeName || getStoreName(row.storeId) }}</td></ng-container>
+        <ng-container matColumnDef="flags">
+          <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'INVENTORY.FLAGS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100"><div class="flex flex-wrap gap-1">
+            @if (row.checkRegisteter === Flag.No) { <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">{{ 'INVENTORY.NOT_REGISTER' | translate }}</span> }
+            @if (row.checkStoreStatus === Flag.No) { <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">{{ 'INVENTORY.WRONG_STORE' | translate }}</span> }
+            @if (row.checkBorrow === Flag.No) { <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">{{ 'INVENTORY.BORROWED' | translate }}</span> }
+          </div></td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="bcColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: bcColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+        <tr class="mat-row" *matNoDataRow><td [attr.colspan]="bcColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">qr_code_scanner</mat-icon><p>{{ 'INVENTORY.NO_SCAN' | translate }}</p></td></tr>
+      </table>
+    </div>
+    <mat-paginator [length]="bcTotal" [pageSize]="bcPageSize" [pageIndex]="bcPageIndex" [pageSizeOptions]="[10,20,50,100]" (page)="onBcPage($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+  </div>
+}
+
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">inventory</mat-icon>{{ (editMode() ? 'INVENTORY.EDIT_TITLE' : 'INVENTORY.ADD_TITLE') | translate }}</h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5">
+        <div class="grid grid-cols-1 gap-4">
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'INVENTORY.NAME' | translate }} <span class="text-red-500">*</span></label><input formControlName="InventoryName" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'INVENTORY.DATE' | translate }}</label><app-date-input formControlName="InventoryDate"></app-date-input></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'COMMON.STATUS' | translate }}</label>
+            <ng-select [items]="statusOptions" bindValue="id" formControlName="Status"
+                       [searchable]="true" [clearable]="false"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ 'INVENTORY.STATUS_' + item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ 'INVENTORY.STATUS_' + item.label | translate }}</ng-template>
+            </ng-select></div>
+        </div>
+      </form>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Đợt 22.5 — Nhập Excel danh sách mã đã quét hàng loạt -->
+@if (showImportModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden" style="max-height:90vh">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-blue-600">file_upload</mat-icon>
+          {{ 'INVENTORY.IMPORT_BULK' | translate }}
+        </h3>
+        <button (click)="closeImportModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+        @if (!importResult()) {
+          <div class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors"
+               (click)="fileInput.click()">
+            <mat-icon class="text-gray-300 mb-1" style="font-size:36px;width:36px;height:36px">upload_file</mat-icon>
+            @if (importFile()) {
+              <span class="text-sm text-blue-700 font-medium px-2 text-center break-all">{{ importFile()!.name }}</span>
+            } @else {
+              <span class="text-sm text-gray-400">{{ 'RE_REGISTER.IMPORT_PICK_FILE' | translate }}</span>
+            }
+          </div>
+          <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" (change)="onImportFileSelect($event)">
+          <p class="mt-2 text-xs text-gray-400 leading-relaxed">{{ 'INVENTORY.IMPORT_COLUMNS' | translate }}</p>
+
+          @if (adminTasksEnabled()) {
+            <div class="mt-3 flex items-start gap-3 px-3 py-2.5 rounded-xl border"
+                 [class.border-blue-200]="importBackground()" [class.bg-blue-50]="importBackground()"
+                 [class.border-gray-200]="!importBackground()" [class.bg-gray-50]="!importBackground()">
+              <label class="relative inline-flex items-center cursor-pointer mt-0.5 flex-shrink-0">
+                <input type="checkbox" class="sr-only peer" [checked]="importBackground()" (change)="importBackground.set($any($event.target).checked)">
+                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer
+                            peer-checked:after:translate-x-full peer-checked:after:border-white
+                            after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                            after:bg-white after:border-gray-300 after:border after:rounded-full
+                            after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+              </label>
+              <div>
+                <p class="text-sm font-medium" [class.text-blue-700]="importBackground()" [class.text-gray-700]="!importBackground()">{{ 'ADMIN_TASKS.BACKGROUND_TOGGLE' | translate }}</p>
+                <p class="text-xs text-gray-400 leading-relaxed">{{ 'ADMIN_TASKS.BACKGROUND_TOGGLE_HINT' | translate }}</p>
+              </div>
+            </div>
+          }
+
+          @if (isImporting()) {
+            <div class="flex items-center justify-center gap-2 mt-3 text-blue-600 text-sm font-medium">
+              <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> {{ 'COMMON.LOADING' | translate }}
+            </div>
+          }
+        } @else {
+          <div class="text-center mb-4">
+            @if (importResult()!.failedCount === 0) {
+              <div class="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-green-600" style="font-size:2rem;width:2rem;height:2rem">check_circle</mat-icon>
+              </div>
+            } @else {
+              <div class="w-14 h-14 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-yellow-500" style="font-size:2rem;width:2rem;height:2rem">warning</mat-icon>
+              </div>
+            }
+            <p class="font-semibold text-gray-800">{{ 'RE_REGISTER.IMPORT_RESULT' | translate }}</p>
+          </div>
+
+          <div class="flex gap-3 mb-4">
+            <div class="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-green-600">{{ importResult()!.successCount }}</p>
+              <p class="text-xs text-green-700 mt-0.5">{{ 'ADMIN_TASKS.RESULT_SUCCESS' | translate }}</p>
+            </div>
+            <div class="flex-1 bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-amber-600">{{ importResult()!.skippedCount }}</p>
+              <p class="text-xs text-amber-700 mt-0.5">{{ 'INVENTORY.IMPORT_SKIPPED' | translate }}</p>
+            </div>
+            <div class="flex-1 bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-red-500">{{ importResult()!.failedCount }}</p>
+              <p class="text-xs text-red-600 mt-0.5">{{ 'ADMIN_TASKS.RESULT_FAILED' | translate }}</p>
+            </div>
+          </div>
+
+          @if (importResult()!.errors.length > 0) {
+            <div class="border border-red-100 rounded-xl bg-red-50/50 px-3 py-2 max-h-36 overflow-y-auto">
+              <p class="text-xs font-semibold text-red-600 mb-1">{{ 'RE_REGISTER.IMPORT_ERRORS' | translate }}</p>
+              @for (e of importResult()!.errors; track e) {
+                <p class="text-xs text-red-500 leading-relaxed py-0.5">• {{ e }}</p>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+        @if (importResult()) {
+          <button (click)="closeImportModal()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CLOSE' | translate }}
+          </button>
+          <button (click)="importResult.set(null); importFile.set(null)"
+                  class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm flex items-center justify-center gap-1.5">
+            <mat-icon class="text-[16px]">refresh</mat-icon> {{ 'RE_REGISTER.IMPORT_AGAIN' | translate }}
+          </button>
+        } @else {
+          <button (click)="closeImportModal()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button *appCan="'add'" (click)="confirmImport()" [disabled]="!importFile() || isImporting()"
+                  class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+            @if (isImporting()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">file_upload</mat-icon> }
+            {{ (importBackground() ? 'ADMIN_TASKS.PREVIEW' : 'INVENTORY.IMPORT_BULK') | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}

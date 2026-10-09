@@ -1,0 +1,241 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'NGANH.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filter Section -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 relative overflow-hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div>
+      <label for="searchNganh" class="block text-xs font-bold text-gray-700 mb-2">{{ 'NGANH.NAME' | translate }}</label>
+      <input id="searchNganh" type="text" (keydown.enter)="triggerSearch()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" [placeholder]="'NGANH.SEARCH_PLACEHOLDER' | translate">
+    </div>
+    @if (isPrivileged) {
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.TENANT' | translate }}</label>
+        <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+                   [(ngModel)]="tenantId" (change)="onTenantChange()"
+                   [appendTo]="'body'"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+    } @else {
+      <div class="hidden xl:block"></div>
+    }
+    <div class="hidden xl:block"></div>
+    <div class="flex items-end">
+      <button (click)="triggerSearch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm shadow-sm transition-colors">
+        <span class="material-icons text-[18px] mr-2 text-white">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex gap-3 items-center justify-between flex-wrap">
+  <div class="flex gap-2">
+    <button *appCan="'add'" (click)="openAddModal()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-1.5 px-3 rounded-lg flex items-center text-sm shadow-sm transition-colors">
+      <mat-icon class="text-sm mr-1.5 pt-0.5">add</mat-icon> {{ 'COMMON.ADD_BTN' | translate }}
+    </button>
+    <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0" class="border border-red-500 text-red-500 hover:bg-red-50 font-medium py-1.5 px-3 rounded-lg flex items-center text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      <mat-icon class="text-sm mr-1.5 pt-0.5">delete</mat-icon> {{ 'COMMON.DELETE_SELECTED' | translate }}
+    </button>
+  </div>
+</div>
+
+<!-- Table Section -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 w-12 text-center border-b border-gray-200 bg-gray-50">
+          <input type="checkbox" (change)="$event ? toggleAllRows() : null"
+                 [checked]="selection.hasValue() && isAllSelected()"
+                 [indeterminate]="selection.hasValue() && !isAllSelected()"
+                 class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+        </th>
+        <td mat-cell *matCellDef="let row" class="py-3 px-4 text-center border-b border-gray-100">
+          <input type="checkbox" (click)="$event.stopPropagation()"
+                 (change)="$event ? selection.toggle(row) : null"
+                 [checked]="selection.isSelected(row)"
+                 class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="id">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium w-16 text-center text-sm text-gray-600 border-b border-gray-200"> ID </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-center text-sm text-gray-500 border-b border-gray-100"> {{element.id}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="majorsCode">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-32"> {{ 'NGANH.CODE' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm font-medium text-blue-600 border-b border-gray-100"> {{element.majorsCode}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="majorsName">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200"> {{ 'NGANH.NAME' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm font-medium text-gray-800 border-b border-gray-100"> {{element.majorsName}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="parent">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200"> {{ 'NGANH.PARENT' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100"> {{ getParentName(element.parentId) }} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-32"> {{ 'NGANH.STATUS' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm border-b border-gray-100">
+          @if (element.status === 2) {
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">{{ 'COMMON.STATUS_ACTIVE' | translate }}</span>
+          } @else {
+            <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">{{ 'COMMON.STATUS_INACTIVE' | translate }}</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="tenant">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200"> {{ 'COMMON.TENANT' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100"> {{ element.tenantName ?? '—' }} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-3 px-4 font-medium text-center w-36 text-sm text-gray-600 border-b border-gray-200"> {{ 'COMMON.ACTIONS' | translate }} </th>
+        <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100">
+          <div class="flex items-center justify-center space-x-2">
+            <button (click)="goToReport(element.publicId || element.id); $event.stopPropagation()" class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors" [title]="'NGANH.VIEW_REPORT' | translate">
+              <mat-icon class="text-[18px]">assessment</mat-icon>
+            </button>
+            <button (click)="goToSubjects(element.publicId || element.id); $event.stopPropagation()" class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors" [title]="'NGANH.MANAGE_SUBJECTS' | translate">
+              <mat-icon class="text-[18px]">menu_book</mat-icon>
+            </button>
+            <button *appCan="'edit'" (click)="openEditModal(element.publicId || element.id); $event.stopPropagation()" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors" [title]="'COMMON.EDIT' | translate">
+              <mat-icon class="text-[18px]">edit</mat-icon>
+            </button>
+            <button *appCan="'delete'" (click)="confirmDelete(element.publicId || element.id); $event.stopPropagation()" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors" [title]="'COMMON.DELETE' | translate">
+              <mat-icon class="text-[18px]">delete</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns" class="bg-gray-50"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="selection.toggle(row)"></tr>
+
+      <tr class="mat-row" *matNoDataRow>
+        <td class="py-6 px-4 text-center text-gray-500" [attr.colspan]="displayedColumns.length">
+          {{ 'COMMON.NO_DATA' | translate }}
+        </td>
+      </tr>
+    </table>
+
+    <mat-paginator [length]="totalRecords"
+                   [pageSize]="pageSize" [pageIndex]="pageIndex"
+                   [pageSizeOptions]="[5, 10, 25, 100]"
+                   (page)="onPageChange($event)"
+                   aria-label="Select page">
+    </mat-paginator>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-gray-800">{{ editMode() ? ('COMMON.MODAL_EDIT_TITLE' | translate) : ('COMMON.MODAL_ADD_TITLE' | translate) }}</h3>
+        <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="modalMajorsCode" class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.CODE' | translate }} <span class="text-red-500">*</span></label>
+            <input id="modalMajorsCode" type="text" formControlName="majorsCode" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label for="modalMajorsName" class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.NAME' | translate }} <span class="text-red-500">*</span></label>
+            <input id="modalMajorsName" type="text" formControlName="majorsName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.PARENT' | translate }}</label>
+          <ng-select [items]="parentOptionsFor(currentId())" bindLabel="majorsName" bindValue="id"
+                     formControlName="parentId" [appendTo]="'body'"
+                     [searchable]="true" [clearable]="true"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate">
+          </ng-select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.PROGRAM' | translate }}</label>
+          <ng-select [items]="programOptions" bindLabel="name" bindValue="id"
+                     formControlName="programId" [appendTo]="'body'"
+                     [searchable]="true" [clearable]="true"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate">
+          </ng-select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="modalAmountStudent" class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.AMOUNT_STUDENT' | translate }}</label>
+            <input id="modalAmountStudent" type="number" formControlName="amountStudent" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label for="modalSortOrder" class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.SORT_ORDER' | translate }}</label>
+            <input id="modalSortOrder" type="number" formControlName="sortOrder" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'NGANH.STATUS' | translate }}</label>
+          <select formControlName="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <option [ngValue]="2">{{ 'COMMON.STATUS_ACTIVE' | translate }}</option>
+            <option [ngValue]="1">{{ 'COMMON.STATUS_INACTIVE' | translate }}</option>
+          </select>
+        </div>
+
+        <div class="pt-4 flex gap-3">
+          <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button type="submit" [disabled]="dataForm.invalid" class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {{ editMode() ? ('COMMON.UPDATE' | translate) : ('COMMON.SAVE' | translate) }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="material-icons text-3xl">warning</span>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'COMMON.DELETE_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-6">{{ 'COMMON.DELETE_CONFIRM_MSG' | translate }}</p>
+        <div class="flex gap-3">
+          <button (click)="closeConfirm()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmActionExecute()" class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+            {{ 'COMMON.DELETE_CONFIRM_BTN' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

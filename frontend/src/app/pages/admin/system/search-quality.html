@@ -1,0 +1,108 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'SEARCH_QUALITY.TITLE' | translate }}</h4>
+  <div class="flex gap-2">
+    @for (d of dayOptions; track d) {
+      <button (click)="setDays(d)"
+              [class]="days() === d ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'"
+              class="py-1.5 px-3 rounded-lg text-sm font-medium transition-colors">
+        {{ d }} {{ 'SEARCH_QUALITY.DAYS' | translate }}
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="flex items-center justify-center py-20">
+    <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+  </div>
+} @else if (report(); as r) {
+  <!-- Stat tiles -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-5">
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-xs text-gray-500 mb-1">{{ 'SEARCH_QUALITY.TOTAL' | translate }}</div>
+      <div class="text-2xl font-bold text-gray-800">{{ r.total }}</div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-xs text-gray-500 mb-1">{{ 'SEARCH_QUALITY.EMPTY_RATE' | translate }}</div>
+      <div class="text-2xl font-bold text-amber-600">{{ round(r.emptyRate) }}%</div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-xs text-gray-500 mb-1">{{ 'SEARCH_QUALITY.FAILURES' | translate }}</div>
+      <div class="text-2xl font-bold text-red-600">{{ r.failures }}</div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-xs text-gray-500 mb-1">{{ 'SEARCH_QUALITY.AVERAGE_MS' | translate }}</div>
+      <div class="text-2xl font-bold text-gray-800">{{ round(r.averageMs) }} ms</div>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="text-xs text-gray-500 mb-1">{{ 'SEARCH_QUALITY.FALLBACK' | translate }}</div>
+      <div class="text-2xl font-bold text-indigo-600">{{ r.fallbackCount }} <span class="text-sm font-normal text-gray-400">({{ round(r.fallbackRate) }}%)</span></div>
+    </div>
+  </div>
+
+  <!-- Tables -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">{{ 'SEARCH_QUALITY.TOP_EMPTY' | translate }}</div>
+      <table class="w-full text-left">
+        <tbody>
+          @for (q of r.topEmpty; track q.query) {
+            <tr class="border-b border-gray-50 last:border-0">
+              <td class="py-2 px-4 text-sm text-gray-700">{{ q.query }}</td>
+              <td class="py-2 px-4 text-sm text-gray-500 text-right w-16">{{ q.count }}</td>
+            </tr>
+          }
+          @if (r.topEmpty.length === 0) {
+            <tr><td class="py-6 px-4 text-center text-gray-400 text-sm">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">{{ 'SEARCH_QUALITY.TOP_QUERIES' | translate }}</div>
+      <table class="w-full text-left">
+        <tbody>
+          @for (q of r.topQueries; track q.query) {
+            <tr class="border-b border-gray-50 last:border-0">
+              <td class="py-2 px-4 text-sm text-gray-700">{{ q.query }}</td>
+              <td class="py-2 px-4 text-sm text-gray-500 text-right w-16">{{ q.count }}</td>
+            </tr>
+          }
+          @if (r.topQueries.length === 0) {
+            <tr><td class="py-6 px-4 text-center text-gray-400 text-sm">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">{{ 'SEARCH_QUALITY.DAILY' | translate }}</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'SEARCH_QUALITY.DATE' | translate }}</th>
+            <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'SEARCH_QUALITY.TOTAL' | translate }}</th>
+            <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'SEARCH_QUALITY.EMPTY' | translate }}</th>
+            <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'SEARCH_QUALITY.FAILURES' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of r.daily; track d.date) {
+            <tr class="border-b border-gray-50 last:border-0">
+              <td class="py-2 px-4 text-sm text-gray-700">{{ d.date | date:'dd/MM/yyyy':'UTC' }}</td>
+              <td class="py-2 px-4 text-sm text-gray-600 text-right">{{ d.count }}</td>
+              <td class="py-2 px-4 text-sm text-amber-600 text-right">{{ d.empty }}</td>
+              <td class="py-2 px-4 text-sm text-red-600 text-right">{{ d.failed }}</td>
+            </tr>
+          }
+          @if (r.daily.length === 0) {
+            <tr><td colspan="4" class="py-6 px-4 text-center text-gray-400 text-sm">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

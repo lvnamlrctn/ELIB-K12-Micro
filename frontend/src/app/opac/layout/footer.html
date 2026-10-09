@@ -1,0 +1,41 @@
+<footer class="bg-main text-white pt-12 pb-6 mt-16">
+  <div class="container mx-auto px-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+      <div>
+        <h4 class="text-lg font-bold mb-4 border-b-2 border-white pb-2 inline-block">
+  <span [innerHTML]="libraryName()"></span>
+</h4>
+        <div class="text-sm mb-2" [innerHTML]="address()"></div>
+        <p class="text-sm mb-2"><i class="fas fa-phone w-5"></i> {{ phone() }}</p>
+        <p class="text-sm"><i class="fas fa-envelope w-5"></i> {{ email() }}</p>
+      </div>
+      <div>
+        <h4 class="text-lg font-bold mb-4 border-b-2 border-white pb-2 inline-block">Liên kết nhanh</h4>
+        <ul class="list-none p-0 m-0">
+          @if (quickLinks().length > 0) {
+            @for (link of quickLinks(); track link.url) {
+              <li class="mb-2"><a [href]="link.url" target="_blank" class="text-white/80 hover:text-white transition-colors">{{ link.name }}</a></li>
+            }
+          } @else {
+            <li class="mb-2"><a href="#" class="text-white/80 hover:text-white transition-colors">Website Phường Phan Đình Phùng</a></li>
+            <li class="mb-2"><a href="#" class="text-white/80 hover:text-white transition-colors">Trung tâm Số</a></li>
+            <li><a href="#" class="text-white/80 hover:text-white transition-colors">Thư viện tỉnh Thái Nguyên</a></li>
+          }
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-lg font-bold mb-4 border-b-2 border-white pb-2 inline-block">{{ 'FOOTER.STATS' | translate }}</h4>
+        <div class="bg-white/10 p-4 rounded">
+          <div class="flex justify-between mb-2 text-sm"><span>{{ 'FOOTER.TODAY' | translate }}:</span> <strong>{{ visitStats().today | number }}</strong></div>
+          <div class="flex justify-between mb-2 text-sm"><span>{{ 'FOOTER.THIS_WEEK' | translate }}:</span> <strong>{{ visitStats().lastWeek | number }}</strong></div>
+          <div class="flex justify-between mb-2 text-sm"><span>{{ 'FOOTER.THIS_MONTH' | translate }}:</span> <strong>{{ visitStats().lastMonth | number }}</strong></div>
+          <div class="flex justify-between text-sm"><span>{{ 'FOOTER.TOTAL' | translate }}:</span> <strong>{{ visitStats().total | number }}</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="text-center mt-10 pt-6 border-t border-white/20 text-sm flex items-center justify-center gap-1">
+  <span>&copy; 2026</span>
+  <span [innerHTML]="libraryName()"></span>
+</div>
+  </div>
+</footer>

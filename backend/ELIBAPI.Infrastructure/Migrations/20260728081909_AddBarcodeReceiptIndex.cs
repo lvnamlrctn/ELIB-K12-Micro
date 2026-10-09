@@ -1,0 +1,28 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace ELIBAPI.Infrastructure.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddBarcodeReceiptIndex : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Barcode_Receipt_Id' AND object_id = OBJECT_ID('PrintBook.Barcode'))
+                CREATE NONCLUSTERED INDEX IX_Barcode_Receipt_Id ON PrintBook.Barcode (Receipt_Id) INCLUDE (BibId, IsDelete);
+            ");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Barcode_Receipt_Id' AND object_id = OBJECT_ID('PrintBook.Barcode'))
+                DROP INDEX IX_Barcode_Receipt_Id ON PrintBook.Barcode;
+            ");
+        }
+    }
+}

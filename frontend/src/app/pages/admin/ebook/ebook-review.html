@@ -1,0 +1,119 @@
+<div class="p-4">
+  <div class="mb-4">
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'EBOOK_REVIEW.TITLE' | translate }}</h4>
+  </div>
+
+  <!-- Filter -->
+  <div class="flex flex-wrap items-end gap-3 mb-4">
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.SEARCH' | translate }}</label>
+      <input type="text" [(ngModel)]="keyword" (keyup.enter)="triggerSearch()"
+             placeholder="{{ 'EBOOK_REVIEW.SEARCH_PLACEHOLDER' | translate }}"
+             class="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-blue-500">
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-1">{{ 'EBOOK_REVIEW.STATUS' | translate }}</label>
+      <ng-select [items]="[{value:1,label:'EBOOK_REVIEW.STATUS_PENDING'},{value:2,label:'EBOOK_REVIEW.STATUS_APPROVED'}]"
+                 bindValue="value" [(ngModel)]="status" (change)="triggerSearch()"
+                 class="min-w-[180px]"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'EBOOK_REVIEW.STATUS_ALL' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate">
+        <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      </ng-select>
+    </div>
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button type="button" (click)="triggerSearch()" class="bg-blue-600 text-white px-5 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors">
+      <i class="fas fa-search mr-1.5"></i>{{ 'COMMON.SEARCH' | translate }}
+    </button>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    }
+    <table mat-table [dataSource]="dataSource" class="w-full">
+      <ng-container matColumnDef="stt">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">STT</th>
+        <td mat-cell *matCellDef="let row; let i = index">{{ getRowIndex(i) }}</td>
+      </ng-container>
+      <ng-container matColumnDef="reviewer">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_REVIEWER' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.displayName }}</td>
+      </ng-container>
+      <ng-container matColumnDef="doc">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_DOC' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.itemTitle }}</td>
+      </ng-container>
+      <ng-container matColumnDef="rating">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_RATING' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          <span class="text-amber-400">
+            @for (s of stars(row.rating); track $index) { <i class="fas fa-star text-xs"></i> }
+          </span>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="content">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_CONTENT' | translate }}</th>
+        <td mat-cell *matCellDef="let row"><span class="line-clamp-2 max-w-[320px] inline-block align-top">{{ row.content }}</span></td>
+      </ng-container>
+      <ng-container matColumnDef="time">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_TIME' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.createdRowDate | appDate:'datetime' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.STATUS' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          @if (row.status === 2) {
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">{{ 'EBOOK_REVIEW.STATUS_APPROVED' | translate }}</span>
+          } @else {
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">{{ 'EBOOK_REVIEW.STATUS_PENDING' | translate }}</span>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="tenant">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'COMMON.TENANT' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.tenantName ?? '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'EBOOK_REVIEW.COL_ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          <div class="flex items-center gap-2">
+            @if (row.status !== 2) {
+              <button type="button" (click)="approve(row)" title="{{ 'EBOOK_REVIEW.APPROVE' | translate }}"
+                      class="text-emerald-600 hover:text-emerald-800"><i class="fas fa-check"></i></button>
+            } @else {
+              <button type="button" (click)="unapprove(row)" title="{{ 'EBOOK_REVIEW.UNAPPROVE' | translate }}"
+                      class="text-amber-600 hover:text-amber-800"><i class="fas fa-rotate-left"></i></button>
+            }
+            <button type="button" (click)="confirmDelete(row)" title="{{ 'COMMON.DELETE' | translate }}"
+                    class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+          </div>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+    @if (!loading() && dataSource.length === 0) {
+      <div class="text-center py-10 text-gray-400 text-sm">{{ 'COMMON.NO_DATA' | translate }}</div>
+    }
+    <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" showFirstLastButtons (page)="onPageChange($event)"></mat-paginator>
+  </div>
+</div>
+
+<!-- Xác nhận xóa -->
+@if (showDeleteConfirm()) {
+  <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" (click)="closeConfirm()">
+    <div class="bg-white rounded-xl shadow-lg max-w-sm w-full p-6" (click)="$event.stopPropagation()">
+      <h5 class="text-lg font-semibold text-gray-800 mb-2">{{ 'COMMON.DELETE' | translate }}</h5>
+      <p class="text-sm text-gray-600 mb-5">{{ 'EBOOK_REVIEW.DELETE_CONFIRM' | translate }}</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" (click)="closeConfirm()" class="px-4 py-2 rounded text-sm border border-gray-300 text-gray-600 hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="doDelete()" class="px-4 py-2 rounded text-sm bg-red-600 text-white font-semibold hover:bg-red-700">{{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}

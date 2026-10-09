@@ -1,0 +1,401 @@
+<!-- Page Header -->
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CATEGORY.TITLE' | translate }}</h4>
+</div>
+
+<!-- Toolbar: Search + Expand/Collapse + Add Root -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+
+    <!-- Đơn vị (chỉ super-admin) -->
+    @if (isPrivileged) {
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.TENANT' | translate }}</label>
+        <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+                   [(ngModel)]="tenantId" (change)="onTenantChange()"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+    }
+
+    <!-- Search -->
+    <div class="xl:col-span-2">
+      <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.NAME' | translate }}</label>
+      <input type="text"
+             [(ngModel)]="searchText"
+             (input)="onSearch()"
+             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+             [placeholder]="'CATEGORY.SEARCH_PLACEHOLDER' | translate">
+    </div>
+
+    <!-- Expand / Collapse -->
+    <div class="flex gap-2">
+      <button (click)="expandAll()"
+              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-3 rounded-lg flex items-center justify-center text-sm transition-colors">
+        <mat-icon class="text-[16px] mr-1">unfold_more</mat-icon>
+        {{ 'CATEGORY.EXPAND_ALL' | translate }}
+      </button>
+      <button (click)="collapseAll()"
+              class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-3 rounded-lg flex items-center justify-center text-sm transition-colors">
+        <mat-icon class="text-[16px] mr-1">unfold_less</mat-icon>
+        {{ 'CATEGORY.COLLAPSE_ALL' | translate }}
+      </button>
+    </div>
+
+    <!-- Add Root -->
+    <div>
+      <button (click)="openCreate()"
+              class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center text-sm shadow-sm transition-colors">
+        <mat-icon class="text-[16px] mr-1.5">add</mat-icon>
+        {{ 'CATEGORY.ADD_ROOT' | translate }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tree Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+
+  @if (loading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse min-w-[900px]">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200">
+            {{ 'CATEGORY.NAME' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-24 text-center">
+            {{ 'CATEGORY.LEVEL' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-24 text-center">
+            {{ 'CATEGORY.ORDER' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-36 text-center">
+            {{ 'COMMON.STATUS' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200">
+            {{ 'CATEGORY.LINK' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-28 text-center">
+            {{ 'CATEGORY.CHILDREN' | translate }}
+          </th>
+          <th class="py-3 px-4 font-medium text-sm text-gray-600 border-b border-gray-200 w-32 text-center">
+            {{ 'COMMON.ACTIONS' | translate }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (node of flatTree; track getNodeId(node)) {
+          @if (node.visible) {
+            <tr class="hover:bg-gray-50/60 transition-colors border-b border-gray-100">
+
+              <!-- Name column with tree indent -->
+              <td class="py-2.5 px-4">
+                <div class="flex items-center" [style.paddingLeft]="(node.depth || 0) * 22 + 'px'">
+                  <!-- Expand/collapse toggle -->
+                  @if (node.hasChildren || node.children?.length) {
+                    <button (click)="toggleNode(node); $event.stopPropagation()"
+                            class="w-5 h-5 flex items-center justify-center mr-1 text-gray-400 hover:text-blue-600 transition-transform duration-150"
+                            [class.rotate-90]="node.expanded">
+                      <mat-icon class="text-[16px] leading-none">chevron_right</mat-icon>
+                    </button>
+                  } @else {
+                    <span class="w-5 h-5 mr-1 inline-block shrink-0"></span>
+                  }
+
+                  <!-- Folder / doc icon -->
+                  <mat-icon class="text-[16px] mr-1.5 shrink-0"
+                            [style.color]="(node.depth ?? 0) <= 1 ? '#3b82f6' : (node.hasChildren || node.children?.length) ? '#60a5fa' : '#9ca3af'">
+                    {{ node.depth === 0 ? 'folder' : (node.hasChildren || node.children?.length) ? 'folder_open' : 'article' }}
+                  </mat-icon>
+
+                  <span class="text-sm text-gray-800 font-medium">{{ node.name }}</span>
+                  @if (isPrivileged && node.tenantName) {
+                    <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{{ node.tenantName }}</span>
+                  }
+                </div>
+              </td>
+
+              <!-- Level badge -->
+              <td class="py-2.5 px-4 text-center">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                      [class]="node.depth === 0 ? 'bg-blue-100 text-blue-700'
+                              : node.depth === 1 ? 'bg-purple-100 text-purple-700'
+                              : node.depth === 2 ? 'bg-green-100 text-green-700'
+                              : 'bg-amber-100 text-amber-700'">
+                  {{ 'CATEGORY.LEVEL' | translate }} {{ (node.depth || 0) + 1 }}
+                </span>
+              </td>
+
+              <!-- Order -->
+              <td class="py-2.5 px-4 text-center text-sm text-gray-600">
+                {{ node.order ?? '—' }}
+              </td>
+
+              <!-- Status badge -->
+              <td class="py-2.5 px-4 text-center">
+                @if (node.status === 2 || node.status === true) {
+                  <span class="bg-green-100 text-green-700 px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center">
+                    <span class="w-1.5 h-1.5 rounded-full mr-1.5 bg-green-500"></span>
+                    {{ 'CATEGORY.STATUS_ACTIVE' | translate }}
+                  </span>
+                } @else {
+                  <span class="bg-red-100 text-red-700 px-2.5 py-1 text-xs font-medium rounded-full inline-flex items-center">
+                    <span class="w-1.5 h-1.5 rounded-full mr-1.5 bg-red-500"></span>
+                    {{ 'CATEGORY.STATUS_HIDDEN' | translate }}
+                  </span>
+                }
+              </td>
+
+              <!-- Link -->
+              <td class="py-2.5 px-4 text-sm text-gray-500 max-w-[180px] truncate">
+                {{ node.link || '—' }}
+              </td>
+
+              <!-- Child count -->
+              <td class="py-2.5 px-4 text-center">
+                @if (node.childCount && node.childCount > 0) {
+                  <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                    {{ node.childCount }}
+                  </span>
+                } @else if (node.children?.length) {
+                  <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                    {{ node.children?.length ?? 0 }}
+                  </span>
+                } @else {
+                  <span class="text-gray-300 text-xs">—</span>
+                }
+              </td>
+
+              <!-- Action buttons -->
+              <td class="py-2.5 px-4">
+                <div class="flex items-center justify-center gap-1">
+                  <button (click)="openCreateChild(node); $event.stopPropagation()"
+                          class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors"
+                          [title]="'CATEGORY.ADD_CHILD' | translate">
+                    <mat-icon class="text-[15px] leading-none">add</mat-icon>
+                  </button>
+                  <button (click)="openEdit(node); $event.stopPropagation()"
+                          class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors"
+                          [title]="'COMMON.EDIT' | translate">
+                    <mat-icon class="text-[15px] leading-none">edit</mat-icon>
+                  </button>
+                  <button *appCan="'delete'" (click)="confirmDelete(node); $event.stopPropagation()"
+                          class="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                          [title]="'COMMON.DELETE' | translate">
+                    <mat-icon class="text-[15px] leading-none">delete</mat-icon>
+                  </button>
+                </div>
+              </td>
+
+            </tr>
+          }
+        }
+
+        <!-- Empty state -->
+        @if (flatTree.length === 0 && !loading()) {
+          <tr>
+            <td colspan="7" class="py-14 text-center text-gray-500 text-sm">
+              <mat-icon class="text-4xl text-gray-300 mb-2 block mx-auto">folder_off</mat-icon>
+              {{ 'COMMON.NO_DATA' | translate }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ─── Add / Edit Modal ─────────────────────────────────────────────────── -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+
+      <!-- Modal header -->
+      <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ editMode() ? ('CATEGORY.MODAL_EDIT_TITLE' | translate) : ('CATEGORY.MODAL_ADD_TITLE' | translate) }}
+        </h3>
+        <button (click)="closeModal()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Modal body -->
+      <div class="overflow-y-auto flex-1 p-6">
+        <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="space-y-4">
+
+          <!-- Parent category select -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ 'CATEGORY.PARENT' | translate }}
+            </label>
+            <div class="border border-gray-300 rounded-lg overflow-hidden h-36">
+              <select formControlName="parentId" class="w-full h-full p-2 text-sm outline-none bg-white" size="7">
+                <option [ngValue]="null">{{ 'CATEGORY.ROOT_OPTION' | translate }}</option>
+                @for (opt of parentOptions; track opt.id) {
+                  <option [value]="opt.id"
+                          [disabled]="!!editingNumericId && opt.id === editingNumericId">
+                    {{ opt.label }}
+                  </option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <!-- Name -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              {{ 'CATEGORY.NAME' | translate }}
+              <span class="text-red-500 ml-0.5">*</span>
+            </label>
+            <input type="text" formControlName="name"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-500]="dataForm.get('name')?.invalid && dataForm.get('name')?.touched">
+            @if (dataForm.get('name')?.errors?.['required'] && dataForm.get('name')?.touched) {
+              <p class="text-red-500 text-xs mt-1">{{ 'CATEGORY.VALIDATION_NAME_REQUIRED' | translate }}</p>
+            }
+            @if (dataForm.get('name')?.errors?.['maxlength'] && dataForm.get('name')?.touched) {
+              <p class="text-red-500 text-xs mt-1">{{ 'CATEGORY.VALIDATION_NAME_MAX' | translate }}</p>
+            }
+          </div>
+
+          <!-- Link + Order (2 columns) -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ 'CATEGORY.LINK' | translate }}</label>
+              <input type="text" formControlName="link"
+                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ 'CATEGORY.ORDER' | translate }}</label>
+              <input type="number" formControlName="order"
+                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <!-- Status + Language (2 columns) -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ 'COMMON.STATUS' | translate }}</label>
+              <select formControlName="status"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option [value]="1">{{ 'CATEGORY.STATUS_ACTIVE' | translate }}</option>
+                <option [value]="0">{{ 'CATEGORY.STATUS_HIDDEN' | translate }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ 'CATEGORY.LANGUAGE' | translate }}</label>
+              <select formControlName="language"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ 'CATEGORY.DESCRIPTION' | translate }}</label>
+            <textarea formControlName="description" rows="3"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+          </div>
+
+          <!-- SEO section (collapsible) -->
+          <details class="border border-gray-200 rounded-lg overflow-hidden">
+            <summary class="flex items-center justify-between px-4 py-2.5 bg-gray-50 cursor-pointer select-none text-sm font-medium text-gray-700 hover:bg-gray-100">
+              <span class="flex items-center gap-1.5">
+                <mat-icon class="text-[16px] text-gray-500">search</mat-icon>
+                {{ 'CATEGORY.SEO_SECTION' | translate }}
+              </span>
+            </summary>
+            <div class="p-4 space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'CATEGORY.PAGE_TITLE' | translate }}</label>
+                <input type="text" formControlName="pageTitle"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'CATEGORY.META_DESCRIPTION' | translate }}</label>
+                <textarea formControlName="metaDescription" rows="2"
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'CATEGORY.KEYWORD' | translate }}</label>
+                <input type="text" formControlName="keyword"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </details>
+
+        </form>
+      </div>
+
+      <!-- Modal footer -->
+      <div class="p-4 border-t border-gray-100 flex gap-3 justify-end shrink-0 bg-gray-50">
+        <button type="button" (click)="closeModal()"
+                class="py-2 px-5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" (click)="onSubmit()"
+                [disabled]="saving()"
+                class="py-2 px-5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm disabled:opacity-60 flex items-center gap-1.5">
+          @if (saving()) {
+            <mat-icon class="animate-spin text-[16px] leading-none">autorenew</mat-icon>
+          } @else {
+            <mat-icon class="text-[16px] leading-none">save</mat-icon>
+          }
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ─── Delete Confirmation Modal ────────────────────────────────────────── -->
+@if (showDeleteConfirm()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div class="p-6 text-center">
+
+        <div class="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl">warning</mat-icon>
+        </div>
+
+        <h3 class="text-base font-bold text-gray-800 mb-2">
+          {{ 'COMMON.DELETE_CONFIRM_TITLE' | translate }}
+        </h3>
+        <p class="text-gray-600 text-sm mb-2">{{ 'COMMON.DELETE_CONFIRM_MSG' | translate }}</p>
+
+        @if (deletingNode?.hasChildren || deletingNode?.children?.length) {
+          <p class="text-amber-600 text-xs mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {{ 'CATEGORY.DELETE_CHILDREN_WARNING' | translate: { count: deletingNode?.childCount || deletingNode?.children?.length || 0 } }}
+          </p>
+        }
+
+        <div class="flex gap-3 mt-5">
+          <button (click)="closeConfirm()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="doDelete()"
+                  [disabled]="saving()"
+                  class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm text-sm disabled:opacity-60">
+            {{ 'COMMON.DELETE_CONFIRM_BTN' | translate }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+}

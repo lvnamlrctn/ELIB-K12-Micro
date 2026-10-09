@@ -1,0 +1,48 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CHECK_STAT.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5">
+  <form [formGroup]="searchForm" (ngSubmit)="run()" class="flex flex-wrap gap-2 items-end">
+    <div><label class="block text-xs text-gray-500 mb-1">{{ 'STAT_DOC.CRITERION' | translate }}</label>
+      <ng-select [items]="criteria" bindValue="id" formControlName="criterion"
+                 class="w-56"
+                 [searchable]="true" [clearable]="false"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate">
+        <ng-template ng-label-tmp let-item="item">{{ 'CHECK_STAT.' + item.label | translate }}</ng-template>
+        <ng-template ng-option-tmp let-item="item">{{ 'CHECK_STAT.' + item.label | translate }}</ng-template>
+      </ng-select></div>
+    <div><label class="block text-xs text-gray-500 mb-1">{{ 'BORROW.CIRC_PLACE' | translate }}</label>
+      <ng-select [items]="circPlaces()" bindLabel="name" bindValue="id" formControlName="circPlaceId"
+                 class="w-44"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'COMMON.ALL' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.FROM' | translate }}</label><app-date-input formControlName="receiptDateFrom"></app-date-input></div>
+    <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.TO' | translate }}</label><app-date-input formControlName="receiptDateTo"></app-date-input></div>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">query_stats</mat-icon> {{ 'STAT_DOC.RUN' | translate }}</button>
+    <button *appCan="'export'" type="button" (click)="exportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">download</mat-icon> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
+  </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="rows()" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ i + 1 }}</td></ng-container>
+      <ng-container matColumnDef="label"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'STAT_DOC.GROUP' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.label || '—' }}</td></ng-container>
+      <ng-container matColumnDef="count"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'CHECK_STAT.VISITS' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100 text-right">{{ (row.count || 0) | number }}</td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">query_stats</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  @if (rows().length) {
+    <div class="flex justify-end gap-8 px-4 py-3 border-t border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
+      <span>{{ 'STAT_DOC.TOTAL' | translate }}:</span>
+      <span>{{ 'CHECK_STAT.VISITS' | translate }}: {{ totalCount | number }}</span>
+    </div>
+  }
+</div>

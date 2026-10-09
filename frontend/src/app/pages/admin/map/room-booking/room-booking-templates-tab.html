@@ -1,0 +1,54 @@
+<div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+  <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-2 h-fit">
+    @for (t of templates(); track t.event) {
+      <button type="button" (click)="select(t.event)"
+              class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between gap-2"
+              [class]="selected() === t.event ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'">
+        <span>{{ eventLabel(t.event) }}</span>
+        @if (!t.isDefault) { <span class="text-[10px] font-bold px-1.5 py-0.5 rounded" [class]="selected() === t.event ? 'bg-white/20' : 'bg-amber-100 text-amber-700'">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_CUSTOM' | translate }}</span> }
+      </button>
+    }
+  </aside>
+
+  @if (current(); as c) {
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_SUBJECT' | translate }}</label>
+        <input type="text" maxlength="300" [ngModel]="subject()" (ngModelChange)="subject.set($event)"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <label class="text-sm font-medium text-gray-700">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_BODY' | translate }}</label>
+          <div class="flex flex-wrap gap-1">
+            @for (k of tokens(); track k) {
+              <button type="button" (click)="insertToken(k)" class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700">{{ tokenLabel(k) }}</button>
+            }
+          </div>
+        </div>
+        <textarea rows="8" [ngModel]="body()" (ngModelChange)="body.set($event)"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        <p class="text-xs text-gray-400 mt-1">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_HINT' | translate }}</p>
+      </div>
+      <div>
+        <p class="text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_PREVIEW' | translate }}</p>
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+          <p class="font-semibold text-gray-800 mb-2">{{ previewSubject() }}</p>
+          <div class="text-gray-700" [innerHTML]="preview()"></div>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+        <button *appCan="'edit'" type="button" (click)="save()" [disabled]="saving() || !dirty()" class="py-2 px-5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">{{ 'COMMON.SAVE' | translate }}</button>
+        @if (!c.isDefault) {
+          <button *appCan="'edit'" type="button" (click)="reset()" class="py-2 px-4 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">{{ 'STUDY_ROOM_BOOKING.TEMPLATE_RESET' | translate }}</button>
+        }
+        <div class="flex items-center gap-2 ml-auto">
+          <input type="email" [(ngModel)]="testTo" [placeholder]="'STUDY_ROOM_BOOKING.TEMPLATE_TEST_TO' | translate" class="w-60 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+          <button *appCan="'edit'" type="button" (click)="sendTest()" class="py-2 px-4 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 flex items-center gap-1.5">
+            <mat-icon class="text-[18px] w-[18px] h-[18px]">send</mat-icon>{{ 'STUDY_ROOM_BOOKING.TEMPLATE_TEST' | translate }}
+          </button>
+        </div>
+      </div>
+    </section>
+  }
+</div>

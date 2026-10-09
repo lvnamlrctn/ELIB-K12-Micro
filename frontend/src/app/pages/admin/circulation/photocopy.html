@@ -1,0 +1,264 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'PHOTOCOPY.TITLE' | translate }}</h4>
+</div>
+
+<!-- Panel lọc -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+    <mat-icon class="text-blue-600 text-lg">search</mat-icon>
+    <h2 class="text-base font-semibold text-gray-700">{{ 'COMMON.SEARCH_FILTERS' | translate }}</h2>
+    <button type="button" (click)="toggleFilters()" class="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            [title]="(filtersCollapsed() ? 'COMMON.EXPAND' : 'COMMON.COLLAPSE') | translate">
+      <mat-icon>{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+    </button>
+  </div>
+  @if (!filtersCollapsed()) {
+  <div class="p-5" [formGroup]="searchForm">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.CARD_NO' | translate }}</label>
+        <input formControlName="cardNo" type="text" (keydown.enter)="triggerSearch()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.LAST_NAME' | translate }}</label>
+        <input formControlName="lastName" type="text" (keydown.enter)="triggerSearch()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.FIRST_NAME' | translate }}</label>
+        <input formControlName="firstName" type="text" (keydown.enter)="triggerSearch()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.PAID_STATUS' | translate }}</label>
+        <ng-select [items]="[{value:2,label:'PHOTOCOPY.PAID'},{value:1,label:'PHOTOCOPY.UNPAID'}]"
+                   bindValue="value" formControlName="isPaid"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'PHOTOCOPY.FILTER_ALL' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate">
+          <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+          <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.DATE_FROM' | translate }}</label>
+        <app-date-input formControlName="photoDateFrom"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.DATE_TO' | translate }}</label>
+        <app-date-input formControlName="photoDateTo"></app-date-input>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.BIB_TITLE' | translate }}</label>
+        <input formControlName="bibTitle" type="text" (keydown.enter)="triggerSearch()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      @if (isPrivileged) {
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'COMMON.TENANT' | translate }}</label>
+          <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" />
+        </div>
+      }
+    </div>
+    <div class="flex gap-2 mt-4">
+      <button (click)="triggerSearch()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors">
+        <mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+      </button>
+      <button (click)="resetFilters()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm transition-colors">
+        <mat-icon class="text-[18px]">refresh</mat-icon> {{ 'PHOTOCOPY.RESET' | translate }}
+      </button>
+    </div>
+  </div>
+  }
+</div>
+
+<!-- Thanh công cụ + tổng tiền -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+  <button *appCan="'add'" (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}</button>
+  <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0" class="bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+
+  <div class="ml-auto flex flex-wrap items-center gap-4 text-sm">
+    <span class="text-gray-500">{{ 'PHOTOCOPY.SUM_TOTAL' | translate }}: <b class="text-gray-800 tabular-nums">{{ sumTotal() | number:'1.0-0' }}</b></span>
+    <span class="text-gray-500">{{ 'PHOTOCOPY.SUM_PAID' | translate }}: <b class="text-emerald-600 tabular-nums">{{ sumPaid() | number:'1.0-0' }}</b></span>
+    <span class="text-gray-500">{{ 'PHOTOCOPY.SUM_UNPAID' | translate }}: <b class="text-red-500 tabular-nums">{{ sumUnpaid() | number:'1.0-0' }}</b></span>
+  </div>
+</div>
+
+<!-- Bảng -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-10 text-center border-b border-gray-200 bg-gray-50"><input type="checkbox" (change)="$event ? masterToggle() : null" [checked]="selection.hasValue() && isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()" class="rounded text-blue-500 border-gray-300 cursor-pointer"></th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-center border-b border-gray-100"><input type="checkbox" (click)="$event.stopPropagation()" (change)="$event ? selection.toggle(row) : null" [checked]="selection.isSelected(row)" class="rounded text-blue-500 border-gray-300 cursor-pointer"></td>
+      </ng-container>
+
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+
+      <ng-container matColumnDef="cardNo"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 whitespace-nowrap">{{ 'PHOTOCOPY.CARD_NO' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100 whitespace-nowrap">{{ row.cardNo || '—' }}</td></ng-container>
+
+      <ng-container matColumnDef="readerName"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 whitespace-nowrap">{{ 'PHOTOCOPY.READER_NAME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap">{{ row.readerName || '—' }}</td></ng-container>
+
+      <ng-container matColumnDef="unitName"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 whitespace-nowrap">{{ 'PHOTOCOPY.UNIT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ row.unitName || '—' }}</td></ng-container>
+
+      <ng-container matColumnDef="bibTitle"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'PHOTOCOPY.BIB_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100 max-w-xs"><div class="truncate" [title]="row.bibTitle">{{ row.bibTitle || '—' }}</div><div class="text-xs text-gray-400">{{ row.barcode }}</div></td></ng-container>
+
+      <ng-container matColumnDef="photoDate"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 whitespace-nowrap">{{ 'PHOTOCOPY.PHOTO_DATE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100 whitespace-nowrap">{{ row.photoDate | appDate }}</td></ng-container>
+
+      <ng-container matColumnDef="pages"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-center whitespace-nowrap">{{ 'PHOTOCOPY.PAGES' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100 text-center whitespace-nowrap"><span class="tabular-nums">{{ row.frompage }}–{{ row.toPage }}</span><span class="text-xs text-gray-400 block">({{ row.pages }} {{ 'PHOTOCOPY.PAGE_UNIT' | translate }})</span></td></ng-container>
+
+      <ng-container matColumnDef="copy"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-center whitespace-nowrap">{{ 'PHOTOCOPY.COPIES' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100 text-center tabular-nums">{{ row.copy }}</td></ng-container>
+
+      <ng-container matColumnDef="price"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right whitespace-nowrap">{{ 'PHOTOCOPY.PRICE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100 text-right tabular-nums">{{ row.price | number:'1.0-0' }}</td></ng-container>
+
+      <ng-container matColumnDef="totalAmount"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right whitespace-nowrap">{{ 'PHOTOCOPY.TOTAL_AMOUNT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-semibold text-gray-800 border-b border-gray-100 text-right tabular-nums">{{ row.totalAmount | number:'1.0-0' }}</td></ng-container>
+
+      <ng-container matColumnDef="isPaid">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-center whitespace-nowrap">{{ 'PHOTOCOPY.PAID_STATUS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-center">
+          @if (row.isPaid === 2) {
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap">{{ 'PHOTOCOPY.PAID' | translate }}</span>
+          } @else {
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">{{ 'PHOTOCOPY.UNPAID' | translate }}</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 whitespace-nowrap">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right"><div class="flex items-center justify-end gap-1">
+          @if (row.isPaid !== 2 && row.readerId && (row.totalAmount ?? 0) > 0) {
+            <button *appCan="'edit'" (click)="openPaymentQr(row)" class="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors" [title]="'FINE_TICKET.PAY_QR' | translate"><mat-icon class="text-[18px]">qr_code_2</mat-icon></button>
+          }
+          <button *appCan="'edit'" (click)="openEditModal(row)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" [title]="'COMMON.EDIT' | translate"><mat-icon class="text-[18px]">edit</mat-icon></button>
+          <button *appCan="'delete'" (click)="handleDelete(row)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+        </div></td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">print</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>
+
+<!-- Modal thêm / sửa -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">print</mat-icon>{{ (editMode() ? 'PHOTOCOPY.EDIT_TITLE' : 'PHOTOCOPY.ADD_TITLE') | translate }}</h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5 overflow-y-auto">
+        <!-- Số thẻ -> tên bạn đọc -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.CARD_NO' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="CardNo" type="text" (blur)="onCardBlur()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-400]="readerNotFound() || (dataForm.get('CardNo')?.invalid && dataForm.get('CardNo')?.touched)">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.READER_NAME' | translate }}</label>
+            <div class="w-full px-3 py-2 text-sm rounded-lg bg-gray-100 border border-gray-200 min-h-[38px] flex items-center">
+              @if (readerLoading()) { <mat-icon class="animate-spin text-[16px] text-gray-400">autorenew</mat-icon> }
+              @else if (readerLookup()) { <span class="text-emerald-700 font-medium">{{ readerLookup()?.fullName }}</span><span class="text-gray-400 text-xs ml-2">{{ readerLookup()?.unitName }}</span> }
+              @else if (readerNotFound()) { <span class="text-red-500 text-xs">{{ 'PHOTOCOPY.READER_NOT_FOUND' | translate }}</span> }
+              @else { <span class="text-gray-400 text-xs">—</span> }
+            </div>
+          </div>
+        </div>
+
+        <!-- Số ĐKCB -> nhan đề -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.BARCODE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Barcode" type="text" (blur)="onBarcodeBlur()" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-400]="docNotFound() || (dataForm.get('Barcode')?.invalid && dataForm.get('Barcode')?.touched)">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-500 mb-1">{{ 'PHOTOCOPY.BIB_TITLE' | translate }}</label>
+            <div class="w-full px-3 py-2 text-sm rounded-lg bg-gray-100 border border-gray-200 min-h-[38px] flex items-center">
+              @if (docLoading()) { <mat-icon class="animate-spin text-[16px] text-gray-400">autorenew</mat-icon> }
+              @else if (docLookup()) { <span class="text-emerald-700 font-medium line-clamp-2" [title]="docLookup()?.bibTitle">{{ docLookup()?.bibTitle || '—' }}</span> }
+              @else if (docNotFound()) { <span class="text-red-500 text-xs">{{ 'PHOTOCOPY.DOC_NOT_FOUND' | translate }}</span> }
+              @else { <span class="text-gray-400 text-xs">—</span> }
+            </div>
+          </div>
+        </div>
+
+        <!-- Trang -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.FROM_PAGE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Frompage" type="number" min="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.TO_PAGE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="ToPage" type="number" min="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-400]="pagesCount() < 1">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.COPIES' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Copy" type="number" min="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.PRICE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Price" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+        @if (pagesCount() < 1) { <p class="text-xs text-red-500 -mt-2 mb-3">{{ 'PHOTOCOPY.PAGE_RANGE_ERROR' | translate }}</p> }
+
+        <!-- Ngày + đã thanh toán -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PHOTOCOPY.PHOTO_DATE' | translate }} <span class="text-red-500">*</span></label>
+            <app-date-input formControlName="PhotoDate"></app-date-input>
+          </div>
+          <div class="flex items-end pb-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input formControlName="IsPaid" type="checkbox" class="rounded text-blue-500 border-gray-300 cursor-pointer w-4 h-4">
+              <span class="text-sm font-medium text-gray-700">{{ 'PHOTOCOPY.PAID' | translate }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Thành tiền -->
+        <div class="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 flex items-center justify-between">
+          <div class="text-sm text-gray-600">
+            {{ 'PHOTOCOPY.TOTAL_AMOUNT' | translate }}
+            <span class="text-xs text-gray-400 block">{{ pagesCount() }} {{ 'PHOTOCOPY.PAGE_UNIT' | translate }} × {{ dataForm.get('Copy')?.value }} × {{ dataForm.get('Price')?.value | number:'1.0-0' }}</span>
+          </div>
+          <div class="text-xl font-bold text-blue-700 tabular-nums">{{ previewTotal() | number:'1.0-0' }}</div>
+        </div>
+      </form>
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="!canSave()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (paymentQrRow(); as row) {
+  <app-payment-qr-dialog mode="staff" [readerId]="row.readerId ?? null" targetType="PHOTOCOPY"
+    [targetId]="row.id" (paid)="onPaymentQrPaid()" (closed)="paymentQrRow.set(null)">
+  </app-payment-qr-dialog>
+}

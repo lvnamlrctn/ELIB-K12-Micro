@@ -1,0 +1,42 @@
+@if (!isOpen()) {
+  <button (click)="open()" type="button" [class]="openClass" [title]="'FACE_CAPTURE.OPEN' | translate">
+    <mat-icon class="text-[18px]">face</mat-icon>
+    @if (openLabel) { <span>{{ openLabel | translate }}</span> }
+  </button>
+} @else {
+  <!-- Trên cả hộp thoại quét check-in (z-[100]) vì component được mở từ bên trong hộp thoại đó. -->
+  <div class="fixed inset-0 z-[140] bg-black/60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg p-4 w-full max-w-sm" role="dialog" aria-modal="true" [attr.aria-label]="titleKey | translate">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-semibold text-gray-700">{{ titleKey | translate }}</span>
+        <button (click)="close()" type="button" class="text-gray-400 hover:text-gray-600" [attr.aria-label]="'COMMON.CLOSE' | translate">
+          <mat-icon class="text-[20px]">close</mat-icon>
+        </button>
+      </div>
+
+      @if (error()) {
+        <div class="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
+          {{ error()! | translate }}
+        </div>
+      } @else {
+        <div class="relative rounded-lg overflow-hidden bg-black aspect-video">
+          <video #video class="w-full h-full object-cover" autoplay playsinline muted></video>
+          <canvas #canvas class="hidden"></canvas>
+          @if (isChecking()) {
+            <div class="absolute inset-0 flex items-center justify-center bg-black/30">
+              <mat-icon class="animate-spin text-white text-3xl">autorenew</mat-icon>
+            </div>
+          }
+        </div>
+        @if (manual) {
+          <button type="button" (click)="captureAndIdentify()" [disabled]="isChecking()"
+                  class="mt-2 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors">
+            <mat-icon class="text-[18px]">face</mat-icon>
+            {{ 'FACE_CAPTURE.CAPTURE' | translate }}
+          </button>
+        }
+        <p class="text-xs text-gray-500 mt-2 text-center">{{ hintKey | translate }}</p>
+      }
+    </div>
+  </div>
+}

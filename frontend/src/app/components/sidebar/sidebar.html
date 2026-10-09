@@ -1,0 +1,102 @@
+<!-- Overlay for mobile -->
+@if (layout.mobileMenuOpen()) {
+  <div class="fixed inset-0 bg-black/50 z-40 md:hidden" (click)="layout.mobileMenuOpen.set(false)" (keydown.enter)="layout.mobileMenuOpen.set(false)" tabindex="0" role="button" aria-label="Close menu"></div>
+}
+
+<!-- Sidebar -->
+<aside
+  class="fixed inset-y-0 left-0 bg-[#1a1d20] z-50 transition-transform duration-300 ease-in-out md:static md:translate-x-0 flex flex-col h-full"
+  [class.-translate-x-full]="!layout.mobileMenuOpen()"
+  [class.md-collapsed]="!layout.desktopMenuOpen()"
+  [style.--sbw]="layout.sidebarWidth() + 'px'">
+
+  <!-- Kéo để chỉnh chiều rộng (chỉ desktop) -->
+  <div class="resize-handle hidden md:block" [class.resizing]="isResizing()" (mousedown)="startResize($event)"></div>
+
+  <!-- Sidebar Header -->
+  <div class="p-4 border-b border-gray-700 flex items-center justify-between shrink-0">
+    <div class="flex items-center text-blue-400 font-bold text-lg">
+      <span class="material-icons mr-2">layers</span>
+      ELIB-LRC
+    </div>
+    <button class="md:hidden text-white hover:text-gray-300" (click)="layout.mobileMenuOpen.set(false)">
+      <span class="material-icons">close</span>
+    </button>
+  </div>
+
+  <!-- Menu Items -->
+  <nav class="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
+    @if (menuItems(); as items) {
+      <ul class="space-y-1.5">
+        @for (item of items; track item.title) {
+          <li>
+            @if (!item.children) {
+              <a [routerLink]="item.link" routerLinkActive="bg-blue-600 text-white" [routerLinkActiveOptions]="{exact: false}"
+                 class="flex items-center px-3 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors group">
+                <span class="material-icons text-[20px] mr-3 group-hover:text-white transition-colors">{{item.icon}}</span>
+                <span class="font-medium text-sm">{{ item.title | translate }}</span>
+              </a>
+            } @else {
+              <button (click)="toggleSubmenu(item)" 
+                      class="w-full flex items-center justify-between px-3 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors group">
+                <div class="flex items-center">
+                  <span class="material-icons text-[20px] mr-3">{{item.icon}}</span>
+                  <span class="font-medium text-sm">{{ item.title | translate }}</span>
+                </div>
+                <span class="material-icons text-[18px] transition-transform duration-300" [class.rotate-180]="item.expanded">expand_more</span>
+              </button>
+              
+              @if (item.expanded) {
+                <ul class="mt-1 space-y-1 pl-9 border-l border-gray-700/50 ml-[21px] pb-2">
+                  @for (child of item.children; track child.title) {
+                    <li>
+                      @if (!child.children) {
+                        <a [routerLink]="child.link" routerLinkActive="text-white font-medium before:bg-blue-500"
+                           class="relative flex items-center py-2 pl-3 pr-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors before:content-[''] before:absolute before:left-[-1px] before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-0 before:transition-all hover:before:h-4 hover:before:bg-gray-400 [class.active-link]:before:h-4 [class.active-link]:before:bg-blue-500">
+                          @if (child.icon) {
+                            <span class="material-icons text-[18px] mr-2">{{child.icon}}</span>
+                          }
+                          {{ child.title | translate }}
+                        </a>
+                      } @else {
+                        <button (click)="toggleSubmenu(child)" 
+                                class="w-full flex items-center justify-between py-2 pl-3 pr-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                          <div class="flex items-center">
+                            @if (child.icon) {
+                              <span class="material-icons text-[18px] mr-2">{{child.icon}}</span>
+                            }
+                            <span class="whitespace-nowrap">{{ child.title | translate }}</span>
+                          </div>
+                          <span class="material-icons text-[16px] transition-transform duration-300" [class.rotate-180]="child.expanded">expand_more</span>
+                        </button>
+                        @if (child.expanded) {
+                          <ul class="pl-3 mt-1 space-y-1">
+                            @for (subChild of child.children; track subChild.title) {
+                              <li>
+                                <a [routerLink]="subChild.link" routerLinkActive="text-white bg-white/10"
+                                   class="flex items-center py-1.5 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-md transition-colors">
+                                  @if (subChild.icon) {
+                                    <span class="material-icons text-[16px] mr-2">{{subChild.icon}}</span>
+                                  }
+                                  {{ subChild.title | translate }}
+                                </a>
+                              </li>
+                            }
+                          </ul>
+                        }
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="flex justify-center py-10">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      </div>
+    }
+  </nav>
+</aside>

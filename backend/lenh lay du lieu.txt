@@ -1,0 +1,23 @@
+pg_dump -h 103.124.95.249 -p 5432 -U lvnam -d tvxa -F c -f /opt/tvxa.dump
+docker cp /opt/tvs/tvxa1.dump 9d99a0fe6784_elibapi-postgres:/tmp/tvxa1.dump
+docker exec 9d99a0fe6784_elibapi-postgres pg_restore -U lvnam -d tvxa -c --if-exists /tmp/tvxa1.dump
+
+cd /opt/elibapi
+git pull
+docker compose -f docker-compose.production.yml --env-file .env.production up -d --build admin-website
+docker compose -f docker-compose.production.yml --env-file .env.production up -d --build elibapi-internal admin-website
+
+docker exec -it 9d99a0fe6784_elibapi-postgres psql -U lvnam -d tvxa -c "SELECT * FROM public."Reader" WHERE \"TenantId\" = 5;"
+
+
+docker compose -f docker-compose.production.yml --env-file .env.production build --no-cache elibapi-internal admin-website
+docker compose -f docker-compose.production.yml --env-file .env.production up -d elibapi-internal admin-website
+
+
+docker compose -f docker-compose.new.yml --env-file .env.same-server up -d --build elibapi-new admin-website-new
+
+
+docker cp 9d99a0fe6784_elibapi-postgres:/tmp/tvxa_moi_backup.dump /opt/tvs/tvxa_moi_$(date +%Y%m%d).dump
+
+
+*.*|node_modules/;bin/;obj/;.git/;.angular/;dist/;.vs/

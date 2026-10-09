@@ -1,0 +1,401 @@
+<div class="mb-5 flex items-center justify-between">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'ADMIN_TASKS.TITLE' | translate }}</h4>
+</div>
+
+<div class="mb-5 border-b border-gray-200 flex gap-1">
+  <button (click)="setTab('mine')" class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
+          [class]="tab() === 'mine' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'">
+    {{ 'ADMIN_TASKS.TAB_MINE' | translate }}
+  </button>
+  <button *appCan="'view'; url: '/admin/admin-tasks/monitor'" (click)="setTab('monitor')"
+          class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
+          [class]="tab() === 'monitor' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'">
+    {{ 'ADMIN_TASKS.TAB_MONITOR' | translate }}
+  </button>
+  <button *appCan="'view'; url: '/admin/admin-tasks/retention'" (click)="setTab('retention')"
+          class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
+          [class]="tab() === 'retention' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'">
+    {{ 'ADMIN_TASKS.TAB_RETENTION' | translate }}
+  </button>
+</div>
+
+<!-- ═══════════════════ TAB: Của tôi (Đợt 10) ═══════════════════ -->
+@if (tab() === 'mine') {
+  @if (!enabled()) {
+    <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
+      {{ 'ADMIN_TASKS.DISABLED' | translate }}
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <!-- Danh sách -->
+      <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.KIND' | translate }}</th>
+                <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.STATE' | translate }}</th>
+                <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'ADMIN_TASKS.PROGRESS' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of tasks(); track t.id) {
+                <tr class="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50"
+                    [class.bg-blue-50]="detail()?.id === t.id"
+                    (click)="open(t)">
+                  <td class="py-2 px-4 text-sm text-gray-700">{{ kindLabel(t.kind) }}</td>
+                  <td class="py-2 px-4 text-sm">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-medium" [class]="stateClass(t.state)">
+                      {{ ('ADMIN_TASKS.STATE_' + t.state.toUpperCase()) | translate }}
+                    </span>
+                  </td>
+                  <td class="py-2 px-4 text-sm text-gray-500 text-right">{{ progress(t) }}%</td>
+                </tr>
+              }
+              @if (tasks().length === 0) {
+                <tr><td colspan="3" class="py-8 px-4 text-center text-gray-400 text-sm">{{ 'ADMIN_TASKS.EMPTY' | translate }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Chi tiết -->
+      <div class="lg:col-span-3">
+        @if (detail(); as t) {
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <div class="font-semibold text-gray-800">{{ 'ADMIN_TASKS.DETAIL' | translate }}</div>
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium mt-1 inline-block" [class]="stateClass(t.state)">
+                  {{ ('ADMIN_TASKS.STATE_' + t.state.toUpperCase()) | translate }}
+                </span>
+              </div>
+              <button (click)="closeDetail()" class="text-gray-400 hover:text-gray-600">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <!-- Thanh tiến độ -->
+            <div class="mb-4">
+              <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>{{ 'ADMIN_TASKS.PROGRESS' | translate }}</span>
+                <span>{{ t.completedItems }}/{{ t.totalItems }} ({{ progress(t) }}%)</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-blue-600 h-2 rounded-full transition-all" [style.width.%]="progress(t)"></div>
+              </div>
+            </div>
+
+            @if (t.error) {
+              <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-4">
+                <strong>{{ 'ADMIN_TASKS.ERROR' | translate }}:</strong> {{ t.error }}
+              </div>
+            }
+
+            <!-- Bảng đối chiếu (tác vụ xem trước đã hoàn tất) -->
+            @if (t.preview && t.state === 'Completed' && t.result?.changes) {
+              <div class="mb-4">
+                <div class="font-medium text-sm text-gray-700 mb-2">{{ 'ADMIN_TASKS.REVIEW_TITLE' | translate }}</div>
+                <div class="border border-gray-100 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+                  @for (c of t.result.changes; track c.cardno) {
+                    <div class="border-b border-gray-50 last:border-0 p-3">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="font-mono text-sm text-gray-800">{{ c.cardno }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[11px] font-medium"
+                              [class]="c.isNew ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'">
+                          {{ (c.isNew ? 'ADMIN_TASKS.REVIEW_NEW' : 'ADMIN_TASKS.REVIEW_UPDATE') | translate }}
+                        </span>
+                      </div>
+                      @if (c.fields.length > 0) {
+                        <table class="w-full text-xs">
+                          <tbody>
+                            @for (f of c.fields; track f.field) {
+                              <tr>
+                                <td class="text-gray-500 pr-2 py-0.5">{{ f.field }}</td>
+                                <td class="text-gray-400 pr-2 py-0.5">{{ f.before || '—' }}</td>
+                                <td class="text-gray-800 py-0.5">→ {{ f.after || '—' }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </div>
+                  }
+                  @if (t.result.changes.length === 0) {
+                    <div class="p-4 text-center text-gray-400 text-sm">{{ 'ADMIN_TASKS.REVIEW_EMPTY' | translate }}</div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- Kết quả (tác vụ xác nhận đã hoàn tất) -->
+            @if (!t.preview && t.state === 'Completed' && t.result) {
+              <div class="mb-4 grid grid-cols-3 gap-3">
+                <div class="bg-green-50 rounded-lg p-3 text-center">
+                  <div class="text-lg font-bold text-green-700">{{ resultValue(t, 'successCount') }}</div>
+                  <div class="text-xs text-gray-500">{{ 'ADMIN_TASKS.RESULT_SUCCESS' | translate }}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                  <div class="text-lg font-bold text-gray-600">{{ resultValue(t, 'skippedCount') }}</div>
+                  <div class="text-xs text-gray-500">{{ 'ADMIN_TASKS.RESULT_SKIPPED' | translate }}</div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-3 text-center">
+                  <div class="text-lg font-bold text-red-600">{{ resultValue(t, 'failedCount') }}</div>
+                  <div class="text-xs text-gray-500">{{ 'ADMIN_TASKS.RESULT_FAILED' | translate }}</div>
+                </div>
+              </div>
+            }
+
+            <!-- Đợt 20: danh mục tự tạo ("sẽ tạo" khi xem trước) + lỗi từng dòng -->
+            @if (t.state === 'Completed' && resultList(t, 'createdRefs').length) {
+              <div class="mb-3 border border-green-100 rounded-lg bg-green-50/50 px-3 py-2 max-h-28 overflow-y-auto">
+                <div class="text-xs font-semibold text-green-700 mb-1">{{ (t.preview ? 'ADMIN_TASKS.REFS_WILL_CREATE' : 'ADMIN_TASKS.REFS_CREATED') | translate }}</div>
+                @for (c of resultList(t, 'createdRefs'); track c) { <div class="text-xs text-green-700">• {{ c }}</div> }
+              </div>
+            }
+            @if (t.kind === 'reader-import' && t.state === 'Completed' && resultList(t, 'errors').length) {
+              <div class="mb-3 border border-red-100 rounded-lg bg-red-50/50 px-3 py-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-red-600">{{ 'ADMIN_TASKS.ERROR_ROWS' | translate: { count: resultList(t, 'errors').length } }}</span>
+                  <button type="button" (click)="downloadErrors(t)" class="text-xs font-medium text-red-700 hover:underline flex items-center gap-1">
+                    <mat-icon class="text-[16px]">download</mat-icon> {{ 'ADMIN_TASKS.DOWNLOAD_ERRORS' | translate }}
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- Hành động -->
+            <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+              @if (t.preview && t.state === 'Completed') {
+                <button *appCan="'add'" [disabled]="busy()" (click)="confirmTask(t)"
+                        class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {{ 'ADMIN_TASKS.CONFIRM' | translate }}
+                </button>
+              }
+              @if (t.state === 'Queued' || t.state === 'Running') {
+                <button *appCan="'add'" [disabled]="busy()" (click)="pause(t)"
+                        class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                  {{ 'ADMIN_TASKS.PAUSE' | translate }}
+                </button>
+              }
+              @if (t.state === 'Paused' || t.state === 'Failed') {
+                <button *appCan="'add'" [disabled]="busy()" (click)="resume(t)"
+                        class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                  {{ 'ADMIN_TASKS.RESUME' | translate }}
+                </button>
+              }
+              @if (t.state === 'Paused' || t.state === 'Failed' || t.state === 'NeedsReview') {
+                <button *appCan="'add'" [disabled]="busy()" (click)="previewRemaining(t)"
+                        class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                  {{ 'ADMIN_TASKS.PREVIEW_REMAINING' | translate }}
+                </button>
+              }
+              @if (t.state !== 'Completed' && t.state !== 'Cancelled') {
+                <button *appCan="'add'" [disabled]="busy()" (click)="cancel(t)"
+                        class="bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50">
+                  {{ 'ADMIN_TASKS.CANCEL' | translate }}
+                </button>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-400 text-sm">
+            {{ 'ADMIN_TASKS.EMPTY' | translate }}
+          </div>
+        }
+      </div>
+    </div>
+  }
+}
+
+<!-- ═══════════════════ TAB: Giám sát (Đợt 13) ═══════════════════ -->
+@if (tab() === 'monitor') {
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="p-3 border-b border-gray-100 flex gap-2">
+        <select [(ngModel)]="monitorState" (ngModelChange)="filterMonitor()" class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 flex-1">
+          <option value="">{{ 'ADMIN_TASKS.MONITOR_ALL_STATES' | translate }}</option>
+          <option value="Queued">{{ 'ADMIN_TASKS.STATE_QUEUED' | translate }}</option>
+          <option value="Running">{{ 'ADMIN_TASKS.STATE_RUNNING' | translate }}</option>
+          <option value="Paused">{{ 'ADMIN_TASKS.STATE_PAUSED' | translate }}</option>
+          <option value="NeedsReview">{{ 'ADMIN_TASKS.STATE_NEEDSREVIEW' | translate }}</option>
+          <option value="Failed">{{ 'ADMIN_TASKS.STATE_FAILED' | translate }}</option>
+          <option value="Completed">{{ 'ADMIN_TASKS.STATE_COMPLETED' | translate }}</option>
+          <option value="Cancelled">{{ 'ADMIN_TASKS.STATE_CANCELLED' | translate }}</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.MONITOR_OWNER' | translate }}</th>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.STATE' | translate }}</th>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'ADMIN_TASKS.PROGRESS' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of monitorTasks(); track t.id) {
+              <tr class="border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50"
+                  [class.bg-blue-50]="monitorDetail()?.id === t.id"
+                  [class.bg-red-50]="t.needsAttention"
+                  (click)="openMonitor(t)">
+                <td class="py-2 px-4 text-sm text-gray-700">
+                  {{ t.ownerName }}
+                  @if (t.needsAttention) {
+                    <span class="ml-1 text-red-500" [title]="'ADMIN_TASKS.MONITOR_NEEDS_ATTENTION' | translate">⚠</span>
+                  }
+                  <div class="text-xs text-gray-400">{{ kindLabel(t.kind) }}</div>
+                </td>
+                <td class="py-2 px-4 text-sm">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium" [class]="stateClass(t.state)">
+                    {{ ('ADMIN_TASKS.STATE_' + t.state.toUpperCase()) | translate }}
+                  </span>
+                </td>
+                <td class="py-2 px-4 text-sm text-gray-500 text-right">{{ progress(t) }}%</td>
+              </tr>
+            }
+            @if (monitorTasks().length === 0) {
+              <tr><td colspan="3" class="py-8 px-4 text-center text-gray-400 text-sm">{{ 'ADMIN_TASKS.EMPTY' | translate }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="lg:col-span-3">
+      @if (monitorDetail(); as t) {
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <div class="font-semibold text-gray-800">{{ t.ownerName }} — {{ kindLabel(t.kind) }}</div>
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium mt-1 inline-block" [class]="stateClass(t.state)">
+                {{ ('ADMIN_TASKS.STATE_' + t.state.toUpperCase()) | translate }}
+              </span>
+            </div>
+            <button (click)="closeMonitorDetail()" class="text-gray-400 hover:text-gray-600">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div class="mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+              <span>{{ 'ADMIN_TASKS.PROGRESS' | translate }}</span>
+              <span>{{ t.completedItems }}/{{ t.totalItems }} ({{ progress(t) }}%)</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+              <div class="bg-blue-600 h-2 rounded-full transition-all" [style.width.%]="progress(t)"></div>
+            </div>
+          </div>
+
+          @if (t.error) {
+            <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-4">
+              <strong>{{ 'ADMIN_TASKS.ERROR' | translate }}:</strong> {{ t.error }}
+            </div>
+          }
+
+          <!-- Hành động can thiệp -->
+          <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100 mb-4">
+            @if (t.state === 'Queued' || t.state === 'Running') {
+              <button *appCan="'edit'; url: '/admin/admin-tasks/monitor/control'" [disabled]="monitorBusy()" (click)="monitorPauseTask(t)"
+                      class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                {{ 'ADMIN_TASKS.PAUSE' | translate }}
+              </button>
+            }
+            @if (t.state === 'Paused' || t.state === 'Failed') {
+              <button *appCan="'edit'; url: '/admin/admin-tasks/monitor/control'" [disabled]="monitorBusy()" (click)="monitorResumeTask(t)"
+                      class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                {{ 'ADMIN_TASKS.RESUME' | translate }}
+              </button>
+            }
+            @if (t.state === 'Completed' || t.state === 'Cancelled') {
+              <button *appCan="'edit'; url: '/admin/admin-tasks/retention'" [disabled]="monitorBusy()" (click)="toggleHold(t, true)"
+                      class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                {{ 'ADMIN_TASKS.RETENTION_HOLD' | translate }}
+              </button>
+              <button *appCan="'edit'; url: '/admin/admin-tasks/retention'" [disabled]="monitorBusy()" (click)="toggleHold(t, false)"
+                      class="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                {{ 'ADMIN_TASKS.RETENTION_UNHOLD' | translate }}
+              </button>
+            }
+          </div>
+
+          <!-- Lịch sử can thiệp -->
+          <div class="font-medium text-sm text-gray-700 mb-2">{{ 'ADMIN_TASKS.MONITOR_EVENTS' | translate }}</div>
+          <div class="border border-gray-100 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+            @for (e of t.events; track e.id) {
+              <div class="border-b border-gray-50 last:border-0 p-3 text-sm">
+                <div class="flex justify-between">
+                  <span class="font-medium text-gray-800">{{ e.action === 'Pause' ? ('ADMIN_TASKS.PAUSE' | translate) : ('ADMIN_TASKS.RESUME' | translate) }}</span>
+                  <span class="text-xs text-gray-400">{{ e.createdAt | date:'short' }}</span>
+                </div>
+                <div class="text-xs text-gray-500">{{ e.operatorName }}: {{ e.reason }}</div>
+              </div>
+            }
+            @if (t.events.length === 0) {
+              <div class="p-4 text-center text-gray-400 text-sm">{{ 'ADMIN_TASKS.MONITOR_EVENTS_EMPTY' | translate }}</div>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-400 text-sm">
+          {{ 'ADMIN_TASKS.EMPTY' | translate }}
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<!-- ═══════════════════ TAB: Dọn dữ liệu (Đợt 13) ═══════════════════ -->
+@if (tab() === 'retention') {
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div class="font-semibold text-gray-800 mb-3">{{ 'ADMIN_TASKS.RETENTION_PREVIEW_TITLE' | translate }}</div>
+      @if (retentionPreviewData(); as p) {
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">{{ 'ADMIN_TASKS.RETENTION_ENABLED' | translate }}</span><span>{{ p.enabled ? '✓' : '✗' }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">{{ 'ADMIN_TASKS.RETENTION_DRY_RUN' | translate }}</span><span>{{ p.dryRun ? '✓' : '✗' }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">{{ 'ADMIN_TASKS.RETENTION_PAYLOAD_DAYS' | translate }}</span><span>{{ p.payloadDays }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">{{ 'ADMIN_TASKS.RETENTION_CANDIDATE_COUNT' | translate }}</span><span class="font-semibold">{{ p.candidateCount }}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">{{ 'ADMIN_TASKS.RETENTION_ESTIMATED_BYTES' | translate }}</span><span>{{ p.estimatedBytes | number }}</span></div>
+        </div>
+        <button *appCan="'edit'; url: '/admin/admin-tasks/retention'" [disabled]="retentionBusy() || !p.enabled" (click)="runRetention()"
+                class="mt-4 w-full bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {{ 'ADMIN_TASKS.RETENTION_RUN_NOW' | translate }}
+        </button>
+        @if (!p.enabled) {
+          <div class="mt-2 text-xs text-amber-600">{{ 'ADMIN_TASKS.RETENTION_DISABLED' | translate }}</div>
+        }
+      }
+    </div>
+
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="p-4 border-b border-gray-100 font-semibold text-gray-800">{{ 'ADMIN_TASKS.RETENTION_RUNS_TITLE' | translate }}</div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.RETENTION_RUN_FINISHED_AT' | translate }}</th>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600">{{ 'ADMIN_TASKS.RETENTION_DRY_RUN' | translate }}</th>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'ADMIN_TASKS.RETENTION_RUN_TASK_COUNT' | translate }}</th>
+              <th class="py-2 px-4 text-xs font-medium text-gray-600 text-right">{{ 'ADMIN_TASKS.RETENTION_ESTIMATED_BYTES' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of retentionRunsData(); track r.id) {
+              <tr class="border-b border-gray-50 last:border-0">
+                <td class="py-2 px-4 text-sm text-gray-700">{{ r.finishedAt | date:'short' }}</td>
+                <td class="py-2 px-4 text-sm">{{ r.dryRun ? '✓' : '✗' }}</td>
+                <td class="py-2 px-4 text-sm text-right">{{ r.taskCount }}</td>
+                <td class="py-2 px-4 text-sm text-right">{{ r.estimatedBytes | number }}</td>
+              </tr>
+            }
+            @if (retentionRunsData().length === 0) {
+              <tr><td colspan="4" class="py-8 px-4 text-center text-gray-400 text-sm">{{ 'ADMIN_TASKS.EMPTY' | translate }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}

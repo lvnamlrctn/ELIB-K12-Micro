@@ -1,0 +1,296 @@
+@if (isLoading()) {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center"><mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon></div>
+} @else if (isNew()) {
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h4 class="text-lg font-bold text-gray-800">{{ 'FINE_TICKET.TITLE' | translate }}</h4>
+      <div class="flex items-center gap-1">
+        <button (click)="save()" [disabled]="isSaving() || !lookedUpReader()" class="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 disabled:opacity-50">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> } @else { <mat-icon class="text-[18px]">save</mat-icon> } {{ 'FINE_TICKET.SAVE' | translate }}
+        </button>
+        <button (click)="back()" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">logout</mat-icon> {{ 'FINE_TICKET.BACK' | translate }}</button>
+      </div>
+    </div>
+
+    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.TICKET_NO' | translate }}</label>
+        <input value="—" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.CARD_NO' | translate }}</label>
+        <div class="flex gap-1">
+          <input [ngModel]="cardNoInput()" (ngModelChange)="cardNoInput.set($event)" (keydown.enter)="lookupCardNo()" type="text" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <button (click)="lookupCardNo()" [disabled]="isLookingUp()" class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+            @if (isLookingUp()) { <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> } @else { <mat-icon class="text-[18px]">search</mat-icon> }
+          </button>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.READER_NAME' | translate }}</label>
+        <input [value]="lookedUpReader()?.fullName || '—'" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-green-700 font-semibold">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.FINE_DATE' | translate }}</label>
+        <app-date-input [ngModel]="fineDate()" (dateChange)="fineDate.set($event)" [ngModelOptions]="{ standalone: true }"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.STATUS' | translate }}</label>
+        <ng-select [items]="statusOptions" bindValue="value"
+                   [ngModel]="status()" (ngModelChange)="status.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [searchable]="true" [clearable]="false"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate">
+          <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+          <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.READER_ISSUE_DATE' | translate }}</label>
+        <app-date-input [ngModel]="readerIssueDate()" (dateChange)="readerIssueDate.set($event)" [ngModelOptions]="{ standalone: true }"></app-date-input>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.REASON' | translate }}</label>
+        <ng-select [items]="reasonTypes()" bindLabel="name" bindValue="id"
+                   [ngModel]="fineTypeId()" (ngModelChange)="fineTypeId.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.SELECT' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.METHOD' | translate }}</label>
+        <ng-select [items]="fineMethods()" bindLabel="name" bindValue="id"
+                   [ngModel]="fineMethodId()" (ngModelChange)="fineMethodId.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.SELECT' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.FINE_AMOUNT' | translate }}</label>
+        <input [ngModel]="fineAmount()" (ngModelChange)="fineAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.DISCOUNT' | translate }}</label>
+        <input [ngModel]="discountAmount()" (ngModelChange)="discountAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.PAID_AMOUNT' | translate }}</label>
+        <input [ngModel]="paidAmount()" (ngModelChange)="paidAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.REMAINING' | translate }}</label>
+        <input [value]="(remaining() | number) + 'đ'" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-red-600 font-semibold">
+      </div>
+
+      <div class="md:col-span-3">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.NOTE' | translate }}</label>
+        <textarea [ngModel]="note()" (ngModelChange)="note.set($event)" rows="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      </div>
+    </div>
+    <div class="px-5 pb-4 text-xs text-gray-500 flex items-center gap-1"><mat-icon class="text-[16px] w-4 h-4">info</mat-icon> {{ 'FINE_TICKET.SAVE_FIRST_HINT' | translate }}</div>
+  </div>
+} @else if (ticket(); as t) {
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h4 class="text-lg font-bold text-gray-800">{{ 'FINE_TICKET.TITLE' | translate }}</h4>
+      <div class="flex items-center gap-1">
+        <button (click)="goToNew()" class="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">add</mat-icon> {{ 'FINE_TICKET.NEW' | translate }}</button>
+        <button (click)="save()" [disabled]="isSaving()" class="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 disabled:opacity-50">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> } @else { <mat-icon class="text-[18px]">save</mat-icon> } {{ 'FINE_TICKET.SAVE' | translate }}
+        </button>
+        <button (click)="print()" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">print</mat-icon> {{ 'FINE_TICKET.PRINT' | translate }}</button>
+        <button (click)="back()" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">logout</mat-icon> {{ 'FINE_TICKET.BACK' | translate }}</button>
+      </div>
+    </div>
+
+    <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.TICKET_NO' | translate }}</label>
+        <input [value]="t.code" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-green-700 font-semibold">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.CARD_NO' | translate }}</label>
+        <input [value]="t.cardNo" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-green-700 font-semibold">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.READER_NAME' | translate }}</label>
+        <input [value]="(t.cardNo || '') + '/ ' + (t.readerName || '')" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-green-700">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.FINE_DATE' | translate }}</label>
+        <app-date-input [ngModel]="fineDate()" (dateChange)="fineDate.set($event)" [ngModelOptions]="{ standalone: true }"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.STATUS' | translate }}</label>
+        <ng-select [items]="statusOptions" bindValue="value"
+                   [ngModel]="status()" (ngModelChange)="status.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [searchable]="true" [clearable]="false"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate">
+          <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+          <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.FINE_TIMES' | translate }}</label>
+        <input [value]="t.lanphat" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.REASON' | translate }}</label>
+        <ng-select [items]="reasonTypes()" bindLabel="name" bindValue="id"
+                   [ngModel]="fineTypeId()" (ngModelChange)="fineTypeId.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [disabled]="isDone()"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.SELECT' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.METHOD' | translate }}</label>
+        <ng-select [items]="fineMethods()" bindLabel="name" bindValue="id"
+                   [ngModel]="fineMethodId()" (ngModelChange)="fineMethodId.set($event)" [ngModelOptions]="{ standalone: true }"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'COMMON.SELECT' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.READER_ISSUE_DATE' | translate }}</label>
+        <app-date-input [ngModel]="readerIssueDate()" (dateChange)="readerIssueDate.set($event)" [ngModelOptions]="{ standalone: true }"></app-date-input>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.FINE_AMOUNT' | translate }}</label>
+        @if (hasLines()) {
+          <input [value]="(totalAmount() | number) + 'đ'" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-red-600 font-semibold">
+        } @else {
+          <input [ngModel]="fineAmount()" (ngModelChange)="fineAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        }
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.DISCOUNT' | translate }}</label>
+        <input [ngModel]="discountAmount()" (ngModelChange)="discountAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.PAID_AMOUNT' | translate }}</label>
+        <input [ngModel]="paidAmount()" (ngModelChange)="paidAmount.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.REMAINING' | translate }}</label>
+        <input [value]="(remaining() | number) + 'đ'" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-red-600 font-semibold">
+      </div>
+      @if (remaining() > 0 && ticket()?.readerId && ticket()?.status !== 2) {
+        <div class="flex items-end pb-0.5">
+          <button type="button" (click)="openPaymentQr()"
+            class="px-3 py-2 text-sm rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 flex items-center gap-1">
+            <span class="material-icons text-[18px]">qr_code_2</span> {{ 'FINE_TICKET.PAY_QR' | translate }}
+          </button>
+        </div>
+      }
+      <div class="flex items-center gap-2 pt-6">
+        <input [ngModel]="owesDocument()" (ngModelChange)="owesDocument.set($event)" type="checkbox" id="owesDoc" class="w-4 h-4">
+        <label for="owesDoc" class="text-sm text-gray-700">{{ 'FINE_TICKET.OWES_DOCUMENT' | translate }}</label>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'FINE_TICKET.NOTE' | translate }}</label>
+        <textarea [ngModel]="note()" (ngModelChange)="note.set($event)" rows="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      </div>
+    </div>
+
+    @if (t.publicId) {
+      <div class="px-5 pb-2">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold text-gray-700">{{ 'FINE_TICKET.DOC_LIST_TITLE' | translate }}</div>
+          @if (!isDone()) {
+            <button type="button" (click)="addLine()"
+              class="px-3 py-1.5 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white flex items-center gap-1 shadow-sm">
+              <mat-icon class="text-[18px] w-[18px] h-[18px]">add</mat-icon> {{ 'FINE_TICKET.ADD_LINE' | translate }}
+            </button>
+          }
+        </div>
+        <div class="overflow-x-auto border border-gray-100 rounded-lg">
+          <table class="w-full text-left text-sm">
+            <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+              <th class="py-2 px-3">STT</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_BARCODE' | translate }}</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_DOC_NAME' | translate }}</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_REASON' | translate }}</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_OVERDUE_DAYS' | translate }}</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_UNIT_PRICE' | translate }}</th>
+              <th class="py-2 px-3">{{ 'FINE_TICKET.COL_LINE_TOTAL' | translate }}</th>
+              @if (!isDone()) { <th class="py-2 px-3 w-10"></th> }
+            </tr></thead>
+            <tbody>
+              @for (line of lineEdits(); track line.id; let i = $index) {
+                <tr class="border-b border-gray-50 last:border-0" [class.bg-green-50]="line.isNew">
+                  <td class="py-2 px-3">{{ i + 1 }}</td>
+                  <td class="py-2 px-3 font-mono">
+                    @if (line.isNew) {
+                      <input [ngModel]="line.barcode" (ngModelChange)="updateLineBarcode(line.id, $event)" maxlength="64"
+                             [placeholder]="'FINE_TICKET.LINE_BARCODE_PH' | translate"
+                             class="w-36 px-2 py-1.5 text-sm border border-gray-300 rounded-lg font-mono">
+                    } @else { {{ line.barcode || '—' }} }
+                  </td>
+                  <td class="py-2 px-3">{{ lineInfo().get(line.id)?.bibTitle || '—' }}</td>
+                  <td class="py-2 px-3">
+                    <ng-select [items]="lineReasonTypes()" bindLabel="name" bindValue="code" class="min-w-[12rem]" appendTo="body"
+                               [searchable]="true" [clearable]="false" [disabled]="isDone()"
+                               [placeholder]="'COMMON.SELECT' | translate"
+                               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate"
+                               [ngModel]="line.fineTypeId || null" (ngModelChange)="updateLineType(line.id, $event)">
+                      <ng-template ng-option-tmp let-item="item">
+                        {{ item.name }}
+                        @if (reasonStatusName(item); as st) { <span class="ml-1 text-xs text-amber-700">→ {{ st }}</span> }
+                      </ng-template>
+                    </ng-select>
+                  </td>
+                  <td class="py-2 px-3">{{ lineInfo().get(line.id)?.overdueDays ?? '—' }}</td>
+                  <td class="py-2 px-3">{{ line.isNew ? '—' : (lineInfo().get(line.id)?.unitPrice | number) }}</td>
+                  <td class="py-2 px-3">
+                    <input [ngModel]="line.value" (ngModelChange)="updateLineValue(line.id, $event)" type="number" min="0" class="w-32 px-2 py-1.5 text-sm border border-gray-300 rounded-lg text-right">
+                  </td>
+                  @if (!isDone()) {
+                    <td class="py-2 px-3">
+                      <button type="button" (click)="removeLine(line)" [title]="'FINE_TICKET.DELETE_LINE' | translate"
+                        class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center">
+                        <mat-icon class="text-[18px] w-[18px] h-[18px]">delete</mat-icon>
+                      </button>
+                    </td>
+                  }
+                </tr>
+              } @empty {
+                <tr><td [attr.colspan]="isDone() ? 7 : 8" class="py-6 text-center text-gray-400 text-sm">{{ 'FINE_TICKET.NO_LINES' | translate }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-2 text-xs text-amber-700 flex items-center gap-1"><mat-icon class="text-[16px] w-4 h-4">info</mat-icon> {{ 'FINE_TICKET.REASON_STATUS_HINT' | translate }}</div>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between mt-3 pb-4 text-sm">
+          <div class="text-gray-500">
+            ({{ getFineTypeName('QUAHAN') }}: {{ t.feeLegend?.overdueRate | number }}đ
+            &nbsp;{{ getFineTypeName('XLKY') }}: {{ t.feeLegend?.techFee | number }}đ
+            &nbsp;{{ getFineTypeName('VANCHUYEN') }}: {{ t.feeLegend?.shippingFee | number }}đ)
+          </div>
+          <div class="font-semibold text-gray-800">{{ 'FINE_TICKET.TOTAL_AMOUNT' | translate }}: <span class="text-red-600">{{ totalAmount() | number }}đ</span></div>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (showPaymentQr()) {
+  <app-payment-qr-dialog mode="staff" [readerId]="ticket()?.readerId ?? null" targetType="FINE_TICKET"
+    [targetId]="ticket()?.id ?? null" (paid)="onPaymentQrPaid()" (closed)="showPaymentQr.set(false)">
+  </app-payment-qr-dialog>
+}

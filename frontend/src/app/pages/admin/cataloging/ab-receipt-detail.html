@@ -1,0 +1,1092 @@
+<div class="print:hidden">
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+  <div>
+    <button (click)="back()" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-1">
+      <mat-icon class="text-[16px]">arrow_back</mat-icon> {{ 'COMMON.BACK' | translate }}
+    </button>
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'AB_RECEIPT.TITLE' | translate }}</h4>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button (click)="openReceiptLookup()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">manage_search</mat-icon> {{ 'AB_RECEIPT.RECEIPT_LOOKUP' | translate }}
+    </button>
+    <button (click)="printClassLabels()" [disabled]="isPrintingLabels() || lineSelection.selected.length === 0" [title]="'AB_RECEIPT.SELECT_LINES_FOR_LABEL' | translate" class="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">label</mat-icon> {{ 'AB_RECEIPT.PRINT_CLASS_LABEL' | translate }} ({{ lineSelection.selected.length }})
+    </button>
+    <button (click)="printAcquisitionList()" [disabled]="isPrintingAcquisition()" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">print</mat-icon> {{ 'AB_RECEIPT.PRINT_ACQUISITION_LIST' | translate }}
+    </button>
+    <button (click)="printStoreAllocation()" [disabled]="isPrintingStoreAllocation()" class="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">print</mat-icon> {{ 'AB_RECEIPT.PRINT_STORE_ALLOCATION' | translate }}
+    </button>
+    <button (click)="save()" [disabled]="isSaving() || !canEdit()" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+    </button>
+  </div>
+</div>
+
+@if (locked()) {
+  <div class="mb-5 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-sm flex items-center gap-2">
+    <mat-icon class="text-[18px]">lock</mat-icon> {{ 'COMMON.RECORD_LOCKED' | translate }}
+  </div>
+}
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5 relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] rounded-xl">
+      <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+    </div>
+  }
+  <form [formGroup]="dataForm">
+  <fieldset [disabled]="!canEdit()" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'AB_RECEIPT.CODE' | translate }}</label>
+      <input type="text" [value]="receipt()?.code || receipt()?.id || ''" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500"></div>
+    <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.NAME' | translate }} <span class="text-red-500">*</span></label>
+      <input formControlName="ReceiptName" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+    <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'AB_RECEIPT.CREATED_BY_LABEL' | translate }}</label>
+      <input type="text" [value]="currentUserName()" disabled class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500"></div>
+
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.ORDER_STATUS' | translate }}</label>
+      <ng-select [items]="statusOptions" bindLabel="label" bindValue="value" formControlName="Status"
+                 [searchable]="true" [clearable]="false"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate">
+        <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.PAYMENT_METHOD' | translate }}</label>
+      <ng-select [items]="paymentMethodOptions" bindLabel="label" bindValue="value" formControlName="PaymentMethodId"
+                 [searchable]="true" [clearable]="false"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate">
+        <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.PAYMENT_STATUS' | translate }}</label>
+      <ng-select [items]="paymentStatusOptions" bindLabel="label" bindValue="value" formControlName="PaymentStatus"
+                 [searchable]="true" [clearable]="false"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate">
+        <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+        <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.DATE' | translate }}</label>
+      <app-date-input formControlName="ReceiptDate"></app-date-input></div>
+
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.SOURCE' | translate }}</label>
+      <ng-select [items]="sources()" bindLabel="name" bindValue="id" formControlName="SourceId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.FUND' | translate }}</label>
+      <ng-select [items]="funds()" bindLabel="name" bindValue="id" formControlName="FundId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.BUDGET' | translate }}</label>
+      <ng-select [items]="budgets()" bindLabel="name" bindValue="id" formControlName="BudgetId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.SUPPLIER' | translate }}</label>
+      <ng-select [items]="suppliers()" bindLabel="name" bindValue="id" formControlName="SupplierId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <div><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.RECEIVER_PLACE' | translate }}</label>
+      <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="StoreId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select></div>
+    <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 uppercase mb-1">{{ 'AB_RECEIPT.NOTE' | translate }}</label>
+      <input formControlName="Note" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+  </fieldset>
+  </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-5">
+  <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center justify-between gap-2">
+    <h5 class="text-sm font-semibold text-gray-600 uppercase">{{ 'AB_RECEIPT.LINES' | translate }}</h5>
+    <div class="flex flex-wrap gap-2">
+      <button (click)="openPickExisting()" [disabled]="!canEdit()" class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">search</mat-icon> {{ 'AB_RECEIPT.PICK_EXISTING' | translate }}</button>
+      <button (click)="openAddNew()" [disabled]="!canEdit()" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'AB_RECEIPT.ADD_NEW_BIB' | translate }}</button>
+      <button (click)="openZ3950()" [disabled]="!canEdit()" class="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">travel_explore</mat-icon> {{ 'AB_RECEIPT.FROM_Z3950' | translate }}</button>
+      <button (click)="openMarcFileImport()" [disabled]="!canEdit()" class="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">upload_file</mat-icon> {{ 'AB_RECEIPT.FROM_MARC_FILE' | translate }}</button>
+      <button (click)="openOrderPick()" [disabled]="!canEdit()" class="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">assignment</mat-icon> {{ 'AB_RECEIPT.FROM_ORDER' | translate }}</button>
+      <button (click)="openMoveCollection()" [disabled]="!canEdit() || lineSelection.selected.length === 0" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">drive_file_move</mat-icon> {{ 'EBOOK.MOVE_SELECTED' | translate }} ({{ lineSelection.selected.length }})</button>
+    </div>
+  </div>
+  <!-- Tìm nhanh trong các dòng của đơn (nhan đề, tác giả, NXB, năm, MFN) — lọc ngay trên trình duyệt. -->
+  <div class="px-5 py-2.5 border-b border-gray-100 flex flex-wrap items-center gap-3">
+    <div class="relative flex-1 min-w-[16rem] max-w-md">
+      <mat-icon class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] !w-[18px] !h-[18px]">search</mat-icon>
+      <input type="text" [ngModel]="lineKeyword()" (ngModelChange)="onLineKeywordChange($event)" [placeholder]="'AB_RECEIPT.LINE_SEARCH_PH' | translate"
+             class="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      @if (lineKeyword()) {
+        <button type="button" (click)="onLineKeywordChange('')" class="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-gray-600"><mat-icon class="text-[16px] !w-4 !h-4">close</mat-icon></button>
+      }
+    </div>
+    <span class="text-xs text-gray-500">
+      @if (lineKeyword()) { {{ 'AB_RECEIPT.LINE_SEARCH_COUNT' | translate: { found: filteredLines().length, total: lines().length } }} }
+      @else { {{ 'AB_RECEIPT.LINE_TOTAL' | translate: { total: lines().length } }} }
+    </span>
+  </div>
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left text-sm">
+      <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+        <th class="py-2 px-3 w-10">
+          <input type="checkbox" (change)="toggleAllLines()" [checked]="lineSelection.hasValue() && isAllLinesSelected()" [indeterminate]="lineSelection.hasValue() && !isAllLinesSelected()" class="rounded text-blue-500 border-gray-300 cursor-pointer">
+        </th>
+        <th class="py-2 px-3 whitespace-nowrap">{{ 'AB_RECEIPT.KCB_MFN' | translate }}</th>
+        <th class="py-2 px-3">{{ 'AB_RECEIPT.L_TITLE' | translate }}</th>
+        <th class="py-2 px-3">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</th>
+        <th class="py-2 px-3">{{ 'AB_RECEIPT.L_YEAR' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.PRICE' | translate }}</th>
+        <th class="py-2 px-3">{{ 'AB_RECEIPT.CURRENCY' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.L_RATE' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.L_TOTAL' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.KCB_COUNT' | translate }}</th>
+        <th class="py-2 px-3 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+      </tr></thead>
+      <tbody>
+        @for (l of pagedLines(); track l.id) {
+          <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="py-2 px-3">
+              <input type="checkbox" (click)="$event.stopPropagation()" (change)="lineSelection.toggle(l)" [checked]="lineSelection.isSelected(l)" class="rounded text-blue-500 border-gray-300 cursor-pointer">
+            </td>
+            <td class="py-2 px-3 font-mono text-xs text-gray-600 whitespace-nowrap">{{ l.mfn ?? l.bibid ?? '—' }}</td>
+            <td class="py-2 px-3">{{ l.title || '—' }}</td>
+            <td class="py-2 px-3">{{ l.author || '—' }}</td>
+            <td class="py-2 px-3">{{ l.publishDate || '—' }}</td>
+            <td class="py-2 px-3 text-right">{{ l.amount || 0 }}</td>
+            <td class="py-2 px-3 text-right">{{ l.price || 0 }}</td>
+            <td class="py-2 px-3">{{ l.currency || '—' }}</td>
+            <td class="py-2 px-3 text-right">{{ l.rate || 1 }}</td>
+            <td class="py-2 px-3 text-right font-medium text-gray-800">{{ lineTotal(l) }}</td>
+            <td class="py-2 px-3 text-right">{{ l.registerCount || 0 }}</td>
+            <td class="py-2 px-3 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <button (click)="openEditLine(l)" [disabled]="!canEdit()" class="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" [title]="'AB_RECEIPT.EDIT_LINE' | translate"><mat-icon class="text-[18px]">edit_note</mat-icon></button>
+                <button (click)="openEditMarc(l)" [disabled]="!canEdit()" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" [title]="'AB_RECEIPT.EDIT_MARC' | translate"><mat-icon class="text-[18px]">edit</mat-icon></button>
+                <button (click)="openKcbModal(l)" class="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors" [title]="'AB_RECEIPT.KCB_REGISTER' | translate"><mat-icon class="text-[18px]">qr_code</mat-icon></button>
+                <button (click)="handleDeleteLine(l)" [disabled]="!canEdit()" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+              </div>
+            </td>
+          </tr>
+        }
+        @if (filteredLines().length === 0) { <tr><td colspan="12" class="py-10 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+      </tbody>
+    </table>
+  </div>
+  @if (filteredLines().length > lineMinPageSize) {
+    <mat-paginator [length]="filteredLines().length" [pageIndex]="linePageIndex()" [pageSize]="linePageSize()" [pageSizeOptions]="linePageSizeOptions"
+                   showFirstLastButtons (page)="onLinePageChange($event)"></mat-paginator>
+  }
+</div>
+
+@if (showAddNew()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">add</mat-icon>{{ 'AB_RECEIPT.ADD_NEW_BIB' | translate }}</h3>
+        <div class="flex items-center gap-2">
+          <button type="submit" form="addNewLineForm" [disabled]="isSavingLine()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+            @if (isSavingLine()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'COMMON.ADD' | translate }}
+          </button>
+          <button (click)="requestCloseAddNew()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+        </div>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        <form id="addNewLineForm" [formGroup]="newLineForm" (ngSubmit)="addNewLine()" class="border border-gray-200 rounded-lg p-3 mb-4">
+          <div class="grid grid-cols-1 md:grid-cols-6 gap-2 mb-3">
+            <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.LINE_BIB_TYPE' | translate }}</label>
+              <ng-select [items]="bibTypes()" bindLabel="name" bindValue="id"
+                         [(ngModel)]="bibTypeId" (ngModelChange)="onBibTypeChange()" [ngModelOptions]="{standalone:true}"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.WORKSHEET' | translate }}</label>
+              <ng-select [items]="worksheets()" bindLabel="name" bindValue="id"
+                         [ngModel]="worksheetId()" (ngModelChange)="onWorksheetChange($event)" [ngModelOptions]="{standalone:true}"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'BIB.F_COLLECTION' | translate }}</label>
+              <ng-select [items]="collections()" bindLabel="label" bindValue="id"
+                         [(ngModel)]="collectionId" [ngModelOptions]="{standalone:true}"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+              <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency" (change)="onCurrencyChangeForNew()"
+                         [searchable]="true" [clearable]="false"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              </ng-select></div>
+          </div>
+          <!-- Ảnh bìa tự động theo ISBN + Biên mục từ ảnh bìa (AI) -->
+          <div class="mb-3 border border-gray-200 rounded-xl p-4 flex items-center gap-4">
+            @if (coverImagePreviewUrl(); as cover) {
+              <img [src]="cover" class="w-16 h-20 object-cover rounded-lg border border-gray-200" [alt]="'BIB_EDIT.COVER_PREVIEW' | translate">
+            } @else {
+              <div class="w-16 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-300">
+                <mat-icon>image</mat-icon>
+              </div>
+            }
+            <div class="flex-1">
+              <p class="text-xs font-semibold text-emerald-600 uppercase mb-1">{{ 'BIB_EDIT.COVER_AUTO_FETCH' | translate }}</p>
+              <button type="button" (click)="fetchCoverPreview()" [disabled]="isFetchingCover()"
+                class="bg-white border border-emerald-300 text-emerald-600 hover:bg-emerald-50 disabled:opacity-40 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                @if (isFetchingCover()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">auto_awesome</mat-icon> }
+                {{ 'BIB_EDIT.COVER_FETCH_BTN' | translate }}
+              </button>
+            </div>
+          </div>
+          <div class="mb-3 border border-gray-200 rounded-xl p-4">
+            <p class="text-xs font-semibold text-emerald-700 uppercase mb-2">{{ 'BIB_EDIT.ANALYSIS_IMAGES' | translate }}</p>
+            <div class="flex items-center gap-3">
+              <label class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 cursor-pointer">
+                <mat-icon class="text-[16px]">folder_open</mat-icon>{{ 'BIB_EDIT.BROWSE_FILE' | translate }}
+                <input type="file" accept="image/*" multiple class="hidden" (change)="onAnalysisImagesSelectNew($event)">
+              </label>
+              @if (analysisImageFilesNew().length) { <span class="text-xs text-gray-500">{{ analysisImageFilesNew().length }} {{ 'BIB_EDIT.IMAGES_SELECTED' | translate }}</span> }
+              <button type="button" (click)="analyzeCoverForAddNew()" [disabled]="!analysisImageFilesNew().length || isAnalyzingCoverNew()" class="bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                @if (isAnalyzingCoverNew()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> {{ 'BIB_EDIT.ANALYZING' | translate }} }
+                @else { <mat-icon class="text-[16px]">auto_awesome</mat-icon> {{ 'BIB_EDIT.ANALYZE_COVER' | translate }} }
+              </button>
+            </div>
+          </div>
+
+          <app-marc-fields-editor [fields]="marcFields()" [marcFieldDics]="marcFieldDics()" [marcSubFieldDics]="marcSubFieldDics()" (fieldsChange)="marcFields.set($event)" />
+
+          <!-- Tài liệu số liên kết (chọn trước, tự liên kết sau khi thêm dòng) -->
+          <div class="mt-3 border border-gray-200 rounded-xl p-4">
+            <p class="text-xs font-semibold text-emerald-600 uppercase mb-2">{{ 'BIB_EDIT.LINKED_EBOOK' | translate }}</p>
+            @if (pendingLinkEbookNew(); as ebook) {
+              <p class="text-sm font-bold text-gray-800">{{ ebook.itemXml?.title || ebook.title || '—' }}</p>
+              <p class="text-sm text-gray-500">{{ ebook.itemXml?.author }}</p>
+              <div class="flex items-center gap-2 mt-2">
+                <button type="button" (click)="clearPendingLinkEbookNew()" class="bg-white border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                  <mat-icon class="text-[16px]">close</mat-icon> {{ 'BIB_EDIT.CLEAR_PICK_BTN' | translate }}
+                </button>
+                <span class="text-xs text-gray-400">{{ 'BIB_EDIT.PENDING_LINK_NOTE' | translate }}</span>
+              </div>
+            } @else {
+              <button type="button" (click)="openEbookPicker()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg inline-flex items-center gap-1">
+                <mat-icon class="text-[16px]">add_link</mat-icon> {{ 'BIB_EDIT.LINK_EBOOK_BTN' | translate }}
+              </button>
+            }
+          </div>
+
+          <button type="submit" [disabled]="isSavingLine()" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+            @if (isSavingLine()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'COMMON.ADD' | translate }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showPickExisting()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-emerald-600">search</mat-icon>{{ 'AB_RECEIPT.PICK_EXISTING' | translate }}</h3>
+        <button (click)="closePickExisting()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        @if (!pickSelected()) {
+          <form [formGroup]="traceSearchForm" (ngSubmit)="searchExistingBibs()" class="border border-gray-200 rounded-lg p-3 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.MFN_FROM' | translate }}</label><input formControlName="MfnFrom" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.MFN_TO' | translate }}</label><input formControlName="MfnTo" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PUBLISH_YEAR' | translate }}</label><input formControlName="PublishYear" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_PUBLISHER' | translate }}</label><input formControlName="Publisher" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_TITLE' | translate }}</label><input formControlName="Title" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</label><input formControlName="Author" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.LINE_BIB_TYPE' | translate }}</label>
+                <ng-select [items]="bibTypes()" bindLabel="name" bindValue="id" formControlName="BibTypeId"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+            </div>
+            <div class="flex gap-2">
+              <button type="submit" [disabled]="isSearchingTrace()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+                @if (isSearchingTrace()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[18px]">search</mat-icon> } {{ 'COMMON.SEARCH' | translate }}
+              </button>
+              <button type="button" (click)="resetTraceSearch()" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'AB_RECEIPT.NEW_CONDITION' | translate }}</button>
+            </div>
+          </form>
+          <table class="w-full text-left text-sm">
+            <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.KCB_MFN' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_TITLE' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_PUBLISHER' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_YEAR' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.HAS_RECEIPT' | translate }}/{{ 'AB_RECEIPT.HAS_ORDER' | translate }}</th>
+              <th class="py-2 px-3"></th>
+            </tr></thead>
+            <tbody>
+              @for (b of pickResults(); track b.bibId) {
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="py-2 px-3 font-mono">{{ b.mfn || '—' }}</td>
+                  <td class="py-2 px-3">{{ b.title || '—' }}</td>
+                  <td class="py-2 px-3">{{ b.author || '—' }}</td>
+                  <td class="py-2 px-3">{{ b.publisher || '—' }}</td>
+                  <td class="py-2 px-3">{{ b.publishDate || '—' }}</td>
+                  <td class="py-2 px-3">
+                    @if (b.hasReceipt) { <span class="inline-block px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 mr-1">{{ 'AB_RECEIPT.HAS_RECEIPT' | translate }}</span> }
+                    @if (b.hasOrder) { <span class="inline-block px-1.5 py-0.5 rounded text-xs bg-sky-100 text-sky-700">{{ 'AB_RECEIPT.HAS_ORDER' | translate }}</span> }
+                  </td>
+                  <td class="py-2 px-3 text-right whitespace-nowrap">
+                    <button (click)="selectExistingBib(b)" [title]="'AB_RECEIPT.PICK_AS_LINK_HINT' | translate" class="text-blue-600 hover:underline text-sm font-medium mr-3">{{ 'COMMON.SELECT' | translate }}</button>
+                    <button (click)="selectExistingBibAsCopy(b)" [title]="'AB_RECEIPT.PICK_AS_COPY_HINT' | translate" class="text-emerald-600 hover:underline text-sm font-medium">{{ 'AB_RECEIPT.PICK_AS_COPY' | translate }}</button>
+                  </td>
+                </tr>
+              }
+              @if (!pickResults().length) { <tr><td colspan="7" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+            </tbody>
+          </table>
+          @if (pickTotalRecords() > pickPageSize) {
+            <div class="flex items-center justify-between mt-3 text-sm text-gray-500">
+              <span>{{ pickPageIndex() * pickPageSize + 1 }}–{{ Math.min((pickPageIndex()+1) * pickPageSize, pickTotalRecords()) }} / {{ pickTotalRecords() }}</span>
+              <div class="flex gap-2">
+                <button type="button" (click)="pickPrevPage()" [disabled]="pickPageIndex() === 0" class="py-1 px-3 border border-gray-300 rounded-lg disabled:opacity-40">{{ 'COMMON.PREV' | translate }}</button>
+                <button type="button" (click)="pickNextPage()" [disabled]="(pickPageIndex()+1) * pickPageSize >= pickTotalRecords()" class="py-1 px-3 border border-gray-300 rounded-lg disabled:opacity-40">{{ 'COMMON.NEXT' | translate }}</button>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm text-gray-700 mb-3"><span class="font-semibold">{{ pickSelected()!.title }}</span> — {{ pickSelected()!.author }}</p>
+            <form [formGroup]="pickLineForm" (ngSubmit)="confirmPickLine()" class="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+                <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency" (change)="onCurrencyChangeForPick()"
+                           [searchable]="true" [clearable]="false"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_RATE' | translate }}</label><input formControlName="Rate" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div class="md:col-span-4 flex gap-2 mt-2">
+                <button type="button" (click)="pickSelected.set(null)" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+                <button type="submit" [disabled]="isPicking()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+                  @if (isPicking()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'COMMON.ADD' | translate }}
+                </button>
+              </div>
+            </form>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showEditMarc()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">edit</mat-icon>{{ 'AB_RECEIPT.EDIT_MARC' | translate }} — {{ editMarcLine()?.title }}</h3>
+        <button (click)="closeEditMarc()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        <form [formGroup]="editMarcLineForm" (ngSubmit)="saveEditMarc()" class="border border-gray-200 rounded-lg p-3 mb-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'BIB.F_COLLECTION' | translate }}</label>
+              <ng-select [items]="collections()" bindLabel="label" bindValue="id"
+                         [(ngModel)]="editMarcCollectionId" [ngModelOptions]="{standalone:true}"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+              <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency" (change)="onCurrencyChangeForEditMarc()"
+                         [searchable]="true" [clearable]="false"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              </ng-select></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_RATE' | translate }}</label><input formControlName="Rate" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          </div>
+          @if (isLoadingEditMarc()) {
+            <div class="flex items-center justify-center gap-2 py-10 text-gray-400 text-sm">
+              <mat-icon class="animate-spin">autorenew</mat-icon> {{ 'COMMON.LOADING' | translate }}
+            </div>
+          } @else {
+            <app-marc-fields-editor [fields]="editMarcFields()" [marcFieldDics]="marcFieldDics()" [marcSubFieldDics]="marcSubFieldDics()" (fieldsChange)="editMarcFields.set($event)" />
+
+            <!-- Tài liệu số liên kết -->
+            <div class="mt-3 border border-gray-200 rounded-xl p-4">
+              <p class="text-xs font-semibold text-emerald-600 uppercase mb-2">{{ 'BIB_EDIT.LINKED_EBOOK' | translate }}</p>
+              @if (isLoadingLinkEditMarc()) {
+                <p class="text-sm text-gray-400">{{ 'COMMON.LOADING' | translate }}</p>
+              } @else if (linkedEbookEditMarc(); as ebook) {
+                <p class="text-sm font-bold text-gray-800">{{ ebook.title || '—' }}</p>
+                <p class="text-sm text-gray-500">{{ ebook.author }}</p>
+                <p class="text-sm text-gray-400">{{ ebook.publisher }} @if (ebook.publishDate) { · {{ ebook.publishDate }} }</p>
+                <div class="flex gap-2 mt-3">
+                  <button type="button" (click)="unlinkEbookEditMarc()" class="bg-white border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                    <mat-icon class="text-[16px]">link_off</mat-icon> {{ 'BIB_EDIT.UNLINK_BTN' | translate }}
+                  </button>
+                </div>
+              } @else {
+                <button type="button" (click)="openEbookPicker()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg inline-flex items-center gap-1">
+                  <mat-icon class="text-[16px]">add_link</mat-icon> {{ 'BIB_EDIT.LINK_EBOOK_BTN' | translate }}
+                </button>
+              }
+            </div>
+          }
+          <div class="flex gap-2 mt-3">
+            <button type="button" (click)="closeEditMarc()" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+            <button type="submit" [disabled]="isSavingMarc() || isLoadingEditMarc()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+              @if (isSavingMarc()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+}
+
+<app-entity-search-picker
+  [title]="'BIB_EDIT.PICK_EBOOK_TITLE' | translate"
+  [searchPlaceholder]="'BIB_EDIT.PICK_EBOOK_SEARCH' | translate"
+  [fetchPage]="fetchEbookPage"
+  [displayFn]="ebookDisplayFn"
+  [subDisplayFn]="ebookSubDisplayFn"
+  (picked)="onEbookPicked($event)" />
+
+@if (showEditLine()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-teal-600">edit_note</mat-icon>{{ 'AB_RECEIPT.EDIT_LINE' | translate }}</h3>
+        <button (click)="closeEditLine()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <form [formGroup]="editLineForm" (ngSubmit)="saveEditLine()" class="px-6 py-4">
+        <p class="text-sm text-gray-700 mb-3 font-semibold">{{ editingLine()?.title }}</p>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+            <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency" (change)="onCurrencyChangeForEditLine()"
+                       [searchable]="true" [clearable]="false"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+            </ng-select></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_RATE' | translate }}</label><input formControlName="Rate" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </div>
+        <div class="flex gap-2 justify-end">
+          <button type="button" (click)="closeEditLine()" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="submit" [disabled]="isSavingLineEdit()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+            @if (isSavingLineEdit()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (showConfirmDeleteLine()) {
+  <div class="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ deletingLine()?.title }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirmDeleteLine()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmDeleteLine()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showIsbnDuplicateWarning()) {
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="px-6 py-5 text-center">
+        <div class="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-amber-500 text-3xl">warning</mat-icon></div>
+        <h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'AB_RECEIPT.ISBN_DUPLICATE_TITLE' | translate }}</h3>
+        <p class="text-sm text-gray-500 mb-3">{{ 'AB_RECEIPT.ISBN_DUPLICATE_DESC' | translate }}</p>
+        <ul class="text-left text-sm bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
+          @for (m of isbnDuplicateMatches(); track m.bibId) {
+            <li><span class="font-mono font-medium text-gray-700">Mfn {{ m.mfn }}</span> — {{ m.title || '—' }}</li>
+          }
+        </ul>
+      </div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="cancelIsbnDuplicateWarning()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmIsbnDuplicateProceed()" class="flex-1 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">check</mat-icon> {{ 'AB_RECEIPT.ISBN_DUPLICATE_CONTINUE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showKcbModal()) {
+  <div class="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-indigo-600">qr_code</mat-icon>{{ 'AB_RECEIPT.KCB_REGISTER' | translate }} — {{ kcbLine()?.title }}</h3>
+        <button (click)="closeKcbModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        <div class="grid grid-cols-3 gap-3 mb-4 bg-gray-50 rounded-lg border border-gray-200 p-3">
+          <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'AB_RECEIPT.KCB_MFN' | translate }}</label><div class="text-sm font-mono text-gray-800">{{ kcbLine()?.mfn || '—' }}</div></div>
+          <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><div class="text-sm text-gray-800">{{ kcbLine()?.amount || 0 }}</div></div>
+          <div><label class="block text-xs font-semibold text-gray-500 uppercase mb-1">{{ 'AB_RECEIPT.KCB_REMAINING' | translate }}</label><div class="text-sm font-semibold" [class.text-red-600]="kcbRemaining() < 0" [class.text-emerald-600]="kcbRemaining() >= 0">{{ kcbRemaining() }}</div></div>
+          <div class="col-span-3 text-xs text-gray-500">{{ kcbLine()?.author }}{{ kcbLine()?.publisher ? ' — ' + kcbLine()?.publisher : '' }}{{ kcbLine()?.publishDate ? ', ' + kcbLine()?.publishDate : '' }}</div>
+        </div>
+
+        <div class="flex gap-1 mb-4 border-b border-gray-200">
+          <button type="button" (click)="kcbTab.set('single')" [class.text-indigo-600]="kcbTab()==='single'" [class.border-indigo-600]="kcbTab()==='single'" [class.text-gray-500]="kcbTab()!=='single'" [class.border-transparent]="kcbTab()!=='single'" class="px-4 py-2 text-sm font-medium border-b-2 transition-colors">{{ 'AB_RECEIPT.KCB_TAB_SINGLE' | translate }}</button>
+          <button type="button" (click)="kcbTab.set('batch')" [class.text-indigo-600]="kcbTab()==='batch'" [class.border-indigo-600]="kcbTab()==='batch'" [class.text-gray-500]="kcbTab()!=='batch'" [class.border-transparent]="kcbTab()!=='batch'" class="px-4 py-2 text-sm font-medium border-b-2 transition-colors">{{ 'AB_RECEIPT.KCB_TAB_BATCH' | translate }}</button>
+        </div>
+
+        @if (kcbTab() === 'single') {
+          <form [formGroup]="kcbSingleForm" (ngSubmit)="registerSingleKcb()" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 items-end">
+            <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.KCB_BARCODE' | translate }}</label>
+              <input formControlName="BarcodeValue" type="text" [placeholder]="'AB_RECEIPT.KCB_BARCODE_PH' | translate" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.RECEIVER_PLACE' | translate }} *</label>
+              <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="StoreId"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div class="md:col-span-3">
+              <button type="submit" [disabled]="isRegisteringSingleKcb() || !canEdit() || kcbRemaining() <= 0" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+                @if (isRegisteringSingleKcb()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'AB_RECEIPT.KCB_DO_REGISTER' | translate }}
+              </button>
+            </div>
+          </form>
+        } @else {
+          <form [formGroup]="kcbForm" (ngSubmit)="registerKcb()" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 items-end">
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.KCB_PREFIX' | translate }}</label><input formControlName="Prefix" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.KCB_DIGIT_LENGTH' | translate }} *</label><input formControlName="DigitLength" type="number" min="1" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.KCB_START_NUMBER' | translate }}</label><input formControlName="StartNumber" type="number" min="1" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.KCB_QUANTITY' | translate }} *</label><input formControlName="Quantity" type="number" min="1" readonly class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"><p class="text-[11px] text-gray-500 mt-1">{{ 'AB_RECEIPT.KCB_QUANTITY_LOCKED_NOTE' | translate }}</p></div>
+            <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.RECEIVER_PLACE' | translate }} *</label>
+              <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="StoreId"
+                         [searchable]="true" [clearable]="true"
+                         [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                         [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              </ng-select>
+            </div>
+            <div class="md:col-span-4">
+              <button type="submit" [disabled]="isRegisteringKcb() || !canEdit() || kcbRemaining() <= 0" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+                @if (isRegisteringKcb()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'AB_RECEIPT.KCB_DO_REGISTER' | translate }}
+              </button>
+            </div>
+          </form>
+        }
+
+        <table class="w-full text-left text-sm">
+          <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+            <th class="py-2 px-3">{{ 'AB_RECEIPT.KCB_BARCODE' | translate }}</th>
+            <th class="py-2 px-3">{{ 'AB_RECEIPT.RECEIVER_PLACE' | translate }}</th>
+            <th class="py-2 px-3">{{ 'AB_RECEIPT.KCB_STATUS' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+          </tr></thead>
+          <tbody>
+            @for (b of kcbList(); track b.id) {
+              <tr class="border-b border-gray-100">
+                <td class="py-2 px-3 font-mono">{{ b.barcode }}</td>
+                <td class="py-2 px-3">{{ getStoreName(b.storeId) }}</td>
+                <td class="py-2 px-3">{{ getStatusLabel(b.status) }}</td>
+                <td class="py-2 px-3 text-right">
+                  @if (b.publicId) {
+                    <button (click)="openBarcodeHistory(b)" class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" [title]="'READER.VIEW_HISTORY' | translate"><mat-icon class="text-[18px]">history</mat-icon></button>
+                  }
+                  <button (click)="deleteKcbItem(b)" [disabled]="!canEdit()" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+                </td>
+              </tr>
+            }
+            @if (!isLoadingKcb() && kcbList().length === 0) { <tr><td colspan="4" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+          </tbody>
+        </table>
+      </div>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeKcbModal()" class="ml-auto py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CLOSE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showZ3950()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-7xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-purple-600">travel_explore</mat-icon>{{ 'AB_RECEIPT.FROM_Z3950' | translate }}</h3>
+        <button (click)="closeZ3950()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        @if (!z3950Selected()) {
+          <form [formGroup]="z3950SearchForm" (ngSubmit)="searchZ3950()" class="border border-gray-200 rounded-lg p-3 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_TITLE' | translate }}</label><input formControlName="title" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</label><input formControlName="author" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">ISBN</label><input formControlName="isbn" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">ISSN</label><input formControlName="issn" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_PUBLISHER' | translate }}</label><input formControlName="publisher" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'COMMON.KEYWORD' | translate }}</label><input formControlName="keyword" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            </div>
+            <div class="mb-3">
+              <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.Z3950_SOURCE' | translate }}</label>
+              <div class="border border-gray-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                <label class="flex items-center gap-2 text-sm font-medium text-gray-600 pb-1 mb-1 border-b border-gray-100 cursor-pointer">
+                  <input type="checkbox" [checked]="selectedZ3950ConfigIds().size === z3950Configs().length && z3950Configs().length > 0" (change)="toggleAllZ3950Configs()" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                  {{ 'AB_RECEIPT.Z3950_ALL_LIBS' | translate }}
+                </label>
+                @for (c of z3950Configs(); track c.id) {
+                  <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" [checked]="selectedZ3950ConfigIds().has(c.id)" (change)="toggleZ3950Config(c.id)" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    {{ c.name }}
+                  </label>
+                }
+                @if (!z3950Configs().length) { <p class="text-xs text-gray-400 py-1">{{ 'COMMON.NO_DATA' | translate }}</p> }
+              </div>
+            </div>
+            <button type="submit" [disabled]="isSearchingZ3950()" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+              @if (isSearchingZ3950()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[18px]">search</mat-icon> } {{ 'COMMON.SEARCH' | translate }}
+            </button>
+          </form>
+          @if (z3950Errors().length) {
+            <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              @for (e of z3950Errors(); track e.configId) {
+                <div>⚠ {{ e.configName || 'N/A' }}: {{ e.error }}</div>
+              }
+            </div>
+          }
+          <table class="w-full text-left text-sm">
+            <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_TITLE' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_PUBLISHER' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.L_YEAR' | translate }}</th>
+              <th class="py-2 px-3">{{ 'AB_RECEIPT.Z3950_SOURCE' | translate }}</th>
+              <th class="py-2 px-3"></th>
+            </tr></thead>
+            <tbody>
+              @for (row of z3950Results(); track row.id) {
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                  <td class="py-2 px-3">{{ row.title || '—' }}</td>
+                  <td class="py-2 px-3">{{ row.author || '—' }}</td>
+                  <td class="py-2 px-3">{{ row.publisher || '—' }}</td>
+                  <td class="py-2 px-3">{{ row.publishDate || '—' }}</td>
+                  <td class="py-2 px-3 text-xs text-gray-500">{{ row.configName }}</td>
+                  <td class="py-2 px-3 text-right"><button (click)="selectZ3950Result(row)" class="text-blue-600 hover:underline text-sm font-medium">{{ 'COMMON.SELECT' | translate }}</button></td>
+                </tr>
+              }
+              @if (!z3950Results().length) { <tr><td colspan="6" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+            </tbody>
+          </table>
+          @if (z3950TotalRecords() > z3950PageSize) {
+            <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+              <span>{{ z3950PageIndex() * z3950PageSize + 1 }}–{{ Math.min((z3950PageIndex()+1) * z3950PageSize, z3950TotalRecords()) }} / {{ z3950TotalRecords() }}</span>
+              <div class="flex gap-2">
+                <button type="button" (click)="z3950PrevPage()" [disabled]="z3950PageIndex() === 0" class="py-1 px-3 border border-gray-300 rounded-lg disabled:opacity-40">{{ 'COMMON.PREV' | translate }}</button>
+                <button type="button" (click)="z3950NextPage()" [disabled]="(z3950PageIndex()+1) * z3950PageSize >= z3950TotalRecords()" class="py-1 px-3 border border-gray-300 rounded-lg disabled:opacity-40">{{ 'COMMON.NEXT' | translate }}</button>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm text-gray-700 mb-3"><span class="font-semibold">{{ z3950Selected()!.title }}</span> — {{ z3950Selected()!.author }}</p>
+            @if (isLoadingZ3950Marc()) {
+              <div class="flex items-center gap-2 text-sm text-gray-500 py-4"><mat-icon class="animate-spin text-[18px]">autorenew</mat-icon> {{ 'COMMON.LOADING' | translate }}</div>
+            } @else {
+              <app-marc-fields-editor [fields]="z3950Fields()" [marcFieldDics]="marcFieldDics()" [marcSubFieldDics]="marcSubFieldDics()" (fieldsChange)="z3950Fields.set($event)" />
+            }
+            <form [formGroup]="z3950LineForm" (ngSubmit)="confirmImportZ3950()" class="grid grid-cols-1 md:grid-cols-4 gap-2 mt-3">
+              <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.LINE_BIB_TYPE' | translate }}</label>
+                <ng-select [items]="bibTypes()" bindLabel="name" bindValue="id"
+                           [ngModel]="z3950ImportBibTypeId()" (ngModelChange)="onZ3950BibTypeChange($event)" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+              <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.WORKSHEET' | translate }}</label>
+                <ng-select [items]="z3950Worksheets()" bindLabel="name" bindValue="id"
+                           [(ngModel)]="z3950ImportWorksheetId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'BIB.F_COLLECTION' | translate }}</label>
+                <ng-select [items]="collections()" bindLabel="label" bindValue="id"
+                           [(ngModel)]="z3950ImportCollectionId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+                <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency" (change)="onCurrencyChangeForZ3950()"
+                           [searchable]="true" [clearable]="false"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_RATE' | translate }}</label><input formControlName="Rate" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div class="md:col-span-4 flex gap-2 mt-2">
+                <button type="button" (click)="z3950Selected.set(null); z3950Fields.set([])" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+                <button type="submit" [disabled]="isImportingZ3950() || isLoadingZ3950Marc()" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+                  @if (isImportingZ3950()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'COMMON.ADD' | translate }}
+                </button>
+              </div>
+            </form>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showMarcFile()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-amber-600">upload_file</mat-icon>{{ 'AB_RECEIPT.FROM_MARC_FILE' | translate }}</h3>
+        <button (click)="closeMarcFileImport()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto">
+        <div class="border border-dashed border-gray-300 rounded-lg p-4 mb-4 flex flex-wrap items-center gap-3">
+          <input type="file" accept=".mrc,.marc,.xml" (change)="onMarcFileSelected($event)" class="text-sm">
+          <span class="text-gray-300">|</span>
+          <!-- .txt: văn bản 3 dòng/trường, hoặc ISO2709 mang đuôi .txt (tự nhận diện) -->
+          <input type="file" accept=".txt" (change)="onMarcTextFileSelected($event)" class="text-sm">
+          <button type="button" (click)="openMarcTextPaste()" class="flex items-center gap-1 px-3 py-1.5 bg-amber-50 border border-amber-300 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-100">
+            <mat-icon class="text-[16px]">content_paste</mat-icon> {{ 'AB_RECEIPT.MARC_TEXT_PASTE_BTN' | translate }}
+          </button>
+          @if (isParsingMarcFile() || isParsingMarcText()) { <mat-icon class="animate-spin text-amber-600">autorenew</mat-icon> }
+        </div>
+        @if (marcFileFields().length) {
+          <form [formGroup]="marcFileLineForm" (ngSubmit)="addMarcFileLine()">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-3">
+              <div class="md:col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.LINE_BIB_TYPE' | translate }} <span class="text-red-500">*</span></label>
+                <ng-select [items]="bibTypes()" bindLabel="name" bindValue="id"
+                           [(ngModel)]="marcFileBibTypeId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'BIB.F_COLLECTION' | translate }}</label>
+                <ng-select [items]="collections()" bindLabel="label" bindValue="id"
+                           [(ngModel)]="marcFileCollectionId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                           [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+                </ng-select></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.L_AMOUNT' | translate }}</label><input formControlName="Amount" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.PRICE' | translate }}</label><input formControlName="Price" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+              <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'AB_RECEIPT.CURRENCY' | translate }}</label>
+                <ng-select [items]="currencies()" bindLabel="code" bindValue="code" formControlName="Currency"
+                           [searchable]="true" [clearable]="false"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select></div>
+            </div>
+            <app-marc-fields-editor [fields]="marcFileFields()" [marcFieldDics]="marcFieldDics()" [marcSubFieldDics]="marcSubFieldDics()" (fieldsChange)="marcFileFields.set($event)" />
+            <button type="submit" [disabled]="isSavingMarcFile()" class="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 disabled:opacity-50">
+              @if (isSavingMarcFile()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">add</mat-icon> } {{ 'COMMON.ADD' | translate }}
+            </button>
+          </form>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (showMarcTextPaste()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-amber-600">content_paste</mat-icon>{{ 'AB_RECEIPT.MARC_TEXT_PASTE_TITLE' | translate }}</h3>
+        <button type="button" (click)="closeMarcTextPaste()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4">
+        <textarea [ngModel]="marcTextPasteValue()" (ngModelChange)="marcTextPasteValue.set($event)" [ngModelOptions]="{ standalone: true }" rows="16"
+                  class="w-full px-3 py-2 text-xs font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  [placeholder]="'AB_RECEIPT.MARC_TEXT_PASTE_PH' | translate"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50">
+        <button type="button" (click)="closeMarcTextPaste()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="applyMarcTextPaste()" [disabled]="!marcTextPasteValue().trim()" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 flex items-center gap-1">
+          <mat-icon class="text-[16px]">auto_fix_high</mat-icon> {{ 'AB_RECEIPT.MARC_TEXT_PARSE_BTN' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showOrderPick()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-teal-600">assignment</mat-icon>{{ 'AB_RECEIPT.ORDER_PICK_TITLE' | translate }}</h3>
+        <button (click)="closeOrderPick()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-4 overflow-y-auto flex-1">
+        <form [formGroup]="orderPickFilter" (ngSubmit)="searchOrderPick()" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 items-end">
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.ORDER_CODE_FROM' | translate }}</label><input formControlName="CodeFrom" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.ORDER_CODE_TO' | translate }}</label><input formControlName="CodeTo" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.MFN_FROM' | translate }}</label><input formControlName="MfnFrom" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.MFN_TO' | translate }}</label><input formControlName="MfnTo" type="number" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="col-span-2"><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.L_TITLE' | translate }}</label><input formControlName="Title" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="col-span-2"><label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'AB_RECEIPT.L_AUTHOR' | translate }}</label><input formControlName="Author" type="text" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="col-span-2 md:col-span-4 flex gap-2 justify-end">
+            <button type="button" (click)="resetOrderPickFilter()" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'AB_RECEIPT.NEW_CONDITION' | translate }}</button>
+            <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+          </div>
+        </form>
+        <table class="w-full text-left text-sm">
+          <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+            <th class="py-2 px-3 w-10"><input type="checkbox" [checked]="isAllOrderPickSelected()" (change)="toggleAllOrderPick()"></th>
+            <th class="py-2 px-3">{{ 'AB_ORDER.CODE' | translate }}</th>
+            <th class="py-2 px-3">MFN</th>
+            <th class="py-2 px-3">{{ 'AB_RECEIPT.L_TITLE' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'AB_RECEIPT.REMAINING_AMOUNT' | translate }}</th>
+          </tr></thead>
+          <tbody>
+            @for (l of orderPickResults(); track l.id) {
+              <tr class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" (click)="orderPickSelection.toggle(l)">
+                <td class="py-2 px-3" (click)="$event.stopPropagation()"><input type="checkbox" [checked]="orderPickSelection.isSelected(l)" (change)="orderPickSelection.toggle(l)"></td>
+                <td class="py-2 px-3">{{ l.orderCode || '—' }}</td>
+                <td class="py-2 px-3">{{ l.mfn || '—' }}</td>
+                <td class="py-2 px-3 font-medium text-gray-800">{{ l.title || '—' }}</td>
+                <td class="py-2 px-3 text-right font-semibold">{{ l.remainingAmount ?? ((l.amount||0)-(l.receivedAmount||0)) }}</td>
+              </tr>
+            }
+            @if (!isSearchingOrderPick() && !orderPickResults().length) { <tr><td colspan="5" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+          </tbody>
+        </table>
+      </div>
+      <div class="flex gap-2 justify-end px-6 py-4 border-t border-gray-100">
+        <button type="button" (click)="closeOrderPick()" class="py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'COMMON.BACK' | translate }}</button>
+        <button type="button" (click)="confirmOrderPickSelection()" [disabled]="!orderPickSelection.selected.length || isConfirmingOrderPick()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1 disabled:opacity-50">
+          @if (isConfirmingOrderPick()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">check</mat-icon> } {{ 'AB_RECEIPT.SELECT_ITEMS' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+</div>
+
+@if (classLabels().length > 0) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="classLabels.set([])" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="printAcq()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+    <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 print:grid-cols-5">
+      @for (lb of classLabels(); track lb.key) {
+        <div class="mx-auto flex flex-col items-center">
+          <div class="border border-gray-400 rounded w-[4.2cm] h-[2.8cm] flex flex-col items-center justify-center text-center px-1">
+            <span class="text-[10px] font-semibold leading-tight uppercase" [innerHTML]="labelHeader().parentLibrary"></span>
+            <span class="text-[9px] leading-tight uppercase underline" [innerHTML]="labelHeader().libraryName"></span>
+            <span class="text-lg font-bold leading-tight mt-1" [innerHTML]="lb.classSymbol || '—'"></span>
+            <div class="w-10 border-t border-dashed border-gray-500 my-0.5"></div>
+            <span class="text-lg font-bold leading-tight" [innerHTML]="lb.authorMark || ''"></span>
+          </div>
+          <span class="text-[9px] text-gray-600 leading-tight mt-0.5 max-w-[4.2cm] truncate" [innerHTML]="labelCaption(lb.author, lb.title)"></span>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (acquisitionPrint(); as ap) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="acquisitionPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="printAcq()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="flex justify-between items-start mb-2">
+      <div class="text-sm">
+        <div class="uppercase" [innerHTML]="ap.parentLibrary"></div>
+        <div class="font-semibold" [innerHTML]="ap.deptName"></div>
+      </div>
+    </div>
+
+    <div class="text-center mb-3">
+      <h1 class="text-lg font-bold uppercase">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TITLE' | translate }}</h1>
+      <div class="text-sm">{{ formatVnDate(ap.receiptDate) }}</div>
+      @if (ap.receiptCode) {
+        <div class="text-sm font-semibold">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_RECEIPT_CODE' | translate }}: {{ ap.receiptCode }}</div>
+      }
+    </div>
+
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr class="border-y-2 border-gray-800">
+          <th class="border border-gray-400 px-2 py-1 w-10">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_STT' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TITLE' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AUTHOR' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_PRICE' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AMOUNT' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TOTAL' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (it of ap.items; track it.stt) {
+          <tr>
+            <td class="border border-gray-400 px-2 py-1 text-center">{{ it.stt }}</td>
+            <td class="border border-gray-400 px-2 py-1" [innerHTML]="it.title || '—'"></td>
+            <td class="border border-gray-400 px-2 py-1" [innerHTML]="it.author || '—'"></td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.price ? (it.price | number) : '' }}</td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.amount }}</td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.total ? (it.total | number) : '' }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr class="font-semibold">
+          <td class="border border-gray-400 px-2 py-1 text-right" colspan="4">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_COUNT' | translate }}:</td>
+          <td class="border border-gray-400 px-2 py-1 text-right">{{ ap.totalCount }}</td>
+          <td class="border border-gray-400 px-2 py-1 text-right">{{ ap.totalMoney | number }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="flex justify-between mt-2 text-sm font-semibold">
+      <span>{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_BOOKS' | translate }}: {{ ap.totalCount }}</span>
+      <span>{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_MONEY' | translate }}: {{ ap.totalMoney | number }}</span>
+    </div>
+  </div>
+}
+
+@if (storeAllocationPrint(); as sp) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="storeAllocationPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="printAcq()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="flex justify-between items-start mb-2">
+      <div class="text-sm">
+        <div class="uppercase font-bold" [innerHTML]="sp.parentLibrary"></div>
+        <div class="font-bold" [innerHTML]="sp.deptName"></div>
+      </div>
+    </div>
+
+    <div class="text-center mb-3">
+      <h1 class="text-lg font-bold uppercase">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_TITLE' | translate }}</h1>
+      <div class="text-sm">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_AS_OF_DATE' | translate }}:{{ formatShortDate() }}</div>
+      @if (sp.receiptCode) {
+        <div class="text-sm font-semibold">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_RECEIPT_CODE' | translate }}: {{ sp.receiptCode }}&nbsp;&nbsp;{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_RECEIVED_DATE' | translate }}: {{ formatShortDate(sp.receiptDate) }}</div>
+      }
+    </div>
+
+    @for (g of sp.groups; track g.storeId) {
+      <div class="font-semibold underline mb-1 mt-3">{{ g.storeName }}</div>
+      <table class="w-full text-sm border-collapse mb-2">
+        <thead>
+          <tr class="border-y-2 border-gray-800">
+            <th class="border border-gray-400 px-2 py-1 w-10">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_STT' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TITLE' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AUTHOR' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_NXB' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_ML_CUTTER' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AMOUNT' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_BARCODE' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_NOTE' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (it of g.items; track it.stt) {
+            <tr>
+              <td class="border border-gray-400 px-2 py-1 text-center align-top">{{ it.stt }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top" [innerHTML]="it.title || ''"></td>
+              <td class="border border-gray-400 px-2 py-1 align-top" [innerHTML]="it.author || ''"></td>
+              <td class="border border-gray-400 px-2 py-1 align-top">{{ it.publisher || '' }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top">{{ it.mlCutter || '' }}</td>
+              <td class="border border-gray-400 px-2 py-1 text-right align-top">{{ it.sl }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top">
+                @for (bc of it.barcodes; track bc) { <div>{{ bc }}</div> }
+              </td>
+              <td class="border border-gray-400 px-2 py-1 align-top"></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <div class="text-sm font-semibold mt-2">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_COUNT' | translate }}: {{ sp.totalCount }}</div>
+
+    <div class="flex justify-between mt-8 text-sm">
+      <div>{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_HANDED_BY' | translate }}:</div>
+      <div class="text-center">
+        <div>Thái Nguyên, {{ formatVnDate().replace('Ngày', 'ngày') }}</div>
+        <div class="font-bold mt-8">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_RECEIVED_BY' | translate }}</div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showMoveCollection()) {
+  <div class="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-indigo-600">drive_file_move</mat-icon>{{ 'EBOOK.MOVE_COLLECTION_TITLE' | translate }}</h3>
+        <button (click)="closeMoveCollection()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">{{ 'EBOOK.MOVE_COLLECTION_TARGET' | translate }}</label>
+        <ng-select [items]="collections()" bindLabel="label" bindValue="id"
+                   [(ngModel)]="moveTargetCollectionId" [ngModelOptions]="{standalone: true}"
+                   [searchable]="true" [clearable]="true"
+                   placeholder="—"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeMoveCollection()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="confirmMoveCollection()" [disabled]="!moveTargetCollectionId() || isMoving()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isMoving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">drive_file_move</mat-icon> }
+          {{ 'EBOOK.MOVE_SELECTED' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

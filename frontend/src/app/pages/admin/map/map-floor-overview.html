@@ -1,0 +1,118 @@
+<div class="max-w-6xl mx-auto space-y-5">
+
+  <!-- Header -->
+  <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <button (click)="goBack()" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div>
+        <h4 class="text-xl font-bold text-gray-800">{{ 'MAP_FLOOR_OVERVIEW.TITLE' | translate }}</h4>
+        @if (floor()) { <p class="text-sm text-gray-500 mt-0.5">{{ floor()?.name }}</p> }
+      </div>
+    </div>
+    <button (click)="openUtilityModal()"
+            class="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm">
+      <mat-icon class="text-[18px]">add</mat-icon> {{ 'MAP_FLOOR.MANAGE_UTILITIES' | translate }}
+    </button>
+  </div>
+
+  <!-- Tiện ích chung của tầng -->
+  <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+    <h5 class="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4">
+      {{ 'MAP_FLOOR_OVERVIEW.UTILITIES_SECTION' | translate }} ({{ utilities().length }})
+    </h5>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      @for (u of utilities(); track u.id) {
+        <div class="border border-gray-100 rounded-xl p-4 flex items-start gap-3 bg-gray-50/50">
+          <div class="w-10 h-10 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+            <mat-icon class="text-[20px]">{{ u.iconName || 'inventory_2' }}</mat-icon>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-semibold text-gray-800 text-sm truncate">{{ u.name }}</div>
+              <button (click)="deleteUtility(u)" class="text-red-500 hover:text-red-700 text-xs font-medium shrink-0 transition-colors">
+                {{ 'COMMON.DELETE' | translate }}
+              </button>
+            </div>
+            @if (u.description) { <p class="text-xs text-gray-500 mt-0.5">{{ u.description }}</p> }
+            <div class="flex items-center gap-2 mt-2">
+              <span class="text-2xs font-medium px-2 py-0.5 rounded-full" [class]="statusColor(u.conditionStatus)">
+                {{ statusLabel(u.conditionStatus) }}
+              </span>
+              @if (u.quantity) { <span class="text-2xs text-gray-400">SL: {{ u.quantity }}</span> }
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <div class="md:col-span-3 text-center py-8 text-gray-400 text-sm">
+          <mat-icon class="text-4xl mb-2 text-gray-300">inventory_2</mat-icon>
+          <p>{{ 'MAP_FLOOR_OVERVIEW.NO_UTILITIES' | translate }}</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Thiết bị theo từng đối tượng ghim trên tầng -->
+  <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+    <h5 class="text-sm font-bold text-gray-500 uppercase tracking-wide mb-4">
+      {{ 'MAP_FLOOR_OVERVIEW.EQUIPMENT_SECTION' | translate }}
+    </h5>
+
+    @if (isLoading()) {
+      <p class="text-sm text-gray-400 text-center py-6">{{ 'COMMON.LOADING' | translate }}</p>
+    } @else if (objectsWithEquipment().length === 0) {
+      <div class="text-center py-8 text-gray-400 text-sm">
+        <mat-icon class="text-4xl mb-2 text-gray-300">category</mat-icon>
+        <p>{{ 'MAP_FLOOR_OVERVIEW.NO_EQUIPMENT_ON_FLOOR' | translate }}</p>
+      </div>
+    } @else {
+      <div class="space-y-4">
+        @for (ow of objectsWithEquipment(); track ow.obj.id) {
+          <div class="border border-gray-100 rounded-xl p-4">
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-2">
+                <mat-icon class="text-emerald-600 text-[20px]">{{ typeIcon(ow.obj.objectType) }}</mat-icon>
+                <span class="font-semibold text-gray-800 text-sm">{{ ow.obj.name }}</span>
+                <span class="text-2xs text-gray-400">({{ typeLabel(ow.obj.objectType) }})</span>
+              </div>
+              <button (click)="openEquipmentModal(ow.obj)"
+                      class="border border-violet-500 text-violet-600 hover:bg-violet-50 text-xs font-medium py-1 px-2.5 rounded-lg flex items-center gap-1 transition-colors">
+                <mat-icon class="text-[14px]">add</mat-icon> {{ 'MAP_OBJECT.MANAGE_EQUIPMENT' | translate }}
+              </button>
+            </div>
+
+            @if (ow.equipment.length === 0) {
+              <p class="text-xs text-gray-400 pl-1">{{ 'MAP_FLOOR_OVERVIEW.NO_EQUIPMENT_ON_OBJECT' | translate }}</p>
+            } @else {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                @for (e of ow.equipment; track e.id) {
+                  <div class="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50">
+                    <div class="min-w-0">
+                      <div class="text-xs font-medium text-gray-800 truncate">{{ e.name }} <span class="text-gray-400">x{{ e.quantity }}</span></div>
+                      <span class="text-2xs font-medium px-1.5 py-0.5 rounded-full inline-block mt-1" [class]="statusColor(e.conditionStatus)">
+                        {{ statusLabel(e.conditionStatus) }}
+                      </span>
+                    </div>
+                    <button (click)="deleteEquipment(e)" class="text-red-500 hover:text-red-700 text-2xs font-medium shrink-0 ml-2 transition-colors">
+                      {{ 'COMMON.DELETE' | translate }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <app-map-floor-utility-modal [open]="utilityModalOpen()" [floorId]="floorId()"
+    [floorName]="floor()?.name ?? ''" (closed)="onUtilityModalClosed()">
+  </app-map-floor-utility-modal>
+
+  <app-map-object-equipment-modal [open]="equipmentModalOpen()" [objectId]="equipmentModalObject()?.id ?? null"
+    [objectName]="equipmentModalObject()?.name ?? ''" (closed)="onEquipmentModalClosed()">
+  </app-map-object-equipment-modal>
+
+</div>

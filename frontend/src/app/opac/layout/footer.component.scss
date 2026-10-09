@@ -1,0 +1,5 @@
+/* Ép thẻ p bên trong class footer-copyright phải biến thành dạng chữ inline */
+.footer-copyright ::ng-deep p {
+  display: inline !important;
+  margin: 0 !important;
+}

@@ -1,0 +1,135 @@
+<!-- Nút nổi -->
+<button
+  type="button"
+  (click)="toggle()"
+  class="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-main text-white shadow-lg hover:brightness-110 flex items-center justify-center transition-transform hover:scale-105"
+  [attr.aria-label]="'CHAT_WIDGET.TITLE' | translate"
+  [attr.aria-expanded]="isOpen()"
+>
+  <i class="fas text-xl" [class.fa-comments]="!isOpen()" [class.fa-times]="isOpen()"></i>
+</button>
+
+<!-- Panel chat -->
+@if (isOpen()) {
+  <div class="fixed bottom-24 right-6 z-50 w-[92vw] max-w-sm h-[70vh] max-h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
+       role="dialog" [attr.aria-label]="'CHAT_WIDGET.TITLE' | translate">
+    <div class="bg-main text-white px-4 py-3 flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-robot"></i>
+        <span class="font-semibold text-sm">{{ 'CHAT_WIDGET.TITLE' | translate }}</span>
+      </div>
+      <div class="flex items-center gap-1">
+        @if (messages().length) {
+          <button type="button" (click)="reset()" title="Cuộc trò chuyện mới" aria-label="Cuộc trò chuyện mới"
+                  class="p-1 rounded hover:bg-white/20 transition-colors"><i class="fas fa-redo-alt text-xs"></i></button>
+        }
+        <button type="button" (click)="close()" aria-label="Đóng" class="p-1 rounded hover:bg-white/20 transition-colors"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-3 py-3 space-y-3 bg-gray-50">
+      @if (messages().length === 0) {
+        <div class="text-center text-sm text-gray-400 py-6 px-4 space-y-3">
+          <i class="fas fa-robot text-3xl text-main block"></i>
+          <p>Hỏi bằng lời thường để tìm tài liệu trong thư viện, ví dụ:</p>
+          <div class="flex flex-col gap-2">
+            @for (s of suggestions; track s) {
+              <button type="button" (click)="send(s)"
+                      class="px-3 py-2 rounded-xl bg-white border border-gray-200 hover:border-main hover:text-main text-gray-600 text-xs text-left transition-colors">
+                {{ s }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (m of messages(); track m.id; let i = $index) {
+        @if (m.role === 'user') {
+          <div class="flex justify-end">
+            <div class="max-w-[80%] bg-main text-white text-sm rounded-2xl rounded-br-sm px-3 py-2 whitespace-pre-wrap">{{ m.text }}</div>
+          </div>
+        } @else {
+          <div class="flex gap-2 items-start">
+            <div class="w-7 h-7 rounded-full bg-main/10 text-main flex items-center justify-center shrink-0 mt-0.5"><i class="fas fa-robot text-xs"></i></div>
+            <div class="max-w-[85%] min-w-0 flex-1">
+              <div class="text-sm rounded-2xl rounded-tl-sm px-3 py-2 chat-markdown border" [class.bg-white]="!m.isError" [class.text-gray-700]="!m.isError" [class.border-gray-100]="!m.isError" [class.bg-red-50]="m.isError" [class.text-red-600]="m.isError" [class.border-red-100]="m.isError">
+                @if (m.isError) {
+                  {{ m.text }}
+                } @else {
+                  <markdown [data]="m.text"></markdown>
+                }
+              </div>
+              @if (m.documents && m.documents.length > 0) {
+                <div class="mt-1.5 space-y-1.5">
+                  @for (d of m.documents; track d.publicId ?? $index) {
+                    <button type="button" (click)="openDocument(d)"
+                            class="w-full text-left bg-white border border-gray-100 rounded-xl p-2 hover:border-main hover:shadow-sm transition-all flex gap-2">
+                      <div class="w-10 h-14 shrink-0 rounded bg-gray-100 overflow-hidden flex items-center justify-center">
+                        @if (d.images) {
+                          <img [src]="d.images" alt="" class="w-full h-full object-cover" loading="lazy">
+                        } @else {
+                          <i class="fas text-gray-300" [class.fa-book]="d.docType === 'print'" [class.fa-file-pdf]="d.docType !== 'print'"></i>
+                        }
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold text-gray-800 line-clamp-2">{{ d.title }}</p>
+                        <p class="text-[11px] text-gray-400 line-clamp-1">
+                          @if (d.author) { {{ d.author }} }
+                          @if (d.publishYear) { · {{ d.publishYear }} }
+                        </p>
+                        <p class="text-[11px] mt-0.5">
+                          @if (d.docType === 'print') {
+                            <span [class.text-green-600]="(d.availableCount ?? 0) > 0" [class.text-gray-400]="!(d.availableCount ?? 0)">
+                              <i class="fas fa-book"></i> Sách in · {{ (d.availableCount ?? 0) > 0 ? ('Còn ' + d.availableCount + '/' + (d.copyCount ?? 0) + ' bản') : 'Hết bản' }}
+                            </span>
+                          } @else {
+                            <span class="text-blue-600"><i class="fas fa-file-alt"></i> Tài liệu số</span>
+                          }
+                        </p>
+                      </div>
+                    </button>
+                  }
+                  @if ((m.total ?? 0) > m.documents.length) {
+                    <button type="button" (click)="searchAll(lastQuestionBefore(i))" class="w-full text-center text-xs text-main hover:underline py-1">
+                      Xem tất cả {{ m.total }} kết quả
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @if (isAsking()) {
+        <div class="flex gap-2 items-start">
+          <div class="w-7 h-7 rounded-full bg-main/10 text-main flex items-center justify-center shrink-0"><i class="fas fa-robot text-xs"></i></div>
+          <div class="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-3 py-2"><i class="fas fa-spinner fa-spin text-main text-sm"></i></div>
+        </div>
+      }
+      <div #messagesEnd></div>
+    </div>
+
+    <div class="border-t border-gray-100 p-2.5 flex items-end gap-2 bg-white shrink-0">
+      <textarea
+        rows="1"
+        [ngModel]="questionInput()"
+        (ngModelChange)="questionInput.set($event)"
+        (keydown.enter)="onEnter($any($event))"
+        [disabled]="isAsking()"
+        [placeholder]="'CHAT_WIDGET.PLACEHOLDER' | translate"
+        [attr.aria-label]="'CHAT_WIDGET.PLACEHOLDER' | translate"
+        class="flex-1 resize-none max-h-28 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-main disabled:bg-gray-50"
+      ></textarea>
+      <button
+        type="button"
+        (click)="send()"
+        [disabled]="isAsking() || !questionInput().trim()"
+        class="w-9 h-9 shrink-0 rounded-xl bg-main text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
+        [attr.aria-label]="'CHAT_WIDGET.SEND' | translate"
+      >
+        <i class="fas fa-paper-plane text-sm"></i>
+      </button>
+    </div>
+  </div>
+}

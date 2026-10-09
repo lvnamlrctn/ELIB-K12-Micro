@@ -1,0 +1,38 @@
+# Build artifacts
+**/bin/
+**/obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+*.docx
+*.sql
+
+# Test projects
+**/*.Tests/
+**/*.Test/
+
+# Local settings (override via env vars in docker-compose)
+**/appsettings.Development.json
+
+# Node modules (if any)
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+.claude/

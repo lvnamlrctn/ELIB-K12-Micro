@@ -1,0 +1,97 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'FINE_TICKET.SEARCH_TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <input formControlName="code" type="text" (keydown.enter)="triggerSearch()" placeholder="{{ 'FINE_TICKET.TICKET_NO' | translate }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <app-date-input formControlName="fineDateFrom" [title]="'FINE_TICKET.DATE_FROM' | translate"></app-date-input>
+    <app-date-input formControlName="fineDateTo" [title]="'FINE_TICKET.DATE_TO' | translate"></app-date-input>
+    <input formControlName="cardNo" type="text" (keydown.enter)="triggerSearch()" placeholder="{{ 'FINE_TICKET.CARD_NO' | translate }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+    <input formControlName="readerName" type="text" (keydown.enter)="triggerSearch()" placeholder="{{ 'FINE_TICKET.READER_NAME' | translate }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <ng-select [items]="statusOptions" bindValue="value" formControlName="statusFilter"
+               [searchable]="true" [clearable]="false"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate">
+      <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+    </ng-select>
+    <ng-select [items]="debtStatusOptions" bindValue="value" formControlName="debtStatus"
+               [searchable]="true" [clearable]="false"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate">
+      <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+      <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+    </ng-select>
+    <ng-select [items]="methods()" bindLabel="name" bindValue="id" formControlName="fineMethodId"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'FINE_TICKET.METHOD' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+    </ng-select>
+
+    <ng-select [items]="creators()" bindValue="id" formControlName="createdRowBy"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'FINE_TICKET.CREATOR' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      <ng-template ng-label-tmp let-item="item">{{ item.fullName || item.loginName }}</ng-template>
+      <ng-template ng-option-tmp let-item="item">{{ item.fullName || item.loginName }}</ng-template>
+    </ng-select>
+    @if (isPrivileged) {
+      <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" />
+    }
+    <div class="md:col-span-3 flex justify-end">
+      <button (click)="triggerSearch()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+    </div>
+  </div>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap items-center justify-between gap-2 print:hidden">
+  <div class="flex flex-wrap gap-4 text-sm">
+    <span class="text-gray-500">{{ 'FINE_TICKET.TOTAL_RECEIVABLE' | translate }}: <strong class="text-gray-800">{{ totals().totalReceivable | number }}đ</strong></span>
+    <span class="text-gray-500">{{ 'FINE_TICKET.TOTAL_RECEIVED' | translate }}: <strong class="text-green-700">{{ totals().totalReceived | number }}đ</strong></span>
+    <span class="text-gray-500">{{ 'FINE_TICKET.REMAINING' | translate }}: <strong class="text-red-600">{{ totals().remaining | number }}đ</strong></span>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <button (click)="printSummary()" class="bg-white border border-gray-300 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 hover:bg-gray-50 transition-colors"><mat-icon class="text-[16px]">summarize</mat-icon> {{ 'FINE_TICKET.REPORT_SUMMARY' | translate }}</button>
+    <button (click)="printDetail()" class="bg-white border border-gray-300 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 hover:bg-gray-50 transition-colors"><mat-icon class="text-[16px]">receipt_long</mat-icon> {{ 'FINE_TICKET.REPORT_DETAIL' | translate }}</button>
+    <button *appCan="'add'; url: '/admin/fines'" (click)="goToNew()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'FINE_TICKET.NEW' | translate }}</button>
+  </div>
+</div>
+
+@if (reportMode() === 'summary') {
+  <div class="hidden print:block p-6">
+    <h3 class="text-xl font-bold mb-4">{{ 'FINE_TICKET.REPORT_SUMMARY' | translate }}</h3>
+    <p>{{ 'FINE_TICKET.TOTAL_RECEIVABLE' | translate }}: {{ totals().totalReceivable | number }}đ</p>
+    <p>{{ 'FINE_TICKET.TOTAL_RECEIVED' | translate }}: {{ totals().totalReceived | number }}đ</p>
+    <p>{{ 'FINE_TICKET.REMAINING' | translate }}: {{ totals().remaining | number }}đ</p>
+    <app-report-signoff />
+  </div>
+}
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative" [ngClass]="{'print:hidden': reportMode() === 'summary'}">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] print:hidden"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+      <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_TICKET_NO' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-green-700 font-semibold border-b border-gray-100">{{ row.code || '—' }}</td></ng-container>
+      <ng-container matColumnDef="fineDate"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_FINE_DATE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.fineDate | appDate }}</td></ng-container>
+      <ng-container matColumnDef="reason"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_REASON' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.fineTypeName || '—' }}</td></ng-container>
+      <ng-container matColumnDef="cardNo"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_CARD_NO' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.cardNo || '—' }}</td></ng-container>
+      <ng-container matColumnDef="readerName"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_READER_NAME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-800 border-b border-gray-100">{{ row.readerName || '—' }}</td></ng-container>
+      <ng-container matColumnDef="totalAmount"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'FINE_TICKET.COL_AMOUNT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-800 border-b border-gray-100 text-right">{{ (row.totalAmount || 0) | number }}</td></ng-container>
+      <ng-container matColumnDef="paidAmount"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'FINE_TICKET.COL_PAID' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-800 border-b border-gray-100 text-right">{{ (row.paidAmount || 0) | number }}</td></ng-container>
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+      <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FINE_TICKET.COL_STATUS' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm border-b border-gray-100"><span class="px-2 py-0.5 rounded-full text-xs" [class]="statusClass(row.status)">{{ statusLabel(row.status) }}</span></td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="goToDetail(row)" class="hover:bg-gray-50 transition-colors cursor-pointer"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">gavel</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100 print:hidden"></mat-paginator>
+</div>
+@if (reportMode() === 'detail') {
+  <div class="hidden print:block px-6">
+    <app-report-signoff />
+  </div>
+}

@@ -1,0 +1,103 @@
+@if (isOpen()) {
+  <div class="fixed top-0 right-0 z-50 w-[92vw] max-w-sm h-full bg-white shadow-2xl border-l border-gray-100 flex flex-col"
+       role="dialog" aria-label="Hỏi đáp tài liệu này">
+    <div class="bg-main text-white px-4 py-3 flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-comment-alt"></i>
+        <span class="font-semibold text-sm">Hỏi đáp tài liệu này</span>
+      </div>
+      <div class="flex items-center gap-1">
+        @if (messages().length) {
+          <button type="button" (click)="reset()" title="Cuộc trò chuyện mới" aria-label="Cuộc trò chuyện mới"
+                  class="p-1 rounded hover:bg-white/20 transition-colors"><i class="fas fa-redo-alt text-xs"></i></button>
+        }
+        <button type="button" (click)="close()" aria-label="Đóng" class="p-1 rounded hover:bg-white/20 transition-colors"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
+    <div #scroll class="flex-1 overflow-y-auto px-3 py-3 space-y-3 bg-gray-50">
+      @if (messages().length === 0) {
+        <div class="text-center text-sm text-gray-400 py-6 px-4 space-y-3">
+          <i class="fas fa-file-alt text-3xl text-main block"></i>
+          <p>Đặt câu hỏi về nội dung tài liệu đang xem, trợ lý sẽ trả lời dựa trên đúng tài liệu này.</p>
+          <div class="flex flex-col gap-2">
+            @for (s of suggestions; track s) {
+              <button type="button" (click)="send(s)"
+                      class="px-3 py-2 rounded-xl bg-white border border-gray-200 hover:border-main hover:text-main text-gray-600 text-xs text-left transition-colors">
+                {{ s }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (m of messages(); track m.id) {
+        @if (m.role === 'user') {
+          <div class="flex justify-end">
+            <div class="max-w-[80%] bg-main text-white text-sm rounded-2xl rounded-br-sm px-3 py-2 whitespace-pre-wrap">{{ m.text }}</div>
+          </div>
+        } @else {
+          <div class="flex gap-2 items-start">
+            <div class="w-7 h-7 rounded-full bg-main/10 text-main flex items-center justify-center shrink-0 mt-0.5"><i class="fas fa-robot text-xs"></i></div>
+            <div class="max-w-[82%]">
+              <div class="text-sm rounded-2xl rounded-tl-sm px-3 py-2 chat-markdown border" [class.bg-white]="!m.isError" [class.text-gray-700]="!m.isError" [class.border-gray-100]="!m.isError" [class.bg-red-50]="m.isError" [class.text-red-600]="m.isError" [class.border-red-100]="m.isError">
+                @if (!m.text && m.streaming) {
+                  <span class="text-gray-500 text-xs flex items-center gap-2"><i class="fas fa-spinner fa-spin text-main"></i> Đang trả lời...</span>
+                } @else {
+                  <markdown [data]="m.text"></markdown>
+                  @if (m.streaming) { <span class="inline-block w-1.5 h-4 bg-main align-middle animate-pulse ml-0.5"></span> }
+                  @if (m.stopped) { <p class="text-[11px] text-gray-400 mt-1">Đã dừng.</p> }
+                }
+                @if (m.sources?.length) {
+                  <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Nguồn</span>
+                    @for (s of m.sources; track s.pageNumber) {
+                      <button type="button" (click)="jump(s.pageNumber)" [disabled]="!canJump" [title]="s.excerpt ?? ''"
+                              class="px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors"
+                              [class.cursor-pointer]="canJump" [class.hover:bg-main]="canJump" [class.hover:text-white]="canJump"
+                              [class.text-main]="canJump" [class.border-main]="canJump" [class.text-gray-500]="!canJump" [class.border-gray-200]="!canJump">
+                        Trang {{ s.pageNumber }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="border-t border-gray-100 p-2.5 bg-white shrink-0">
+      <div class="flex items-end gap-2">
+        <textarea
+          rows="1"
+          [ngModel]="questionInput()"
+          (ngModelChange)="questionInput.set($event)"
+          (keydown.enter)="onEnter($any($event))"
+          [disabled]="isAsking()"
+          placeholder="Hỏi về nội dung tài liệu..."
+          aria-label="Câu hỏi"
+          class="flex-1 resize-none max-h-28 text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-main disabled:bg-gray-50"
+        ></textarea>
+        @if (isAsking()) {
+          <button type="button" (click)="stop()" aria-label="Dừng"
+                  class="h-9 px-3 shrink-0 rounded-xl bg-gray-800 hover:bg-gray-900 text-white text-xs font-semibold flex items-center gap-1">
+            <i class="fas fa-stop text-[10px]"></i> Dừng
+          </button>
+        } @else {
+          <button
+            type="button"
+            (click)="send()"
+            [disabled]="!questionInput().trim()"
+            class="w-9 h-9 shrink-0 rounded-xl bg-main text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
+            aria-label="Gửi câu hỏi"
+          >
+            <i class="fas fa-paper-plane text-sm"></i>
+          </button>
+        }
+      </div>
+      <p class="mt-1.5 text-[10px] text-gray-400 text-center">Câu trả lời do AI tạo từ nội dung tài liệu, có thể chưa chính xác.</p>
+    </div>
+  </div>
+}

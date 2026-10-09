@@ -1,0 +1,78 @@
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-xl font-bold text-gray-800">{{ 'DATA_QUALITY.TITLE' | translate }}</h1>
+    <p class="text-sm text-gray-500">{{ 'DATA_QUALITY.SUBTITLE' | translate }}</p>
+  </div>
+  <button type="button" (click)="refresh()" [disabled]="isLoading()"
+          class="border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50">
+    <mat-icon class="text-[16px]">refresh</mat-icon> {{ 'DATA_QUALITY.RECHECK' | translate }}
+  </button>
+</div>
+
+@if (summaryError()) {
+  <div class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-4">{{ 'DATA_QUALITY.LOAD_FAILED' | translate }}</div>
+} @else if (summary() && rules().length === 0) {
+  <div class="bg-white border border-gray-100 text-gray-500 text-sm rounded-xl p-6 text-center">{{ 'DATA_QUALITY.NO_RULES' | translate }}</div>
+} @else {
+  <div class="flex flex-wrap gap-2 mb-4" role="tablist">
+    @for (r of rules(); track r.key) {
+      <button type="button" role="tab" [attr.aria-selected]="rule() === r.key" (click)="select(r.key)"
+              class="px-3 py-2 rounded-lg text-sm font-medium border transition-colors flex items-center gap-2"
+              [class]="rule() === r.key ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+        {{ r.label | translate }}
+        <span class="px-1.5 py-0.5 rounded-md text-xs tabular-nums"
+              [class]="rule() === r.key ? 'bg-white/20 text-white' : (count(r.key) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700')">{{ count(r.key) }}</span>
+      </button>
+    }
+  </div>
+
+  @if (currentRule(); as cr) {
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+      <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-gray-600">{{ cr.description | translate }}</p>
+        @if (checkedAt()) { <span class="text-xs text-gray-400">{{ 'DATA_QUALITY.CHECKED_AT' | translate }} {{ checkedAt() | date:'HH:mm:ss dd/MM/yyyy' }}</span> }
+      </div>
+      @if (isLoading()) {
+        <div class="absolute inset-0 bg-white/60 z-10 flex items-center justify-center"><mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon></div>
+      }
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-gray-50 text-xs font-medium text-gray-600">
+            <tr>
+              <th class="py-3 px-4 w-14">STT</th>
+              <th class="py-3 px-4">{{ (isBarcodeRule() ? 'DATA_QUALITY.COL_BARCODE' : 'DATA_QUALITY.COL_MFN') | translate }}</th>
+              <th class="py-3 px-4">{{ 'DATA_QUALITY.COL_TITLE' | translate }}</th>
+              <th class="py-3 px-4 w-32 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of items(); track item.id; let i = $index) {
+              <tr class="border-t border-gray-100 hover:bg-gray-50">
+                <td class="py-2.5 px-4 text-gray-500 tabular-nums">{{ pageIndex() * pageSize + i + 1 }}</td>
+                <td class="py-2.5 px-4 font-mono text-gray-800 whitespace-pre">{{ isBarcodeRule() ? ('«' + item.barcode + '»') : (item.mfn ?? ('DATA_QUALITY.NO_MFN' | translate)) }}</td>
+                <td class="py-2.5 px-4 text-gray-700">{{ item.title || '—' }}</td>
+                <td class="py-2.5 px-4 text-right">
+                  @if (fixLink(item); as link) {
+                    <a [routerLink]="link.path" [queryParams]="link.query ?? null"
+                       class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800">
+                      <mat-icon class="text-[16px]">edit</mat-icon> {{ 'DATA_QUALITY.FIX_NOW' | translate }}
+                    </a>
+                  } @else { <span class="text-xs text-gray-400">—</span> }
+                </td>
+              </tr>
+            } @empty {
+              @if (!isLoading()) {
+                <tr><td colspan="4" class="py-10 text-center text-sm" [class]="listError() ? 'text-red-600' : 'text-green-700'">
+                  {{ (listError() ? 'DATA_QUALITY.LIST_FAILED' : 'DATA_QUALITY.NO_ISSUES') | translate }}
+                </td></tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (total() > pageSize) {
+        <mat-paginator [length]="total()" [pageSize]="pageSize" [pageIndex]="pageIndex()" [hidePageSize]="true" (page)="onPage($event)"></mat-paginator>
+      }
+    </div>
+  }
+}

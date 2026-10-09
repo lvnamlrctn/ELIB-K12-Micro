@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
+    <PackageReference Include="MassTransit.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Persistence\Elib.BuildingBlocks.Persistence.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+    <ProjectReference Include="..\..\Contracts\Elib.Contracts.Events\Elib.Contracts.Events.csproj" />
+  </ItemGroup>
+</Project>

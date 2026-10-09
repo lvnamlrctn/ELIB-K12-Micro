@@ -1,0 +1,297 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'BORROW.TITLE' | translate }}</h4>
+</div>
+
+<!-- Controls -->
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.CIRC_PLACE' | translate }}</label>
+      <ng-select [items]="circPlaces()" bindLabel="name" bindValue="id"
+                 [ngModel]="circPlaceId()" (ngModelChange)="circPlaceId.set($event)"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'COMMON.SELECT' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.CARD_NO' | translate }}</label>
+      <div class="flex gap-2">
+        <input #cardNoInput [ngModel]="cardNo()" (ngModelChange)="cardNo.set($event)" (keydown.enter)="loadReader()" type="text" placeholder="{{ 'BORROW.CARD_PH' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button (click)="loadReader()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded-lg flex items-center"><mat-icon class="text-[18px]">person_search</mat-icon></button>
+        <app-face-capture (matched)="onFaceMatched($event)" />
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.BARCODE' | translate }}</label>
+      <div class="flex gap-2">
+        <input #barcodeInput [ngModel]="barcode()" (ngModelChange)="barcode.set($event)" (keydown.enter)="onScanBarcode()" [disabled]="barcodeDisabled()" type="text" placeholder="{{ 'BORROW.BARCODE_PH' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+        <button (click)="onScanBarcode()" [disabled]="barcodeDisabled() || isBorrowing()" class="bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white px-3 rounded-lg flex items-center"><mat-icon class="text-[18px]">add</mat-icon></button>
+        <button (click)="openBulkModal()" [disabled]="barcodeDisabled()" [title]="'BORROW.BULK_BORROW' | translate" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-3 rounded-lg flex items-center"><mat-icon class="text-[18px]">playlist_add</mat-icon></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@if (isLoadingReader()) {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center print:hidden"><mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon></div>
+}
+
+@if (snapshot(); as s) {
+  <!-- Receipt-style print output -->
+  <div class="hidden print:block max-w-xs mx-auto font-mono text-xs text-black">
+    <div class="text-center border-b border-dashed border-black pb-2 mb-2">
+      <div class="font-bold text-sm">{{ 'BORROW.RECEIPT_HEADER' | translate }}</div>
+      <div>{{ now() | appDate:'datetime' }}</div>
+    </div>
+    <div class="mb-2">
+      <div>{{ 'BORROW.CARD_NO' | translate }}: {{ s.cardNo }}</div>
+      <div>{{ 'BORROW.READER' | translate }}: {{ s.fullName }}</div>
+      @if (s.className)  { <div>{{ 'BORROW.ACADEMIC_CLASS' | translate }}: {{ s.className }}</div> }
+      @if (s.courseName) { <div>{{ 'BORROW.COURSE' | translate }}: {{ s.courseName }}</div> }
+      @if (s.orgName)    { <div>{{ 'BORROW.ORG' | translate }}: {{ s.orgName }}</div> }
+      @if (s.citizenId)  { <div>{{ 'BORROW.CITIZEN_ID' | translate }}: {{ s.citizenId }}</div> }
+    </div>
+    <div class="border-t border-dashed border-black pt-2">
+      @for (loan of s.currentLoans; track loan.id) {
+        <div class="mb-2">
+          <div class="font-semibold">{{ loan.bibTitle }}</div>
+          <div class="flex justify-between"><span>{{ loan.barcode }}</span></div>
+          <div class="flex justify-between">
+            <span>{{ 'BORROW.BORROW_DATE' | translate }}: {{ loan.borrowDate | appDate }}</span>
+            <span>{{ 'BORROW.DUE_DATE' | translate }}: {{ loan.dueDate | appDate }}</span>
+          </div>
+          @if (loan.note) { <div>{{ 'BORROW.NOTE_LABEL' | translate }}: {{ loan.note }}</div> }
+        </div>
+      }
+    </div>
+    <div class="border-t border-dashed border-black pt-2 text-center">{{ 'BORROW.RECEIPT_TOTAL' | translate }}: {{ s.currentLoans.length }}</div>
+  </div>
+
+  <!-- Reader card -->
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden">
+    <div class="flex flex-col md:flex-row md:items-center gap-5">
+      <div class="flex items-center gap-4 flex-1">
+        @if (s.photo) {
+          <img [src]="s.photo" [alt]="s.fullName" class="w-16 h-16 rounded-full object-cover border border-gray-200 shrink-0">
+        } @else {
+          <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold shrink-0">{{ (s.fullName || '?').charAt(0) }}</div>
+        }
+        <div class="flex-1 grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-sm">
+          <div><span class="text-gray-400">{{ 'BORROW.CARD_NO' | translate }}:</span> <span class="font-semibold">{{ s.cardNo || '—' }}</span></div>
+          <div class="md:col-span-2 flex items-center gap-2">
+            <span class="font-semibold">{{ s.fullName || '—' }}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs" [class]="statusBadgeClass()">{{ (isLocked() ? 'BORROW.LOCKED' : 'BORROW.NORMAL') | translate }}</span>
+          </div>
+          <div><span class="text-gray-400">{{ 'BORROW.READER_TYPE' | translate }}:</span> {{ s.readerType || '—' }}</div>
+          <div><span class="text-gray-400">{{ 'BORROW.BALANCE' | translate }}:</span> <span class="font-semibold">{{ s.balance ?? 0 }}</span></div>
+          <div class="md:col-span-1"><span class="text-gray-400">{{ 'BORROW.ISSUE_DATE' | translate }}:</span> {{ s.issueDate | appDate }} - {{ s.expireDate | appDate }}</div>
+          <div><span class="text-gray-400">{{ 'BORROW.ACADEMIC_CLASS' | translate }}:</span> {{ s.className || '—' }}</div>
+          <div><span class="text-gray-400">{{ 'BORROW.COURSE' | translate }}:</span> {{ s.courseName || '—' }}</div>
+          <div><span class="text-gray-400">{{ 'BORROW.ORG' | translate }}:</span> {{ s.orgName || '—' }}</div>
+          <div class="md:col-span-3"><span class="text-gray-400">{{ 'BORROW.CITIZEN_ID' | translate }}:</span> <span class="font-semibold">{{ s.citizenId || '—' }}</span></div>
+        </div>
+      </div>
+      <div class="w-full md:w-64">
+        <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.REASON' | translate }}</label>
+        <input [ngModel]="reasonText()" (ngModelChange)="reasonText.set($event)" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <button (click)="print()" class="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 print:hidden shrink-0"><mat-icon class="text-[18px]">print</mat-icon> {{ 'BORROW.PRINT_RECEIPT' | translate }}</button>
+    </div>
+
+    <!-- Stat badges -->
+    <div class="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-100">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-green-500 text-white flex items-center justify-center font-bold">{{ countBorrowing() }}</div>
+        <span class="text-xs text-gray-500">{{ 'BORROW.STAT_BORROWING' | translate }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold">{{ countOverdue() }}</div>
+        <span class="text-xs text-gray-500">{{ 'BORROW.STAT_OVERDUE' | translate }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">{{ countRenew() }}</div>
+        <span class="text-xs text-gray-500">{{ 'BORROW.STAT_RENEW' | translate }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center font-bold">{{ countLocked() }}</div>
+        <span class="text-xs text-gray-500">{{ 'BORROW.STAT_LOCKED' | translate }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Current loans -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:hidden">
+    <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-700">{{ 'BORROW.CURRENT_LOANS' | translate }}</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+          <th class="py-2 px-3 w-10"></th>
+          <th class="py-2 px-3">{{ 'BORROW.BARCODE' | translate }}</th>
+          <th class="py-2 px-3">{{ 'BORROW.BOOK_TITLE' | translate }}</th>
+          <th class="py-2 px-3">{{ 'BORROW.BORROW_DATE' | translate }}</th>
+          <th class="py-2 px-3">{{ 'BORROW.DUE_DATE' | translate }}</th>
+        </tr></thead>
+        <tbody>
+          @for (loan of s.currentLoans; track loan.id) {
+            <tr class="border-b border-gray-100" [class.bg-red-50]="isOverdue(loan.dueDate)">
+              <td class="py-2 px-3">
+                <input type="checkbox" [checked]="isSelected(loan.id)" (change)="toggleSelect(loan.id)" class="w-4 h-4">
+              </td>
+              <td class="py-2 px-3 font-mono">{{ loan.barcode || '—' }}</td>
+              <td class="py-2 px-3">
+                <div class="font-medium text-gray-800">{{ loan.bibTitle || '—' }}</div>
+                <div class="text-xs text-gray-500 flex flex-wrap gap-x-3">
+                  <span>{{ 'BORROW.LOCATION' | translate }}: {{ loan.location || '—' }}</span>
+                  <span>{{ 'BORROW.RENEW' | translate }}: {{ loan.renewCount || 0 }} ({{ 'COMMON.TIMES' | translate }})</span>
+                  <span [class.text-red-600]="isOverdue(loan.dueDate)" [class.font-semibold]="isOverdue(loan.dueDate)">
+                    {{ 'BORROW.DUE_DATE' | translate }}: {{ remainingDays(loan.dueDate) }} ({{ 'COMMON.DAYS' | translate }})
+                  </span>
+                  @if (loan.note) { <span>{{ 'BORROW.NOTE_LABEL' | translate }}: {{ loan.note }}</span> }
+                </div>
+              </td>
+              <td class="py-2 px-3">{{ loan.borrowDate | appDate }}</td>
+              <td class="py-2 px-3">{{ loan.dueDate | appDate }}</td>
+            </tr>
+          }
+          @if (s.currentLoans.length === 0) { <tr><td colspan="5" class="py-8 text-center text-gray-400">{{ 'BORROW.NO_LOANS' | translate }}</td></tr> }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bottom icon toolbar -->
+    <div class="flex items-center gap-1 px-3 py-2 border-t border-gray-100 bg-gray-50 print:hidden">
+      <button (click)="toolbarAdd()" [title]="'BORROW.TOOLBAR_ADD' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">add</mat-icon></button>
+      <button (click)="toolbarEdit()" [title]="'BORROW.TOOLBAR_EDIT' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">edit</mat-icon></button>
+      <button (click)="toolbarSearch()" [title]="'BORROW.TOOLBAR_SEARCH' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">search</mat-icon></button>
+      <button (click)="toolbarReturn()" [disabled]="circPlaceId() == null" [title]="'BORROW.TOOLBAR_RETURN' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200 disabled:opacity-40"><mat-icon class="text-[20px]">undo</mat-icon></button>
+      <button (click)="toolbarRenew()" [disabled]="circPlaceId() == null" [title]="'BORROW.TOOLBAR_RENEW' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40"><mat-icon class="text-[20px]">autorenew</mat-icon></button>
+      <button (click)="toolbarRefresh()" [title]="'BORROW.TOOLBAR_REFRESH' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">refresh</mat-icon></button>
+      <button (click)="openNoteModal()" [title]="'BORROW.TOOLBAR_NOTE' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">edit_note</mat-icon></button>
+      <button (click)="toolbarLockCard()" [title]="'BORROW.TOOLBAR_LOCK' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-200"><mat-icon class="text-[20px]">anchor</mat-icon></button>
+      <button (click)="openFineTicket()" [disabled]="countOverdue() === 0 && selectedIds().size === 0" [title]="'BORROW.TOOLBAR_FINE' | translate" class="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:bg-gray-300"><mat-icon class="text-[20px]">receipt_long</mat-icon></button>
+    </div>
+  </div>
+} @else if (!isLoadingReader()) {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-400 print:hidden">
+    <mat-icon class="text-5xl mb-2 text-gray-300">badge</mat-icon>
+    <p>{{ 'BORROW.SCAN_CARD' | translate }}</p>
+  </div>
+}
+
+@if (showBlockDialog() && snapshot(); as s) {
+  <div class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center print:hidden">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+      <div class="flex flex-col items-center text-center gap-3">
+        <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+          <mat-icon class="text-red-600 text-3xl">block</mat-icon>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-800">{{ 'BORROW.BLOCK_TITLE' | translate }}</h3>
+        <p class="text-sm text-gray-600">{{ s.blockReason }}</p>
+      </div>
+      <div class="flex justify-center mt-5">
+        <button (click)="closeBlockDialog()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'COMMON.CLOSE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showReturnConfirm() && pendingReturnLoan(); as loan) {
+  <div class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center print:hidden">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+      <div class="flex flex-col items-center text-center gap-3">
+        <div class="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
+          <mat-icon class="text-blue-600 text-3xl">assignment_return</mat-icon>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-800">{{ 'BORROW.RETURN_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-sm text-gray-600">{{ 'BORROW.RETURN_CONFIRM_MSG' | translate: { barcode: loan.barcode, title: loan.bibTitle } }}</p>
+      </div>
+      <div class="flex justify-center gap-2 mt-5">
+        <button (click)="cancelReturnConfirm()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmReturnExecute()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'BORROW.RETURN_CONFIRM_OK' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showNoteDialog()) {
+  <div class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center print:hidden">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">{{ 'BORROW.NOTE_TITLE' | translate }}</h3>
+      <textarea [ngModel]="noteDraft()" (ngModelChange)="noteDraft.set($event)" rows="4"
+                [placeholder]="'BORROW.NOTE_PLACEHOLDER' | translate"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      <label class="block text-xs font-semibold text-gray-500 mt-3 mb-1">{{ 'BORROW.NOTE_REASON' | translate }}</label>
+      <input [ngModel]="noteReason()" (ngModelChange)="noteReason.set($event)" type="text"
+             [placeholder]="'BORROW.REASON_PLACEHOLDER' | translate"
+             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="flex justify-end gap-2 mt-5">
+        <button (click)="closeNoteModal()" [disabled]="isSavingNote()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-lg text-sm transition-colors disabled:opacity-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="saveNote()" [disabled]="isSavingNote() || !noteReason().trim()" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'COMMON.SAVE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showRenewDialog()) {
+  <div class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center print:hidden">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-1">{{ 'BORROW.RENEW_CONFIRM_TITLE' | translate }}</h3>
+      <p class="text-sm text-gray-500 mb-3">{{ 'BORROW.RENEW_CONFIRM_COUNT' | translate: { count: renewTargetIds().length } }}</p>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.RENEW_REASON' | translate }}</label>
+      <input [ngModel]="renewReason()" (ngModelChange)="renewReason.set($event)" type="text"
+             [placeholder]="'BORROW.REASON_PLACEHOLDER' | translate"
+             class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div class="flex justify-end gap-2 mt-5">
+        <button (click)="closeRenewDialog()" [disabled]="isSavingRenew()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-lg text-sm transition-colors disabled:opacity-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmRenew()" [disabled]="isSavingRenew() || !renewReason().trim()" class="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'BORROW.RENEW_CONFIRM_OK' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showBulkModal() && snapshot(); as s) {
+  <div class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm flex items-center justify-center print:hidden">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">{{ 'BORROW.BULK_TITLE' | translate: { cardNo: s.cardNo } }}</h3>
+        <button (click)="closeBulkModal()" class="text-gray-400 hover:text-gray-600"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.BULK_PREFIX' | translate }}</label>
+          <input [ngModel]="bulkPrefix()" (ngModelChange)="bulkPrefix.set($event)" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.BULK_FROM' | translate }}</label>
+          <input [ngModel]="bulkFromNo()" (ngModelChange)="bulkFromNo.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.BULK_TO' | translate }}</label>
+          <input [ngModel]="bulkToNo()" (ngModelChange)="bulkToNo.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <label class="block text-xs font-semibold text-gray-500 mb-1">{{ 'BORROW.BULK_MANUAL' | translate }} <span class="text-gray-400 font-normal">({{ 'BORROW.BULK_MANUAL_HINT' | translate }})</span></label>
+      <textarea [ngModel]="bulkManual()" (ngModelChange)="bulkManual.set($event)" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-3"></textarea>
+
+      @if (bulkResults(); as results) {
+        <div class="max-h-48 overflow-y-auto border border-gray-100 rounded-lg mb-3">
+          @for (r of results; track r.barcode) {
+            <div class="flex items-center justify-between px-3 py-1.5 text-sm border-b border-gray-50 last:border-0" [class.bg-red-50]="!r.success" [class.bg-green-50]="r.success">
+              <span class="font-mono">{{ r.barcode }}</span>
+              <span [class.text-red-600]="!r.success" [class.text-green-600]="r.success">{{ r.message }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="flex justify-end gap-2">
+        <button (click)="closeBulkModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-lg text-sm transition-colors">{{ 'BORROW.BULK_BACK' | translate }}</button>
+        <button (click)="submitBulkBorrow()" [disabled]="isBulkBorrowing()" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 px-5 rounded-lg text-sm transition-colors flex items-center gap-1">
+          @if (isBulkBorrowing()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } {{ 'BORROW.BULK_SUBMIT' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

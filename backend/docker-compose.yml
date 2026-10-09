@@ -1,0 +1,199 @@
+services:
+
+  # ── SQL Server ──────────────────────────────────────────────────────────────
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: elibapi-mssql
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourStr0ng!Pass}
+      - MSSQL_PID=Express
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    networks:
+      - elibapi-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: elibapi-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${PG_DATABASE:-ELIBAPI}
+      - POSTGRES_USER=${PG_USER:-elibapi}
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-YourStr0ng!Pass}
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - elibapi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-elibapi} -d ${PG_DATABASE:-ELIBAPI}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── Ollama (self-hosted embedding) ──────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: elibapi-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - elibapi-network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Backend API (.NET — Internal + Public đã merge) ─────────────────────────
+  elibapi-internal:
+    build:
+      context: .
+      dockerfile: ELIBAPI.API/Dockerfile
+    container_name: elibapi-internal
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8090}:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      # Database provider (SqlServer hoặc PostgreSQL)
+      - DatabaseProvider=${DATABASE_PROVIDER:-SqlServer}
+      - ConnectionStrings__SqlServer=Server=mssql,1433;Database=ELIBAPI;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStr0ng!Pass};TrustServerCertificate=True;Encrypt=False;
+      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=${PG_DATABASE:-ELIBAPI};Username=${PG_USER:-elibapi};Password=${PG_PASSWORD:-YourStr0ng!Pass}
+      # JWT
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER:-ELIBAPI}
+      - Jwt__Audience=${JWT_AUDIENCE:-ELIBAPI_CLIENTS}
+      - Jwt__ExpireMinutes=${JWT_EXPIRE_MINUTES:-60}
+      # Minio
+      - MinioSettings__Endpoint=${MINIO_ENDPOINT:-103.124.95.249:9000}
+      - MinioSettings__AccessKey=${MINIO_ACCESS_KEY:-minioadmin}
+      - MinioSettings__SecretKey=${MINIO_SECRET_KEY}
+      - MinioSettings__BucketName=${MINIO_BUCKET:-elibapi}
+      - MinioSettings__PrivateBucketName=${MINIO_PRIVATE_BUCKET:-elibapi-private}
+      - MinioSettings__UseSSL=${MINIO_USE_SSL:-false}
+      - MinioSettings__PublicBaseUrl=${MINIO_PUBLIC_URL:-http://103.97.134.58:8090/api/public/media}
+      # Elasticsearch
+      - ElasticsearchSettings__Uri=${ES_URI:-http://103.124.95.249:9200}
+      - ElasticsearchSettings__Username=${ES_USERNAME:-elastic}
+      - ElasticsearchSettings__Password=${ES_PASSWORD}
+      # File paths
+      - PathSettings__PathEbook=/app/ebook-data
+      # LLM
+      - LLMSettings__Provider=${LLM_PROVIDER:-gemini}
+      - LLMSettings__ApiKey=${GEMINI_API_KEY:-}
+      - LLMSettings__Model=${LLM_MODEL:-gemini-3.0-flash-lite}
+      # Ollama (embedding)
+      - OllamaSettings__BaseUrl=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OllamaSettings__EmbeddingModel=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Hangfire
+      - Hangfire__User=${HANGFIRE_USER:-admin}
+      - Hangfire__Password=${HANGFIRE_PASSWORD}
+      # Z39.50 (Zebra) — thư mục xuất MARC dùng chung với container elib-zebra.
+      # Host/Port/Database chỉ để trang quản trị hiển thị thông tin kết nối cho thư viện bạn.
+      - ZebraExport__Directory=/export
+      - ZebraExport__Host=${ZEBRA_PUBLIC_HOST:-localhost}
+      - ZebraExport__Port=${ZEBRA_PORT:-2100}
+      - ZebraExport__Database=${ZEBRA_COMBINED_DB:-ELIB}
+      - ZebraExport__DatabasePrefix=${ZEBRA_DB_PREFIX:-ELIB_}
+    volumes:
+      - ${EBOOK_DATA_PATH:-./data/ebook}:/app/ebook-data
+      - ${ZEBRA_EXPORT_PATH:-./data/zebra-export}:/export
+    networks:
+      - elibapi-network
+    depends_on:
+      mssql:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # ── Angular Admin Website (SSR Node.js) ────────────────────────────────────
+  admin-website:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: admin-website
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    networks:
+      - elibapi-network
+    depends_on:
+      elibapi-internal:
+        condition: service_healthy
+
+  # ── Z39.50 Server (Zebra — Index Data) ──────────────────────────────────────
+  # Đọc file MARC ISO2709 do elibapi-internal xuất ra ở /export (volume dùng chung), tự đánh chỉ mục định
+  # kỳ thành 1 database gộp + 1 database mỗi đơn vị, rồi phục vụ Z39.50 thuần trên cổng ZEBRA_PORT.
+  # LƯU Ý: Z39.50 là TCP thuần nên KHÔNG đi qua nginx được — cổng này mở thẳng ra host. Đây là cổng duy
+  # nhất trong stack cần thư viện BÊN NGOÀI kết nối vào, hãy giới hạn bằng tường lửa theo dải IP đơn vị
+  # bạn trước khi mở công khai (xem docs/Z3950-SERVER.md).
+  elib-zebra:
+    build:
+      context: ./zebra
+      dockerfile: Dockerfile
+    container_name: elib-zebra
+    restart: unless-stopped
+    environment:
+      - ZEBRA_REINDEX_INTERVAL=${ZEBRA_REINDEX_INTERVAL:-60}
+      - ZEBRA_COMBINED_DB=${ZEBRA_COMBINED_DB:-ELIB}
+      - ZEBRA_DB_PREFIX=${ZEBRA_DB_PREFIX:-ELIB_}
+    volumes:
+      - ${ZEBRA_EXPORT_PATH:-./data/zebra-export}:/export
+      - zebra-register-data:/var/lib/zebra
+    ports:
+      - "${ZEBRA_PORT:-2100}:2100"
+    networks:
+      - elibapi-network
+    depends_on:
+      elibapi-internal:
+        condition: service_healthy
+
+  # ── Nginx Reverse Proxy ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: elibapi-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8088}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - elibapi-network
+    depends_on:
+      - elibapi-internal
+      - admin-website
+
+volumes:
+  mssql-data:
+  pg-data:
+  ollama-data:
+  # Register/chỉ mục của Zebra — dựng lại được từ /export nên không cần sao lưu.
+  zebra-register-data:
+
+networks:
+  elibapi-network:
+    driver: bridge

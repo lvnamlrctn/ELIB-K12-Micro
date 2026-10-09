@@ -1,0 +1,45 @@
+<div class="container mx-auto px-4 py-2 h-[calc(100vh-64px)] min-h-[800px] flex flex-col">
+  <nav class="flex items-center justify-between text-sm text-gray-500 mb-2 bg-white p-3 rounded shadow-sm border-l-4 border-main shrink-0">
+    <div class="flex items-center">
+      <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+      <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+      <span class="text-main font-semibold">Trang {{ pageNumber() }}</span>
+    </div>
+    <div class="flex gap-2">
+      <button (click)="goBack()" class="bg-gray-100 hover:bg-gray-200 text-dark px-4 py-1.5 rounded transition-colors font-semibold text-xs flex items-center gap-2">
+        <i class="fas fa-arrow-left"></i> Quay lại
+      </button>
+      <a [routerLink]="['/reader', ebookFileId()]" class="bg-main text-white px-4 py-1.5 rounded transition-colors font-semibold text-xs flex items-center gap-2 hover:bg-blue-700">
+        <i class="fas fa-book-open"></i> Xem toàn bộ tài liệu
+      </a>
+    </div>
+  </nav>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
+    <div class="bg-gray-800 text-white p-3 flex justify-between items-center shrink-0">
+      <div class="font-semibold text-sm flex items-center gap-2">
+        <i class="fas fa-file-pdf text-red-400"></i>
+        Đang xem trang <span class="text-gray-300 font-normal ml-1">{{ pageNumber() }}</span>
+      </div>
+    </div>
+
+    <div class="flex-1 bg-gray-100 relative flex items-center justify-center p-2 overflow-auto">
+      @if (loading()) {
+        <div class="text-center text-gray-500">
+          <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+          <p class="text-sm font-medium">Đang tải trang tài liệu...</p>
+        </div>
+      } @else if (errorMessage()) {
+        <div class="text-center max-w-md px-6">
+          <div class="w-20 h-20 mx-auto mb-5 rounded-full bg-red-100 flex items-center justify-center">
+            <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+          </div>
+          <h3 class="text-xl font-bold text-dark mb-2">Không thể hiển thị trang</h3>
+          <p class="text-sm text-gray-500">{{ errorMessage() }}</p>
+        </div>
+      } @else if (pageUrl()) {
+        <iframe [src]="pageUrl()" class="w-full h-full min-h-[800px] bg-white" title="Trang tài liệu"></iframe>
+      }
+    </div>
+  </div>
+</div>

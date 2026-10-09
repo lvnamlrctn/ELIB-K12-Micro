@@ -1,0 +1,101 @@
+@if (isOpen()) {
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-emerald-600">link</mat-icon>
+          {{ title }}
+        </h3>
+        <button (click)="close()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 border-b border-gray-100">
+        @if (advancedFields.length === 0) {
+          <div class="flex gap-2">
+            <input [ngModel]="filters().keyword" (ngModelChange)="updateFilter('keyword', $event)" (keydown.enter)="search()"
+              [placeholder]="searchPlaceholder"
+              class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <button type="button" (click)="search()"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+              <mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+            </button>
+          </div>
+        } @else {
+          <div class="grid grid-cols-2 gap-2">
+            @if (advancedFields.includes('title')) {
+              <input [ngModel]="filters().title" (ngModelChange)="updateFilter('title', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_TITLE' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            @if (advancedFields.includes('author')) {
+              <input [ngModel]="filters().author" (ngModelChange)="updateFilter('author', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_AUTHOR' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            @if (advancedFields.includes('publisher')) {
+              <input [ngModel]="filters().publisher" (ngModelChange)="updateFilter('publisher', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_PUBLISHER' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            @if (advancedFields.includes('publishDate')) {
+              <input [ngModel]="filters().publishDate" (ngModelChange)="updateFilter('publishDate', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_PUBLISH_DATE' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            @if (advancedFields.includes('mfnFrom')) {
+              <input type="number" [ngModel]="filters().mfnFrom" (ngModelChange)="updateFilter('mfnFrom', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_MFN_FROM' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            @if (advancedFields.includes('mfnTo')) {
+              <input type="number" [ngModel]="filters().mfnTo" (ngModelChange)="updateFilter('mfnTo', $event)" (keydown.enter)="search()"
+                [placeholder]="'ENTITY_PICKER.FIELD_MFN_TO' | translate"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            }
+            <button type="button" (click)="search()"
+              class="col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1">
+              <mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+            </button>
+          </div>
+        }
+      </div>
+
+      <div class="px-6 py-3 overflow-y-auto flex-1">
+        @if (isLoading()) {
+          <p class="text-center text-sm text-gray-400 py-10">{{ 'COMMON.LOADING' | translate }}</p>
+        } @else if (items().length === 0) {
+          <p class="text-center text-sm text-gray-400 py-10">{{ 'ENTITY_PICKER.EMPTY' | translate }}</p>
+        } @else {
+          <div class="flex flex-col divide-y divide-gray-100">
+            @for (item of items(); track $index) {
+              <button type="button" (click)="choose(item)"
+                class="text-left px-3 py-2.5 hover:bg-emerald-50 rounded-lg transition-colors">
+                <p class="text-sm font-medium text-gray-800">{{ displayFn(item) }}</p>
+                @if (subDisplayFn(item)) {
+                  <p class="text-xs text-gray-400 mt-0.5">{{ subDisplayFn(item) }}</p>
+                }
+                @if (extraDisplayFn && extraDisplayFn(item)) {
+                  <p class="text-xs text-gray-400 mt-0.5">{{ extraDisplayFn(item) }}</p>
+                }
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="prevPage()" [disabled]="page() <= 1"
+          class="text-sm font-medium text-gray-600 disabled:opacity-40 hover:text-emerald-600 flex items-center gap-1">
+          <mat-icon class="text-[18px]">chevron_left</mat-icon> {{ 'MEDIA_LIBRARY.PREV' | translate }}
+        </button>
+        <span class="text-xs text-gray-400">{{ items().length }} / {{ total() }}</span>
+        <button type="button" (click)="nextPage()" [disabled]="page() * pageSize >= total()"
+          class="text-sm font-medium text-gray-600 disabled:opacity-40 hover:text-emerald-600 flex items-center gap-1">
+          {{ 'MEDIA_LIBRARY.NEXT' | translate }} <mat-icon class="text-[18px]">chevron_right</mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+}

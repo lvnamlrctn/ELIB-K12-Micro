@@ -1,0 +1,550 @@
+<div class="p-4 space-y-4 print:hidden">
+
+  <div class="mb-1 flex items-center gap-2">
+    <mat-icon class="text-blue-600">search</mat-icon>
+    <h2 class="text-lg font-semibold text-gray-800">{{ 'AB_RECEIPT_LOOKUP.TITLE' | translate }}</h2>
+  </div>
+
+  <!-- Search Form Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+      <mat-icon class="text-blue-600 text-lg">filter_alt</mat-icon>
+      <h2 class="text-base font-semibold text-gray-700">{{ 'AB_RECEIPT_LOOKUP.SEARCH_TITLE' | translate }}</h2>
+      <button type="button" (click)="toggleFilters()" class="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" [title]="(filtersCollapsed() ? 'COMMON.EXPAND' : 'COMMON.COLLAPSE') | translate">
+        <mat-icon>{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+      </button>
+    </div>
+
+    @if (!filtersCollapsed()) {
+    <form [formGroup]="searchForm" class="p-4">
+      <div class="flex gap-4">
+
+        <!-- Left: form fields grid -->
+        <div class="flex-1 grid grid-cols-4 gap-x-4 gap-y-3">
+
+          <!-- Row 1 -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.RECEIPT_CODE_FROM' | translate }}</label>
+            <input type="number" formControlName="receiptCodeFrom" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.RECEIPT_CODE_TO' | translate }}</label>
+            <input type="number" formControlName="receiptCodeTo" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.RECEIPT_NAME' | translate }}</label>
+            <input type="text" formControlName="receiptName" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.TITLE' | translate }}</label>
+            <input type="text" formControlName="title" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.TITLE_PH' | translate">
+          </div>
+
+          <!-- Row 2 -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.MFN_FROM' | translate }}</label>
+            <input type="number" formControlName="mfnFrom" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.MFN_TO' | translate }}</label>
+            <input type="number" formControlName="mfnTo" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.STATUS' | translate }}</label>
+            <ng-select [items]="statusOptions" bindLabel="label" bindValue="value" formControlName="status" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'COMMON.ALL' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.AUTHOR' | translate }}</label>
+            <input type="text" formControlName="author" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.AUTHOR_PH' | translate">
+          </div>
+
+          <!-- Row 3 -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.RECEIPT_DATE_FROM' | translate }}</label>
+            <app-date-input formControlName="receiptDateFrom"></app-date-input>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.RECEIPT_DATE_TO' | translate }}</label>
+            <app-date-input formControlName="receiptDateTo"></app-date-input>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.SOURCE' | translate }}</label>
+            <ng-select [items]="sources()" bindLabel="name" bindValue="id" formControlName="sourceId" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'AB_RECEIPT_LOOKUP.CHOOSE_SOURCE' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate"
+              [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.PUBLISH_YEAR' | translate }}</label>
+            <input type="text" formControlName="publishYear" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.PUBLISH_YEAR_PH' | translate">
+          </div>
+
+          <!-- Row 4 -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.CREATED_DATE_FROM' | translate }}</label>
+            <app-date-input formControlName="createdDateFrom"></app-date-input>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.CREATED_DATE_TO' | translate }}</label>
+            <app-date-input formControlName="createdDateTo"></app-date-input>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.FUND' | translate }}</label>
+            <ng-select [items]="funds()" bindLabel="name" bindValue="id" formControlName="fundId" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'AB_RECEIPT_LOOKUP.CHOOSE_FUND' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate"
+              [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.PUBLISHER' | translate }}</label>
+            <input type="text" formControlName="publisher" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.PUBLISHER_PH' | translate">
+          </div>
+
+          <!-- Row 5 -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.SUPPLIER' | translate }}</label>
+            <ng-select [items]="suppliers()" bindLabel="name" bindValue="id" formControlName="supplierId" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'AB_RECEIPT_LOOKUP.CHOOSE_SUPPLIER' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate"
+              [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.CREATED_BY' | translate }}</label>
+            <ng-select [items]="users()" bindValue="id" formControlName="createdBy" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'AB_RECEIPT_LOOKUP.CHOOSE_CREATED_BY' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate"
+              [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.fullName || item.loginName }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.fullName || item.loginName }}</ng-template>
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.STORE' | translate }}</label>
+            <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="storeId" (change)="triggerSearch()"
+              [searchable]="true" [clearable]="true"
+              [placeholder]="'AB_RECEIPT_LOOKUP.CHOOSE_STORE' | translate"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate"
+              [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'AB_RECEIPT_LOOKUP.REPORT_TYPE' | translate }}</label>
+            <ng-select [items]="[
+                {value:'CLASS_LABEL',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_CLASS_LABEL'},
+                {value:'STORE_ALLOCATION',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_STORE_ALLOCATION'},
+                {value:'ACQUISITION_LIST',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_ACQUISITION_LIST'},
+                {value:'NEW_BOOK_CATALOG',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_NEW_BOOK_CATALOG'},
+                {value:'ACCESSION_REGISTER',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_ACCESSION_REGISTER'},
+                {value:'CLASS_LABEL_ACCESSION',label:'AB_RECEIPT_LOOKUP.REPORT_TYPE_CLASS_LABEL_ACCESSION'}
+              ]"
+              bindValue="value" [formControl]="reportType"
+              [searchable]="true" [clearable]="false"
+              [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+            </ng-select>
+          </div>
+
+        </div>
+
+        <!-- Right: action buttons -->
+        <div class="flex flex-col gap-2 min-w-[160px]">
+          <button type="button" (click)="triggerSearch()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <mat-icon class="text-base leading-none">search</mat-icon>
+            {{ 'BOOK_SEARCH.BTN_SEARCH' | translate }}
+          </button>
+          <button *appCan="'export'" type="button" (click)="exportExcel()" [disabled]="isExporting()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+            <mat-icon class="text-base leading-none">download</mat-icon>
+            {{ 'AB_RECEIPT_LOOKUP.BTN_EXPORT' | translate }}
+          </button>
+          <button type="button" (click)="runReport()" [disabled]="isPrintingLabels()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+            <mat-icon class="text-base leading-none">print</mat-icon>
+            {{ 'AB_RECEIPT_LOOKUP.BTN_REPORT' | translate }}
+          </button>
+          <button type="button" (click)="exit()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+            <mat-icon class="text-base leading-none">logout</mat-icon>
+            {{ 'AB_RECEIPT_LOOKUP.BTN_EXIT' | translate }}
+          </button>
+        </div>
+
+      </div>
+    </form>
+    }
+  </div>
+
+  <!-- Results Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <mat-icon class="text-blue-600 text-lg">list</mat-icon>
+        <h2 class="text-base font-semibold text-gray-700">{{ 'AB_RECEIPT_LOOKUP.RESULT_TITLE' | translate }}</h2>
+        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+          {{ totalRecords }} {{ 'BOOK_SEARCH.RECORDS' | translate }}
+        </span>
+      </div>
+    </div>
+
+    @if (isLoading()) {
+      <div class="flex items-center justify-center py-12 text-gray-400">
+        <mat-icon class="animate-spin mr-2">sync</mat-icon>
+        {{ 'COMMON.LOADING' | translate }}
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table mat-table [dataSource]="dataSource" class="w-full text-sm">
+
+          <ng-container matColumnDef="stt">
+            <th mat-header-cell *matHeaderCellDef class="text-center font-semibold text-gray-600 text-xs bg-gray-50 w-10">STT</th>
+            <td mat-cell *matCellDef="let row; let i = index" class="text-center text-gray-500 text-xs">{{ getRowIndex(i) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="mfn">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_MFN' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 font-mono text-xs">{{ row.mfn ?? '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="receiptCode">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'AB_RECEIPT_LOOKUP.COL_RECEIPT_CODE' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 font-mono text-xs">{{ row.receiptCode ?? '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="isbd">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'AB_RECEIPT_LOOKUP.COL_ISBD' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-800 max-w-md">
+              <span class="block truncate" [title]="row.isbd ?? ''">{{ row.isbd || '—' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="createdDate">
+            <th mat-header-cell *matHeaderCellDef class="text-center font-semibold text-gray-600 text-xs bg-gray-50">{{ 'AB_RECEIPT_LOOKUP.COL_CREATED_DATE' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-center text-gray-700 text-xs">{{ (row.createdDate | date:'dd/MM/yyyy') || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="sourceName">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'AB_RECEIPT_LOOKUP.COL_SOURCE' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 text-xs">{{ row.sourceName || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="storeName">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'AB_RECEIPT_LOOKUP.COL_STORE' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 text-xs">{{ row.storeName || '—' }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" class="border-b border-gray-200"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            class="border-b border-gray-100 hover:bg-blue-50 transition-colors"></tr>
+
+          <tr class="mat-row" *matNoDataRow>
+            <td [attr.colspan]="displayedColumns.length" class="py-10 text-center text-gray-400 text-sm">
+              <mat-icon class="block mx-auto mb-1 text-gray-300 text-4xl" style="font-size:48px">search_off</mat-icon>
+              {{ 'COMMON.NO_DATA' | translate }}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <mat-paginator
+        [length]="totalRecords"
+        [pageSize]="pageSize" [pageIndex]="pageIndex"
+        [pageSizeOptions]="pageSizeOptions"
+        showFirstLastButtons
+        class="border-t border-gray-100"
+        (page)="onPageChange($event)">
+      </mat-paginator>
+    }
+  </div>
+</div>
+
+@if (printLabels().length > 0) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="printLabels.set([])" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+    <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 print:grid-cols-5">
+      @for (lb of printLabels(); track lb.key) {
+        <div class="mx-auto flex flex-col items-center">
+          <div class="border border-gray-400 rounded w-[4.2cm] h-[2.8cm] flex flex-col items-center justify-center text-center px-1">
+            <span class="text-[10px] font-semibold leading-tight uppercase" [innerHTML]="libraryHeader().parentLibrary"></span>
+            <span class="text-[9px] leading-tight uppercase underline" [innerHTML]="libraryHeader().libraryName"></span>
+            <span class="text-lg font-bold leading-tight mt-1" [innerHTML]="lb.classSymbol || '—'"></span>
+            <div class="w-10 border-t border-dashed border-gray-500 my-0.5"></div>
+            <span class="text-lg font-bold leading-tight" [innerHTML]="lb.authorMark || ''"></span>
+          </div>
+          <span class="text-[9px] text-gray-600 leading-tight mt-0.5 max-w-[4.2cm] truncate" [innerHTML]="caption(lb.author, lb.title)"></span>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (acquisitionPrint(); as ap) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="acquisitionPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="flex justify-between items-start mb-2">
+      <div class="text-sm">
+        <div class="uppercase" [innerHTML]="ap.parentLibrary"></div>
+        <div class="font-semibold" [innerHTML]="ap.deptName"></div>
+      </div>
+    </div>
+
+    <div class="text-center mb-3">
+      <h1 class="text-lg font-bold uppercase">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TITLE' | translate }}</h1>
+      <div class="text-sm">{{ formatVnDate(ap.receiptDate) }}</div>
+      @if (ap.receiptCode) {
+        <div class="text-sm font-semibold">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_RECEIPT_CODE' | translate }}: {{ ap.receiptCode }}</div>
+      }
+    </div>
+
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr class="border-y-2 border-gray-800">
+          <th class="border border-gray-400 px-2 py-1 w-10">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_STT' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TITLE' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AUTHOR' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_PRICE' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AMOUNT' | translate }}</th>
+          <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TOTAL' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (it of ap.items; track it.stt) {
+          <tr>
+            <td class="border border-gray-400 px-2 py-1 text-center">{{ it.stt }}</td>
+            <td class="border border-gray-400 px-2 py-1" [innerHTML]="it.title || '—'"></td>
+            <td class="border border-gray-400 px-2 py-1" [innerHTML]="it.author || '—'"></td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.price ? (it.price | number) : '' }}</td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.amount }}</td>
+            <td class="border border-gray-400 px-2 py-1 text-right">{{ it.total ? (it.total | number) : '' }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr class="font-semibold">
+          <td class="border border-gray-400 px-2 py-1 text-right" colspan="4">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_COUNT' | translate }}:</td>
+          <td class="border border-gray-400 px-2 py-1 text-right">{{ ap.totalCount }}</td>
+          <td class="border border-gray-400 px-2 py-1 text-right">{{ ap.totalMoney | number }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="flex justify-between mt-2 text-sm font-semibold">
+      <span>{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_BOOKS' | translate }}: {{ ap.totalCount }}</span>
+      <span>{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_MONEY' | translate }}: {{ ap.totalMoney | number }}</span>
+    </div>
+  </div>
+}
+
+@if (storeAllocationPrint(); as sp) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="storeAllocationPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="flex justify-between items-start mb-2">
+      <div class="text-sm">
+        <div class="uppercase font-bold" [innerHTML]="sp.parentLibrary"></div>
+        <div class="font-bold" [innerHTML]="sp.deptName"></div>
+      </div>
+    </div>
+
+    <div class="text-center mb-3">
+      <h1 class="text-lg font-bold uppercase">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_TITLE' | translate }}</h1>
+      <div class="text-sm">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_AS_OF_DATE' | translate }}:{{ formatShortDate() }}</div>
+      @if (sp.receiptCode) {
+        <div class="text-sm font-semibold">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_RECEIPT_CODE' | translate }}: {{ sp.receiptCode }}&nbsp;&nbsp;{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_RECEIVED_DATE' | translate }}: {{ formatShortDate(sp.receiptDate) }}</div>
+      }
+    </div>
+
+    @for (g of sp.groups; track g.storeId) {
+      <div class="font-semibold underline mb-1 mt-3">{{ g.storeName }}</div>
+      <table class="w-full text-sm border-collapse mb-2">
+        <thead>
+          <tr class="border-y-2 border-gray-800">
+            <th class="border border-gray-400 px-2 py-1 w-10">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_STT' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_TITLE' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AUTHOR' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_NXB' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_ML_CUTTER' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-right">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_COL_AMOUNT' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_BARCODE' | translate }}</th>
+            <th class="border border-gray-400 px-2 py-1 text-left">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_COL_NOTE' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (it of g.items; track it.stt) {
+            <tr>
+              <td class="border border-gray-400 px-2 py-1 text-center align-top">{{ it.stt }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top" [innerHTML]="it.title || ''"></td>
+              <td class="border border-gray-400 px-2 py-1 align-top" [innerHTML]="it.author || ''"></td>
+              <td class="border border-gray-400 px-2 py-1 align-top">{{ it.publisher || '' }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top">{{ it.mlCutter || '' }}</td>
+              <td class="border border-gray-400 px-2 py-1 text-right align-top">{{ it.sl }}</td>
+              <td class="border border-gray-400 px-2 py-1 align-top">
+                @for (bc of it.barcodes; track bc) { <div>{{ bc }}</div> }
+              </td>
+              <td class="border border-gray-400 px-2 py-1 align-top"></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <div class="text-sm font-semibold mt-2">{{ 'AB_RECEIPT_LOOKUP.ACQ_PRINT_TOTAL_COUNT' | translate }}: {{ sp.totalCount }}</div>
+
+    <div class="flex justify-between mt-8 text-sm">
+      <div>{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_HANDED_BY' | translate }}:</div>
+      <div class="text-center">
+        <div>Thái Nguyên, {{ formatVnDate().replace('Ngày', 'ngày') }}</div>
+        <div class="font-bold mt-8">{{ 'AB_RECEIPT_LOOKUP.STORE_ALLOC_RECEIVED_BY' | translate }}</div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (accessionRegisterPrint(); as rp) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="accessionRegisterPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="flex justify-between items-start mb-2">
+      <div class="text-sm font-bold">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_YEAR' | translate }} {{ rp.year }}</div>
+    </div>
+    <div class="text-center mb-3">
+      <h1 class="text-lg font-bold uppercase">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_TITLE' | translate }}</h1>
+    </div>
+
+    <table class="w-full text-xs border-collapse">
+      <thead>
+        <tr class="border-y-2 border-gray-800">
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_DATE' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_STT' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_AUTHOR_TITLE' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" colspan="3">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_INVENTORY' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" colspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_PUBLICATION' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_PRICE' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_GENERAL_REGISTER' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_CLASS' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_EXPORT_MINUTES' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1" rowspan="2">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_NOTE' | translate }}</th>
+        </tr>
+        <tr class="border-b-2 border-gray-800">
+          <th class="border border-gray-400 px-1 py-1">{{ rp.year }}</th>
+          <th class="border border-gray-400 px-1 py-1">{{ rp.year + 1 }}</th>
+          <th class="border border-gray-400 px-1 py-1">{{ rp.year + 2 }}</th>
+          <th class="border border-gray-400 px-1 py-1">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_PLACE' | translate }}</th>
+          <th class="border border-gray-400 px-1 py-1">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_COL_YEAR' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (it of rp.items; track it.barcode; let i = $index) {
+          <tr [style.border-bottom]="(!rp.items[i+1] || rp.items[i+1].bibId !== it.bibId) ? '2px dashed #6b7280' : ''">
+            <td class="border border-gray-400 px-1 py-1 text-center">{{ formatShortDate(it.date) }}</td>
+            <td class="border border-gray-400 px-1 py-1 font-mono">{{ it.barcode }}</td>
+            <td class="border border-gray-400 px-1 py-1">
+              <div class="font-bold uppercase" [innerHTML]="it.author || ''"></div>
+              <div [innerHTML]="it.title || ''"></div>
+            </td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+            <td class="border border-gray-400 px-1 py-1">{{ it.publisher || '' }}</td>
+            <td class="border border-gray-400 px-1 py-1 text-center">{{ it.publishDate || '' }}</td>
+            <td class="border border-gray-400 px-1 py-1 text-right">{{ it.price ? (it.price | number) : '' }}</td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+            <td class="border border-gray-400 px-1 py-1 text-center">{{ it.mlDigit || '' }}</td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+            <td class="border border-gray-400 px-1 py-1"></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div class="flex justify-between mt-2 text-sm">
+      <div class="font-semibold">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_TOTAL' | translate }}: {{ rp.totalCount }}</div>
+      <div class="text-center">
+        <div>Thái Nguyên, {{ formatVnDate().replace('Ngày', 'ngày') }}</div>
+        <div class="font-bold mt-8">{{ 'AB_RECEIPT_LOOKUP.ACCESSION_HEAD_OF_DEPT' | translate }}</div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (classLabelAccessionPrint(); as cla) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="classLabelAccessionPrint.set(null)" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+
+    <div class="grid grid-cols-4 md:grid-cols-6 gap-3 print:grid-cols-4">
+      @for (it of cla.items; track $index) {
+        <div class="border-2 border-blue-700 rounded w-[4.2cm] h-[3.6cm] flex flex-col items-center justify-between text-center px-1 py-1 mx-auto">
+          <span class="text-base font-bold underline">{{ it.classSymbol || '—' }}</span>
+          <span class="text-sm">{{ it.authorMark || '' }}</span>
+          @if (it.barcode) {
+            <svg [appBarcode]="it.barcode" class="block w-full h-8 max-w-full"></svg>
+            <span class="text-[10px] font-mono">{{ it.barcode }}</span>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

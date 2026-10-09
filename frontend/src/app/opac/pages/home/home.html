@@ -1,0 +1,155 @@
+<section class="relative h-[400px] flex items-center justify-center text-center text-white bg-cover bg-center" [style.background-image]="heroBgStyle()">
+  <div class="z-10 px-4">
+    <h2 class="text-3xl md:text-4xl font-bold mb-6">Tìm kiếm tài liệu</h2>
+    <div class="flex flex-col md:flex-row max-w-3xl mx-auto bg-white rounded overflow-hidden">
+      <select [(ngModel)]="searchType" class="p-4 text-dark border-r border-gray-200 outline-none bg-gray-50 font-medium">
+        <option value="Title">Nhan đề</option>
+        <option value="Author">Tác giả</option>
+      </select>
+      <input type="text" [(ngModel)]="searchQueryInput" (keyup.enter)="performSearch()" placeholder="Nhập tên sách, tác giả..." class="flex-1 p-4 text-dark outline-none cursor-text">
+      <button (click)="performSearch()" class="bg-main text-white px-8 py-4 font-bold hover:bg-blue-700 transition-colors">
+        <i class="fas fa-search mr-2"></i> Tìm kiếm
+      </button>
+    </div>
+    <div class="mt-4 flex justify-center gap-6 flex-wrap">
+      <a routerLink="/tra-cuu" [queryParams]="{ q: searchQueryInput }" class="text-white hover:text-blue-200 transition-colors inline-block underline underline-offset-4 font-semibold shadow-sm">
+        <i class="fas fa-bolt mr-1"></i> Tìm toàn văn trong tài liệu
+      </a>
+      <a routerLink="/tra-cuu" [queryParams]="{ q: searchQueryInput, docType: 'print' }" class="text-white hover:text-blue-200 transition-colors inline-block underline underline-offset-4 font-semibold shadow-sm">
+        <i class="fas fa-book mr-1"></i> Tra cứu tài liệu in
+      </a>
+      <!-- <a routerLink="/advanced-search" class="text-white hover:text-blue-200 transition-colors inline-block underline underline-offset-4 font-semibold shadow-sm">Tìm kiếm tại thư viện liên kết</a> -->
+    </div>
+    <p class="mt-6 italic text-lg opacity-90">"Kết nối tri thức – Kiến tạo tương lai"</p>
+  </div>
+</section>
+
+<div class="container mx-auto px-4 py-12">
+  
+  <!-- NEW: Quick Links -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+    @for (link of hyperLinks(); track link.publicId) {
+      <a [href]="link.linkUrl" target="_blank" [style.background-color]="link.color" class="text-white p-6 rounded-lg flex flex-col items-center justify-center hover:opacity-90 transition-opacity h-[154px] shadow-md">
+        <i class="fas {{ link.icon }} text-4xl mb-3"></i>
+        <span class="font-bold uppercase tracking-wide text-center">{{ link.name }}</span>
+      </a>
+    }
+  </div>
+
+  <!-- NEW: Collections -->
+  <div class="mb-12">
+    <div class="flex justify-between items-center mb-6 border-b border-gray-200 pb-2">
+      <h2 class="text-xl font-bold text-[#3b5b8c] uppercase border-l-4 border-[#d93025] pl-3 m-0">Bộ sưu tập tài liệu số</h2>
+      <div class="flex items-center gap-3">
+        <button class="bg-[#d93025] text-white px-4 py-1.5 text-sm font-semibold rounded hover:bg-red-700 transition-colors">Xem thêm</button>
+        <div class="flex gap-1">
+          <button (click)="prevCollections()" [disabled]="colIndex() === 0" class="border border-gray-300 px-2.5 py-1 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-left text-xs"></i></button>
+          <button (click)="nextCollections()" [disabled]="colIndex() + colItemsPerPage >= collections().length" class="border border-gray-300 px-2.5 py-1 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-right text-xs"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      @for (col of visibleCollections(); track col.title) {
+        <div [routerLink]="['/search']" [queryParams]="{collection: col.id}" class="border border-gray-200 rounded-lg p-5 flex items-center gap-5 hover:shadow-md transition-shadow bg-white cursor-pointer active:scale-95 transition-transform">
+          <div class="bg-[#eef2f6] w-16 h-16 rounded-xl flex items-center justify-center shrink-0">
+            <i class="fas fa-folder text-3xl text-[#3b5b8c]"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-gray-800 mb-1.5 text-lg">{{ col.title }}</h3>
+            <p class="text-sm text-gray-500 m-0 flex items-center gap-2"><i class="fas fa-file-alt text-[#d93025]"></i> {{ col.count }} tài liệu</p>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="flex justify-between items-center mb-8 border-b border-gray-200 pb-2">
+    <div class="flex items-center border-l-4 border-main pl-4">
+      <h2 class="text-2xl font-bold text-main m-0">Tài liệu mới</h2>
+    </div>
+    <div class="flex gap-1">
+      <button (click)="prevBooks()" [disabled]="bookIndex() === 0" class="border border-gray-300 px-3 py-1.5 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-left text-sm"></i></button>
+      <button (click)="nextBooks()" [disabled]="bookIndex() + itemsPerPage >= latestBooks().length" class="border border-gray-300 px-3 py-1.5 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-right text-sm"></i></button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+    @for (book of visibleBooks(); track book.id) {
+      <div class="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex flex-col">
+        <a [routerLink]="['/book', book.id]" class="block h-64 overflow-hidden bg-gray-50 p-4">
+          <img [src]="book.imageUrl" [alt]="book.title" class="w-full h-full object-contain drop-shadow-md transition-transform hover:scale-105">
+        </a>
+        <div class="p-4 flex flex-col flex-1">
+          <h4 class="font-semibold text-main mb-2 line-clamp-2">
+            <a [routerLink]="['/book', book.id]">{{ book.title }}</a>
+          </h4>
+          <p class="text-sm text-gray-500 mt-auto">{{ book.author }}</p>
+        </div>
+      </div>
+    }
+  </div>
+
+  @if (showNews()) {
+  <div class="flex justify-between items-center mb-8 border-b border-gray-200 pb-2 mt-16">
+    <div class="flex items-center border-l-4 border-main pl-4">
+      <h2 class="text-2xl font-bold text-main m-0">Tin tức & Thông báo</h2>
+    </div>
+    <div class="flex gap-1">
+      <button (click)="prevNews()" [disabled]="newsIndex() === 0" class="border border-gray-300 px-3 py-1.5 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-left text-sm"></i></button>
+      <button (click)="nextNews()" [disabled]="newsIndex() + itemsPerPage >= latestNews().length" class="border border-gray-300 px-3 py-1.5 rounded text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i class="fas fa-chevron-right text-sm"></i></button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+    @for (item of visibleNews(); track item.id) {
+      <div class="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex flex-col">
+        <a [routerLink]="['/news', item.id]" class="block h-48 overflow-hidden relative">
+          <span class="absolute top-3 left-3 bg-main text-white text-xs font-bold px-2 py-1 rounded z-10">{{ item.date }}</span>
+          <img [src]="item.imageUrl" [alt]="item.title" class="w-full h-full object-cover transition-transform hover:scale-105">
+        </a>
+        <div class="p-4 flex flex-col flex-1">
+          <h4 class="font-semibold text-main mb-2 line-clamp-2">
+            <a [routerLink]="['/news', item.id]">{{ item.title }}</a>
+          </h4>
+          <p class="text-sm text-gray-600 line-clamp-3 mt-auto">{{ item.summary }}</p>
+        </div>
+      </div>
+    }
+  </div>
+  }
+
+  <!-- NEW: Info Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+    <div class="bg-white border border-gray-200 rounded-lg p-6 flex items-center gap-5 border-b-4 border-b-[#3b5b8c] shadow-sm hover:shadow-md transition-shadow">
+      <div class="bg-[#eef2f6] w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+        <i class="fas fa-clock text-2xl text-[#3b5b8c]"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-[#3b5b8c] uppercase mb-1.5">Giờ mở cửa</h3>
+        <div class="text-sm text-gray-600" [innerHTML]="openHour()"></div>
+      </div>
+    </div>
+    
+    <div class="bg-white border border-gray-200 rounded-lg p-6 flex items-center gap-5 border-b-4 border-b-[#3b5b8c] shadow-sm hover:shadow-md transition-shadow">
+      <div class="bg-[#eef2f6] w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+        <i class="fas fa-phone-alt text-2xl text-[#3b5b8c]"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-[#3b5b8c] uppercase mb-1.5">Hotline hỗ trợ</h3>
+        <p class="text-sm text-gray-600 m-0 text-lg">{{phone()}}</p>
+      </div>
+    </div>
+    
+    <div class="bg-white border border-gray-200 rounded-lg p-6 flex items-center gap-5 border-b-4 border-b-[#3b5b8c] shadow-sm hover:shadow-md transition-shadow">
+      <div class="bg-[#eef2f6] w-14 h-14 rounded-full flex items-center justify-center shrink-0">
+        <i class="fas fa-envelope text-2xl text-[#3b5b8c]"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-[#3b5b8c] uppercase mb-1.5">Email liên hệ</h3>
+        <p class="text-sm text-gray-600 m-0">{{email()}}</p>
+      </div>
+    </div>
+  </div>
+
+</div>

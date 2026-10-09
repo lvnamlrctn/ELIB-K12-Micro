@@ -1,0 +1,1152 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'EBOOK_DOC.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filter Section -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+    <mat-icon class="text-blue-600 text-lg">search</mat-icon>
+    <h2 class="text-base font-semibold text-gray-700">{{ 'COMMON.SEARCH_FILTERS' | translate }}</h2>
+    <button type="button" (click)="toggleFilters()" class="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" [title]="(filtersCollapsed() ? 'COMMON.EXPAND' : 'COMMON.COLLAPSE') | translate">
+      <mat-icon>{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+    </button>
+  </div>
+  @if (!filtersCollapsed()) {
+  <div class="p-5" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+
+    <!-- Row 1 -->
+    <select formControlName="collectionId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_COLLECTION' | translate }}</option>
+      @for (c of collections; track c.id) {
+        <option [ngValue]="c.id">{{ c.label }}</option>
+      }
+    </select>
+    <select formControlName="subjectId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_SUBJECT' | translate }}</option>
+      @for (s of subjects; track s.id) {
+        <option [ngValue]="s.id">{{ s.label }}</option>
+      }
+    </select>
+    <select formControlName="topicId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_TOPIC' | translate }}</option>
+      @for (t of topics; track t.id) {
+        <option [ngValue]="t.id">{{ t.label }}</option>
+      }
+    </select>
+    <select formControlName="typeId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_DIG_TYPE' | translate }}</option>
+      @for (t of digTypes; track t.id) {
+        <option [ngValue]="t.id">{{ t.name }}</option>
+      }
+    </select>
+
+    <!-- Row 2 -->
+    <input formControlName="keyword" type="text" (keydown.enter)="triggerSearch()"
+           placeholder="{{ 'EBOOK_DOC.TITLE_FIELD' | translate }}"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="author" type="text" (keydown.enter)="triggerSearch()"
+           placeholder="{{ 'EBOOK_DOC.AUTHOR' | translate }}"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="publisher" type="text" (keydown.enter)="triggerSearch()"
+           placeholder="{{ 'EBOOK_DOC.PUBLISHER' | translate }}"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <select formControlName="status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_STATUS' | translate }}</option>
+      <option [ngValue]="1">{{ 'EBOOK_DOC.IS_PUBLISHED' | translate }}</option>
+      <option [ngValue]="0">Chưa xuất bản</option>
+    </select>
+
+    @if (isPrivileged) {
+      <ng-select formControlName="tenantId" [items]="tenantOptions" bindLabel="name" bindValue="id"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select>
+    }
+
+    <!-- Row 3 -->
+    <ng-select formControlName="publishDateFrom" [items]="years"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'EBOOK_DOC.YEAR_FROM' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+    </ng-select>
+    <ng-select formControlName="publishDateTo" [items]="years"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'EBOOK_DOC.YEAR_TO' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+    </ng-select>
+    <app-date-input formControlName="submitedFrom"></app-date-input>
+    <app-date-input formControlName="submitedTo"></app-date-input>
+
+    <!-- Row 4 -->
+    <div class="xl:col-span-3"></div>
+    <button (click)="triggerSearch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors">
+      <mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+    </button>
+  </div>
+  </div>
+  }
+</div>
+
+<!-- Action Toolbar -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+  <button *appCan="'export'" (click)="openExportModal()" [disabled]="isExporting()"
+          class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    @if (isExporting()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> }
+    @else { <mat-icon class="text-[16px]">file_download</mat-icon> }
+    {{ 'EBOOK_DOC.EXPORT_EXCEL' | translate }}
+  </button>
+  <button *appCan="'export'" (click)="exportMetadataFile()" [disabled]="isExporting()"
+          class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    @if (isExporting()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> }
+    @else { <mat-icon class="text-[16px]">cloud_download</mat-icon> }
+    {{ 'EBOOK_DOC.EXPORT_METADATA_FILE' | translate }}
+  </button>
+  <button *appCan="'export'" (click)="exportMetadata()" [disabled]="isExporting()"
+          class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    @if (isExporting()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> }
+    @else { <mat-icon class="text-[16px]">download</mat-icon> }
+    {{ 'EBOOK_DOC.EXPORT_METADATA' | translate }}
+  </button>
+  <button *appCan="'import'" (click)="openImportModal()"
+          class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">file_upload</mat-icon> {{ 'EBOOK_DOC.IMPORT_DATA' | translate }}
+  </button>
+  <button *appCan="'add'" (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}
+  </button>
+  <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0"
+          class="bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">close</mat-icon> {{ 'COMMON.DELETE' | translate }}
+  </button>
+  <button *appCan="'edit'" (click)="openMoveCollection()" [disabled]="selection.selected.length === 0"
+          class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">drive_file_move</mat-icon> {{ 'EBOOK.MOVE_SELECTED' | translate }} ({{ selection.selected.length }})
+  </button>
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse min-w-[900px]">
+
+      <!-- Checkbox -->
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-10 text-center border-b border-gray-200 bg-gray-50">
+          <input type="checkbox" (change)="$event ? masterToggle() : null"
+                 [checked]="selection.hasValue() && isAllSelected()"
+                 [indeterminate]="selection.hasValue() && !isAllSelected()"
+                 class="rounded text-blue-500 border-gray-300 cursor-pointer">
+        </th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-center border-b border-gray-100">
+          <input type="checkbox" (click)="$event.stopPropagation()"
+                 (change)="$event ? selection.toggle(row) : null"
+                 [checked]="selection.isSelected(row)"
+                 class="rounded text-blue-500 border-gray-300 cursor-pointer">
+        </td>
+      </ng-container>
+
+      <!-- STT -->
+      <ng-container matColumnDef="stt">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-12 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">STT</th>
+        <td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-center text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td>
+      </ng-container>
+
+      <!-- Collection -->
+      <ng-container matColumnDef="collection">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_DOC.COLLECTION' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ element.collectionName ?? '—' }}</td>
+      </ng-container>
+
+      <!-- Info -->
+      <ng-container matColumnDef="info">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_DOC.INFO' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 border-b border-gray-100">
+          <div class="flex items-start gap-3">
+            @if (element.images) {
+              <img [src]="element.images" class="w-10 h-14 object-cover rounded shadow-sm border border-gray-200 flex-shrink-0" [alt]="element.itemXml?.title ?? ''" referrerpolicy="no-referrer">
+            } @else {
+              <div class="w-10 h-14 bg-gray-100 rounded border border-gray-200 flex items-center justify-center flex-shrink-0">
+                <mat-icon class="text-gray-400 text-[18px]">menu_book</mat-icon>
+              </div>
+            }
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-blue-700 cursor-pointer hover:underline line-clamp-2 leading-snug">{{ getTitleDisplay(element) }}</p>
+              @if (getAuthorDisplay(element)) {
+                <p class="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                  <mat-icon class="text-[13px] text-gray-400">person</mat-icon>
+                  <span class="line-clamp-1">{{ getAuthorDisplay(element) }}</span>
+                </p>
+              }
+              <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1 flex-wrap">
+                @if (getPublishYearDisplay(element)) {
+                  <span class="flex items-center gap-0.5">
+                    <mat-icon class="text-[13px]">calendar_today</mat-icon>{{ getPublishYearDisplay(element) }}
+                  </span>
+                }
+                @if (getPublisherDisplay(element)) {
+                  <span class="text-gray-300">·</span>
+                  <span class="line-clamp-1">{{ getPublisherDisplay(element) }}</span>
+                }
+              </p>
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Đơn vị (chỉ super-admin) -->
+      <ng-container matColumnDef="tenant">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ element.tenantName ?? '—' }}</td>
+      </ng-container>
+
+      <!-- Views -->
+      <ng-container matColumnDef="views">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-20 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_DOC.VIEWS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-center text-sm text-gray-700 border-b border-gray-100">{{ element.totalView ?? 0 }}</td>
+      </ng-container>
+
+      <!-- Files -->
+      <ng-container matColumnDef="files">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_DOC.FILES' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 border-b border-gray-100">
+          <span (click)="openFiles(element); $event.stopPropagation()"
+                class="text-blue-600 hover:underline cursor-pointer text-sm flex items-center gap-0.5">
+            <mat-icon class="text-[15px]">folder_open</mat-icon>
+            {{ 'EBOOK_DOC.MANAGE_FILES' | translate }} ({{ element.totalFile ?? 0 }})
+          </span>
+        </td>
+      </ng-container>
+
+      <!-- Status -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-24 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'EBOOK_DOC.STATUS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 text-center border-b border-gray-100">
+          <label class="relative inline-flex items-center cursor-pointer" (click)="$event.stopPropagation()">
+            <input type="checkbox" [checked]="element.status === 2" (change)="togglePublished(element)" class="sr-only peer">
+            <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+          </label>
+        </td>
+      </ng-container>
+
+      <!-- Actions -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-36 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="py-2 px-3 border-b border-gray-100">
+          <div class="flex items-center justify-center gap-1">
+            <button *appCan="'edit'" (click)="openCoverPageDialogForItem(element); $event.stopPropagation()" class="w-7 h-7 rounded bg-purple-500 text-white hover:bg-purple-600 flex items-center justify-center transition-colors" title="{{ 'EBOOK_DOC.COVER_FROM_PAGE' | translate }}">
+              <mat-icon class="text-[15px]">image</mat-icon>
+            </button>
+            <button *appCan="'edit'" (click)="openEditModal(element); $event.stopPropagation()" class="w-7 h-7 rounded bg-blue-500 text-white hover:bg-blue-600 flex items-center justify-center transition-colors" title="{{ 'COMMON.EDIT' | translate }}">
+              <mat-icon class="text-[15px]">edit</mat-icon>
+            </button>
+            <button *appCan="'edit'" (click)="openLoans(element); $event.stopPropagation()" class="w-7 h-7 rounded bg-amber-500 text-white hover:bg-amber-600 flex items-center justify-center transition-colors" title="{{ 'EBOOK_LOAN.MANAGE_LOANS' | translate }}">
+              <mat-icon class="text-[15px]">assignment_return</mat-icon>
+            </button>
+            <button *appCan="'delete'" (click)="handleDelete(element); $event.stopPropagation()" class="w-7 h-7 rounded bg-red-500 text-white hover:bg-red-600 flex items-center justify-center transition-colors" title="{{ 'COMMON.DELETE' | translate }}">
+              <mat-icon class="text-[15px]">delete</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="selection.toggle(row)"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td class="py-6 px-4 text-center text-gray-500" [attr.colspan]="displayedColumns.length">{{ 'COMMON.NO_DATA' | translate }}</td>
+      </tr>
+    </table>
+
+    <mat-paginator #paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions"
+                   (page)="onPageChange($event)" aria-label="Select page"></mat-paginator>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[92vh]">
+
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+        <h3 class="text-lg font-bold text-blue-700">{{ (editMode() ? 'EBOOK_DOC.EDIT_TITLE' : 'EBOOK_DOC.ADD_TITLE') | translate }}</h3>
+        <div class="flex items-center gap-3">
+          @if (editMode()) {
+            <button type="button" (click)="openHistory()" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+              <mat-icon style="font-size:18px;width:18px;height:18px">history</mat-icon>
+              {{ 'READER.VIEW_HISTORY' | translate }}
+            </button>
+          }
+          <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600"><mat-icon>close</mat-icon></button>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="overflow-y-auto flex-1 px-6 py-4" [formGroup]="docForm">
+
+        <!-- Toggles -->
+        <div class="flex flex-wrap gap-6 mb-5 pb-4 border-b border-gray-100">
+          <label class="relative inline-flex items-center cursor-pointer gap-2">
+            <input type="checkbox" formControlName="isPublished" class="sr-only peer">
+            <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+            <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.IS_PUBLISHED' | translate }}</span>
+          </label>
+          <label class="relative inline-flex items-center cursor-pointer gap-2">
+            <input type="checkbox" formControlName="allowDownload" class="sr-only peer">
+            <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+            <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.ALLOW_DOWNLOAD' | translate }}</span>
+          </label>
+          <label class="relative inline-flex items-center cursor-pointer gap-2">
+            <input type="checkbox" formControlName="isFree" class="sr-only peer">
+            <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+            <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.IS_FREE' | translate }}</span>
+          </label>
+        </div>
+
+        <!-- Số bản in + Số ngày Offline -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.PRINT_COPIES' | translate }}</label>
+            <input type="number" min="0" formControlName="printCopies" placeholder="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <p class="text-xs text-gray-400 mt-0.5">{{ 'EBOOK_DOC.UNLIMITED_HINT' | translate }}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.OFFLINE_DAYS' | translate }}</label>
+            <input type="number" min="0" formControlName="offlineDays" placeholder="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <p class="text-xs text-gray-400 mt-0.5">{{ 'EBOOK_DOC.UNLIMITED_HINT' | translate }}</p>
+          </div>
+        </div>
+
+        <!-- Subject + Topic -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.SUBJECT' | translate }}</label>
+            <select formControlName="subjectId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_SUBJECT' | translate }}</option>
+              @for (s of subjects; track s.id) { <option [ngValue]="s.id">{{ s.label }}</option> }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.TOPIC' | translate }}</label>
+            <select formControlName="topicId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_TOPIC' | translate }}</option>
+              @for (t of topics; track t.id) { <option [ngValue]="t.id">{{ t.label }}</option> }
+            </select>
+          </div>
+        </div>
+
+        <!-- Share + Collection -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.SHARE_TYPE' | translate }}</label>
+            <select formControlName="shareType" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              @for (st of shareTypes; track st.value) { <option [ngValue]="st.value">{{ st.label }}</option> }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.COLLECTION' | translate }}</label>
+            <select formControlName="collectionId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_COLLECTION' | translate }}</option>
+              @for (c of collections; track c.id) { <option [ngValue]="c.id">{{ c.label }}</option> }
+            </select>
+          </div>
+        </div>
+
+        <!-- Edit mode only: Ảnh bìa + Siêu dữ liệu -->
+        @if (editMode()) {
+          <div class="mb-3">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.COVER_IMAGE' | translate }}</label>
+            <div class="flex items-center gap-3">
+              <label class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 cursor-pointer transition-colors">
+                <mat-icon class="text-[16px]">folder_open</mat-icon>
+                Browse file
+                <input type="file" accept="image/*" class="hidden" (change)="onCoverImageSelect($event)">
+              </label>
+              @if (coverImagePreviewUrl()) {
+                <img [src]="coverImagePreviewUrl()!" class="h-16 w-12 object-cover rounded-lg border border-gray-200 shadow-sm flex-shrink-0">
+              }
+              @if (coverImageFile()) {
+                <span class="text-xs text-gray-500 truncate max-w-[180px]">{{ coverImageFile()!.name }}</span>
+              }
+              <button type="button" (click)="openCoverPageDialog()"
+                      class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-purple-50 border border-purple-300 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-100 transition-colors">
+                <mat-icon class="text-[16px]">image</mat-icon>
+                {{ 'EBOOK_DOC.COVER_FROM_PAGE' | translate }}
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm font-semibold text-blue-700">Siêu dữ liệu</label>
+              <button type="button" (click)="addMetaData()" class="text-blue-600 hover:text-blue-800">
+                <mat-icon class="text-[18px]">add_circle</mat-icon>
+              </button>
+            </div>
+            <div formArrayName="metaDataEntries">
+              @for (grp of metaDataEntriesArr.controls; track grp; let i = $index) {
+                <div class="flex items-center gap-2 mb-1" [formGroupName]="i">
+                  @if (asGroup(grp).get('isNew')?.value) {
+                    <select formControlName="metaDataFieldId" class="w-52 flex-shrink-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option [ngValue]="null">-- Chọn trường --</option>
+                      @for (f of activeMetaDataFields; track f.metaDataFieldId) {
+                        <option [ngValue]="f.metaDataFieldId">{{ f.descriptionVn || f.field }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <select formControlName="metaDataFieldId" class="w-52 flex-shrink-0 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed">
+                      <option [ngValue]="null">-- Chọn trường --</option>
+                      @for (f of metaDataFields; track f.metaDataFieldId) {
+                        <option [ngValue]="f.metaDataFieldId">{{ f.descriptionVn || f.field }}</option>
+                      }
+                    </select>
+                  }
+                  <input formControlName="value" type="text" placeholder="Giá trị..." class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (metaDataEntriesArr.length > 1) {
+                    <button type="button" (click)="removeMetaData(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                      <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Tài liệu in liên kết -->
+          <div class="mb-3 border border-gray-200 rounded-xl p-4">
+            <p class="text-xs font-semibold text-emerald-600 uppercase mb-2">{{ 'EBOOK_DOC.LINKED_BIB' | translate }}</p>
+            @if (isLoadingLink()) {
+              <p class="text-sm text-gray-400">{{ 'COMMON.LOADING' | translate }}</p>
+            } @else if (linkedBib(); as bib) {
+              <p class="text-sm font-bold text-gray-800">{{ bib.title || '—' }} @if (bib.mfn) { <span class="font-normal text-gray-400">(MFN {{ bib.mfn }})</span> }</p>
+              <p class="text-sm text-gray-500">{{ bib.author }}</p>
+              <p class="text-sm text-gray-400">{{ bib.publisher }} @if (bib.publishDate) { · {{ bib.publishDate }} }</p>
+              <div class="flex gap-2 mt-3">
+                <button type="button" (click)="unlinkBib()" class="bg-white border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                  <mat-icon class="text-[16px]">link_off</mat-icon> {{ 'EBOOK_DOC.UNLINK_BTN' | translate }}
+                </button>
+              </div>
+            } @else {
+              <button type="button" (click)="openBibPicker()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg inline-flex items-center gap-1">
+                <mat-icon class="text-[16px]">add_link</mat-icon> {{ 'EBOOK_DOC.LINK_BIB_BTN' | translate }}
+              </button>
+            }
+          </div>
+        }
+
+        <!-- Add mode only: full bibliographic form -->
+        @if (!editMode()) {
+
+        <!-- Tài liệu in liên kết (chọn trước, tự liên kết sau khi lưu) -->
+        <div class="mb-3 border border-gray-200 rounded-xl p-4">
+          <p class="text-xs font-semibold text-emerald-600 uppercase mb-2">{{ 'EBOOK_DOC.LINKED_BIB' | translate }}</p>
+          @if (pendingLinkBib(); as bib) {
+            <p class="text-sm font-bold text-gray-800">{{ bib.title || '—' }}</p>
+            <p class="text-sm text-gray-500">{{ bib.author }}</p>
+            <div class="flex items-center gap-2 mt-2">
+              <button type="button" (click)="clearPendingLinkBib()" class="bg-white border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+                <mat-icon class="text-[16px]">close</mat-icon> {{ 'EBOOK_DOC.CLEAR_PICK_BTN' | translate }}
+              </button>
+              <span class="text-xs text-gray-400">{{ 'EBOOK_DOC.PENDING_LINK_NOTE' | translate }}</span>
+            </div>
+          } @else {
+            <button type="button" (click)="openBibPicker()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg inline-flex items-center gap-1">
+              <mat-icon class="text-[16px]">add_link</mat-icon> {{ 'EBOOK_DOC.LINK_BIB_BTN' | translate }}
+            </button>
+          }
+        </div>
+
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.TITLE_FIELD' | translate }}</label>
+          <input formControlName="title" type="text" placeholder="{{ 'EBOOK_DOC.TITLE_FIELD' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Other Titles (repeatable) -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-semibold text-blue-700">{{ 'EBOOK_DOC.OTHER_TITLES' | translate }}</label>
+            <button type="button" (click)="addOtherTitle()" class="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 text-sm">
+              <mat-icon class="text-[18px]">add_circle</mat-icon>
+            </button>
+          </div>
+          <div formArrayName="otherTitles">
+            @for (ctrl of otherTitlesArr.controls; track ctrl; let i = $index) {
+              <div class="flex items-center gap-2 mb-1">
+                <input [formControlName]="i" type="text" placeholder="{{ 'EBOOK_DOC.OTHER_TITLES_PH' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                @if (otherTitlesArr.length > 1) {
+                  <button type="button" (click)="removeOtherTitle(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                    <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Publisher + Publish Date -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.PUBLISHER' | translate }}</label>
+            <div class="relative">
+              <input formControlName="publisher" type="text"
+                     placeholder="{{ 'EBOOK_DOC.PUBLISHER' | translate }}"
+                     (input)="onPublisherInput($any($event.target).value)"
+                     (blur)="blurPublisher()"
+                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              @if (showPublisherSug() && publisherSugs().length > 0) {
+                <div class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  @for (s of publisherSugs(); track s) {
+                    <div (mousedown)="selectPublisher(s)" class="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer">{{ s }}</div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.PUBLISH_DATE' | translate }}</label>
+            <div class="grid grid-cols-3 gap-2">
+              <input formControlName="publishDay" type="number" placeholder="{{ 'EBOOK_DOC.PUBLISH_DAY' | translate }}" min="1" max="31" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select formControlName="publishMonth" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option [ngValue]="null">{{ 'EBOOK_DOC.PUBLISH_MONTH' | translate }}</option>
+                @for (m of months; track m.value) { <option [ngValue]="m.value">{{ m.label }}</option> }
+              </select>
+              <input formControlName="publishYear" type="number" placeholder="{{ 'EBOOK_DOC.PUBLISH_YEAR' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Authors (repeatable) -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-semibold text-blue-700">{{ 'EBOOK_DOC.AUTHOR' | translate }}</label>
+            <button type="button" (click)="addAuthor()" class="text-blue-600 hover:text-blue-800">
+              <mat-icon class="text-[18px]">add_circle</mat-icon>
+            </button>
+          </div>
+          <div formArrayName="authors">
+            @for (grp of authorsArr.controls; track grp; let i = $index) {
+              <div class="grid grid-cols-2 gap-2 mb-1" [formGroupName]="i">
+                <div class="relative">
+                  <input formControlName="lastName" type="text"
+                         placeholder="{{ 'EBOOK_DOC.AUTHOR_LAST' | translate }}"
+                         (input)="onAuthorLastInput($any($event.target).value, i)"
+                         (blur)="blurAuthor()"
+                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (activeAuthorIdx() === i && authorSugs().length > 0) {
+                    <div class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      @for (s of authorSugs(); track s) {
+                        <div (mousedown)="selectAuthor(s, i)" class="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer">{{ s }}</div>
+                      }
+                    </div>
+                  }
+                </div>
+                <div class="flex items-center gap-2">
+                  <input formControlName="firstName" type="text" placeholder="{{ 'EBOOK_DOC.AUTHOR_FIRST' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (authorsArr.length > 1) {
+                    <button type="button" (click)="removeAuthor(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                      <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Pages + Cover image -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.PAGES' | translate }}</label>
+            <input formControlName="pages" type="number" min="0" placeholder="{{ 'EBOOK_DOC.PAGES' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.COVER_IMAGE' | translate }}</label>
+            <div class="flex items-center gap-3">
+              <label class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 cursor-pointer transition-colors">
+                <mat-icon class="text-[16px]">folder_open</mat-icon>
+                Browse file
+                <input type="file" accept="image/*" class="hidden" (change)="onCoverImageSelect($event)">
+              </label>
+              @if (coverImagePreviewUrl()) {
+                <img [src]="coverImagePreviewUrl()!" class="h-16 w-12 object-cover rounded-lg border border-gray-200 shadow-sm flex-shrink-0">
+              }
+              @if (coverImageFile()) {
+                <span class="text-xs text-gray-500 truncate max-w-[120px]">{{ coverImageFile()!.name }}</span>
+              }
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <label class="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-indigo-50 border border-indigo-300 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-100 cursor-pointer transition-colors">
+                <mat-icon class="text-[16px]">add_photo_alternate</mat-icon>
+                {{ 'EBOOK_DOC.ANALYZE_BROWSE' | translate }}
+                <input type="file" accept="image/*" multiple class="hidden" (change)="onAnalyzeFilesSelect($event)">
+              </label>
+              @if (analyzeFiles().length) {
+                <span class="text-xs text-gray-500">{{ 'EBOOK_DOC.ANALYZE_FILES_COUNT' | translate:{ count: analyzeFiles().length } }}</span>
+                <button type="button" (click)="clearAnalyzeFiles()" class="text-xs text-red-500 hover:text-red-700 inline-flex items-center">
+                  <mat-icon class="text-[16px]">close</mat-icon>
+                </button>
+              }
+              <button type="button" (click)="analyzeCover()" [disabled]="(!analyzeFiles().length && !coverImageFile()) || isAnalyzing()"
+                      class="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                @if (isAnalyzing()) {
+                  <mat-icon class="text-[16px] animate-spin">autorenew</mat-icon> {{ 'EBOOK_DOC.ANALYZING' | translate }}
+                } @else {
+                  <mat-icon class="text-[16px]">auto_awesome</mat-icon> {{ 'EBOOK_DOC.ANALYZE_COVER' | translate }}
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DocType + Language -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.DOC_TYPE' | translate }}</label>
+            <select formControlName="docTypeId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_DOC_TYPE' | translate }}</option>
+              @for (dt of digTypes; track dt.id) { <option [ngValue]="dt.id">{{ dt.name }}</option> }
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.LANGUAGE' | translate }}</label>
+            <select formControlName="languageId" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option [ngValue]="null">{{ 'EBOOK_DOC.SELECT_LANGUAGE' | translate }}</option>
+              @for (lang of languages; track lang.id) { <option [ngValue]="lang.id">{{ lang.name }}</option> }
+            </select>
+          </div>
+        </div>
+
+        <!-- Journal Name + Report Pages (side by side) -->
+        <div class="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.JOURNAL_NAME' | translate }}</label>
+            <input formControlName="journalName" type="text" placeholder="{{ 'EBOOK_DOC.JOURNAL_NAME_PH' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-sm font-semibold text-blue-700">{{ 'EBOOK_DOC.REPORT_PAGE' | translate }}</label>
+              <button type="button" (click)="addReportPage()" class="text-blue-600 hover:text-blue-800">
+                <mat-icon class="text-[18px]">add_circle</mat-icon>
+              </button>
+            </div>
+            <div formArrayName="reportPages">
+              @for (ctrl of reportPagesArr.controls; track ctrl; let i = $index) {
+                <div class="flex items-center gap-2 mb-1">
+                  <input [formControlName]="i" type="text" placeholder="{{ 'EBOOK_DOC.REPORT_PAGE_PH' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (reportPagesArr.length > 1) {
+                    <button type="button" (click)="removeReportPage(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                      <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Advisors (repeatable) -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-semibold text-blue-700">{{ 'EBOOK_DOC.ADVISOR' | translate }}</label>
+            <button type="button" (click)="addAdvisor()" class="text-blue-600 hover:text-blue-800">
+              <mat-icon class="text-[18px]">add_circle</mat-icon>
+            </button>
+          </div>
+          <div formArrayName="advisors">
+            @for (grp of advisorsArr.controls; track grp; let i = $index) {
+              <div class="grid grid-cols-3 gap-2 mb-1" [formGroupName]="i">
+                <input formControlName="lastName"  type="text" placeholder="{{ 'EBOOK_DOC.ADVISOR_LAST' | translate }}"  class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input formControlName="firstName" type="text" placeholder="{{ 'EBOOK_DOC.ADVISOR_FIRST' | translate }}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex items-center gap-2">
+                  <input formControlName="title" type="text" placeholder="{{ 'EBOOK_DOC.ADVISOR_TITLE' | translate }}" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (advisorsArr.length > 1) {
+                    <button type="button" (click)="removeAdvisor(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                      <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Keywords (repeatable) -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-semibold text-blue-700">{{ 'EBOOK_DOC.KEYWORDS' | translate }}</label>
+            <button type="button" (click)="addKeyword()" class="text-blue-600 hover:text-blue-800">
+              <mat-icon class="text-[18px]">add_circle</mat-icon>
+            </button>
+          </div>
+          <div formArrayName="keywords">
+            @for (ctrl of keywordsArr.controls; track ctrl; let i = $index) {
+              <div class="flex items-center gap-2 mb-1">
+                <div class="relative flex-1">
+                  <input [formControlName]="i" type="text"
+                         placeholder="{{ 'EBOOK_DOC.KEYWORDS_PH' | translate }}"
+                         (input)="onKeywordInput($any($event.target).value, i)"
+                         (blur)="blurKeyword()"
+                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @if (activeKeywordIdx() === i && keywordSugs().length > 0) {
+                    <div class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      @for (s of keywordSugs(); track s) {
+                        <div (mousedown)="selectKeyword(s, i)" class="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 cursor-pointer">{{ s }}</div>
+                      }
+                    </div>
+                  }
+                </div>
+                @if (keywordsArr.length > 1) {
+                  <button type="button" (click)="removeKeyword(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                    <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Numbers / Identifiers (ISSN, ISBN, ...) -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-semibold text-blue-700">Số</label>
+            <button type="button" (click)="addNumber()" class="text-blue-600 hover:text-blue-800">
+              <mat-icon class="text-[18px]">add_circle</mat-icon>
+            </button>
+          </div>
+          <div formArrayName="numbers">
+            @for (grp of numbersArr.controls; track grp; let i = $index) {
+              <div class="flex items-center gap-2 mb-1" [formGroupName]="i">
+                <select formControlName="type" class="w-36 flex-shrink-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  @for (nt of numberTypes; track nt.value) {
+                    <option [value]="nt.value">{{ nt.label }}</option>
+                  }
+                </select>
+                <input formControlName="value" type="text" placeholder="Giá trị..." class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                @if (numbersArr.length > 1) {
+                  <button type="button" (click)="removeNumber(i)" class="text-red-500 hover:text-red-700 flex-shrink-0">
+                    <mat-icon class="text-[20px]">remove_circle</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Abstract -->
+        <div class="mb-3">
+          <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.ABSTRACT' | translate }}</label>
+          <textarea formControlName="abstract" rows="3" placeholder="{{ 'EBOOK_DOC.ABSTRACT_PH' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+        </div>
+
+        <!-- Description -->
+        <div class="mb-1">
+          <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'EBOOK_DOC.DESCRIPTION' | translate }}</label>
+          <textarea formControlName="description" rows="3" placeholder="{{ 'EBOOK_DOC.DESCRIPTION_PH' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+        </div>
+        }
+      </div>
+
+      <!-- Đợt 17 — Lý do sửa (tuỳ chọn), phục vụ Lịch sử thay đổi theo hồ sơ -->
+      <div class="px-6 pt-3 flex-shrink-0">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'READER.CHANGE_REASON' | translate }}</label>
+        <input type="text" [ngModel]="changeReason()" (ngModelChange)="changeReason.set($event)" [ngModelOptions]="{standalone: true}"
+               [placeholder]="'READER.CHANGE_REASON_PLACEHOLDER' | translate"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+        <button type="button" (click)="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="px-5 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm transition-colors shadow-sm">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px] mr-1">autorenew</mat-icon> }
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<app-entity-search-picker
+  [title]="'EBOOK_DOC.PICK_BIB_TITLE' | translate"
+  [searchPlaceholder]="'EBOOK_DOC.PICK_BIB_SEARCH' | translate"
+  [fetchPage]="fetchBibPage"
+  [displayFn]="bibDisplayFn"
+  [subDisplayFn]="bibSubDisplayFn"
+  (picked)="onBibPicked($event)" />
+
+<!-- Export Fields Modal -->
+@if (showExportModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" style="max-height:90vh">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-blue-600">file_download</mat-icon>
+          {{ 'EBOOK_DOC.EXPORT_TITLE' | translate }}
+        </h3>
+        <button (click)="closeExportModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+        @if (exportFieldsLoading()) {
+          <div class="flex flex-col items-center justify-center py-10 text-gray-400">
+            <mat-icon class="animate-spin text-blue-500 text-3xl mb-2">autorenew</mat-icon>
+            <span class="text-sm">{{ 'EBOOK_DOC.EXPORT_FIELDS_LOADING' | translate }}</span>
+          </div>
+        } @else if (exportFields.length === 0) {
+          <p class="text-center text-gray-400 text-sm py-8">{{ 'COMMON.NO_DATA' | translate }}</p>
+        } @else {
+          <label class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 mb-3">
+            <input type="checkbox" [checked]="isAllExportSelected()" (change)="toggleSelectAllExport()"
+                   class="rounded text-blue-500 border-gray-300 cursor-pointer">
+            <span class="text-sm font-semibold text-gray-700">{{ 'EBOOK_DOC.EXPORT_SELECT_ALL' | translate }}</span>
+            <span class="ml-auto text-xs text-gray-400">{{ selectedExportKeys().length }}/{{ exportFields.length }}</span>
+          </label>
+          <div class="grid grid-cols-2 gap-1.5">
+            @for (f of exportFields; track getFieldKey(f)) {
+              <label class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-blue-50 cursor-pointer border border-transparent hover:border-blue-200 transition-colors"
+                     [class.bg-blue-50]="isExportFieldSelected(f)"
+                     [class.border-blue-200]="isExportFieldSelected(f)">
+                <input type="checkbox" [checked]="isExportFieldSelected(f)" (change)="toggleExportField(f)"
+                       class="rounded text-blue-500 border-gray-300 cursor-pointer flex-shrink-0">
+                <span class="text-sm text-gray-700 truncate" [title]="getFieldLabel(f)">{{ getFieldLabel(f) }}</span>
+              </label>
+            }
+          </div>
+        }
+      </div>
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeExportModal()"
+                class="py-2 px-5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button *appCan="'export'" (click)="confirmExport()" [disabled]="selectedExportKeys().length === 0 || exportFieldsLoading()"
+                class="py-2 px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+          <mat-icon class="text-[16px]">file_download</mat-icon>
+          {{ 'EBOOK_DOC.EXPORT_CONFIRM' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Import Modal -->
+@if (showImportModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" style="max-height:90vh">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <h3 class="flex items-center gap-2 text-base font-bold text-gray-800">
+          <mat-icon class="text-blue-600">file_upload</mat-icon>
+          {{ 'EBOOK_DOC.IMPORT_TITLE' | translate }}
+        </h3>
+        <button (click)="closeImportModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+
+        @if (!importResult()) {
+
+          <!-- Type Tabs -->
+          <div class="flex rounded-xl border border-gray-200 overflow-hidden mb-4 text-sm font-medium">
+            <button (click)="importType.set('excel'); importFiles.set([])"
+                    class="flex-1 py-2 flex items-center justify-center gap-1.5 transition-colors"
+                    [class.bg-blue-600]="importType() === 'excel'" [class.text-white]="importType() === 'excel'"
+                    [class.text-gray-600]="importType() !== 'excel'" [class.hover:bg-gray-50]="importType() !== 'excel'">
+              <mat-icon class="text-[16px]">table_chart</mat-icon> Excel
+            </button>
+            <button (click)="importType.set('xml'); importFiles.set([])"
+                    class="flex-1 py-2 flex items-center justify-center gap-1.5 border-l border-r border-gray-200 transition-colors"
+                    [class.bg-blue-600]="importType() === 'xml'" [class.text-white]="importType() === 'xml'"
+                    [class.text-gray-600]="importType() !== 'xml'" [class.hover:bg-gray-50]="importType() !== 'xml'">
+              <mat-icon class="text-[16px]">code</mat-icon> XML
+            </button>
+            <button (click)="importType.set('dspace'); importFiles.set([])"
+                    class="flex-1 py-2 flex items-center justify-center gap-1.5 transition-colors"
+                    [class.bg-blue-600]="importType() === 'dspace'" [class.text-white]="importType() === 'dspace'"
+                    [class.text-gray-600]="importType() !== 'dspace'" [class.hover:bg-gray-50]="importType() !== 'dspace'">
+              <mat-icon class="text-[16px]">folder_zip</mat-icon> DSpace SAF
+            </button>
+          </div>
+
+          <!-- Hint -->
+          <p class="text-xs text-gray-400 flex items-start gap-1 mb-3">
+            <mat-icon class="text-[13px] mt-0.5 flex-shrink-0">info</mat-icon>
+            @if (importType() === 'excel') { File .xlsx / .xls, header row đúng mẫu (Tiêu đề, Tác giả, Nhà xuất bản…). Phân cách nhiều giá trị bằng dấu ;. }
+            @if (importType() === 'xml') { Nhiều file .xml định dạng Dublin Core. Mỗi file tương ứng một tài liệu. }
+            @if (importType() === 'dspace') { File .zip theo cấu trúc DSpace SAF (mỗi thư mục có dublin_core.xml). }
+          </p>
+
+          <!-- File Zone -->
+          <label class="flex flex-col items-center justify-center w-full min-h-[7rem] border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-blue-400 cursor-pointer transition-colors mb-4">
+            <mat-icon class="text-gray-300 mb-1" style="font-size:2.5rem;width:2.5rem;height:2.5rem">upload_file</mat-icon>
+            @if (importFiles().length === 0) {
+              <span class="text-sm text-gray-400">
+                @if (importType() === 'xml') { Click để chọn nhiều file .xml }
+                @else if (importType() === 'dspace') { Click để chọn file .zip }
+                @else { Click để chọn file .xlsx / .xls }
+              </span>
+            } @else if (importFiles().length === 1) {
+              <span class="text-sm text-blue-700 font-medium px-4 text-center truncate max-w-full">{{ importFiles()[0].name }}</span>
+            } @else {
+              <span class="text-sm text-blue-700 font-medium">{{ importFiles().length }} file XML đã chọn</span>
+            }
+            @if (importType() === 'xml') {
+              <input type="file" accept=".xml" multiple class="hidden" (change)="onImportFileSelect($event)">
+            } @else if (importType() === 'dspace') {
+              <input type="file" accept=".zip" class="hidden" (change)="onImportFileSelect($event)">
+            } @else {
+              <input type="file" accept=".xlsx,.xls" class="hidden" (change)="onImportFileSelect($event)">
+            }
+          </label>
+
+          <!-- Optional Params -->
+          <div class="border-t border-gray-100 pt-3">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ 'EBOOK_DOC.IMPORT_OPTIONAL_PARAMS' | translate }}</p>
+
+            <!-- Toggles -->
+            <div class="flex flex-wrap gap-5 mb-3">
+              <label class="relative inline-flex items-center cursor-pointer gap-2">
+                <input type="checkbox" [checked]="importIsPublished()" (change)="importIsPublished.set(!importIsPublished())" class="sr-only peer">
+                <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.IS_PUBLISHED' | translate }}</span>
+              </label>
+              <label class="relative inline-flex items-center cursor-pointer gap-2">
+                <input type="checkbox" [checked]="importIsFree()" (change)="importIsFree.set(!importIsFree())" class="sr-only peer">
+                <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.IS_FREE' | translate }}</span>
+              </label>
+              <label class="relative inline-flex items-center cursor-pointer gap-2">
+                <input type="checkbox" [checked]="importAllowDownload()" (change)="importAllowDownload.set(!importAllowDownload())" class="sr-only peer">
+                <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                <span class="text-sm font-medium text-blue-600">{{ 'EBOOK_DOC.ALLOW_DOWNLOAD' | translate }}</span>
+              </label>
+            </div>
+
+            <!-- Dropdowns -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-gray-500 mb-0.5">{{ 'EBOOK_DOC.COLLECTION' | translate }}</label>
+                <select (change)="importCollectionId.set($any($event.target).value ? +$any($event.target).value : null)"
+                        class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">— Không chọn —</option>
+                  @for (c of collections; track c.id) { <option [value]="c.id">{{ c.label }}</option> }
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-0.5">{{ 'EBOOK_DOC.SUBJECT' | translate }}</label>
+                <select (change)="importSubjectId.set($any($event.target).value ? +$any($event.target).value : null)"
+                        class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">— Không chọn —</option>
+                  @for (s of subjects; track s.id) { <option [value]="s.id">{{ s.label }}</option> }
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-500 mb-0.5">{{ 'EBOOK_DOC.TOPIC' | translate }}</label>
+                <select (change)="importTopicId.set($any($event.target).value ? +$any($event.target).value : null)"
+                        class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">— Không chọn —</option>
+                  @for (t of topics; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+                </select>
+              </div>
+            </div>
+          </div>
+
+          @if (isImporting()) {
+            <div class="flex items-center justify-center gap-2 mt-4 text-blue-600 text-sm font-medium">
+              <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon>
+              Đang import dữ liệu...
+            </div>
+          }
+
+        } @else {
+
+          <!-- Result Section -->
+          <div class="text-center mb-4">
+            @if (importResult()!.failed === 0) {
+              <div class="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-green-600" style="font-size:2rem">check_circle</mat-icon>
+              </div>
+            } @else {
+              <div class="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-yellow-500" style="font-size:2rem">warning</mat-icon>
+              </div>
+            }
+            <p class="font-semibold text-gray-800">{{ 'EBOOK_DOC.IMPORT_RESULT' | translate }}</p>
+            @if (importResult()!.message) {
+              <p class="text-xs text-gray-400 mt-0.5">{{ importResult()!.message }}</p>
+            }
+          </div>
+
+          <div class="flex gap-3 mb-4">
+            <div class="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-green-600">{{ importResult()!.imported }}</p>
+              <p class="text-xs text-green-700 mt-0.5">{{ 'EBOOK_DOC.IMPORT_SUCCESS_COUNT' | translate }}</p>
+            </div>
+            <div class="flex-1 bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-red-500">{{ importResult()!.failed }}</p>
+              <p class="text-xs text-red-600 mt-0.5">{{ 'EBOOK_DOC.IMPORT_FAIL_COUNT' | translate }}</p>
+            </div>
+          </div>
+
+          @if (importResult()!.errors.length > 0) {
+            <div class="border border-red-100 rounded-xl bg-red-50/50 px-3 py-2 max-h-40 overflow-y-auto">
+              <p class="text-xs font-semibold text-red-600 mb-1">{{ 'EBOOK_DOC.IMPORT_ERRORS' | translate }}</p>
+              @for (e of importResult()!.errors; track e) {
+                <p class="text-xs text-red-500 leading-relaxed py-0.5">• {{ e }}</p>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+        @if (importResult()) {
+          <button (click)="closeImportModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CLOSE' | translate }}
+          </button>
+          <button (click)="importResult.set(null); importFiles.set([])"
+                  class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 text-sm transition-colors shadow-sm flex items-center justify-center gap-1">
+            <mat-icon class="text-[16px]">refresh</mat-icon>
+            {{ 'EBOOK_DOC.IMPORT_AGAIN' | translate }}
+          </button>
+        } @else {
+          <button (click)="closeImportModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button *appCan="'import'" (click)="confirmImport()" [disabled]="importFiles().length === 0 || isImporting()"
+                  class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors shadow-sm flex items-center justify-center gap-1">
+            @if (isImporting()) {
+              <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+            } @else {
+              <mat-icon class="text-[16px]">file_upload</mat-icon>
+            }
+            {{ 'EBOOK_DOC.IMPORT_DATA' | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Move to Collection Modal -->
+@if (showMoveCollection()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-indigo-600">drive_file_move</mat-icon>{{ 'EBOOK.MOVE_COLLECTION_TITLE' | translate }}</h3>
+        <button (click)="closeMoveCollection()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">{{ 'EBOOK.MOVE_COLLECTION_TARGET' | translate }}</label>
+        <select [(ngModel)]="moveTargetCollectionId" [ngModelOptions]="{standalone: true}"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option [ngValue]="null">—</option>
+          @for (c of collections; track c.id) { <option [ngValue]="c.id">{{ c.label }}</option> }
+        </select>
+      </div>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeMoveCollection()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="confirmMoveCollection()" [disabled]="!moveTargetCollectionId() || isMoving()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isMoving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">drive_file_move</mat-icon> }
+          {{ 'EBOOK.MOVE_SELECTED' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirm Delete Modal -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl">warning</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-6">{{ (confirmDeleteId() === null ? 'COMMON.CONFIRM_BULK_DELETE' : 'COMMON.CONFIRM_DELETE_MSG') | translate }}</p>
+        <div class="flex gap-3">
+          <button (click)="closeConfirm()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmActionExecute()" class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 text-sm transition-colors shadow-sm">
+            {{ 'COMMON.CONFIRM' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showCoverPageDialog()) {
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-blue-700">{{ 'EBOOK_DOC.COVER_FROM_PAGE' | translate }}</h3>
+        <button (click)="closeCoverPageDialog()" class="text-gray-400 hover:text-gray-600">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <div class="p-5">
+        <div class="flex items-center justify-center bg-gray-50 border border-gray-200 rounded-xl h-80 mb-4 overflow-hidden">
+          @if (isLoadingCoverPreview()) {
+            <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+          } @else if (coverPreviewUrl()) {
+            <img [src]="coverPreviewUrl()!" class="max-h-full max-w-full object-contain shadow-sm">
+          } @else {
+            <span class="text-sm text-gray-400">{{ 'EBOOK_DOC.COVER_PAGE_LOAD_ERROR' | translate }}</span>
+          }
+        </div>
+        <div class="flex items-center justify-center gap-3">
+          <button type="button" (click)="changeCoverPage(-1)" [disabled]="isLoadingCoverPreview() || coverPageNumber() <= 1"
+                  class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 border border-gray-300 hover:bg-gray-50 disabled:opacity-40">
+            <mat-icon class="text-[20px]">chevron_left</mat-icon>
+          </button>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-500">{{ 'EBOOK_DOC.COVER_PAGE_LABEL' | translate }}</span>
+            <input type="number" min="1" [value]="coverPageNumber()" (change)="setCoverPageNumber($any($event.target).valueAsNumber)"
+                   class="w-20 px-2 py-1.5 text-sm text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <button type="button" (click)="changeCoverPage(1)" [disabled]="isLoadingCoverPreview()"
+                  class="w-9 h-9 rounded-lg flex items-center justify-center text-gray-600 border border-gray-300 hover:bg-gray-50 disabled:opacity-40">
+            <mat-icon class="text-[20px]">chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100">
+        <button (click)="closeCoverPageDialog()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmCoverFromPage()" [disabled]="isSavingCoverPage() || isLoadingCoverPreview() || !coverPreviewUrl()"
+                class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          @if (isSavingCoverPage()) {
+            <mat-icon class="text-[16px] animate-spin align-middle">autorenew</mat-icon>
+          }
+          {{ 'EBOOK_DOC.COVER_PAGE_CONFIRM' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

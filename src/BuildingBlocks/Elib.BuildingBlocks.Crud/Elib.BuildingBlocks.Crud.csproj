@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- AD0001: RouteHandlerAnalyzer của ASP.NET ném NullReferenceException với lambda map endpoint trong kiểu generic (lỗi analyzer, không phải lỗi mã). -->
+    <NoWarn>$(NoWarn);AD0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="MassTransit.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.BuildingBlocks.Domain\Elib.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+    <ProjectReference Include="..\..\Contracts\Elib.Contracts.Events\Elib.Contracts.Events.csproj" />
+  </ItemGroup>
+</Project>

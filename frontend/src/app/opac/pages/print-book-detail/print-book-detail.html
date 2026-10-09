@@ -1,0 +1,368 @@
+<div class="container mx-auto px-4 py-8">
+  <nav class="flex items-center text-sm text-gray-500 mb-8 bg-white p-3 rounded shadow-sm border-l-4 border-main">
+    <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <a routerLink="/tra-cuu" class="hover:text-main">Tra cứu tài liệu</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <span class="text-main font-semibold">Chi tiết tài liệu in</span>
+  </nav>
+
+  @if (loading()) {
+    <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-500">
+      <i class="fas fa-spinner fa-spin mr-2"></i> Đang tải dữ liệu...
+    </div>
+  } @else if (!book()) {
+    <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-500">
+      <i class="fas fa-circle-exclamation text-3xl mb-3 text-gray-300"></i>
+      <p>Không tìm thấy tài liệu.</p>
+    </div>
+  } @else {
+    @let b = book()!;
+
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mb-8">
+      <div class="flex flex-col md:flex-row gap-10">
+        <div class="w-full md:w-64 shrink-0">
+          @if (b.images) {
+            <img [src]="b.images" [alt]="b.title" class="w-full rounded-lg shadow-lg aspect-[3/4] object-cover">
+          } @else {
+            <div class="w-full aspect-[3/4] rounded-lg shadow-lg bg-gray-100 flex items-center justify-center text-6xl">📕</div>
+          }
+
+          <div class="flex flex-col gap-2 mt-4">
+            <button (click)="qrOpen.set(true)" class="w-full text-center bg-blue-50 text-main border border-main px-4 py-2 rounded font-semibold text-sm hover:bg-main hover:text-white transition-colors">
+              <i class="fas fa-qrcode mr-1"></i> Quét mã QR
+            </button>
+            <button (click)="citationOpen.set(true)" class="w-full text-center bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 rounded font-semibold text-sm hover:bg-gray-100 transition-colors">
+              <i class="fas fa-quote-right mr-1"></i> Trích dẫn tài liệu
+            </button>
+            <button (click)="exportOpen.set(true); exportTab.set('fields')" class="w-full text-center bg-gray-800 text-white px-4 py-2 rounded font-semibold text-sm hover:bg-gray-900 transition-colors">
+              <i class="fas fa-file-export mr-1"></i> Xuất biểu ghi
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1">
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <span class="bg-amber-50 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">TÀI LIỆU IN</span>
+            @if (b.ddc) { <span class="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">DDC {{ b.ddc }}@if (b.cutter) { / {{ b.cutter }} }</span> }
+            @if (b.language) { <span class="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">{{ b.language }}</span> }
+          </div>
+
+          <h2 class="text-3xl font-bold text-dark mb-6">{{ b.title }}</h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 border-t border-gray-100 pt-6">
+            <div class="text-sm text-gray-600"><span>Tác giả:</span> <strong class="text-dark ml-1">{{ b.author || '—' }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Nhà xuất bản:</span> <strong class="text-dark ml-1">{{ b.publisher || '—' }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Năm xuất bản:</span> <strong class="text-dark ml-1">{{ b.publishYear || '—' }}</strong></div>
+            <div class="text-sm text-gray-600"><span>ISBN:</span> <strong class="text-dark ml-1">{{ b.isbn || '—' }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Ngôn ngữ:</span> <strong class="text-dark ml-1">{{ b.language || '—' }}</strong></div>
+            <div class="text-sm text-gray-600"><span>Bộ sưu tập:</span> <strong class="text-dark ml-1">{{ b.collectionName || '—' }}</strong></div>
+          </div>
+
+          <div class="mt-8 border-t border-gray-100 pt-6">
+            <h3 class="text-lg font-bold text-dark mb-4 flex items-center gap-2">
+              <i class="fas fa-warehouse text-gray-400"></i> Tình trạng bản sách trong kho
+              <span class="ml-auto text-sm font-normal text-gray-500">{{ b.availableCount }}/{{ b.copyCount }} sẵn sàng cho mượn</span>
+            </h3>
+
+            @if (b.holdings.length > 0) {
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                  <thead>
+                    <tr class="border-b border-gray-100 text-gray-500">
+                      <th class="py-2 pr-4 font-medium">Số ĐKCB</th>
+                      <th class="py-2 pr-4 font-medium">Kho</th>
+                      <th class="py-2 pr-4 font-medium">Trạng thái</th>
+                      <th class="py-2 pr-4 font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (h of paginatedHoldings(); track h.barcodeId) {
+                      <tr class="border-b border-gray-50 last:border-0">
+                        <td class="py-2.5 pr-4 font-mono text-dark">{{ h.barcode || '—' }}</td>
+                        <td class="py-2.5 pr-4 text-gray-600">{{ h.storeName || '—' }}</td>
+                        <td class="py-2.5 pr-4">
+                          <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            [class.bg-green-50]="isAvailable(h)" [class.text-green-700]="isAvailable(h)"
+                            [class.bg-amber-50]="!isAvailable(h)" [class.text-amber-700]="!isAvailable(h)">
+                            {{ h.statusName || 'Không rõ' }}
+                          </span>
+                        </td>
+                        <td class="py-2.5 pr-4 text-right">
+                          <button (click)="viewLocation(h)" class="text-xs text-main hover:underline whitespace-nowrap">
+                            <i class="fas fa-location-dot mr-1"></i>Vị trí
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (holdingsTotalPages() > 1) {
+                <div class="flex justify-end mt-4 gap-2">
+                  <button (click)="goToHoldingsPage(holdingsPage() - 1)" [disabled]="holdingsPage() === 1" class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs">
+                    <i class="fas fa-chevron-left"></i>
+                  </button>
+
+                  @for (page of holdingsPages(); track page) {
+                    <button (click)="goToHoldingsPage(page)" [class.bg-main]="holdingsPage() === page" [class.text-white]="holdingsPage() === page" [class.border-main]="holdingsPage() === page" class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 transition-colors text-xs font-medium">
+                      {{ page }}
+                    </button>
+                  }
+
+                  <button (click)="goToHoldingsPage(holdingsPage() + 1)" [disabled]="holdingsPage() === holdingsTotalPages()" class="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs">
+                    <i class="fas fa-chevron-right"></i>
+                  </button>
+                </div>
+              }
+            } @else {
+              <p class="text-gray-500 text-sm">Chưa có bản sách nào trong kho.</p>
+            }
+          </div>
+
+          @if (b.summary) {
+            <div class="mt-8 border-t border-gray-100 pt-6">
+              <h4 class="text-lg font-bold text-dark mb-3">Tóm tắt</h4>
+              <p class="text-gray-600 leading-relaxed text-justify">{{ b.summary }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (related().length > 0) {
+      <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+        <h3 class="text-lg font-bold text-dark mb-6 flex items-center gap-2">
+          <i class="fas fa-layer-group text-gray-400"></i> Tài liệu liên quan
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          @for (it of related(); track it.groupId) {
+            <a [routerLink]="it.docType === 'print' ? ['/tai-lieu-in', it.publicId] : ['/book', it.publicId]"
+               class="block group">
+              <div class="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden mb-2">
+                @if (it.imageUrl) {
+                  <img [src]="it.imageUrl" [alt]="it.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                } @else {
+                  <div class="w-full h-full flex items-center justify-center text-3xl">{{ it.docType === 'print' ? '📕' : '💻' }}</div>
+                }
+              </div>
+              <p class="text-xs font-medium text-dark line-clamp-2 group-hover:text-main">{{ it.title }}</p>
+            </a>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Modal: QR -->
+    @if (qrOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="qrOpen.set(false)">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-bold text-dark mb-4">Quét mã QR để mượn tài liệu</h3>
+          <img [src]="qrImageUrl()" alt="QR code" class="mx-auto rounded-lg border border-gray-100">
+          <p class="text-xs text-gray-500 mt-3 break-all">{{ currentUrl() }}</p>
+          <button (click)="qrOpen.set(false)" class="mt-5 w-full py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Đóng</button>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: Vị trí tài liệu -->
+    @if (locationOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="closeLocation()">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-bold text-dark mb-4">Vị trí tài liệu</h3>
+
+          @if (locationLoading()) {
+            <div class="py-8 text-center text-gray-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
+          } @else {
+            @let loc = location();
+            @if (loc?.found) {
+              <div class="mb-3">
+                @if (loc!.source === 'assigned') {
+                  <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 mb-2">Vị trí đã xếp giá thực tế</span>
+                } @else {
+                  <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 mb-2">Khu vực ước tính theo DDC — sách này chưa được xếp giá cụ thể</span>
+                }
+              </div>
+              <app-shelf-location-pin [loc]="loc" class="block mb-3" />
+              <div class="grid grid-cols-2 gap-y-2 text-sm">
+                <div class="text-gray-500">Tòa nhà:</div><div class="text-dark font-medium">{{ loc!.buildingName || '—' }}</div>
+                <div class="text-gray-500">Tầng:</div><div class="text-dark font-medium">{{ loc!.floorName || loc!.floorNumber || '—' }}</div>
+                <div class="text-gray-500">Kệ:</div><div class="text-dark font-medium">{{ loc!.shelfName || '—' }}</div>
+                @if (loc!.rowIndex) { <div class="text-gray-500">Ngăn:</div><div class="text-dark font-medium">{{ loc!.rowIndex }}</div> }
+                @if (loc!.subjectName) { <div class="text-gray-500">Chủ đề:</div><div class="text-dark font-medium">{{ loc!.subjectName }}</div> }
+                @if (loc!.ddcStart || loc!.ddcEnd) { <div class="text-gray-500">Khoảng DDC:</div><div class="text-dark font-medium">{{ loc!.ddcStart }} – {{ loc!.ddcEnd }}</div> }
+              </div>
+              <button (click)="goToMap()" class="mt-5 w-full py-2 rounded bg-main text-white font-semibold hover:bg-blue-700 flex items-center justify-center gap-2">
+                <i class="fas fa-map"></i> Xem trên sơ đồ thư viện
+              </button>
+            } @else {
+              <p class="text-sm text-gray-500">Chưa xác định được vị trí của bản sách này.</p>
+            }
+          }
+
+          <button (click)="closeLocation()" class="mt-3 w-full py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Đóng</button>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: Trích dẫn -->
+    @if (citationOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="citationOpen.set(false)">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-bold text-dark mb-4">Trích dẫn tài liệu</h3>
+
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-gray-500 uppercase">APA (7th Edition)</span>
+              <div class="flex items-center gap-3">
+                <button (click)="copyText(citationApa(), 'apa')" class="text-xs text-main hover:underline">
+                  <i class="fas fa-copy mr-1"></i>{{ copied() === 'apa' ? 'Đã sao chép' : 'Sao chép' }}
+                </button>
+                <button (click)="downloadText(citationApa(), 'mfn-' + (b.mfn ?? b.bibId) + '-apa.txt')" class="text-xs text-main hover:underline">
+                  <i class="fas fa-download mr-1"></i>Tải về
+                </button>
+              </div>
+            </div>
+            <p class="text-sm text-gray-700 bg-gray-50 rounded p-3 leading-relaxed">{{ citationApa() }}</p>
+          </div>
+
+          <div class="mb-5">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-gray-500 uppercase">MLA (9th Edition)</span>
+              <div class="flex items-center gap-3">
+                <button (click)="copyText(citationMla(), 'mla')" class="text-xs text-main hover:underline">
+                  <i class="fas fa-copy mr-1"></i>{{ copied() === 'mla' ? 'Đã sao chép' : 'Sao chép' }}
+                </button>
+                <button (click)="downloadText(citationMla(), 'mfn-' + (b.mfn ?? b.bibId) + '-mla.txt')" class="text-xs text-main hover:underline">
+                  <i class="fas fa-download mr-1"></i>Tải về
+                </button>
+              </div>
+            </div>
+            <p class="text-sm text-gray-700 bg-gray-50 rounded p-3 leading-relaxed">{{ citationMla() }}</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-5">
+            <button (click)="downloadText(citationBibtex(), 'mfn-' + (b.mfn ?? b.bibId) + '-citation.bib')"
+              class="py-2 rounded border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
+              <i class="fas fa-download mr-1"></i> Tải BibTeX (.bib)
+            </button>
+            <button (click)="downloadText(citationRis(), 'mfn-' + (b.mfn ?? b.bibId) + '-citation.ris')"
+              class="py-2 rounded border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
+              <i class="fas fa-download mr-1"></i> Tải RIS (.ris)
+            </button>
+          </div>
+
+          <button (click)="citationOpen.set(false)" class="w-full py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Đóng</button>
+        </div>
+      </div>
+    }
+
+    <!-- Modal: Xuất biểu ghi -->
+    @if (exportOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" (click)="exportOpen.set(false)">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" (click)="$event.stopPropagation()">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-bold text-dark">Xuất biểu ghi</h3>
+            <button (click)="exportOpen.set(false)" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+          </div>
+
+          <div class="flex border-b border-gray-100 px-6">
+            <button (click)="exportTab.set('fields')"
+              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px"
+              [class.border-main]="exportTab() === 'fields'" [class.text-main]="exportTab() === 'fields'"
+              [class.border-transparent]="exportTab() !== 'fields'" [class.text-gray-500]="exportTab() !== 'fields'">
+              Trường số
+            </button>
+            <button (click)="exportTab.set('text')"
+              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px"
+              [class.border-main]="exportTab() === 'text'" [class.text-main]="exportTab() === 'text'"
+              [class.border-transparent]="exportTab() !== 'text'" [class.text-gray-500]="exportTab() !== 'text'">
+              Văn bản (.txt)
+            </button>
+            <button (click)="exportTab.set('card')"
+              class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px"
+              [class.border-main]="exportTab() === 'card'" [class.text-main]="exportTab() === 'card'"
+              [class.border-transparent]="exportTab() !== 'card'" [class.text-gray-500]="exportTab() !== 'card'">
+              Thẻ mục lục
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-6">
+            @if (exportTab() === 'fields') {
+              @if (marcTableRows().length > 0) {
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-gray-500 border-b border-gray-100">
+                        <th class="py-2 pr-3 font-medium">NHÃN</th>
+                        <th class="py-2 pr-3 font-medium">CHỈ SỐ</th>
+                        <th class="py-2 pr-3 font-medium">DỮ LIỆU CON</th>
+                        <th class="py-2 font-medium">MÔ TẢ TRƯỜNG</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (r of marcTableRows(); track $index) {
+                        <tr class="border-b border-gray-50">
+                          <td class="py-1.5 pr-3 font-mono font-semibold text-dark whitespace-nowrap align-top">{{ r.tag }}</td>
+                          <td class="py-1.5 pr-3 font-mono text-gray-400 whitespace-nowrap align-top">{{ r.ind }}</td>
+                          <td class="py-1.5 pr-3 font-mono text-dark align-top">{{ r.data }}</td>
+                          <td class="py-1.5 text-gray-500 align-top">{{ r.desc || '—' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="text-sm text-gray-500">Chưa có dữ liệu MARC cho biểu ghi này.</p>
+              }
+            } @else if (exportTab() === 'text') {
+              <pre class="text-xs font-mono text-dark whitespace-pre-wrap">{{ marcText() }}</pre>
+            } @else {
+              <div class="flex justify-center p-3">
+                <div class="w-full max-w-md bg-[#FAF6EE] text-slate-800 p-8 rounded-2xl shadow-md border-t-4 border-amber-600/60 font-serif relative overflow-hidden text-left border border-amber-100 select-none">
+                  <div class="absolute bottom-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-slate-200 border border-slate-300 shadow-inner"></div>
+                  <div class="absolute top-6 left-6 font-mono text-[11px] text-amber-900 leading-tight">
+                    @if (b.ddc) { <div>{{ b.ddc }}</div> }
+                    @if (b.cutter) { <div>{{ b.cutter }}</div> }
+                    @if (b.publishYear) { <div>{{ b.publishYear }}</div> }
+                  </div>
+                  <div class="pl-24 text-xs space-y-2">
+                    <div class="font-bold border-b border-dashed border-slate-300 pb-1 pr-4">{{ b.author || 'Chưa rõ tác giả' }}</div>
+                    <div class="leading-relaxed">
+                      <span class="font-semibold">{{ b.title }}</span> / {{ b.author || 'Chưa rõ tác giả' }}. -- {{ b.publisher || 'Chưa rõ nhà xuất bản' }}, {{ b.publishYear || 'Chưa rõ năm' }}.
+                    </div>
+                    @if (b.isbn || b.language) {
+                      <div class="text-[11px] text-slate-600">
+                        @if (b.isbn) { <span>ISBN: {{ b.isbn }}</span> }
+                        @if (b.isbn && b.language) { <span> -- </span> }
+                        @if (b.language) { <span>{{ b.language }}</span> }
+                      </div>
+                    }
+                    @if (b.keyword || b.collectionName) {
+                      <div class="text-[10px] text-slate-500 italic pt-2 space-y-1">
+                        @if (b.keyword) { <div>1. {{ b.keyword }}.</div> }
+                        @if (b.collectionName) { <div>I. {{ b.collectionName }}.</div> }
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+            <button (click)="downloadMarcBinary()"
+              class="px-4 py-2 rounded bg-gray-800 text-white text-sm font-semibold hover:bg-gray-900">
+              <i class="fas fa-download mr-1"></i> Tải Binary (.mrc)
+            </button>
+            <button (click)="downloadText(marcText(), 'mfn-' + (b.mfn ?? b.bibId) + '.txt')"
+              class="px-4 py-2 rounded bg-main text-white text-sm font-semibold hover:bg-blue-700">
+              <i class="fas fa-download mr-1"></i> Tải văn bản (.txt)
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,59 @@
+@if (open) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-amber-600">build</mat-icon>
+          {{ 'MAP_FLOOR.UTILITIES_TITLE' | translate }} — {{ floorName }}
+        </h3>
+        <button (click)="close()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
+        <div class="space-y-2 mb-4">
+          @for (u of utilitiesList(); track u.id) {
+            <div class="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50">
+              <div>
+                <div class="text-sm font-medium text-gray-800">{{ u.name }} <span class="text-xs text-gray-400">x{{ u.quantity }}</span></div>
+                @if (u.description) { <div class="text-xs text-gray-500">{{ u.description }}</div> }
+                <span class="text-2xs px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ u.conditionStatus }}</span>
+              </div>
+              <button (click)="deleteUtility(u)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors">
+                <mat-icon class="text-[18px]">delete</mat-icon>
+              </button>
+            </div>
+          } @empty {
+            <p class="text-sm text-gray-400 text-center py-4">{{ 'COMMON.NO_DATA' | translate }}</p>
+          }
+        </div>
+
+        <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input [(ngModel)]="newUtility.name" type="text" placeholder="{{ 'MAP_FLOOR.UTILITY_NAME' | translate }}"
+                 class="md:col-span-2 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <input [(ngModel)]="newUtility.quantity" type="number" min="1" placeholder="{{ 'MAP_FLOOR.UTILITY_QUANTITY' | translate }}"
+                 class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <select [(ngModel)]="newUtility.conditionStatus" class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white">
+            <option value="HOAT_DONG">Hoạt động</option>
+            <option value="BAO_TRI">Bảo trì</option>
+            <option value="HU_HONG">Hư hỏng</option>
+          </select>
+          <input [(ngModel)]="newUtility.description" type="text" placeholder="{{ 'MAP_FLOOR.UTILITY_DESCRIPTION' | translate }}"
+                 class="md:col-span-3 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <button (click)="addUtility()"
+                  class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1 transition-colors">
+            <mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="close()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CLOSE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

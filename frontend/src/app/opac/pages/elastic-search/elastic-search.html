@@ -1,0 +1,171 @@
+<div class="container mx-auto px-4 py-8">
+  <nav class="flex items-center text-sm text-gray-500 mb-8 bg-white p-3 rounded shadow-sm border-l-4 border-main">
+    <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <span class="text-main font-semibold">Tìm kiếm toàn văn</span>
+  </nav>
+
+  <div class="flex flex-col md:flex-row gap-8">
+    <!-- Sidebar -->
+    <aside class="w-full md:w-1/3 lg:w-1/4">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 class="text-lg font-bold text-main mb-5 pb-2 border-b-2 border-gray-100 uppercase">Tìm kiếm toàn văn</h3>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Từ khóa toàn văn</label>
+            <input type="text" [(ngModel)]="q" (keyup.enter)="runSearch()" placeholder="Tìm trong tiêu đề, tác giả, nội dung..." class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Nhan đề</label>
+            <input type="text" [(ngModel)]="title" (keyup.enter)="runSearch()" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Tác giả</label>
+            <input type="text" [(ngModel)]="author" (keyup.enter)="runSearch()" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Nhà xuất bản</label>
+            <input type="text" [(ngModel)]="publisher" (keyup.enter)="runSearch()" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Từ khóa</label>
+            <input type="text" [(ngModel)]="keyword" (keyup.enter)="runSearch()" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Từ năm</label>
+              <input type="text" [(ngModel)]="yearFrom" (keyup.enter)="runSearch()" placeholder="2020" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Đến năm</label>
+              <input type="text" [(ngModel)]="yearTo" (keyup.enter)="runSearch()" placeholder="2025" class="w-full p-2.5 border border-gray-300 rounded outline-none focus:border-main transition-colors text-sm">
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 mt-4">
+            <button (click)="runSearch()" class="w-full bg-orange text-white font-bold py-3 rounded hover:bg-orange-600 transition-colors shadow-md">
+              <i class="fas fa-search mr-2"></i> TÌM KIẾM
+            </button>
+            <button (click)="clearFilters()" class="w-full bg-gray-50 text-gray-600 font-semibold py-2.5 rounded hover:bg-gray-100 transition-colors border border-gray-200">
+              <i class="fas fa-sync-alt mr-2"></i> XÓA BỘ LỌC
+            </button>
+          </div>
+        </div>
+
+        <!-- Facets -->
+        @if (facets().freeCount > 0 || facets().languages.length || facets().collections.length || facets().years.length) {
+          <div class="mt-6 pt-4 border-t border-gray-100 space-y-5">
+            @if (facets().freeCount > 0) {
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Truy cập</h4>
+                <button (click)="toggleFree()" [class.bg-main]="free" [class.text-white]="free" class="text-sm px-3 py-1.5 rounded-full border border-gray-200 hover:border-main transition-colors">
+                  Miễn phí <span class="opacity-70">({{ facets().freeCount }})</span>
+                </button>
+              </div>
+            }
+            @if (facets().languages.length) {
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Ngôn ngữ</h4>
+                <ul class="space-y-1">
+                  @for (f of facets().languages; track f.key) {
+                    <li>
+                      <button (click)="toggleLanguage(f.key)" [class.text-main]="language === f.key" [class.font-bold]="language === f.key" class="w-full flex justify-between text-sm text-gray-600 hover:text-main">
+                        <span>{{ languageLabel(f.key) }}</span><span class="text-gray-400">{{ f.count }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (facets().collections.length) {
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Bộ sưu tập</h4>
+                <ul class="space-y-1">
+                  @for (f of facets().collections; track f.key) {
+                    <li>
+                      <button (click)="toggleCollection(f.key)" [class.text-main]="collectionId === f.key" [class.font-bold]="collectionId === f.key" class="w-full flex justify-between text-sm text-gray-600 hover:text-main text-left gap-2">
+                        <span class="line-clamp-1">{{ collectionName(f.key) }}</span><span class="text-gray-400 shrink-0">{{ f.count }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (facets().years.length) {
+              <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Năm xuất bản</h4>
+                <ul class="space-y-1">
+                  @for (f of facets().years; track f.key) {
+                    <li>
+                      <button (click)="toggleYear(f.key)" [class.text-main]="yearFrom === f.key && yearTo === f.key" [class.font-bold]="yearFrom === f.key && yearTo === f.key" class="w-full flex justify-between text-sm text-gray-600 hover:text-main">
+                        <span>{{ f.key }}</span><span class="text-gray-400">{{ f.count }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </aside>
+
+    <!-- Results -->
+    <main class="w-full md:w-2/3 lg:w-3/4">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px] relative">
+        @if (loading()) {
+          <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange"></div>
+          </div>
+        }
+
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-orange m-0">Kết quả: {{ total() }} tài liệu</h2>
+        </div>
+
+        @if (!loading() && items().length === 0) {
+          <div class="text-center py-16 text-gray-400">
+            <i class="fas fa-search text-4xl mb-3"></i>
+            <p class="font-medium">Không tìm thấy tài liệu phù hợp.</p>
+          </div>
+        }
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          @for (item of items(); track item.ebookId) {
+            <div class="bg-white border border-gray-100 p-4 rounded-lg hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col">
+              <div class="bg-gray-50 p-3 mb-3 rounded text-center">
+                <a [routerLink]="['/book', item.ebookId]">
+                  <img [src]="item.imageUrl || 'assets/images/banner.png'" [alt]="item.title" class="w-28 h-40 object-cover shadow-md mx-auto">
+                </a>
+              </div>
+              <h4 class="font-semibold text-sm text-gray-800 line-clamp-2 mb-1">
+                <a [routerLink]="['/book', item.ebookId]" class="hover:text-main">{{ item.title }}</a>
+              </h4>
+              <p class="text-xs text-gray-500 m-0"><strong>Tác giả:</strong> {{ item.author || '—' }}</p>
+              <p class="text-xs text-gray-400 m-0 mt-0.5"><strong>Năm XB:</strong> {{ item.publishDate || '—' }}</p>
+              @if (item.highlight) {
+                <p class="text-xs text-gray-600 mt-2 line-clamp-3 bg-yellow-50 p-2 rounded [&_mark]:bg-yellow-200" [innerHTML]="item.highlight"></p>
+              }
+            </div>
+          }
+        </div>
+
+        @if (totalPages() > 1) {
+          <div class="flex justify-center mt-10 gap-2">
+            <button (click)="goToPage(page() - 1)" [disabled]="page() === 1" class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <i class="fas fa-chevron-left text-sm"></i>
+            </button>
+            @for (p of pages(); track p) {
+              <button (click)="goToPage(p)" [class.bg-main]="page() === p" [class.text-white]="page() === p" [class.border-main]="page() === p" class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 transition-colors font-medium">
+                {{ p }}
+              </button>
+            }
+            <button (click)="goToPage(page() + 1)" [disabled]="page() === totalPages()" class="w-10 h-10 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <i class="fas fa-chevron-right text-sm"></i>
+            </button>
+          </div>
+        }
+      </div>
+    </main>
+  </div>
+</div>

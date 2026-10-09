@@ -1,0 +1,76 @@
+# Stack mới — Server hoàn toàn mới, tái dụng docmanager-db postgres + archive-web nginx
+# File mới hoàn toàn — không ảnh hưởng docker-compose.production.yml
+#
+# Trước khi chạy:
+#   1. Tìm tên network của docmanager-db:
+#      docker inspect docmanager-db | grep -A3 '"Networks"'
+#   2. Điền tên network thực vào dòng "docmanager-net: external: true, name: <tên>"
+#   3. Điền PG_USER và PG_PASSWORD của docmanager-db vào .env.new
+#
+# Triển khai:
+#   docker compose -f docker-compose.fresh.yml --env-file .env.new build
+#   docker compose -f docker-compose.fresh.yml --env-file .env.new up -d
+
+services:
+
+  # ── Backend API (.NET) ──────────────────────────────────────────────────────
+  elibapi-new:
+    build:
+      context: .
+      dockerfile: ELIBAPI.API/Dockerfile
+    image: elibapi-internal:new
+    container_name: elibapi-new
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - DatabaseProvider=PostgreSQL
+      - ConnectionStrings__PostgreSQL=Host=docmanager-db;Port=5432;Database=${PG_DATABASE:-tvxa_moi};Username=${PG_USER};Password=${PG_PASSWORD};Timeout=30;Command Timeout=60
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER:-ELIBAPI}
+      - Jwt__Audience=${JWT_AUDIENCE:-ELIBAPI_CLIENTS}
+      - Jwt__ExpireMinutes=${JWT_EXPIRE_MINUTES:-60}
+      - MinioSettings__Endpoint=${MINIO_ENDPOINT:-103.124.95.249:9000}
+      - MinioSettings__AccessKey=${MINIO_ACCESS_KEY:-minioadmin}
+      - MinioSettings__SecretKey=${MINIO_SECRET_KEY}
+      - MinioSettings__BucketName=${MINIO_BUCKET:-elibapi-moi}
+      - MinioSettings__PrivateBucketName=${MINIO_PRIVATE_BUCKET:-elibapi-moi-private}
+      - MinioSettings__UseSSL=${MINIO_USE_SSL:-false}
+      - MinioSettings__PublicBaseUrl=${MINIO_PUBLIC_URL}
+      - ElasticsearchSettings__Uri=${ES_URI:-http://103.124.95.249:9200}
+      - ElasticsearchSettings__Username=${ES_USERNAME:-elastic}
+      - ElasticsearchSettings__Password=${ES_PASSWORD}
+      - PathSettings__PathEbook=/app/ebook-data
+      - LLMSettings__Provider=${LLM_PROVIDER:-gemini}
+      - LLMSettings__ApiKey=${GEMINI_API_KEY}
+      - LLMSettings__Model=${LLM_MODEL:-gemini-3.1-flash-lite}
+      - Hangfire__User=${HANGFIRE_USER:-admin}
+      - Hangfire__Password=${HANGFIRE_PASSWORD}
+    volumes:
+      - ${EBOOK_DATA_PATH:-./data/ebook}:/app/ebook-data
+    networks:
+      - elibapi-net
+      - docmanager-net   # join network của docmanager-db để kết nối postgres
+
+  # ── Angular Admin Website (SSR Node.js) ────────────────────────────────────
+  admin-website-new:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: admin-website:new
+    container_name: admin-website-new
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+    networks:
+      - elibapi-net
+    depends_on:
+      - elibapi-new
+
+networks:
+  elibapi-net:
+    driver: bridge
+  docmanager-net:
+    external: true
+    name: document_default   # ← thay bằng tên network thực từ Bước 0

@@ -1,0 +1,64 @@
+<Solution>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.AdminTasks/Elib.BuildingBlocks.AdminTasks.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Authorization/Elib.BuildingBlocks.Authorization.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Crud/Elib.BuildingBlocks.Crud.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Domain/Elib.BuildingBlocks.Domain.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Hosting/Elib.BuildingBlocks.Hosting.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Messaging/Elib.BuildingBlocks.Messaging.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Observability/Elib.BuildingBlocks.Observability.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Persistence/Elib.BuildingBlocks.Persistence.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Resilience/Elib.BuildingBlocks.Resilience.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Storage/Elib.BuildingBlocks.Storage.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Tenancy/Elib.BuildingBlocks.Tenancy.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.TenantReplica/Elib.BuildingBlocks.TenantReplica.csproj" />
+    <Project Path="src/BuildingBlocks/Elib.BuildingBlocks.Testing/Elib.BuildingBlocks.Testing.csproj" />
+  </Folder>
+  <Folder Name="/BuildingBlocks/tests/">
+    <Project Path="src/BuildingBlocks/tests/Elib.BuildingBlocks.Tests/Elib.BuildingBlocks.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Contracts/">
+    <Project Path="src/Contracts/Elib.Contracts.Events/Elib.Contracts.Events.csproj" />
+    <Project Path="src/Contracts/Elib.Contracts.Grpc/Elib.Contracts.Grpc.csproj" />
+  </Folder>
+  <Folder Name="/Gateway/">
+    <Project Path="src/Gateway/Elib.Gateway/Elib.Gateway.csproj" />
+    <Project Path="src/Gateway/tests/Elib.Gateway.Tests/Elib.Gateway.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/Audit/">
+    <Project Path="src/Services/Audit/Elib.Audit.Api/Elib.Audit.Api.csproj" />
+    <Project Path="src/Services/Audit/Elib.Audit.Application/Elib.Audit.Application.csproj" />
+    <Project Path="src/Services/Audit/Elib.Audit.Domain/Elib.Audit.Domain.csproj" />
+    <Project Path="src/Services/Audit/Elib.Audit.Infrastructure/Elib.Audit.Infrastructure.csproj" />
+    <Project Path="src/Services/Audit/tests/Elib.Audit.Tests/Elib.Audit.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Services/Media/">
+    <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
+    <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />
+    <Project Path="src/Services/Media/Elib.Media.Domain/Elib.Media.Domain.csproj" />
+    <Project Path="src/Services/Media/Elib.Media.Infrastructure/Elib.Media.Infrastructure.csproj" />
+    <Project Path="src/Services/Media/tests/Elib.Media.Tests/Elib.Media.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Services/Identity/">
+    <Project Path="src/Services/Identity/Elib.Identity.Api/Elib.Identity.Api.csproj" />
+    <Project Path="src/Services/Identity/Elib.Identity.Application/Elib.Identity.Application.csproj" />
+    <Project Path="src/Services/Identity/Elib.Identity.Domain/Elib.Identity.Domain.csproj" />
+    <Project Path="src/Services/Identity/Elib.Identity.Infrastructure/Elib.Identity.Infrastructure.csproj" />
+    <Project Path="src/Services/Identity/tests/Elib.Identity.Tests/Elib.Identity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Services/Notification/">
+    <Project Path="src/Services/Notification/Elib.Notification.Api/Elib.Notification.Api.csproj" />
+    <Project Path="src/Services/Notification/Elib.Notification.Application/Elib.Notification.Application.csproj" />
+    <Project Path="src/Services/Notification/Elib.Notification.Domain/Elib.Notification.Domain.csproj" />
+    <Project Path="src/Services/Notification/Elib.Notification.Infrastructure/Elib.Notification.Infrastructure.csproj" />
+    <Project Path="src/Services/Notification/tests/Elib.Notification.Tests/Elib.Notification.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Services/Tenant/">
+    <Project Path="src/Services/Tenant/Elib.Tenant.Api/Elib.Tenant.Api.csproj" />
+    <Project Path="src/Services/Tenant/Elib.Tenant.Application/Elib.Tenant.Application.csproj" />
+    <Project Path="src/Services/Tenant/Elib.Tenant.Domain/Elib.Tenant.Domain.csproj" />
+    <Project Path="src/Services/Tenant/Elib.Tenant.Infrastructure/Elib.Tenant.Infrastructure.csproj" />
+    <Project Path="src/Services/Tenant/tests/Elib.Tenant.Tests/Elib.Tenant.Tests.csproj" />
+  </Folder>
+</Solution>

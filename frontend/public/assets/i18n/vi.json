@@ -1,0 +1,19 @@
+{
+  "HEADER": {
+    "HOME": "Trang chủ",
+    "INTRO": "Giới thiệu",
+    "SEARCH": "Tra cứu",
+    "NEWS": "Tin tức",
+    "CONTACT": "Liên hệ",
+    "APP_TITLE": "Thư viện Phường Phan Đình Phùng",
+    "APP_SUBTITLE": "Kết nối tri thức",
+    "LOGIN": "Bạn đọc đăng nhập",
+    "LOGOUT": "Đăng xuất",
+    "PROFILE": "Trang cá nhân",
+    "ADMIN": "Quản trị",
+    "LIBRARY_MAP": "Sơ đồ thư viện"
+  },
+  "CATEGORY": {
+    "NO_NEWS": "Hiện tại chưa có tin nào"
+  }
+}

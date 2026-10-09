@@ -1,0 +1,176 @@
+@if (open) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-blue-600">category</mat-icon>
+          {{ (editMode() ? 'MAP_OBJECT.EDIT_TITLE' : 'MAP_OBJECT.ADD_TITLE') | translate }}
+        </h3>
+        <button (click)="cancel()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5 overflow-y-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">
+              {{ 'MAP_OBJECT.NAME' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <input formControlName="Name" type="text"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.CODE' | translate }}</label>
+            <input formControlName="Code" type="text"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">
+              {{ 'MAP_OBJECT.FLOOR' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <select formControlName="FloorId"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option [ngValue]="null">— {{ 'COMMON.SELECT' | translate }} —</option>
+              @for (f of floors; track f.id) { <option [ngValue]="f.id">{{ f.name }}</option> }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.TYPE' | translate }}</label>
+            <select formControlName="ObjectType"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              @for (t of objectTypes; track t.value) { <option [ngValue]="t.value">{{ t.label }}</option> }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.CATEGORY' | translate }}</label>
+            <select formControlName="Category"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              @for (c of categories; track c.value) { <option [ngValue]="c.value">{{ c.label }}</option> }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.COLOR' | translate }}</label>
+            <div class="flex items-center gap-2">
+              <input formControlName="ColorHex" type="color" class="h-9 w-12 border border-gray-300 rounded-lg cursor-pointer">
+              <input formControlName="ColorHex" type="text"
+                     class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.ICON' | translate }}</label>
+            <input formControlName="IconName" type="text" placeholder="material icon name"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        @if (dataForm.value.ObjectType === 'SHELF') {
+          <div class="mt-4 pt-4 border-t border-gray-100">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAP_OBJECT.STORE' | translate }}</label>
+            <select formControlName="StoreId"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option [ngValue]="null">— {{ 'COMMON.SELECT' | translate }} —</option>
+              @for (s of stores; track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+            </select>
+          </div>
+          <div class="mt-4 pt-4 border-t border-gray-100" [formGroup]="shelfForm">
+            <h4 class="text-sm font-bold text-amber-700 mb-3 flex items-center gap-1.5">
+              <mat-icon class="text-[18px]">menu_book</mat-icon> {{ 'MAP_OBJECT.SHELF_DETAIL' | translate }}
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1">{{ 'MAP_OBJECT.CATEGORY_RANGE' | translate }}</label>
+                <input formControlName="CategoryRange" type="text" placeholder="000 - 099"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1">{{ 'MAP_OBJECT.SUBJECT_NAME' | translate }}</label>
+                <input formControlName="SubjectName" type="text"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-600 mb-1">{{ 'MAP_OBJECT.CAPACITY' | translate }}</label>
+                <input formControlName="Capacity" type="number"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-gray-600 mb-1">{{ 'MAP_OBJECT.SHELF_DESCRIPTION' | translate }}</label>
+                <textarea formControlName="Description" rows="2"
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+              </div>
+            </div>
+          </div>
+        }
+      </form>
+
+      @if (editMode()) {
+        <div class="px-6 pb-5 pt-2">
+          <h4 class="text-sm font-bold text-violet-700 mb-3 flex items-center gap-1.5 border-t border-gray-100 pt-4">
+            <mat-icon class="text-[18px]">inventory_2</mat-icon> {{ 'MAP_OBJECT.EQUIPMENT_TITLE' | translate }} ({{ equipmentList().length }})
+          </h4>
+          <div class="space-y-2 mb-3">
+            @for (eq of equipmentList(); track eq.id) {
+              <div class="flex items-center justify-between p-2.5 border border-gray-100 rounded-lg bg-gray-50">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-gray-800 truncate">{{ eq.name }} <span class="text-xs text-gray-400">x{{ eq.quantity }}</span></div>
+                  @if (eq.description) { <div class="text-xs text-gray-500">{{ eq.description }}</div> }
+                  <span class="text-2xs font-medium px-1.5 py-0.5 rounded-full inline-block mt-1" [class]="statusColor(eq.conditionStatus)">{{ statusLabel(eq.conditionStatus) }}</span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button type="button" (click)="startEditEquipment(eq)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+                    <mat-icon class="text-[16px]">edit</mat-icon>
+                  </button>
+                  <button type="button" (click)="deleteEquipmentItem(eq)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors">
+                    <mat-icon class="text-[16px]">delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <p class="text-xs text-gray-400 text-center py-2">{{ 'COMMON.NO_DATA' | translate }}</p>
+            }
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <input [(ngModel)]="equipmentForm.name" [ngModelOptions]="{standalone: true}" type="text" placeholder="{{ 'MAP_OBJECT.EQUIPMENT_NAME' | translate }}"
+                   class="md:col-span-2 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+            <input [(ngModel)]="equipmentForm.quantity" [ngModelOptions]="{standalone: true}" type="number" min="1" placeholder="SL"
+                   class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+            <select [(ngModel)]="equipmentForm.conditionStatus" [ngModelOptions]="{standalone: true}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white">
+              <option value="Sẵn sàng">Sẵn sàng</option>
+              <option value="Hoạt động">Hoạt động</option>
+              <option value="Bảo trì">Bảo trì</option>
+            </select>
+            <input [(ngModel)]="equipmentForm.description" [ngModelOptions]="{standalone: true}" type="text" placeholder="{{ 'MAP_OBJECT.SHELF_DESCRIPTION' | translate }}"
+                   class="md:col-span-3 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+            <button type="button" (click)="submitEquipment()"
+                    class="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1 transition-colors">
+              <mat-icon class="text-[16px]">{{ equipmentForm.publicId ? 'save' : 'add' }}</mat-icon>
+              {{ (equipmentForm.publicId ? 'COMMON.UPDATE' : 'COMMON.ADD') | translate }}
+            </button>
+            @if (equipmentForm.publicId) {
+              <button type="button" (click)="cancelEditEquipment()"
+                      class="md:col-span-4 text-xs text-gray-500 hover:text-gray-700 text-center">{{ 'COMMON.CANCEL' | translate }}</button>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="cancel()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> }
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

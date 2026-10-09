@@ -1,0 +1,37 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CLASS_LABEL.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <input formControlName="receiptCode" type="text" [placeholder]="'AB_RECEIPT.CODE' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="barcodeFrom" type="text" [placeholder]="'SHELVING.BARCODE_FROM' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    <input formControlName="barcodeTo" type="text" [placeholder]="'SHELVING.BARCODE_TO' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    <button (click)="search()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+  </div>
+  @if (labels().length > 0) {
+    <div class="flex gap-2 mt-3">
+      <button (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }} ({{ labels().length }})</button>
+      <button (click)="clear()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">clear</mat-icon> {{ 'COMMON.RESET' | translate }}</button>
+    </div>
+  }
+</div>
+
+@if (labels().length > 0) {
+  <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0 print:p-0">
+    <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 print:grid-cols-8">
+      @for (lb of labels(); track lb.id) {
+        <div class="border border-gray-300 rounded w-[3cm] h-[3cm] flex flex-col items-center justify-center text-center mx-auto">
+          <span class="text-sm font-bold leading-tight">{{ lb.classSymbol || '—' }}</span>
+          @if (lb.authorMark) { <span class="text-sm leading-tight">{{ lb.authorMark }}</span> }
+          @if (lb.barcode) { <span class="text-xs text-gray-600 leading-tight">{{ lb.barcode }}</span> }
+        </div>
+      }
+    </div>
+  </div>
+} @else if (!isLoading()) {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-400 print:hidden">
+    <mat-icon class="text-5xl mb-2 text-gray-300">label</mat-icon>
+    <p>{{ 'COMMON.NO_DATA' | translate }}</p>
+  </div>
+}

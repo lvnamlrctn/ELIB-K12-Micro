@@ -1,0 +1,197 @@
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+  <div class="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-200">
+    <div class="border-l-4 border-[#3b5b8c] pl-4 mb-8">
+      <h2 class="text-2xl font-bold text-[#3b5b8c] m-0 uppercase inline-block">Tìm kiếm nâng cao</h2>
+    </div>
+
+    <form class="space-y-4" (ngSubmit)="onSearch()">
+      <!-- Row 1 -->
+      <div class="flex flex-col md:flex-row gap-4 items-center">
+        <div class="w-full md:w-48 hidden md:block"></div>
+        <select [(ngModel)]="field1" name="field1" class="w-full md:w-48 p-2 border border-gray-300 rounded outline-none focus:border-main bg-white">
+          <option value="Mọi trường">Mọi trường</option>
+          <option value="Nhan đề">Nhan đề</option>
+          <option value="Tác giả">Tác giả</option>
+          <option value="Nhà xuất bản">Nhà xuất bản</option>
+          <option value="Từ khóa">Từ khóa</option>
+          <option value="ISBN">ISBN</option>
+        </select>
+        <input type="text" [(ngModel)]="query1" name="query1" class="flex-1 w-full p-2 border border-gray-300 rounded outline-none focus:border-main">
+      </div>
+
+      <!-- Row 2 -->
+      <div class="flex flex-col md:flex-row gap-4 items-center">
+        <select [(ngModel)]="bool2" name="bool2" class="w-full md:w-48 p-2 border border-gray-300 rounded outline-none focus:border-main bg-white">
+          <option value="Và">Và</option>
+          <option value="Hoặc">Hoặc</option>
+        </select>
+        <select [(ngModel)]="field2" name="field2" class="w-full md:w-48 p-2 border border-gray-300 rounded outline-none focus:border-main bg-white">
+          <option value="Mọi trường">Mọi trường</option>
+          <option value="Nhan đề">Nhan đề</option>
+          <option value="Tác giả">Tác giả</option>
+          <option value="Nhà xuất bản">Nhà xuất bản</option>
+          <option value="Từ khóa">Từ khóa</option>
+          <option value="ISBN">ISBN</option>
+        </select>
+        <input type="text" [(ngModel)]="query2" name="query2" class="flex-1 w-full p-2 border border-gray-300 rounded outline-none focus:border-main">
+      </div>
+
+      <!-- Row 3 -->
+      <div class="flex flex-col md:flex-row gap-4 items-center">
+        <select [(ngModel)]="bool3" name="bool3" class="w-full md:w-48 p-2 border border-gray-300 rounded outline-none focus:border-main bg-white">
+          <option value="Và">Và</option>
+          <option value="Hoặc">Hoặc</option>
+        </select>
+        <select [(ngModel)]="field3" name="field3" class="w-full md:w-48 p-2 border border-gray-300 rounded outline-none focus:border-main bg-white">
+          <option value="Mọi trường">Mọi trường</option>
+          <option value="Nhan đề">Nhan đề</option>
+          <option value="Tác giả">Tác giả</option>
+          <option value="Nhà xuất bản">Nhà xuất bản</option>
+          <option value="Từ khóa">Từ khóa</option>
+          <option value="ISBN">ISBN</option>
+        </select>
+        <input type="text" [(ngModel)]="query3" name="query3" class="flex-1 w-full p-2 border border-gray-300 rounded outline-none focus:border-main">
+      </div>
+
+      <!-- Danh sách thư viện liên kết -->
+      <div class="mt-8">
+        <div class="flex items-center justify-between mb-3">
+          <button type="button" (click)="showLibraries.set(!showLibraries())" class="flex items-center gap-2 text-gray-800 hover:text-main">
+            <i class="fas text-xs" [class.fa-chevron-down]="showLibraries()" [class.fa-chevron-right]="!showLibraries()"></i>
+            <h3 class="font-semibold text-sm uppercase m-0">Thư viện liên kết ({{ libraries().length }})</h3>
+          </button>
+          @if (libraries().length && showLibraries()) {
+            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input type="checkbox" (change)="toggleAll($event)" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+              Chọn tất cả
+            </label>
+          }
+        </div>
+        @if (showLibraries()) {
+          <div class="border border-gray-300 rounded-lg p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2">
+            @for (lib of libraries(); track lib.id) {
+              <label class="flex items-center gap-2 text-sm text-gray-700 hover:text-main cursor-pointer py-1">
+                <input type="checkbox" [(ngModel)]="lib.selected" name="lib_selected_{{lib.id}}" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 flex-shrink-0">
+                <span class="truncate" [title]="lib.name">{{ lib.name }}</span>
+              </label>
+            } @empty {
+              <p class="text-sm text-gray-400 col-span-full">Không có thư viện liên kết</p>
+            }
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Không chọn thư viện nào sẽ tìm trên tất cả.</p>
+        }
+      </div>
+
+      @if (errorMsg()) {
+        <p class="text-sm text-red-600">{{ errorMsg() }}</p>
+      }
+
+      <!-- Submit Button -->
+      <div class="flex justify-end mt-8">
+        <button type="submit" [disabled]="isSearching()"
+                class="inline-flex items-center gap-2 bg-[#3b5b8c] hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          @if (isSearching()) { <i class="fas fa-spinner fa-spin"></i> Đang tìm... } @else { Tìm kiếm }
+        </button>
+      </div>
+    </form>
+
+    <!-- KẾT QUẢ -->
+    @if (searched()) {
+      <div class="mt-8 border-t border-gray-200 pt-6">
+        <div class="flex items-center justify-between mb-4">
+          <button type="button" (click)="showResults.set(!showResults())" class="flex items-center gap-2 text-gray-800 hover:text-main">
+            <i class="fas text-xs" [class.fa-chevron-down]="showResults()" [class.fa-chevron-right]="!showResults()"></i>
+            <h3 class="font-semibold text-sm uppercase m-0">Kết quả tìm kiếm ({{ totalCount() }} biểu ghi)</h3>
+          </button>
+        </div>
+
+        @if (showResults()) {
+          <!-- Tóm tắt theo từng thư viện (chỉ nơi có biểu ghi > 0) -->
+          @if (connectedBriefResults().length) {
+            <h4 class="font-semibold text-gray-700 text-xs uppercase mb-2">Tình trạng các thư viện</h4>
+            <div class="space-y-1 mb-6">
+              @for (b of connectedBriefResults(); track b.libraryId) {
+                <div class="flex items-center justify-between text-sm border border-gray-200 rounded px-3 py-2">
+                  <div class="flex items-center gap-2">
+                    <i class="fas fa-check-circle text-green-600"></i>
+                    <span class="font-medium text-gray-800">{{ b.libraryName }}</span>
+                    <span class="text-xs text-gray-400">({{ b.systax }})</span>
+                  </div>
+                  <span class="text-gray-600">{{ b.count }} biểu ghi</span>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Bảng biểu ghi gộp -->
+          @if (mergedRecords().length) {
+            <div class="border border-gray-300 rounded-lg overflow-x-auto">
+              <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr class="bg-gray-50 border-b border-gray-300 text-gray-700">
+                    <th class="p-3 font-semibold">Thư viện</th>
+                    <th class="p-3 font-semibold">Nhan đề</th>
+                    <th class="p-3 font-semibold">Tác giả</th>
+                    <th class="p-3 font-semibold">Nhà xuất bản</th>
+                    <th class="p-3 font-semibold">Năm</th>
+                    <th class="p-3 font-semibold">Từ khóa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of mergedRecords(); track $index) {
+                    <tr class="border-b border-gray-200 hover:bg-gray-50 align-top">
+                      <td class="p-3 text-gray-500 whitespace-nowrap">{{ r.libraryName }}</td>
+                      <td class="p-3 text-gray-800">
+                        @if (r.publicId) {
+                          <a [routerLink]="['/bookz3950', r.publicId]" [queryParams]="{ tenantId: r.libraryId }" class="text-main hover:underline font-medium">{{ r.title || '(Không có nhan đề)' }}</a>
+                        } @else {
+                          <button type="button" (click)="toggleExpand($index)" class="text-left text-main hover:underline font-medium inline-flex items-center gap-1.5">
+                            <i class="fas text-[10px]" [class.fa-chevron-down]="expandedIndex() === $index" [class.fa-chevron-right]="expandedIndex() !== $index"></i>
+                            {{ r.title || '(Không có nhan đề)' }}
+                          </button>
+                        }
+                      </td>
+                      <td class="p-3 text-gray-700">{{ r.author }}</td>
+                      <td class="p-3 text-gray-700">{{ r.publisher }}</td>
+                      <td class="p-3 text-gray-700 whitespace-nowrap">{{ r.publishDate }}</td>
+                      <td class="p-3 text-gray-500">{{ r.keyword }}</td>
+                    </tr>
+                    @if (!r.publicId && expandedIndex() === $index) {
+                      <tr class="border-b border-gray-200 bg-blue-50/40">
+                        <td colspan="6" class="p-4">
+                          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Thư viện</dt><dd class="text-gray-800 m-0">{{ r.libraryName }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Loại</dt><dd class="text-gray-800 m-0">{{ r.systax }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Nhan đề</dt><dd class="text-gray-800 m-0">{{ r.title || '—' }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Tác giả</dt><dd class="text-gray-800 m-0">{{ r.author || '—' }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Nhà xuất bản</dt><dd class="text-gray-800 m-0">{{ r.publisher || '—' }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Năm xuất bản</dt><dd class="text-gray-800 m-0">{{ r.publishDate || '—' }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Từ khóa</dt><dd class="text-gray-800 m-0">{{ r.keyword || '—' }}</dd></div>
+                            <div class="flex gap-2"><dt class="font-semibold text-gray-600 w-28 flex-shrink-0">Nhan đề khác</dt><dd class="text-gray-800 m-0">{{ r.otherTitle || '—' }}</dd></div>
+                          </dl>
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Phân trang -->
+            @if (totalPages() > 1) {
+              <div class="flex items-center justify-center gap-2 mt-4">
+                <button type="button" (click)="goToPage(pageIndex() - 1)" [disabled]="pageIndex() <= 1 || isSearching()"
+                        class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Trước</button>
+                <span class="text-sm text-gray-600">Trang {{ pageIndex() }} / {{ totalPages() }}</span>
+                <button type="button" (click)="goToPage(pageIndex() + 1)" [disabled]="pageIndex() >= totalPages() || isSearching()"
+                        class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-40 hover:bg-gray-50">Sau</button>
+              </div>
+            }
+          } @else if (!isSearching()) {
+            <p class="text-sm text-gray-500">Không tìm thấy biểu ghi phù hợp.</p>
+          }
+        }
+      </div>
+    }
+  </div>
+</div>

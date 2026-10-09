@@ -1,0 +1,812 @@
+<div class="container mx-auto px-4 py-8">
+  <div class="flex flex-col md:flex-row gap-8">
+    <!-- Sidebar -->
+    <aside class="w-full md:w-1/4">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div class="flex flex-col items-center mb-6">
+          <div class="w-24 h-24 bg-main rounded-full flex items-center justify-center text-white font-bold text-4xl mb-4">
+            {{ user()?.fullName?.charAt(0) }}
+          </div>
+          <h2 class="text-xl font-bold text-dark m-0">{{ user()?.fullName }}</h2>
+          <p class="text-gray-500 text-sm m-0">{{ user()?.email || 'Chưa cập nhật email' }}</p>
+        </div>
+
+        <nav class="flex flex-col space-y-2">
+          <button
+            (click)="selectTab('activity')"
+            [class.bg-main]="activeTab() === 'activity'"
+            [class.text-white]="activeTab() === 'activity'"
+            [class.text-gray-700]="activeTab() !== 'activity'"
+            [class.hover:bg-gray-100]="activeTab() !== 'activity'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-history w-5 text-center"></i> Hoạt động gần đây
+          </button>
+          <button 
+            (click)="activeTab.set('saved')" 
+            [class.bg-main]="activeTab() === 'saved'"
+            [class.text-white]="activeTab() === 'saved'"
+            [class.text-gray-700]="activeTab() !== 'saved'"
+            [class.hover:bg-gray-100]="activeTab() !== 'saved'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-bookmark w-5 text-center"></i> Tài liệu đã lưu
+          </button>
+          <button
+            (click)="selectTab('borrowing')"
+            [class.bg-main]="activeTab() === 'borrowing'"
+            [class.text-white]="activeTab() === 'borrowing'"
+            [class.text-gray-700]="activeTab() !== 'borrowing'"
+            [class.hover:bg-gray-100]="activeTab() !== 'borrowing'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-book-reader w-5 text-center"></i> Đang mượn / Đặt mượn
+          </button>
+          <button
+            (click)="selectTab('digital')"
+            [class.bg-main]="activeTab() === 'digital'"
+            [class.text-white]="activeTab() === 'digital'"
+            [class.text-gray-700]="activeTab() !== 'digital'"
+            [class.hover:bg-gray-100]="activeTab() !== 'digital'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-tablet-alt w-5 text-center"></i> Tài liệu số của tôi
+          </button>
+          @if (badges()?.enabled) {
+            <button
+              (click)="selectTab('badges')"
+              [class.bg-main]="activeTab() === 'badges'"
+              [class.text-white]="activeTab() === 'badges'"
+              [class.text-gray-700]="activeTab() !== 'badges'"
+              [class.hover:bg-gray-100]="activeTab() !== 'badges'"
+              class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+              <i class="fas fa-medal w-5 text-center"></i> Huy hiệu đọc
+            </button>
+          }
+          @if (roomsEnabled()) {
+            <button
+              (click)="selectTab('rooms')"
+              [class.bg-main]="activeTab() === 'rooms'"
+              [class.text-white]="activeTab() === 'rooms'"
+              [class.text-gray-700]="activeTab() !== 'rooms'"
+              [class.hover:bg-gray-100]="activeTab() !== 'rooms'"
+              class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+              <i class="fas fa-door-open w-5 text-center"></i> Đặt phòng học nhóm
+            </button>
+          }
+          <button
+            (click)="selectTab('debts')"
+            [class.bg-main]="activeTab() === 'debts'"
+            [class.text-white]="activeTab() === 'debts'"
+            [class.text-gray-700]="activeTab() !== 'debts'"
+            [class.hover:bg-gray-100]="activeTab() !== 'debts'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-money-bill-wave w-5 text-center"></i> Phí / Nợ của tôi
+            @if (debtCount() > 0) {
+              <span class="ml-auto px-2 py-0.5 text-xs rounded-full bg-red-500 text-white">{{ debtCount() }}</span>
+            }
+          </button>
+          <button
+            (click)="selectTab('savedSearches')"
+            [class.bg-main]="activeTab() === 'savedSearches'"
+            [class.text-white]="activeTab() === 'savedSearches'"
+            [class.text-gray-700]="activeTab() !== 'savedSearches'"
+            [class.hover:bg-gray-100]="activeTab() !== 'savedSearches'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-bell w-5 text-center"></i> Tìm kiếm đã lưu
+            @if (savedSearches().length && savedSearches().some(s => s.hasUnread)) {
+              <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            }
+          </button>
+          <button
+            (click)="selectTab('workspace')"
+            [class.bg-main]="activeTab() === 'workspace'"
+            [class.text-white]="activeTab() === 'workspace'"
+            [class.text-gray-700]="activeTab() !== 'workspace'"
+            [class.hover:bg-gray-100]="activeTab() !== 'workspace'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-lightbulb w-5 text-center"></i> Không gian nghiên cứu
+          </button>
+          <button
+            (click)="activeTab.set('settings')"
+            [class.bg-main]="activeTab() === 'settings'"
+            [class.text-white]="activeTab() === 'settings'"
+            [class.text-gray-700]="activeTab() !== 'settings'"
+            [class.hover:bg-gray-100]="activeTab() !== 'settings'"
+            class="px-4 py-3 rounded-lg text-left font-semibold transition-colors flex items-center gap-3">
+            <i class="fas fa-cog w-5 text-center"></i> Cài đặt tài khoản
+          </button>
+          <a routerLink="/reader-card"
+            class="px-4 py-3 rounded-lg text-left font-semibold text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3">
+            <i class="fas fa-id-card w-5 text-center"></i> Thẻ bạn đọc điện tử
+          </a>
+          <button
+            (click)="logout()"
+            class="px-4 py-3 rounded-lg text-left font-semibold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 mt-4">
+            <i class="fas fa-sign-out-alt w-5 text-center"></i> Đăng xuất
+          </button>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="w-full md:w-3/4">
+      <div class="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100 min-h-[500px]">
+        
+        @if (activeTab() === 'activity') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Hoạt động gần đây</h3>
+
+          @if (statsLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (!stats() || stats()!.totalReads === 0) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-chart-line text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Chưa có hoạt động nào gần đây.</p>
+            </div>
+          } @else {
+            <!-- KPI -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-main">{{ stats()!.totalReads }}</div>
+                <div class="text-xs text-gray-500 mt-1">Lượt đọc</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-main">{{ stats()!.distinctDocs }}</div>
+                <div class="text-xs text-gray-500 mt-1">Tài liệu đã đọc</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-main">{{ stats()!.totalPages | number }}</div>
+                <div class="text-xs text-gray-500 mt-1">Trang đã đọc</div>
+              </div>
+              <div class="bg-gray-50 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-main">{{ stats()!.thisMonthDocs }}</div>
+                <div class="text-xs text-gray-500 mt-1">Tài liệu tháng này</div>
+              </div>
+            </div>
+
+            <!-- Biểu đồ 6 tháng gần nhất -->
+            <h4 class="font-semibold text-dark mb-3">Lượt đọc 6 tháng gần đây</h4>
+            <div class="flex items-end gap-3 h-32 mb-8 px-1">
+              @for (m of stats()!.monthly; track m.year + '-' + m.month) {
+                <div class="flex-1 flex flex-col items-center justify-end h-full">
+                  <span class="text-xs text-gray-500 mb-1">{{ m.reads }}</span>
+                  <div class="w-full bg-main/20 rounded-t" [style.height.%]="(m.reads / maxMonthlyReads()) * 100"
+                       [class.bg-main]="m.reads > 0"></div>
+                  <span class="text-xs text-gray-400 mt-1">{{ m.label }}</span>
+                </div>
+              }
+            </div>
+
+            <!-- Top 10 tài liệu đọc gần đây -->
+            <h4 class="font-semibold text-dark mb-3">Đọc gần đây</h4>
+            @if (stats()!.recentReads.length === 0) {
+              <p class="text-gray-500">Chưa có tài liệu nào được đọc gần đây.</p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Nhan đề</th><th class="py-2 pr-4">Tác giả</th><th class="py-2 pr-4">Trang</th><th class="py-2">Lần đọc gần nhất</th></tr></thead>
+                  <tbody>
+                    @for (r of stats()!.recentReads; track r.id) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          @if (r.id) { <a [routerLink]="['/book', r.id]" class="text-main hover:underline">{{ r.title }}</a> }
+                          @else { {{ r.title }} }
+                        </td>
+                        <td class="py-2 pr-4">{{ r.author }}</td>
+                        <td class="py-2 pr-4">{{ r.page }}</td>
+                        <td class="py-2">{{ r.date | date:'dd/MM/yyyy HH:mm' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+
+        @if (activeTab() === 'saved') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Tài liệu đã lưu</h3>
+          
+          @if (authService.savedBooks().length === 0) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-bookmark text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Bạn chưa lưu tài liệu nào.</p>
+              <a routerLink="/search" class="mt-4 inline-block text-main hover:text-blue-700 font-semibold px-4 py-2 border border-main rounded-lg hover:bg-blue-50 transition-colors">Khám phá tài liệu số</a>
+            </div>
+          } @else {
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              @for (book of authService.savedBooks(); track book.id) {
+                <div class="bg-white border text-left border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 md:hover:-translate-y-1 relative group w-full flex flex-col h-full">
+                  <div class="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button (click)="authService.toggleSaveBook(book)" class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-red-500 shadow-md hover:scale-110 transition-transform" title="Bỏ lưu">
+                      <i class="fas fa-bookmark"></i>
+                    </button>
+                  </div>
+                  <a [routerLink]="['/book', book.id]" class="block h-48 overflow-hidden bg-gray-50 p-4 shrink-0">
+                    <img [src]="book.imageUrl" [alt]="book.title" class="w-full h-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300">
+                  </a>
+                  <a [routerLink]="['/book', book.id]" class="block p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 class="font-bold text-dark mb-1 line-clamp-2 text-base md:text-sm lg:text-base group-hover:text-main transition-colors m-0">{{ book.title }}</h3>
+                      <p class="text-xs text-gray-500 line-clamp-1 mb-2 m-0">{{ book.author }}</p>
+                    </div>
+                  </a>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'borrowing') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Đang mượn / Đặt mượn (sách in)</h3>
+
+          @if (borrowingLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else {
+            <h4 class="font-semibold text-dark mb-3">Đang mượn</h4>
+            @if (borrowing().length === 0) {
+              <p class="text-gray-500 mb-8">Bạn chưa mượn tài liệu in nào.</p>
+            } @else {
+              <div class="overflow-x-auto mb-8">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Nhan đề</th><th class="py-2 pr-4">Ngày mượn</th><th class="py-2 pr-4">Hạn trả</th><th class="py-2">Trạng thái</th></tr></thead>
+                  <tbody>
+                    @for (b of borrowing(); track b.id) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          @if (b.bookPublicId) { <a [routerLink]="['/tai-lieu-in', b.bookPublicId]" class="text-main hover:underline">{{ b.title }}</a> }
+                          @else { {{ b.title }} }
+                        </td>
+                        <td class="py-2 pr-4">{{ b.borrowDate | date:'dd/MM/yyyy' }}</td>
+                        <td class="py-2 pr-4">{{ b.dueDate | date:'dd/MM/yyyy' }}</td>
+                        <td class="py-2">
+                          @if (b.overdue) { <span class="text-red-600 font-semibold">Quá hạn</span> }
+                          @else { <span class="text-green-600">Đang mượn</span> }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <h4 class="font-semibold text-dark mb-3">Đang đặt mượn</h4>
+            @if (reserved().length === 0) {
+              <p class="text-gray-500">Bạn chưa đặt mượn tài liệu in nào.</p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Nhan đề</th><th class="py-2 pr-4">Ngày đặt</th><th class="py-2 pr-4">Trạng thái</th><th class="py-2">Vị trí xếp hàng</th></tr></thead>
+                  <tbody>
+                    @for (r of reserved(); track r.id) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          @if (r.bookPublicId) { <a [routerLink]="['/tai-lieu-in', r.bookPublicId]" class="text-main hover:underline">{{ r.title }}</a> }
+                          @else { {{ r.title }} }
+                        </td>
+                        <td class="py-2 pr-4">{{ r.reserveDate | date:'dd/MM/yyyy' }}</td>
+                        <td class="py-2 pr-4">{{ r.status }}</td>
+                        <td class="py-2">{{ r.queuePosition ?? '-' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+
+        @if (activeTab() === 'digital') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Tài liệu số của tôi</h3>
+
+          @if (digitalLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else {
+            <h4 class="font-semibold text-dark mb-3">Đang mượn</h4>
+            @if (digitalBorrowing().length === 0) {
+              <p class="text-gray-500 mb-8">Bạn chưa mượn tài liệu số nào.</p>
+            } @else {
+              <div class="overflow-x-auto mb-8">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Nhan đề</th><th class="py-2 pr-4">Ngày mượn</th><th class="py-2 pr-4">Hạn</th><th class="py-2"></th></tr></thead>
+                  <tbody>
+                    @for (d of digitalBorrowing(); track d.id) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          @if (d.ebookPublicId) { <a [routerLink]="['/book', d.ebookPublicId]" class="text-main hover:underline">{{ d.title }}</a> }
+                          @else { {{ d.title }} }
+                        </td>
+                        <td class="py-2 pr-4">{{ d.borrowDate | date:'dd/MM/yyyy' }}</td>
+                        <td class="py-2 pr-4">
+                          @if (d.dueDate) { {{ d.dueDate | date:'dd/MM/yyyy' }} @if (d.overdue) { <span class="text-red-600 font-semibold"> (Hết hạn)</span> } }
+                          @else { Không giới hạn }
+                        </td>
+                        <td class="py-2 text-right"><button (click)="returnDigital(d.loanPublicId)" class="text-sm text-red-600 hover:underline">Trả</button></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <h4 class="font-semibold text-dark mb-3">Đang đặt trước</h4>
+            @if (digitalReserved().length === 0) {
+              <p class="text-gray-500">Bạn chưa đặt trước tài liệu số nào.</p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Nhan đề</th><th class="py-2 pr-4">Ngày đặt</th><th class="py-2 pr-4">Trạng thái</th><th class="py-2"></th></tr></thead>
+                  <tbody>
+                    @for (r of digitalReserved(); track r.id) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          @if (r.ebookPublicId) { <a [routerLink]="['/book', r.ebookPublicId]" class="text-main hover:underline">{{ r.title }}</a> }
+                          @else { {{ r.title }} }
+                        </td>
+                        <td class="py-2 pr-4">{{ r.reserveDate | date:'dd/MM/yyyy' }}</td>
+                        <td class="py-2 pr-4">
+                          @if (r.status === 'ready') { <span class="text-green-600 font-semibold">Sẵn sàng mượn</span> }
+                          @else { Đang chờ (vị trí {{ r.queuePosition ?? '-' }}) }
+                        </td>
+                        <td class="py-2 text-right"><button (click)="cancelDigitalReservation(r.reservationPublicId)" class="text-sm text-red-600 hover:underline">Huỷ</button></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+
+        @if (activeTab() === 'badges') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Huy hiệu đọc</h3>
+
+          @if (badgesLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (!badges()?.earned?.length && !badges()?.inProgress?.length) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-medal text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Chưa có huy hiệu nào. Hãy tiếp tục đọc để đạt huy hiệu đầu tiên!</p>
+            </div>
+          } @else {
+            @if (badges()!.earned.length) {
+              <h4 class="font-semibold text-dark mb-3">Đã đạt được</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                @for (b of badges()!.earned; track b.badgeId) {
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                      <i class="fas fa-medal text-xl"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="font-bold text-dark truncate">{{ b.name }}</p>
+                      <p class="text-xs text-gray-500 truncate">{{ b.description }}</p>
+                      <p class="text-[11px] text-amber-600 font-semibold mt-0.5">{{ b.earnedAt | date:'dd/MM/yyyy' }}</p>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (badges()!.inProgress.length) {
+              <h4 class="font-semibold text-dark mb-3">Đang phấn đấu</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                @for (b of badges()!.inProgress; track b.badgeId) {
+                  <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 opacity-80">
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="w-12 h-12 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center shrink-0">
+                        <i class="fas fa-medal text-xl"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-bold text-dark truncate">{{ b.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ b.description }}</p>
+                      </div>
+                    </div>
+                    <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                      <div class="h-full rounded-full bg-main" [style.width.%]="(b.current / b.threshold * 100) > 100 ? 100 : (b.current / b.threshold * 100)"></div>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1.5">{{ b.current }}/{{ b.threshold }}</p>
+                  </div>
+                }
+              </div>
+            }
+          }
+        }
+
+        @if (activeTab() === 'rooms') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0 flex flex-wrap items-center justify-between gap-2">
+            Đặt phòng học nhóm
+            <a routerLink="/dat-phong-hoc-nhom" class="text-sm font-semibold text-main hover:underline"><i class="fas fa-map-marked-alt mr-1"></i>Xem lịch theo sơ đồ tầng</a>
+          </h3>
+
+          @if (roomsLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (rooms().length === 0) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-door-open text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Hiện chưa có phòng nào khả dụng để đặt.</p>
+            </div>
+          } @else {
+            <!-- Chọn phòng -->
+            <h4 class="font-semibold text-dark mb-3">Chọn phòng</h4>
+            <div class="flex flex-wrap gap-2 mb-6">
+              @for (r of rooms(); track r.mapObjectId) {
+                <button type="button" (click)="selectRoom(r.mapObjectId)"
+                        [class.bg-main]="selectedRoomId() === r.mapObjectId"
+                        [class.text-white]="selectedRoomId() === r.mapObjectId"
+                        [class.border-gray-300]="selectedRoomId() !== r.mapObjectId"
+                        [class.text-gray-700]="selectedRoomId() !== r.mapObjectId"
+                        class="px-4 py-2 rounded-lg text-sm font-medium border transition-colors">
+                  {{ r.name }} <span class="text-xs opacity-75">(@if (r.minGroupSize && r.minGroupSize > 1) {{{ r.minGroupSize }}–}{{ r.capacity }} người)</span>
+                  @if (r.maintenance) { <span class="text-xs opacity-75"> · tạm ngưng</span> }
+                </button>
+              }
+            </div>
+
+            @if (selectedRoom(); as room) {
+              <div class="mb-6 text-sm space-y-2">
+                <p class="text-gray-600">
+                  <i class="fas" [class.fa-bolt]="room.autoApprove" [class.fa-hourglass-half]="!room.autoApprove"></i>
+                  {{ room.autoApprove ? 'Tự động duyệt — đặt xong là lượt đặt được duyệt ngay.' : 'Cần thủ thư duyệt.' }}
+                  @if (room.allowedReaderTypes?.length) { · Dành cho: {{ room.allowedReaderTypes!.join(', ') }} }
+                </p>
+                @if (room.maintenance) {
+                  <p class="text-red-600 font-semibold">Phòng đang tạm ngưng phục vụ@if (room.maintenanceNote) {: {{ room.maintenanceNote }}}.</p>
+                } @else if (room.readerAllowed === false) {
+                  <p class="text-red-600 font-semibold">Phòng này không dành cho loại bạn đọc của bạn.</p>
+                }
+                @if (room.rules) {
+                  <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 text-gray-700 whitespace-pre-line"><strong>Nội quy:</strong> {{ room.rules }}</div>
+                }
+              </div>
+
+              <!-- Chọn ngày -->
+              <h4 class="font-semibold text-dark mb-3">Chọn ngày</h4>
+              <input type="date" [ngModel]="selectedDate()" (ngModelChange)="onDateChange($event)"
+                     class="mb-6 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-main">
+
+              <!-- Lưới khung giờ -->
+              <h4 class="font-semibold text-dark mb-3">Chọn khung giờ ({{ slotLength() }} phút/lượt)</h4>
+              @if (slotsLoading()) {
+                <p class="text-gray-500 py-4">Đang tải khung giờ...</p>
+              } @else {
+                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-6">
+                  @for (slot of timeSlots(); track slot.startAt.getTime()) {
+                    <button type="button" (click)="pickSlot(slot)" [disabled]="slot.state !== 'available'"
+                            class="px-2 py-2 rounded-lg text-xs font-semibold border transition-colors"
+                            [class.bg-main]="selectedSlot()?.startAt?.getTime() === slot.startAt.getTime()"
+                            [class.text-white]="selectedSlot()?.startAt?.getTime() === slot.startAt.getTime()"
+                            [class.border-main]="selectedSlot()?.startAt?.getTime() === slot.startAt.getTime()"
+                            [class.bg-gray-50]="slot.state === 'booked' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.text-gray-300]="slot.state !== 'available' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.border-gray-200]="slot.state !== 'available' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.text-gray-700]="slot.state === 'available' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.border-gray-300]="slot.state === 'available' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.hover:bg-blue-50]="slot.state === 'available' && selectedSlot()?.startAt?.getTime() !== slot.startAt.getTime()"
+                            [class.cursor-not-allowed]="slot.state !== 'available'">
+                      {{ slot.label }}
+                    </button>
+                  } @empty {
+                    <p class="text-gray-400 text-sm col-span-full">Thư viện không mở cửa đặt phòng ngày này.</p>
+                  }
+                </div>
+              }
+
+              @if (selectedSlot() && !roomBlocked()) {
+                <div class="bg-gray-50 border border-gray-100 rounded-lg p-4 mb-6 max-w-md">
+                  <p class="text-sm text-gray-700 mb-3">Đặt <strong>{{ selectedRoom()!.name }}</strong> lúc <strong>{{ selectedSlot()!.label }}</strong> ngày {{ selectedDate() | date:'dd/MM/yyyy' }}</p>
+                  <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                      Thẻ thành viên nhóm (số thẻ hoặc UID, mỗi dòng một thẻ)@if ((selectedRoom()!.minGroupSize ?? 1) > 1) { — tối thiểu {{ selectedRoom()!.minGroupSize! - 1 }} thành viên }
+                    </label>
+                    <textarea rows="2" [(ngModel)]="memberCardsText" name="memberCards" placeholder="Không bắt buộc với phòng không yêu cầu nhóm"
+                              class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-main"></textarea>
+                  </div>
+                  @if (!memberCardsText.trim()) {
+                    <div class="mb-3">
+                      <label class="block text-xs font-semibold text-gray-600 mb-1">Số người tham gia (tối đa {{ selectedRoom()!.capacity }})</label>
+                      <input type="number" min="1" [max]="selectedRoom()!.capacity" [(ngModel)]="partySize" name="partySize"
+                             class="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-main">
+                    </div>
+                  }
+                  <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Ghi chú (không bắt buộc)</label>
+                    <input type="text" [(ngModel)]="bookingNote" name="bookingNote" placeholder="Mục đích sử dụng phòng..."
+                           class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-main">
+                  </div>
+                  <button (click)="submitBooking()" [disabled]="bookingSubmitting()"
+                          class="bg-main text-white px-5 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                    {{ bookingSubmitting() ? 'Đang gửi...' : 'Gửi yêu cầu đặt phòng' }}
+                  </button>
+                </div>
+              }
+
+              @if (bookingMessage()) {
+                <p class="text-sm mb-6" [class.text-green-600]="bookingMessage()!.ok" [class.text-red-600]="!bookingMessage()!.ok">
+                  {{ bookingMessage()!.text }}
+                </p>
+              }
+            }
+
+            <!-- Lượt đặt của tôi -->
+            <h4 class="font-semibold text-dark mb-3 mt-8 pt-6 border-t border-gray-100">Lượt đặt phòng của tôi</h4>
+            @if (myBookingsLoading()) {
+              <p class="text-gray-500 py-4">Đang tải...</p>
+            } @else if (myBookings().length === 0) {
+              <p class="text-gray-500">Bạn chưa có lượt đặt phòng nào.</p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead><tr class="text-left text-gray-500 border-b"><th class="py-2 pr-4">Phòng</th><th class="py-2 pr-4">Thời gian</th><th class="py-2 pr-4">Số người</th><th class="py-2 pr-4">Trạng thái</th><th class="py-2"></th></tr></thead>
+                  <tbody>
+                    @for (b of myBookings(); track b.publicId) {
+                      <tr class="border-b border-gray-100">
+                        <td class="py-2 pr-4">
+                          {{ b.roomName }}
+                          @if (b.isOwner === false) { <div class="text-xs text-gray-500">Thành viên nhóm của {{ b.ownerName }}</div> }
+                          @else if (b.members?.length) { <div class="text-xs text-gray-500">+ {{ b.members!.join(', ') }}</div> }
+                        </td>
+                        <td class="py-2 pr-4">{{ b.startAt | date:'dd/MM/yyyy HH:mm' }} - {{ b.endAt | date:'HH:mm' }}</td>
+                        <td class="py-2 pr-4">{{ b.partySize }}</td>
+                        <td class="py-2 pr-4">
+                          @switch (b.status) {
+                            @case (1) { <span class="text-amber-600 font-semibold">Chờ duyệt</span> }
+                            @case (2) { <span class="text-blue-600 font-semibold">Đã duyệt</span> }
+                            @case (3) { <span class="text-green-600 font-semibold">Đã check-in</span> }
+                            @case (4) { <span class="text-gray-500">Hoàn tất</span> }
+                            @case (5) { <span class="text-gray-400">Đã hủy</span> }
+                            @case (6) { <span class="text-red-600 font-semibold">Bị từ chối</span> }
+                            @case (7) { <span class="text-red-500">Không tới</span> }
+                          }
+                        </td>
+                        <td class="py-2 text-right whitespace-nowrap">
+                          @if (canShowCheckInQr(b)) {
+                            <button (click)="openCheckInQr(b)" class="text-sm text-main hover:underline mr-3">Mã QR check-in</button>
+                          }
+                          @if (canCheckInRoomBooking(b)) {
+                            <button (click)="checkInRoomBooking(b.publicId)" class="text-sm text-main hover:underline mr-3">Check-in</button>
+                            <span class="inline-block align-middle mr-3">
+                              <app-face-capture [manual]="true" [submitFn]="faceCheckInFor(b.publicId)" (matched)="onFaceCheckedIn()"
+                                                titleKey="ROOM_CHECKIN.FACE_SELF" hintKey="ROOM_CHECKIN.FACE_SELF_HINT" openLabel="ROOM_CHECKIN.FACE_SELF"
+                                                openClass="text-sm text-main hover:underline inline-flex items-center gap-1" />
+                            </span>
+                          }
+                          @if (b.status === 3) {
+                            <button (click)="checkOutRoomBooking(b)" class="text-sm text-main hover:underline mr-3">Trả phòng</button>
+                          }
+                          @if (canCancelRoomBooking(b)) {
+                            <button (click)="cancelRoomBooking(b.publicId)" class="text-sm text-red-600 hover:underline">Huỷ</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+
+        @if (qrBooking(); as qb) {
+          <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" (click)="closeCheckInQr()">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" (click)="$event.stopPropagation()">
+              <h4 class="text-lg font-bold text-dark mb-1">Mã QR check-in</h4>
+              <p class="text-sm text-gray-600 mb-4">{{ qb.roomName }} · {{ qb.startAt | date:'dd/MM/yyyy HH:mm' }} - {{ qb.endAt | date:'HH:mm' }}</p>
+              @if (qb.status === 3) {
+                <p class="text-green-600 font-bold py-10"><i class="fas fa-check-circle text-4xl block mb-2"></i>Đã check-in thành công</p>
+              } @else if (qrImage()) {
+                <img [src]="qrImage()" alt="Mã QR check-in" class="mx-auto w-64 h-64">
+                <p class="text-xs text-gray-500 mt-3">Xuất trình mã này cho thủ thư hoặc máy quét tại phòng.</p>
+              } @else {
+                <p class="text-gray-500 py-10">Đang tạo mã...</p>
+              }
+              <button (click)="closeCheckInQr()" class="mt-5 px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Đóng</button>
+            </div>
+          </div>
+        }
+
+        @if (activeTab() === 'savedSearches') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Tìm kiếm đã lưu</h3>
+
+          @if (savedSearchesLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (savedSearches().length === 0) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-bell text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Bạn chưa lưu tìm kiếm nào.</p>
+              <p class="text-gray-400 text-sm mt-1">Ở trang tra cứu, bấm "Lưu tìm kiếm này" để nhận thông báo khi có tài liệu mới.</p>
+            </div>
+          } @else {
+            <div class="space-y-3">
+              @for (s of savedSearches(); track s.id) {
+                <div class="border border-gray-100 rounded-xl p-4 flex items-center justify-between gap-4"
+                     [class.bg-blue-50]="s.hasUnread" [class.border-blue-200]="s.hasUnread">
+                  <div class="flex-1 min-w-0 cursor-pointer" (click)="runSavedSearch(s)">
+                    <div class="flex items-center gap-2">
+                      <p class="font-semibold text-dark m-0 truncate">{{ s.name }}</p>
+                      @if (s.hasUnread) {
+                        <span class="text-[11px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium">Mới</span>
+                      }
+                    </div>
+                    <p class="text-xs text-gray-400 m-0 mt-1">{{ s.total }} kết quả lúc lưu · {{ s.matches.length }} kết quả mới chưa xem</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" (click)="toggleSavedSearchAlerts(s)"
+                            [title]="s.alertsEnabled ? 'Tắt cảnh báo' : 'Bật cảnh báo'"
+                            class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                            [class.bg-blue-50]="s.alertsEnabled" [class.text-blue-600]="s.alertsEnabled"
+                            [class.bg-gray-50]="!s.alertsEnabled" [class.text-gray-400]="!s.alertsEnabled">
+                      <i class="fas" [class.fa-bell]="s.alertsEnabled" [class.fa-bell-slash]="!s.alertsEnabled"></i>
+                    </button>
+                    <button type="button" (click)="deleteSavedSearch(s)" title="Xoá"
+                            class="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'workspace') {
+          <div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+            <h3 class="text-2xl font-bold text-dark m-0">Không gian nghiên cứu</h3>
+            <button type="button" (click)="openAddProject()"
+                    class="bg-main text-white text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2">
+              <i class="fas fa-plus"></i> Thêm đề tài
+            </button>
+          </div>
+
+          @if (workspaceConflict()) {
+            <div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center justify-between gap-3">
+              <span><i class="fas fa-exclamation-triangle mr-2"></i>Không gian nghiên cứu đã được sửa trên thiết bị khác. Tải lại để lấy bản mới nhất.</span>
+              <button type="button" (click)="reloadWorkspaceAfterConflict()" class="text-amber-800 font-semibold hover:underline shrink-0">Tải lại</button>
+            </div>
+          }
+
+          @if (workspaceLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (projects().length === 0) {
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+              <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                <i class="fas fa-lightbulb text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-medium">Bạn chưa có đề tài nghiên cứu nào.</p>
+              <p class="text-gray-400 text-sm mt-1">Dữ liệu được đồng bộ giữa các thiết bị bạn đăng nhập.</p>
+            </div>
+          } @else {
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              @for (p of projects(); track p.id) {
+                <div class="border border-gray-100 rounded-xl p-4 border-l-4" [style.borderLeftColor]="p.color || '#3b82f6'">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="font-semibold text-dark m-0">{{ p.title }}</p>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button type="button" (click)="openEditProject(p)" class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100"><i class="fas fa-pen text-xs"></i></button>
+                      <button type="button" (click)="deleteProject(p)" class="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i class="fas fa-trash text-xs"></i></button>
+                    </div>
+                  </div>
+                  @if (p.category) { <span class="inline-block text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full mt-2">{{ p.category }}</span> }
+                  @if (p.description) { <p class="text-sm text-gray-500 mt-2 mb-0">{{ p.description }}</p> }
+                </div>
+              }
+            </div>
+          }
+
+          @if (showProjectModal()) {
+            <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                  <h3 class="text-lg font-bold text-dark m-0">{{ editingProjectId ? 'Sửa đề tài' : 'Thêm đề tài mới' }}</h3>
+                  <button (click)="closeProjectModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-5 space-y-3">
+                  <input [(ngModel)]="projectDraft.title" placeholder="Tên đề tài *"
+                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input [(ngModel)]="projectDraft.category" placeholder="Phân loại (tuỳ chọn)"
+                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <textarea [(ngModel)]="projectDraft.description" rows="3" placeholder="Ghi chú..."
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">Màu:</span>
+                    <input type="color" [(ngModel)]="projectDraft.color" class="w-10 h-8 rounded border border-gray-300" />
+                  </div>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50">
+                  <button (click)="closeProjectModal()" class="py-2 px-4 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Huỷ</button>
+                  <button (click)="saveProjectDraft()" [disabled]="!projectDraft.title.trim()"
+                          class="py-2 px-4 bg-main text-white rounded-lg text-sm disabled:opacity-60">Lưu</button>
+                </div>
+              </div>
+            </div>
+          }
+        }
+
+        @if (activeTab() === 'debts') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Phí / Nợ của tôi</h3>
+          @if (debtsLoading()) {
+            <p class="text-gray-500 text-center py-8">Đang tải...</p>
+          } @else if (debtCount() === 0) {
+            <p class="text-gray-500 text-center py-8">Bạn không có khoản phí hay tiền phạt nào cần thanh toán.</p>
+          } @else {
+            <p class="text-gray-600 mb-4">Tổng cần thanh toán: <strong class="text-red-600">{{ debtTotal() | number:'1.0-0' }} đ</strong></p>
+            @if (paymentProviders().length === 0) {
+              <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+                Thư viện chưa nhận thanh toán trực tuyến — vui lòng thanh toán tại quầy.
+              </p>
+            }
+            <div class="space-y-3">
+              @for (t of debts().tickets; track t.publicId) {
+                <div class="flex flex-wrap items-center justify-between gap-3 p-4 border border-amber-200 bg-amber-50 rounded-xl">
+                  <div>
+                    <div class="text-sm font-semibold text-gray-800">Phiếu phạt {{ t.code }}</div>
+                    <div class="text-xs text-gray-500">{{ t.fineDate | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="text-lg font-bold text-red-600">{{ t.remaining | number:'1.0-0' }} đ</div>
+                    @if (paymentProviders().length > 0) {
+                      <button type="button" (click)="openDebtPayment('FINE_TICKET', t.targetId)"
+                        class="px-3 py-1.5 text-sm rounded-lg bg-main text-white hover:opacity-90">Thanh toán QR</button>
+                    }
+                  </div>
+                </div>
+              }
+              @for (p of debts().photos; track p.publicId) {
+                <div class="flex flex-wrap items-center justify-between gap-3 p-4 border border-amber-200 bg-amber-50 rounded-xl">
+                  <div>
+                    <div class="text-sm font-semibold text-gray-800">Phí sao chụp tài liệu</div>
+                    <div class="text-xs text-gray-500">{{ p.photoDate | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="text-lg font-bold text-red-600">{{ p.remaining | number:'1.0-0' }} đ</div>
+                    @if (paymentProviders().length > 0) {
+                      <button type="button" (click)="openDebtPayment('PHOTOCOPY', p.targetId)"
+                        class="px-3 py-1.5 text-sm rounded-lg bg-main text-white hover:opacity-90">Thanh toán QR</button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+          @if (debtPaymentTarget(); as target) {
+            <app-payment-qr-dialog mode="reader" [providers]="paymentProviders()" [targetType]="target.targetType"
+              [targetId]="target.targetId" (paid)="onDebtPaid()" (closed)="debtPaymentTarget.set(null)">
+            </app-payment-qr-dialog>
+          }
+        }
+
+        @if (activeTab() === 'settings') {
+          <h3 class="text-2xl font-bold text-dark border-b border-gray-100 pb-4 mb-6 m-0">Cài đặt tài khoản</h3>
+
+          <form class="max-w-xl">
+            <div class="mb-6">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Họ và tên</label>
+              <input type="text" [value]="user()?.fullName" class="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-main bg-gray-50 text-gray-600" disabled>
+              <p class="text-xs text-gray-400 mt-1">Tên không thể thay đổi lúc này</p>
+            </div>
+            
+            <div class="mb-6">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Tên đăng nhập / Số thẻ</label>
+              <input type="text" [value]="user()?.username" class="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-main bg-gray-50 text-gray-600" disabled>
+            </div>
+            
+            <div class="mb-6">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+              <input type="email" [value]="user()?.email || ''" placeholder="Nhập địa chỉ email..." class="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-main transition-colors text-sm">
+            </div>
+            
+            <button type="button" class="bg-main text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+              Cập nhật thông tin
+            </button>
+          </form>
+        }
+
+      </div>
+    </main>
+  </div>
+</div>

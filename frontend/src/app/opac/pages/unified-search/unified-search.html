@@ -1,0 +1,355 @@
+<div class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- Ô tìm kiếm -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+    <h1 class="text-xl font-bold text-gray-800 mb-4">Tra cứu tài liệu</h1>
+
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input
+        [(ngModel)]="q" (keyup.enter)="runSearch()"
+        placeholder="Nhập nhan đề, tác giả, từ khóa, hoặc nội dung trong tài liệu…"
+        class="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <button (click)="runSearch()"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors">
+        Tìm kiếm
+      </button>
+      <button (click)="showAdvanced = !showAdvanced"
+        class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-lg text-sm transition-colors">
+        {{ showAdvanced ? 'Thu gọn' : 'Nâng cao' }}
+      </button>
+    </div>
+
+    @if (showAdvanced) {
+      <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <label class="text-sm relative">
+          <span class="block text-gray-600 mb-1">Nhan đề</span>
+          <input [(ngModel)]="title" (ngModelChange)="onFilterInput('title')" (focus)="onFilterInput('title')" (blur)="closeSuggestions()" (keyup.enter)="runSearch()" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          @if (activeSuggestField() === 'title' && suggestions().length) {
+            <ul class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto text-sm">
+              @for (s of suggestions(); track s) {
+                <li (mousedown)="selectSuggestion('title', s)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer truncate">{{ s }}</li>
+              }
+            </ul>
+          }
+        </label>
+        <label class="text-sm relative">
+          <span class="block text-gray-600 mb-1">Tác giả</span>
+          <input [(ngModel)]="author" (ngModelChange)="onFilterInput('author')" (focus)="onFilterInput('author')" (blur)="closeSuggestions()" (keyup.enter)="runSearch()" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          @if (activeSuggestField() === 'author' && suggestions().length) {
+            <ul class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto text-sm">
+              @for (s of suggestions(); track s) {
+                <li (mousedown)="selectSuggestion('author', s)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer truncate">{{ s }}</li>
+              }
+            </ul>
+          }
+        </label>
+        <label class="text-sm relative">
+          <span class="block text-gray-600 mb-1">Nhà xuất bản</span>
+          <input [(ngModel)]="publisher" (ngModelChange)="onFilterInput('publisher')" (focus)="onFilterInput('publisher')" (blur)="closeSuggestions()" (keyup.enter)="runSearch()" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          @if (activeSuggestField() === 'publisher' && suggestions().length) {
+            <ul class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto text-sm">
+              @for (s of suggestions(); track s) {
+                <li (mousedown)="selectSuggestion('publisher', s)" class="px-3 py-2 hover:bg-blue-50 cursor-pointer truncate">{{ s }}</li>
+              }
+            </ul>
+          }
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">Nội dung trong tài liệu <span class="text-xs text-indigo-600">(tài liệu số)</span></span>
+          <input [(ngModel)]="content" (keyup.enter)="runSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">Phân loại DDC <span class="text-xs text-amber-600">(tài liệu in)</span></span>
+          <input [(ngModel)]="ddc" (keyup.enter)="runSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">Số ĐKCB <span class="text-xs text-amber-600">(tài liệu in)</span></span>
+          <input [(ngModel)]="callNumber" (keyup.enter)="runSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">Năm xuất bản từ</span>
+          <input type="number" [(ngModel)]="yearFrom" (keyup.enter)="runSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">đến</span>
+          <input type="number" [(ngModel)]="yearTo" (keyup.enter)="runSearch()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <div class="flex items-end gap-2">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" [(ngModel)]="availableOnly" (change)="runSearch()" class="rounded" />
+            Chỉ tài liệu còn sẵn
+          </label>
+          <button (click)="clearAll()" class="ml-auto text-sm text-gray-500 hover:text-gray-700 underline">Xóa lọc</button>
+        </div>
+        <label class="text-sm">
+          <span class="block text-gray-600 mb-1">Bộ sưu tập</span>
+          <app-searchable-select
+            [items]="collectionSelectOptions()" bindLabel="label" bindValue="id"
+            [(value)]="collectionId" (valueChange)="onCollectionChange()"
+            placeholder="Tất cả bộ sưu tập" />
+        </label>
+      </div>
+    }
+  </div>
+
+  @if (searched()) {
+    <!-- Tab loại tài liệu -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <button (click)="setDocType(null)"
+        class="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
+        [class]="docType === null ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
+        Tất cả ({{ total() }})
+      </button>
+      <button (click)="setDocType('print')"
+        class="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
+        [class]="docType === 'print' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
+        Tài liệu in ({{ countOf()['print'] || 0 }})
+      </button>
+      <button (click)="setDocType('digital')"
+        class="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
+        [class]="docType === 'digital' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'">
+        Tài liệu số ({{ countOf()['digital'] || 0 }})
+      </button>
+
+      <div class="ml-auto flex items-center gap-2">
+        <select [(ngModel)]="sortBy" (change)="runSearch()"
+          class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
+          <option value="relevance">Liên quan nhất</option>
+          <option value="newest">Mới nhất</option>
+          <option value="oldest">Cũ nhất</option>
+          <option value="title">Theo nhan đề</option>
+        </select>
+        <select [ngModel]="pageSize()" (ngModelChange)="changePageSize($event)"
+          class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
+          @for (n of pageSizeOptions; track n) { <option [ngValue]="n">{{ n }}/trang</option> }
+        </select>
+        <div class="flex border border-gray-300 rounded-lg overflow-hidden">
+          <button type="button" (click)="viewMode.set('list')"
+            [class]="viewMode() === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+            class="w-9 h-9 flex items-center justify-center transition-colors" title="Dạng danh sách">
+            <i class="fas fa-list"></i>
+          </button>
+          <button type="button" (click)="viewMode.set('grid')"
+            [class]="viewMode() === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+            class="w-9 h-9 flex items-center justify-center border-l border-gray-300 transition-colors" title="Dạng lưới">
+            <i class="fas fa-th-large"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    @if (scopeNotice() === 'print') {
+      <div class="mb-4 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+        Tiêu chí bạn chọn (DDC / số ĐKCB) chỉ có ở <strong>tài liệu in</strong> — kết quả sẽ không gồm tài liệu số.
+      </div>
+    }
+    @if (scopeNotice() === 'digital') {
+      <div class="mb-4 px-4 py-2.5 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-800">
+        Tìm theo nội dung chỉ áp dụng cho <strong>tài liệu số</strong> (tài liệu in không có toàn văn).
+      </div>
+    }
+
+    <div class="flex flex-col lg:flex-row gap-5">
+      <!-- Facet -->
+      <aside class="lg:w-60 shrink-0 space-y-4">
+        @if (facets().years.length) {
+          <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <h3 class="font-semibold text-sm text-gray-800 mb-2">Năm xuất bản</h3>
+            <div class="space-y-1 max-h-56 overflow-y-auto">
+              @for (f of facets().years; track f.key) {
+                <button (click)="toggleYear(f.key)"
+                  class="w-full flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-gray-50"
+                  [class.bg-blue-50]="selectedYears.includes(+f.key)">
+                  <input type="checkbox" [checked]="selectedYears.includes(+f.key)" class="rounded pointer-events-none" tabindex="-1">
+                  <span class="text-gray-700 flex-1 text-left">{{ f.key }}</span>
+                  <span class="text-gray-400">{{ f.count }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+        @if (facets().materialTypes.length) {
+          <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <h3 class="font-semibold text-sm text-gray-800 mb-2">Loại hình</h3>
+            <div class="space-y-1">
+              @for (f of facets().materialTypes; track f.key) {
+                <button (click)="toggleMaterial(f.key)"
+                  class="w-full flex justify-between text-sm px-2 py-1 rounded hover:bg-gray-50"
+                  [class.bg-blue-50]="materialType === f.key">
+                  <span class="text-gray-700 truncate">{{ f.key }}</span>
+                  <span class="text-gray-400 ml-2">{{ f.count }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+        @if (facets().stores.length) {
+          <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <h3 class="font-semibold text-sm text-gray-800 mb-2">Kho</h3>
+            <div class="space-y-1 max-h-56 overflow-y-auto">
+              @for (f of facets().stores; track f.key) {
+                <button (click)="toggleStore(f.key)"
+                  class="w-full flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-gray-50"
+                  [class.bg-blue-50]="selectedStores.includes(f.key)">
+                  <input type="checkbox" [checked]="selectedStores.includes(f.key)" class="rounded pointer-events-none" tabindex="-1">
+                  <span class="text-gray-700 truncate flex-1 text-left">{{ f.key }}</span>
+                  <span class="text-gray-400 ml-2">{{ f.count }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+        @if (facets().authors.length) {
+          <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <h3 class="font-semibold text-sm text-gray-800 mb-2">Tác giả</h3>
+            <div class="space-y-1 max-h-56 overflow-y-auto">
+              @for (f of facets().authors; track f.key) {
+                <button (click)="toggleAuthorFacet(f.key)"
+                  class="w-full flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-gray-50"
+                  [class.bg-blue-50]="selectedAuthors.includes(f.key)">
+                  <input type="checkbox" [checked]="selectedAuthors.includes(f.key)" class="rounded pointer-events-none" tabindex="-1">
+                  <span class="text-gray-700 truncate flex-1 text-left">{{ f.key }}</span>
+                  <span class="text-gray-400 ml-2">{{ f.count }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </aside>
+
+      <!-- Kết quả -->
+      <div class="flex-1">
+        @if (loading()) {
+          <div class="bg-white rounded-xl border border-gray-100 p-10 text-center text-blue-600">Đang tìm…</div>
+        } @else if (!items().length) {
+          <div class="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
+            Không tìm thấy tài liệu phù hợp.
+          </div>
+        } @else {
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <p class="text-sm text-gray-500 m-0 flex items-center gap-2 flex-wrap">
+              <span>Tìm thấy <strong>{{ total() }}</strong> tài liệu</span>
+              @if (searchExecutionTimeMs() != null) {
+                <span class="text-xs text-gray-400">({{ searchExecutionTimeMs() }} ms)</span>
+              }
+            </p>
+            @if (authService.isAuthenticated()) {
+              <button type="button" (click)="openSaveSearchModal()"
+                      class="text-sm text-main font-medium flex items-center gap-1.5 hover:underline">
+                <i class="fas fa-bell"></i> Lưu tìm kiếm này
+              </button>
+            }
+          </div>
+          @if (usedFallback()) {
+            <div class="mb-3 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+              <i class="fas fa-exclamation-triangle"></i>
+              Đang dùng tìm kiếm dự phòng do hệ thống tìm kiếm chính tạm gián đoạn — kết quả có thể chưa đầy đủ hoặc chưa sắp xếp theo mức độ liên quan.
+            </div>
+          }
+          <div [class]="viewMode() === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-3'">
+            @for (it of items(); track trackByGroup($index, it)) {
+              <div (click)="openItem(it)"
+                [class]="viewMode() === 'grid'
+                  ? 'bg-white rounded-xl border border-gray-100 p-3 hover:shadow-md cursor-pointer transition-shadow flex flex-col'
+                  : 'bg-white rounded-xl border border-gray-100 p-4 flex gap-4 hover:shadow-md cursor-pointer transition-shadow'">
+                <div [class]="viewMode() === 'grid'
+                    ? 'w-full aspect-[3/4] mb-2 bg-gray-100 rounded overflow-hidden flex items-center justify-center'
+                    : 'w-16 h-22 shrink-0 bg-gray-100 rounded overflow-hidden flex items-center justify-center'">
+                  @if (it.imageUrl) {
+                    <img [src]="it.imageUrl" [alt]="it.title" class="w-full h-full object-cover" />
+                  } @else {
+                    <span class="text-2xl">{{ it.docType === 'print' ? '📕' : '💻' }}</span>
+                  }
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start gap-2 mb-1">
+                    <span class="px-2 py-0.5 rounded text-xs font-medium shrink-0"
+                      [class]="it.docType === 'print' ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'">
+                      {{ it.docType === 'print' ? 'Tài liệu in' : 'Tài liệu số' }}
+                    </span>
+                    @if (viewMode() === 'list') { <h3 class="font-semibold text-gray-800 truncate">{{ it.title }}</h3> }
+                  </div>
+                  @if (viewMode() === 'grid') { <h3 class="font-semibold text-gray-800 text-sm line-clamp-2 mb-1">{{ it.title }}</h3> }
+
+                  <p class="text-sm text-gray-600 truncate">
+                    @if (it.author) { <span>{{ it.author }}</span> }
+                    @if (it.publisher) { <span class="text-gray-400"> · </span><span>{{ it.publisher }}</span> }
+                    @if (it.publishDate) { <span class="text-gray-400"> · </span><span>{{ it.publishDate }}</span> }
+                  </p>
+
+                  @if (it.highlight && viewMode() === 'list') {
+                    <p class="text-sm text-gray-600 mt-1.5 bg-gray-50 rounded px-2 py-1 line-clamp-2" [innerHTML]="it.highlight"></p>
+                  }
+
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-500">
+                    @if (it.docType === 'digital' && it.bestPageNumber) {
+                      <span class="text-indigo-600 font-medium">Khớp tại trang {{ it.bestPageNumber }}</span>
+                    }
+                    @if (it.docType === 'print') {
+                      <span>{{ it.copyCount || 0 }} bản</span>
+                      @if (it.availableCount) { <span class="text-emerald-600 font-medium">{{ it.availableCount }} sẵn sàng</span> }
+                      @if (it.holdings?.length) { <span>{{ it.holdings![0].storeName }}</span> }
+                      @if (it.ddc) { <span>DDC {{ it.ddc }}</span> }
+                    }
+                    @if (it.collectionName) { <span>{{ it.collectionName }}</span> }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Phân trang -->
+          @if (totalPages() > 1) {
+            <div class="flex justify-center items-center gap-1 mt-5">
+              <button (click)="goToPage(1)" [disabled]="page() === 1"
+                class="px-3 py-1.5 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50">«</button>
+              <button (click)="goToPage(page() - 1)" [disabled]="page() === 1"
+                class="px-3 py-1.5 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50">‹</button>
+              @for (p of pages(); track p) {
+                <button (click)="goToPage(p)"
+                  class="px-3 py-1.5 rounded border text-sm"
+                  [class]="p === page() ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'">{{ p }}</button>
+              }
+              <button (click)="goToPage(page() + 1)" [disabled]="page() === totalPages()"
+                class="px-3 py-1.5 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50">›</button>
+              <button (click)="goToPage(totalPages())" [disabled]="page() === totalPages()"
+                class="px-3 py-1.5 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50">»</button>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (saveSearchMessage(); as msg) {
+    <div class="fixed bottom-5 right-5 z-[110] px-4 py-3 rounded-lg shadow-lg text-sm font-medium"
+         [class.bg-green-600]="msg.ok" [class.text-white]="msg.ok"
+         [class.bg-red-50]="!msg.ok" [class.text-red-700]="!msg.ok" [class.border]="!msg.ok" [class.border-red-200]="!msg.ok">
+      {{ msg.text }}
+    </div>
+  }
+
+  @if (showSaveSearchModal()) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+          <h3 class="text-lg font-bold text-gray-800 m-0">Lưu tìm kiếm này</h3>
+          <button (click)="closeSaveSearchModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-gray-500 m-0">Bạn sẽ nhận thông báo trong tài khoản khi có tài liệu mới khớp với tìm kiếm này.</p>
+          <input [(ngModel)]="saveSearchName" placeholder="Đặt tên cho tìm kiếm..."
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="p-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50">
+          <button (click)="closeSaveSearchModal()" class="py-2 px-4 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">Huỷ</button>
+          <button (click)="confirmSaveSearch()" [disabled]="savingSearch() || !saveSearchName.trim()"
+                  class="py-2 px-4 bg-main text-white rounded-lg text-sm disabled:opacity-60">
+            {{ savingSearch() ? 'Đang lưu...' : 'Lưu' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

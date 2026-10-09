@@ -1,0 +1,214 @@
+<div class="container mx-auto px-4 py-8">
+  <nav class="flex items-center text-sm text-gray-500 mb-6 bg-white p-3 rounded shadow-sm border-l-4 border-main">
+    <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <span class="text-main font-semibold">Đặt phòng học nhóm</span>
+  </nav>
+
+  <!-- Bộ chọn -->
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-wrap items-end gap-4">
+    <label class="flex flex-col gap-1 text-sm font-semibold text-gray-600">
+      Tòa nhà
+      <select [ngModel]="buildingId()" (ngModelChange)="onBuildingChange($event)"
+        class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        @for (b of buildings(); track b.id) { <option [ngValue]="b.id">{{ b.name }}</option> }
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 text-sm font-semibold text-gray-600">
+      Tầng
+      <select [ngModel]="floorId()" (ngModelChange)="onFloorChange($event)"
+        class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        @for (f of floors(); track f.id) { <option [ngValue]="f.id">{{ f.name || ('Tầng ' + f.floorNumber) }}</option> }
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 text-sm font-semibold text-gray-600">
+      Ngày
+      <input type="date" [ngModel]="date()" (ngModelChange)="onDateChange($event)" [min]="today" [max]="maxDate()"
+        class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </label>
+    <div class="flex flex-wrap items-center gap-3 ml-auto text-xs text-gray-600">
+      @for (l of legend; track l.state) {
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" [class]="l.dot"></span>{{ l.label }}</span>
+      }
+    </div>
+  </div>
+
+  @if (message(); as m) {
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm border" role="status"
+         [class.bg-green-50]="m.ok" [class.text-green-700]="m.ok" [class.border-green-200]="m.ok"
+         [class.bg-red-50]="!m.ok" [class.text-red-700]="!m.ok" [class.border-red-200]="!m.ok">
+      {{ m.text }}
+    </div>
+  }
+
+  @if (board() && !board()!.enabled) {
+    <div class="bg-white p-10 rounded-xl shadow-sm border border-gray-100 text-center text-gray-500">
+      <i class="fas fa-door-closed text-3xl text-gray-300 mb-3 block"></i>
+      Thư viện hiện chưa mở đặt phòng học nhóm trực tuyến.
+    </div>
+  } @else {
+    <!-- Sơ đồ tầng -->
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
+      @if (!floor() && !loading()) {
+        <div class="py-12 text-center text-gray-400 text-sm"><i class="fas fa-map text-3xl mb-3 text-gray-300 block"></i>Chưa có dữ liệu sơ đồ cho khu vực này.</div>
+      } @else {
+        <div class="relative w-full bg-gray-50 border-2 border-gray-200 rounded-xl overflow-hidden shadow-inner" [style.aspect-ratio]="aspectRatio()">
+          <div class="absolute inset-0 opacity-40 pointer-events-none"
+               style="background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px); background-size: 30px 30px;"></div>
+          @if (loading()) {
+            <div class="absolute inset-0 flex items-center justify-center bg-white/60 z-20"><i class="fas fa-spinner fa-spin text-2xl text-main"></i></div>
+          }
+          @for (o of floor()?.objects; track o.id) {
+            @if (boardRoomFor(o); as room) {
+              <button type="button" (click)="selectRoom(room, true)"
+                      class="absolute rounded-lg border-2 flex flex-col items-center justify-center text-center px-1 overflow-hidden transition-shadow cursor-pointer hover:shadow-md"
+                      [class]="style(roomState(room)).box"
+                      [class.ring-4]="isSelectedRow(room)" [class.ring-blue-300]="isSelectedRow(room)" [class.z-10]="isSelectedRow(room)"
+                      [style.left.%]="geom(o).x" [style.top.%]="geom(o).y" [style.width.%]="geom(o).w" [style.height.%]="geom(o).h"
+                      [attr.aria-label]="room.name + ' — ' + style(roomState(room)).label">
+                <i class="fas fa-door-open text-sm"></i>
+                <span class="text-[10px] font-bold leading-tight line-clamp-2">{{ room.name }}</span>
+                <span class="text-[9px]"><i class="fas fa-user"></i> {{ room.capacity }}</span>
+              </button>
+            } @else {
+              <div class="absolute rounded-lg border flex items-center justify-center text-center px-1 overflow-hidden bg-white/70 border-gray-200 text-gray-400"
+                   [style.left.%]="geom(o).x" [style.top.%]="geom(o).y" [style.width.%]="geom(o).w" [style.height.%]="geom(o).h">
+                <span class="text-[9px] leading-tight line-clamp-2">{{ o.name }}</span>
+              </div>
+            }
+          }
+        </div>
+        @if (board() && boardRooms().length === 0 && !loading()) {
+          <p class="mt-3 text-sm text-gray-500 text-center">Tầng này chưa có phòng học nhóm nhận đặt trực tuyến.</p>
+        }
+      }
+    </div>
+
+    <!-- Bảng lịch: phòng × khung giờ -->
+    @if (boardRooms().length > 0) {
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-x-auto">
+        <div class="min-w-max">
+          <div class="grid sticky top-0 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500" [style.grid-template-columns]="gridColumns()">
+            <div class="px-3 py-2">Phòng</div>
+            @for (s of slots(); track s.index) { <div class="py-2 text-center border-l border-gray-100">{{ s.label }}</div> }
+            <div class="py-2 text-center border-l border-gray-100">{{ closeLabel() }}</div>
+          </div>
+          @for (room of boardRooms(); track room.mapObjectId) {
+            <div [id]="'rb-row-' + room.mapObjectId" class="grid border-b border-gray-100 relative" [style.grid-template-columns]="gridColumns()"
+                 [class.bg-blue-50]="isSelectedRow(room)">
+              <button type="button" (click)="selectRoom(room)" class="px-3 py-2 text-left">
+                <span class="block text-sm font-semibold text-gray-800 line-clamp-1">{{ room.name }}</span>
+                <span class="block text-[11px] text-gray-500">
+                  <i class="fas fa-user"></i> {{ room.capacity }}
+                  @if ((room.minGroupSize ?? 1) > 1) { · tối thiểu {{ room.minGroupSize }} }
+                  @if (room.autoApprove) { · <span class="text-emerald-600">tự duyệt</span> }
+                </span>
+                @if (room.maintenance) {
+                  <span class="block text-[11px] text-amber-700"><i class="fas fa-tools"></i> Tạm ngưng{{ room.maintenanceNote ? ': ' + room.maintenanceNote : '' }}</span>
+                } @else if (room.closed) {
+                  <span class="block text-[11px] text-gray-500">Đóng cửa{{ room.closedReason ? ' (' + room.closedReason + ')' : '' }}</span>
+                } @else if (earliestFree(room); as ef) {
+                  <span class="block text-[11px] text-emerald-700">Trống sớm nhất {{ ef }}</span>
+                }
+              </button>
+              @for (s of slots(); track s.index) {
+                <button type="button" (click)="pickCell(room, s.index)" [disabled]="slotState(room, s) !== 'free' && !awaitingEnd(room)"
+                        class="h-12 border-l border-gray-100 transition-colors"
+                        [class.bg-blue-500]="isInRange(room, s.index)"
+                        [class.hover:bg-emerald-50]="!isInRange(room, s.index) && slotState(room, s) === 'free'"
+                        [class.bg-gray-100]="!isInRange(room, s.index) && slotState(room, s) === 'closed'"
+                        [class.cursor-not-allowed]="slotState(room, s) === 'closed' && !awaitingEnd(room)"
+                        [attr.aria-label]="room.name + ' ' + s.label + ' — ' + style(slotState(room, s)).label"></button>
+              }
+              <button type="button" (click)="pickCell(room, slots().length)" [disabled]="!awaitingEnd(room)"
+                      class="h-12 border-l border-gray-100" [class.hover:bg-blue-50]="awaitingEnd(room)"
+                      [attr.aria-label]="'Kết thúc lúc ' + closeLabel()"></button>
+              <!-- Khối lượt đặt -->
+              @for (bl of blocksByRoom().get(room.mapObjectId) ?? []; track $index) {
+                <button type="button" (click)="pickBlock(room, bl)"
+                        class="absolute top-1 bottom-1 rounded-md border text-[10px] leading-tight px-1 overflow-hidden text-left"
+                        [class]="bookingStyle(bl.booking.status).box"
+                        [style.left]="'calc(220px + ' + (bl.from * 64) + 'px + 2px)'"
+                        [style.width]="((bl.to - bl.from) * 64 - 4) + 'px'"
+                        [title]="bl.label + ' · ' + bookingStyle(bl.booking.status).label + (bl.booking.isMine ? ' · Lượt của bạn' : '')">
+                  <span class="font-semibold block truncate">{{ bl.booking.isMine ? 'Lượt của bạn' : bl.booking.readerName }}</span>
+                  <span class="block truncate">{{ bl.label }}</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Khung đặt phòng -->
+    @if (selectedRoom(); as room) {
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <h3 class="text-lg font-bold text-dark mb-1">{{ room.name }}</h3>
+        @if (room.rules) { <p class="text-sm text-gray-600 mb-3 whitespace-pre-line"><i class="fas fa-info-circle text-main"></i> {{ room.rules }}</p> }
+        @if (room.equipment.length) {
+          <p class="text-xs text-gray-500 mb-3">Thiết bị:
+            @for (e of room.equipment; track $index) { <span class="inline-block bg-gray-100 rounded px-2 py-0.5 mr-1 mb-1">{{ e.name }}@if (e.quantity && e.quantity > 1) { ×{{ e.quantity }} }</span> }
+          </p>
+        }
+        @if (selectedRange(); as r) {
+          <p class="text-sm mb-4">
+            Khung giờ: <strong>{{ hhmm(r.from) }} – {{ hhmm(r.to) }}</strong> ({{ r.minutes }} phút), ngày {{ date() | date:'dd/MM/yyyy' }}
+            @if (rangeEnd() == null) { <span class="text-gray-500"> — bấm ô giờ kết thúc để kéo dài</span> }
+            <button type="button" (click)="clearSelection()" class="ml-2 text-xs text-gray-500 hover:text-red-600 underline">Bỏ chọn</button>
+          </p>
+
+          @if (minGroup() > 1 || members().length > 0) {
+            <div class="mb-4">
+              <label class="block text-sm font-semibold text-gray-600 mb-1">
+                Thẻ thành viên nhóm @if (minGroup() > 1) { <span class="font-normal text-gray-500">(cần thêm {{ membersMissing() }} người)</span> }
+              </label>
+              <div class="flex gap-2">
+                <input [(ngModel)]="memberInput" (keydown.enter)="addMember()" placeholder="Số thẻ hoặc UID thẻ chip" aria-label="Thẻ thành viên"
+                       class="flex-1 max-w-xs px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="button" (click)="addMember()" [disabled]="memberChecking() || !memberInput.trim()"
+                        class="px-3 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50">
+                  @if (memberChecking()) { <i class="fas fa-spinner fa-spin"></i> } @else { Thêm }
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-2 mt-2">
+                @for (m of members(); track m.card) {
+                  <span class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-800 rounded-full px-3 py-1">
+                    {{ m.card }} · {{ m.name }}
+                    <button type="button" (click)="removeMember(m.card)" class="hover:text-red-600" [attr.aria-label]="'Bỏ ' + m.card"><i class="fas fa-times"></i></button>
+                  </span>
+                }
+              </div>
+            </div>
+          } @else {
+            <label class="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-4">
+              Số người
+              <select [ngModel]="partySize()" (ngModelChange)="partySize.set($event)"
+                      class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                @for (n of partyOptions(); track n) { <option [ngValue]="n">{{ n }}</option> }
+              </select>
+            </label>
+          }
+
+          <label class="block text-sm font-semibold text-gray-600 mb-1">Ghi chú</label>
+          <textarea [(ngModel)]="note" rows="2" maxlength="500" aria-label="Ghi chú"
+                    class="w-full max-w-xl px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"></textarea>
+
+          @if (isLoggedIn()) {
+            <button type="button" (click)="submit()" [disabled]="submitting() || notAllowed(room) || room.maintenance"
+                    class="px-5 py-2.5 rounded-lg bg-main text-white font-semibold text-sm hover:opacity-90 disabled:opacity-50">
+              @if (submitting()) { <i class="fas fa-spinner fa-spin mr-1"></i> } Gửi yêu cầu đặt phòng
+            </button>
+            @if (notAllowed(room)) { <p class="text-sm text-red-600 mt-2">Phòng này chỉ dành cho: {{ (room.allowedReaderTypes ?? []).join(', ') }}.</p> }
+          } @else {
+            <button type="button" (click)="goLogin()" class="px-5 py-2.5 rounded-lg bg-main text-white font-semibold text-sm hover:opacity-90">
+              Đăng nhập để đặt phòng
+            </button>
+          }
+        } @else {
+          <p class="text-sm text-gray-500">Bấm vào ô giờ trống trên bảng lịch để chọn giờ bắt đầu, rồi bấm ô giờ kết thúc.</p>
+        }
+      </div>
+    }
+  }
+</div>

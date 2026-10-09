@@ -1,0 +1,3 @@
+# Script chạy trên Linux (sh/dash, entrypoint Docker) phải xuống dòng LF — CRLF làm "set: Illegal option -".
+*.sh text eol=lf
+deploy/** text=auto eol=lf

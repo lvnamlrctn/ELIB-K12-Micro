@@ -1,0 +1,19 @@
+{
+  "HEADER": {
+    "HOME": "Home",
+    "INTRO": "About",
+    "SEARCH": "Search",
+    "NEWS": "News",
+    "CONTACT": "Contact",
+    "APP_TITLE": "Phan Dinh Phung Library",
+    "APP_SUBTITLE": "Connecting Knowledge",
+    "LOGIN": "Reader Login",
+    "LOGOUT": "Logout",
+    "PROFILE": "Profile",
+    "ADMIN": "Admin",
+    "LIBRARY_MAP": "Library Map"
+  },
+  "CATEGORY": {
+    "NO_NEWS": "There are currently no news items"
+  }
+}

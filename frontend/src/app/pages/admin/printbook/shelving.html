@@ -1,0 +1,56 @@
+<div class="mb-5">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'SHELVING.TITLE' | translate }}</h4>
+  <p class="text-sm text-gray-500 mt-1">{{ 'SHELVING.HINT' | translate }}</p>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+    <input formControlName="receiptCode" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.RECEIPT_CODE' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="barcodeFrom" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.BARCODE_FROM' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    <input formControlName="barcodeTo" type="text" (keydown.enter)="triggerSearch()" [placeholder]="'SHELVING.BARCODE_TO' | translate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+    <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="storeId"
+               [searchable]="true" [clearable]="true"
+               [placeholder]="'SHELVING.ALL_STORES' | translate"
+               [notFoundText]="'COMMON.NO_RESULTS' | translate"
+               [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+    </ng-select>
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button (click)="triggerSearch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+  </div>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+  <ng-select class="w-64" [items]="stores()" bindLabel="name" bindValue="id"
+             [ngModel]="targetStoreId()" (ngModelChange)="targetStoreId.set($event)"
+             [clearable]="true" [placeholder]="'SHELVING.TARGET_STORE' | translate"
+             [notFoundText]="'COMMON.NO_RESULTS' | translate"></ng-select>
+  <button (click)="shelveSelected()" [disabled]="selection.selected.length === 0 || isShelving()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+    @if (isShelving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">inventory_2</mat-icon> } {{ 'SHELVING.DO' | translate }} ({{ selection.selected.length }})
+  </button>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-12 border-b border-gray-200 bg-gray-50">
+          <input type="checkbox" (change)="toggleAllRows()" [checked]="selection.hasValue() && isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+        </th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100">
+          <input type="checkbox" (click)="$event.stopPropagation()" (change)="selection.toggle(row)" [checked]="selection.isSelected(row)" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="barcode"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SHELVING.BARCODE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-mono font-medium text-gray-800 border-b border-gray-100">{{ row.barcode || '—' }}</td></ng-container>
+      <ng-container matColumnDef="bibTitle"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'BIB.COL_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-800 border-b border-gray-100">{{ row.bibTitle || '—' }}</td></ng-container>
+      <ng-container matColumnDef="receiptCode"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'AB_RECEIPT.CODE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.receiptCode || '—' }}</td></ng-container>
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+      <ng-container matColumnDef="store"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SHELVING.STORE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.storeName || getStoreName(row.storeId) }}</td></ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors cursor-pointer" (click)="selection.toggle(row)"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">inventory_2</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>

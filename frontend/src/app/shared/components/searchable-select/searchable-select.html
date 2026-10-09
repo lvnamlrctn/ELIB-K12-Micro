@@ -1,0 +1,18 @@
+@if (loadFn) {
+  <ng-select [items]="items ?? []" [bindLabel]="bindLabel" [bindValue]="bindValue"
+             [ngModel]="value" (ngModelChange)="onChange($event)"
+             [searchable]="true" [clearable]="clearable" [multiple]="multiple" [disabled]="disabled"
+             [loading]="loading" [typeahead]="searchInput$"
+             [placeholder]="placeholder"
+             [notFoundText]="'COMMON.NO_RESULTS' | translate"
+             [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+  </ng-select>
+} @else {
+  <ng-select [items]="items ?? []" [bindLabel]="bindLabel" [bindValue]="bindValue"
+             [ngModel]="value" (ngModelChange)="onChange($event)"
+             [searchable]="true" [clearable]="clearable" [multiple]="multiple" [disabled]="disabled"
+             [placeholder]="placeholder"
+             [notFoundText]="'COMMON.NO_RESULTS' | translate"
+             [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+  </ng-select>
+}

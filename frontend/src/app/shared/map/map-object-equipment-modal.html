@@ -1,0 +1,59 @@
+@if (open) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-violet-600">inventory_2</mat-icon>
+          {{ 'MAP_OBJECT.EQUIPMENT_TITLE' | translate }} — {{ objectName }}
+        </h3>
+        <button (click)="close()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
+        <div class="space-y-2 mb-4">
+          @for (e of equipmentList(); track e.id) {
+            <div class="flex items-center justify-between p-3 border border-gray-100 rounded-lg bg-gray-50">
+              <div>
+                <div class="text-sm font-medium text-gray-800">{{ e.name }} <span class="text-xs text-gray-400">x{{ e.quantity }}</span></div>
+                @if (e.description) { <div class="text-xs text-gray-500">{{ e.description }}</div> }
+                <span class="text-2xs px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ e.conditionStatus }}</span>
+              </div>
+              <button (click)="deleteEquipment(e)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors">
+                <mat-icon class="text-[18px]">delete</mat-icon>
+              </button>
+            </div>
+          } @empty {
+            <p class="text-sm text-gray-400 text-center py-4">{{ 'COMMON.NO_DATA' | translate }}</p>
+          }
+        </div>
+
+        <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input [(ngModel)]="newEquipment.name" type="text" placeholder="{{ 'MAP_OBJECT.EQUIPMENT_NAME' | translate }}"
+                 class="md:col-span-2 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+          <input [(ngModel)]="newEquipment.quantity" type="number" min="1" placeholder="SL"
+                 class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+          <select [(ngModel)]="newEquipment.conditionStatus" class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white">
+            <option value="Sẵn sàng">Sẵn sàng</option>
+            <option value="Hoạt động">Hoạt động</option>
+            <option value="Bảo trì">Bảo trì</option>
+          </select>
+          <input [(ngModel)]="newEquipment.description" type="text" placeholder="{{ 'MAP_OBJECT.SHELF_DESCRIPTION' | translate }}"
+                 class="md:col-span-3 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500">
+          <button (click)="addEquipment()"
+                  class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1 transition-colors">
+            <mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="close()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CLOSE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

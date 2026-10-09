@@ -1,0 +1,274 @@
+<div class="p-4 space-y-4 print:hidden">
+
+  <!-- Search Form Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+      <mat-icon class="text-blue-600 text-lg">search</mat-icon>
+      <h2 class="text-base font-semibold text-gray-700">{{ 'BOOK_TITLE_SEARCH.SEARCH_TITLE' | translate }}</h2>
+      <button type="button" (click)="toggleFilters()" class="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" [title]="(filtersCollapsed() ? 'COMMON.EXPAND' : 'COMMON.COLLAPSE') | translate">
+        <mat-icon>{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+      </button>
+    </div>
+
+    @if (!filtersCollapsed()) {
+    <form [formGroup]="searchForm" class="p-4">
+      <div class="flex gap-4">
+
+        <!-- Left: form fields grid -->
+        <div class="flex-1 grid grid-cols-4 gap-x-4 gap-y-3">
+
+          <!-- Row 1: Mfn từ | Đến | Năm XB | Loại tài liệu -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.MFN_FROM' | translate }}</label>
+            <input type="number" formControlName="mfnFrom" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.MFN_FROM' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.MFN_TO' | translate }}</label>
+            <input type="number" formControlName="mfnTo" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.MFN_TO' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.PUBLISH_YEAR' | translate }}</label>
+            <input type="text" formControlName="publishYear" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.PUBLISH_YEAR_PH' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.DOC_TYPE' | translate }}</label>
+            <ng-select [items]="bibTypes()" bindLabel="name" bindValue="id" formControlName="docTypeId" (change)="triggerSearch()"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'BOOK_SEARCH.DOC_TYPE_ALL' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+
+          <!-- Row 2: Nhan đề | Nhà XB | Trạng thái | (empty) -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.TITLE' | translate }}</label>
+            <input type="text" formControlName="title" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.TITLE_PH' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.PUBLISHER' | translate }}</label>
+            <input type="text" formControlName="publisher" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.PUBLISHER_PH' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.STATUS' | translate }}</label>
+            <ng-select [items]="statuses()" bindLabel="name" bindValue="id" formControlName="status" (change)="triggerSearch()"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'BOOK_SEARCH.STATUS_ALL' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+          <div></div>
+
+          <!-- Row 3: Tác giả | Số ĐKCB | Từ khóa | (empty) -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.AUTHOR' | translate }}</label>
+            <input type="text" formControlName="author" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.AUTHOR_PH' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.CALL_NUMBER' | translate }}</label>
+            <input type="text" formControlName="callNumber" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.CALL_NUMBER_PH' | translate">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.KEYWORD' | translate }}</label>
+            <input type="text" formControlName="keyword" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.KEYWORD_PH' | translate">
+          </div>
+          @if (isPrivileged) {
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'COMMON.TENANT' | translate }}</label>
+              <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" />
+            </div>
+          } @else { <div></div> }
+
+          <!-- Row 4: Tóm tắt -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'BOOK_SEARCH.SUMMARY' | translate }}</label>
+            <input type="text" formControlName="summary" (keydown.enter)="triggerSearch()"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              [placeholder]="'BOOK_SEARCH.SUMMARY_PH' | translate">
+          </div>
+          <div></div>
+          <div></div>
+          <div></div>
+
+        </div>
+
+        <!-- Right: action buttons -->
+        <div class="flex flex-col gap-2 min-w-[160px]">
+          <button type="button" (click)="triggerSearch()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <mat-icon class="text-base leading-none">search</mat-icon>
+            {{ 'BOOK_SEARCH.BTN_SEARCH' | translate }}
+          </button>
+          <button type="button" (click)="resetForm()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+            <mat-icon class="text-base leading-none">refresh</mat-icon>
+            {{ 'BOOK_SEARCH.BTN_RESET' | translate }}
+          </button>
+          <button *appCan="'export'" type="button" (click)="exportTitles()" [disabled]="isExporting()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+            <mat-icon class="text-base leading-none">download</mat-icon>
+            {{ 'BOOK_TITLE_SEARCH.BTN_EXPORT' | translate }}
+          </button>
+          <button type="button" (click)="printClassLabels()" [disabled]="selection.isEmpty() || isPrintingLabels()"
+            class="flex items-center justify-center gap-1 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+            <mat-icon class="text-base leading-none">print</mat-icon>
+            {{ 'BOOK_TITLE_SEARCH.BTN_PRINT_LABEL' | translate }}
+          </button>
+        </div>
+
+      </div>
+    </form>
+    }
+  </div>
+
+  <!-- Results Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <mat-icon class="text-blue-600 text-lg">list</mat-icon>
+        <h2 class="text-base font-semibold text-gray-700">{{ 'BOOK_TITLE_SEARCH.RESULT_TITLE' | translate }}</h2>
+        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+          {{ totalRecords }} {{ 'BOOK_SEARCH.RECORDS' | translate }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    @if (isLoading()) {
+      <div class="flex items-center justify-center py-12 text-gray-400">
+        <mat-icon class="animate-spin mr-2">sync</mat-icon>
+        {{ 'COMMON.LOADING' | translate }}
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table mat-table [dataSource]="dataSource" class="w-full text-sm">
+
+          <!-- Chọn -->
+          <ng-container matColumnDef="select">
+            <th mat-header-cell *matHeaderCellDef class="text-center bg-gray-50 w-10">
+              <input type="checkbox" (change)="toggleAllRows()" [checked]="selection.hasValue() && isAllSelected()" [indeterminate]="selection.hasValue() && !isAllSelected()" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+            </th>
+            <td mat-cell *matCellDef="let row" class="text-center">
+              <input type="checkbox" (click)="$event.stopPropagation()" (change)="selection.toggle(row)" [checked]="selection.isSelected(row)" class="rounded text-blue-500 focus:ring-blue-500 border-gray-300 cursor-pointer">
+            </td>
+          </ng-container>
+
+          <!-- STT -->
+          <ng-container matColumnDef="stt">
+            <th mat-header-cell *matHeaderCellDef class="text-center font-semibold text-gray-600 text-xs bg-gray-50 w-10">STT</th>
+            <td mat-cell *matCellDef="let row; let i = index" class="text-center text-gray-500 text-xs">{{ getRowIndex(i) }}</td>
+          </ng-container>
+
+          <!-- Mfn -->
+          <ng-container matColumnDef="mfn">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_MFN' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 font-mono text-xs">{{ row.mfn ?? '—' }}</td>
+          </ng-container>
+
+          <!-- Nhan đề -->
+          <ng-container matColumnDef="title">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_TITLE' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-800 max-w-xs">
+              <span class="block truncate" [title]="row.title ?? ''">{{ row.title ?? '—' }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Tác giả -->
+          <ng-container matColumnDef="author">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_AUTHOR' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 text-xs">{{ row.author ?? '—' }}</td>
+          </ng-container>
+
+          <!-- Nhà XB -->
+          <ng-container matColumnDef="publisher">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_PUBLISHER' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 text-xs">{{ row.publisher ?? '—' }}</td>
+          </ng-container>
+
+          <!-- Năm XB -->
+          <ng-container matColumnDef="publishYear">
+            <th mat-header-cell *matHeaderCellDef class="text-center font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_SEARCH.COL_PUBLISH_YEAR' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-center text-gray-700 text-xs">{{ row.publishYear ?? '—' }}</td>
+          </ng-container>
+
+          <!-- Thư viện -->
+          <ng-container matColumnDef="tenant">
+            <th mat-header-cell *matHeaderCellDef class="font-semibold text-gray-600 text-xs bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-gray-700 text-xs">{{ row.tenantName ?? '—' }}</td>
+          </ng-container>
+
+          <!-- Số lượng -->
+          <ng-container matColumnDef="quantity">
+            <th mat-header-cell *matHeaderCellDef class="text-center font-semibold text-gray-600 text-xs bg-gray-50">{{ 'BOOK_TITLE_SEARCH.COL_QUANTITY' | translate }}</th>
+            <td mat-cell *matCellDef="let row" class="text-center text-gray-700 text-xs font-semibold">{{ row.quantity ?? 0 }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns" class="border-b border-gray-200"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            class="border-b border-gray-100 hover:bg-blue-50 transition-colors"></tr>
+
+          <!-- No data row -->
+          <tr class="mat-row" *matNoDataRow>
+            <td [attr.colspan]="displayedColumns.length" class="py-10 text-center text-gray-400 text-sm">
+              <mat-icon class="block mx-auto mb-1 text-gray-300 text-4xl" style="font-size:48px">search_off</mat-icon>
+              {{ 'COMMON.NO_DATA' | translate }}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <mat-paginator
+        [length]="totalRecords"
+        [pageSize]="pageSize" [pageIndex]="pageIndex"
+        [pageSizeOptions]="pageSizeOptions"
+        (page)="onPageChange($event)"
+        showFirstLastButtons
+        class="border-t border-gray-100">
+      </mat-paginator>
+    }
+  </div>
+</div>
+
+@if (printLabels().length > 0) {
+  <div class="fixed inset-0 bg-white z-50 p-4 overflow-auto print:static print:z-auto print:p-0">
+    <div class="flex justify-end gap-2 mb-3 print:hidden">
+      <button type="button" (click)="printLabels.set([])" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">close</mat-icon> {{ 'COMMON.CLOSE' | translate }}
+      </button>
+      <button type="button" (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px]">print</mat-icon> {{ 'CLASS_LABEL.PRINT' | translate }}
+      </button>
+    </div>
+    <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 print:grid-cols-5">
+      @for (lb of printLabels(); track lb.key) {
+        <div class="mx-auto flex flex-col items-center">
+          <div class="border border-gray-400 rounded w-[4.2cm] h-[2.8cm] flex flex-col items-center justify-center text-center px-1">
+            <span class="text-[10px] font-semibold leading-tight uppercase" [innerHTML]="libraryHeader().parentLibrary"></span>
+            <span class="text-[9px] leading-tight uppercase underline" [innerHTML]="libraryHeader().libraryName"></span>
+            <span class="text-lg font-bold leading-tight mt-1" [innerHTML]="lb.classSymbol || '—'"></span>
+            <div class="w-10 border-t border-dashed border-gray-500 my-0.5"></div>
+            <span class="text-lg font-bold leading-tight" [innerHTML]="lb.authorMark || ''"></span>
+          </div>
+          <span class="text-[9px] text-gray-600 leading-tight mt-0.5 max-w-[4.2cm] truncate" [innerHTML]="caption(lb.author, lb.title)"></span>
+        </div>
+      }
+    </div>
+  </div>
+}

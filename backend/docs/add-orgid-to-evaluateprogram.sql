@@ -1,0 +1,7 @@
+-- ĐÃ THU HỒI — KHÔNG DÙNG SCRIPT NÀY.
+-- Đợt 8 lần đầu nhầm lẫn: "Đơn vị đào tạo" (DonVi — Khoa/Viện/Trường, sở hữu Chương trình đào tạo) KHÔNG
+-- PHẢI là Org (Dbo.Org — phòng ban nội bộ hệ thống, dùng cho Reader.OrgId). Cột Program.OrgId do script
+-- này tạo đã bị DROP khỏi CSDL live, migration 20260918142351_AddOrgIdToEvaluateProgram đã bị gỡ khỏi cả
+-- code lẫn __EFMigrationsHistory. Thay bằng entity Evaluate.DonVi + Program.DonViId thật, xem
+-- backend/docs/add-donvi-table-and-program-donviid.sql.
+-- Giữ lại file này (không xoá) làm dấu vết — không chạy lại dưới bất kỳ hình thức nào.

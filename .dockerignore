@@ -1,0 +1,17 @@
+# Build context của image service chỉ cần global.json + src/. Loại monolith cũ, frontend, secret và output build.
+*
+!global.json
+!src/
+!deploy/docker/web.nginx.conf
+src/**/bin/
+src/**/obj/
+src/**/TestResults/
+src/Web/node_modules/
+src/Web/dist/
+src/Web/.angular/
+**/.env
+**/.env.*
+**/*.pfx
+**/*.pem
+**/*.key
+**/secrets/

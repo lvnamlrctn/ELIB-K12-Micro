@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<dublin_core>
+  <dcvalue element="title">Lập trình Python cơ bản</dcvalue>
+  <dcvalue element="title" qualifier="alternative">Introduction to Python Programming</dcvalue>
+  <dcvalue element="contributor" qualifier="author">Nguyễn Văn An</dcvalue>
+  <dcvalue element="contributor" qualifier="author">Trần Thị Bình</dcvalue>
+  <dcvalue element="contributor" qualifier="advisor">PGS.TS Lê Hoàng Cường</dcvalue>
+  <dcvalue element="publisher">NXB Giáo dục Việt Nam</dcvalue>
+  <dcvalue element="date" qualifier="issued">2024</dcvalue>
+  <dcvalue element="subject">Python</dcvalue>
+  <dcvalue element="subject">Lập trình</dcvalue>
+  <dcvalue element="subject">Trí tuệ nhân tạo</dcvalue>
+  <dcvalue element="identifier" qualifier="citation">Nguyễn Văn An (2024). Lập trình Python cơ bản. NXB Giáo dục.</dcvalue>
+  <dcvalue element="relation" qualifier="ispartofseries">Bộ sách Công nghệ thông tin</dcvalue>
+  <dcvalue element="identifier" qualifier="isbn">978-604-123-456-7</dcvalue>
+  <dcvalue element="language" qualifier="iso">vi</dcvalue>
+  <dcvalue element="description" qualifier="abstract">Cuốn sách giới thiệu ngôn ngữ lập trình Python từ cơ bản đến nâng cao, bao gồm cú pháp, cấu trúc dữ liệu, lập trình hướng đối tượng và ứng dụng trong khoa học dữ liệu.</dcvalue>
+</dublin_core>

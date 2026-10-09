@@ -1,0 +1,351 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CABINET.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filter -->
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <input formControlName="keyword" type="text" (keydown.enter)="triggerSearch()"
+           placeholder="{{ 'CABINET.SEARCH_PH' | translate }}"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 md:col-span-2">
+    <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" />
+    <button (click)="triggerSearch()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors">
+      <mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}
+    </button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center">
+  <button *appCan="'add'" (click)="openAddModal()"
+          class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}
+  </button>
+  <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0"
+          class="bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}
+  </button>
+  <button (click)="goToMap()"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+    <mat-icon class="text-[16px]">map</mat-icon> {{ 'CABINET.POSITION_MAP' | translate }}
+  </button>
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 w-10 text-center border-b border-gray-200 bg-gray-50">
+          <input type="checkbox" (change)="$event ? masterToggle() : null"
+                 [checked]="selection.hasValue() && isAllSelected()"
+                 [indeterminate]="selection.hasValue() && !isAllSelected()"
+                 class="rounded text-blue-500 border-gray-300 cursor-pointer">
+        </th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-center border-b border-gray-100">
+          <input type="checkbox" (click)="$event.stopPropagation()"
+                 (change)="$event ? selection.toggle(row) : null"
+                 [checked]="selection.isSelected(row)"
+                 class="rounded text-blue-500 border-gray-300 cursor-pointer">
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="stt">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th>
+        <td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="code">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'CABINET.CODE' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">
+          @if (row.code) {
+            <span class="font-mono text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-700">{{ row.code }}</span>
+          } @else { <span class="text-gray-300">—</span> }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'CABINET.NAME' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.name || '—' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="circPlaceName">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'CABINET.CIRC_PLACE' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ getCircPlaceName(row.circPlaceId) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-center">{{ 'CABINET.STATUS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-center">
+          @if (row.status === 1) {
+            <span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">{{ 'CABINET.STATUS_ACTIVE' | translate }}</span>
+          } @else if (row.status === 0) {
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{{ 'CABINET.STATUS_INACTIVE' | translate }}</span>
+          } @else { <span class="text-gray-300">—</span> }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="tenant">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right">
+          <div class="flex items-center justify-end gap-1">
+            <button *appCan="'edit'" (click)="openCompartmentModal(row)" class="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors" [title]="'CABINET.COMPARTMENTS' | translate">
+              <mat-icon class="text-[18px]">grid_view</mat-icon>
+            </button>
+            <button *appCan="'edit'" (click)="openEditModal(row)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" [title]="'COMMON.EDIT' | translate">
+              <mat-icon class="text-[18px]">edit</mat-icon>
+            </button>
+            <button *appCan="'delete'" (click)="handleDelete(row)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" [title]="'COMMON.DELETE' | translate">
+              <mat-icon class="text-[18px]">delete</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow>
+        <td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm">
+          <mat-icon class="text-4xl mb-2 text-gray-300">door_back</mat-icon>
+          <p>{{ 'COMMON.NO_DATA' | translate }}</p>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions"
+                 (page)="onPageChange($event)"
+                 showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>
+
+<!-- Add/Edit Modal -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-blue-600">door_back</mat-icon>
+          {{ (editMode() ? 'CABINET.EDIT_TITLE' : 'CABINET.ADD_TITLE') | translate }}
+        </h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- Name -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">
+              {{ 'CABINET.NAME' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <input formControlName="Name" type="text"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-400]="dataForm.get('Name')?.invalid && dataForm.get('Name')?.touched">
+            @if (dataForm.get('Name')?.invalid && dataForm.get('Name')?.touched) {
+              <p class="text-xs text-red-500 mt-0.5">{{ 'COMMON.REQUIRED' | translate }}</p>
+            }
+          </div>
+
+          <!-- Code -->
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.CODE' | translate }}</label>
+            <input formControlName="Code" type="text"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <!-- Status -->
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.STATUS' | translate }}</label>
+            <ng-select [items]="[{value:0,label:'CABINET.STATUS_INACTIVE'},{value:1,label:'CABINET.STATUS_ACTIVE'}]"
+                       bindValue="value" formControlName="Status"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.label | translate }}</ng-template>
+            </ng-select>
+          </div>
+
+          <!-- CircPlace -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.CIRC_PLACE' | translate }}</label>
+            <ng-select [items]="circPlaces()" bindLabel="name" bindValue="id"
+                       formControlName="CircPlaceId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select>
+          </div>
+
+          <!-- Note -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.NOTE' | translate }}</label>
+            <textarea formControlName="Note" rows="2"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+          </div>
+
+        </div>
+      </form>
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()"
+                class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) {
+            <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+          } @else {
+            <mat-icon class="text-[16px]">save</mat-icon>
+          }
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirm Delete -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center">
+        <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+          <mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3>
+        <p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p>
+      </div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()"
+                class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmActionExecute()"
+                class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          <mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Ngăn tủ (compartments) grid modal -->
+@if (showCompartmentModal(); as show) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-amber-600">grid_view</mat-icon>
+          {{ 'CABINET.COMPARTMENTS' | translate }} — {{ compartmentCabinet()?.name }}
+        </h3>
+        <button (click)="closeCompartmentModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="px-6 py-5">
+        @if (!compartmentCabinet()?.rows || !compartmentCabinet()?.cols) {
+          <div [formGroup]="gridSizeForm" class="max-w-xs">
+            <p class="text-sm text-gray-500 mb-3">{{ 'CABINET.GRID_SIZE_HINT' | translate }}</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.ROWS' | translate }}</label>
+                <input formControlName="Rows" type="number" min="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.COLS' | translate }}</label>
+                <input formControlName="Cols" type="number" min="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+            <button (click)="saveGridSize()" [disabled]="isSavingGridSize()"
+                    class="mt-4 w-full py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+              <mat-icon class="text-[16px]">save</mat-icon> {{ 'COMMON.SAVE' | translate }}
+            </button>
+          </div>
+        } @else {
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-gray-500">{{ compartmentCabinet()?.rows }} × {{ compartmentCabinet()?.cols }}</span>
+          </div>
+          <div class="grid gap-2" [style.grid-template-columns]="'repeat(' + compartmentCabinet()?.cols + ', minmax(0, 1fr))'">
+            @for (cell of gridCells(); track cell.row + '-' + cell.col) {
+              @if (cell.item) {
+                <div class="relative border rounded-lg p-2 text-xs min-h-[64px] flex flex-col justify-between"
+                     [class.border-red-300]="cell.item.isOccupied" [class.bg-red-50]="cell.item.isOccupied"
+                     [class.border-gray-200]="!cell.item.isOccupied" [class.bg-gray-50]="!cell.item.isOccupied">
+                  <div>
+                    <div class="font-semibold text-gray-800 truncate">{{ cell.item.code }}</div>
+                    <div class="text-gray-500 truncate">{{ cell.item.name }}</div>
+                  </div>
+                  <div class="flex items-center justify-between mt-1">
+                    @if (cell.item.isOccupied) {
+                      <span class="px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px]">{{ 'CABINET.OCCUPIED' | translate }}</span>
+                    } @else { <span></span> }
+                    <div class="flex gap-0.5">
+                      <button (click)="openEditCompartmentCell(cell.row, cell.col, cell.item)" class="p-1 rounded text-blue-600 hover:bg-blue-100"><mat-icon class="text-[14px]">edit</mat-icon></button>
+                      <button (click)="deleteCompartmentCell(cell.item)" class="p-1 rounded text-red-500 hover:bg-red-100"><mat-icon class="text-[14px]">delete</mat-icon></button>
+                    </div>
+                  </div>
+                </div>
+              } @else {
+                <button (click)="openAddCompartmentCell(cell.row, cell.col)"
+                        class="border border-dashed border-gray-300 rounded-lg min-h-[64px] flex items-center justify-center text-gray-300 hover:text-blue-500 hover:border-blue-400 transition-colors">
+                  <mat-icon>add</mat-icon>
+                </button>
+              }
+            }
+          </div>
+          @if (isLoadingCompartments()) {
+            <div class="text-center text-xs text-gray-400 mt-3">{{ 'COMMON.LOADING' | translate }}</div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Ngăn tủ — thêm/sửa 1 ô -->
+@if (showCompartmentCellModal()) {
+  <div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800">{{ 'CABINET.COMPARTMENT_TITLE' | translate }}</h3>
+        <button (click)="closeCompartmentCellModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <form [formGroup]="compartmentCellForm" (ngSubmit)="saveCompartmentCell()" class="px-6 py-5 flex flex-col gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.COMPARTMENT_CODE' | translate }} <span class="text-red-500">*</span></label>
+          <input formControlName="Code" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CABINET.COMPARTMENT_NAME' | translate }}</label>
+          <input formControlName="Name" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </form>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeCompartmentCellModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="saveCompartmentCell()" [disabled]="isSavingCompartmentCell()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          <mat-icon class="text-[16px]">save</mat-icon> {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

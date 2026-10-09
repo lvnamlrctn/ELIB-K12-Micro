@@ -1,0 +1,51 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'PRINT_BARCODE.TITLE' | translate }}</h4>
+</div>
+
+<!-- Controls -->
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Range generator -->
+    <div>
+      <h5 class="font-semibold text-blue-700 mb-2">{{ 'PRINT_BARCODE.BY_RANGE' | translate }}</h5>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-gray-500 mb-1">{{ 'PRINT_BARCODE.PREFIX' | translate }}</label><input [ngModel]="prefix()" (ngModelChange)="prefix.set($event)" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        <div><label class="block text-xs text-gray-500 mb-1">{{ 'PRINT_BARCODE.PAD' | translate }}</label><input [ngModel]="pad()" (ngModelChange)="pad.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.FROM' | translate }}</label><input [ngModel]="fromNo()" (ngModelChange)="fromNo.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        <div><label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.TO' | translate }}</label><input [ngModel]="toNo()" (ngModelChange)="toNo.set($event)" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+      </div>
+      <button (click)="generateRange()" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">qr_code</mat-icon> {{ 'PRINT_BARCODE.GENERATE' | translate }}</button>
+    </div>
+    <!-- Manual -->
+    <div>
+      <h5 class="font-semibold text-blue-700 mb-2">{{ 'PRINT_BARCODE.BY_LIST' | translate }}</h5>
+      <textarea [ngModel]="manual()" (ngModelChange)="manual.set($event)" rows="5" placeholder="{{ 'PRINT_BARCODE.LIST_PH' | translate }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      <button (click)="generateManual()" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">qr_code</mat-icon> {{ 'PRINT_BARCODE.GENERATE' | translate }}</button>
+    </div>
+  </div>
+  @if (barcodes().length > 0) {
+    <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+      <button (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">print</mat-icon> {{ 'PRINT_BARCODE.PRINT' | translate }} ({{ barcodes().length }})</button>
+      <button (click)="clear()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">clear</mat-icon> {{ 'COMMON.RESET' | translate }}</button>
+    </div>
+  }
+</div>
+
+<!-- Print area -->
+@if (barcodes().length > 0) {
+  <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0 print:p-0">
+    <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 print:grid-cols-5">
+      @for (bc of barcodes(); track bc) {
+        <div class="border border-gray-200 rounded p-2 flex flex-col items-center print:border-gray-300">
+          <svg [appBarcode]="bc" class="block w-full h-auto max-w-full"></svg>
+          <span class="text-xs font-mono mt-1">{{ bc }}</span>
+        </div>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-400 print:hidden">
+    <mat-icon class="text-5xl mb-2 text-gray-300">qr_code_2</mat-icon>
+    <p>{{ 'PRINT_BARCODE.EMPTY' | translate }}</p>
+  </div>
+}

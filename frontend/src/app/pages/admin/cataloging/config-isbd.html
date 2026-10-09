@@ -1,0 +1,152 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CONFIG_ISBD.TITLE' | translate }}</h4>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <!-- Danh sách cấu hình theo Loại tài liệu -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 lg:col-span-1">
+    <div class="flex items-center justify-between mb-2 px-1">
+      <h5 class="text-xs font-bold text-gray-500 uppercase">{{ 'CONFIG_ISBD.CONFIG_LIST' | translate }}</h5>
+      <button *appCan="'add'" (click)="openAddConfig()" class="text-xs text-blue-600 hover:underline flex items-center gap-0.5"><mat-icon class="text-[14px]">add</mat-icon>{{ 'CONFIG_ISBD.ADD_CONFIG' | translate }}</button>
+    </div>
+    <div class="space-y-1">
+      @for (c of configs(); track c.id) {
+        <div (click)="selectConfig(c.id)" [class.bg-blue-50]="selectedConfigId() === c.id" [class.text-blue-700]="selectedConfigId() === c.id"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 text-sm">
+          <mat-icon class="text-[18px] text-gray-400">description</mat-icon>
+          <span class="flex-1 truncate">{{ bibTypeName(c.bib_Type_Id) }}</span>
+          <button *appCan="'delete'" (click)="$event.stopPropagation(); handleDeleteConfig(c)" class="p-1 rounded text-red-400 hover:bg-red-50"><mat-icon class="text-[15px]">delete</mat-icon></button>
+        </div>
+      }
+      @if (!configs().length && !isLoading()) { <p class="text-center text-gray-400 text-sm py-6">{{ 'COMMON.NO_DATA' | translate }}</p> }
+    </div>
+  </div>
+
+  <!-- Cây field -> subfield của cấu hình đang chọn -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 lg:col-span-2 relative">
+    @if (isLoading()) {
+      <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] rounded-xl">
+        <mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon>
+      </div>
+    }
+    @if (!selectedConfig()) {
+      <p class="text-center text-gray-400 text-sm py-10">{{ 'CONFIG_ISBD.SELECT_CONFIG_HINT' | translate }}</p>
+    } @else {
+      <div class="flex items-center justify-between mb-3 px-1">
+        <h5 class="text-sm font-bold text-gray-700">{{ bibTypeName(selectedConfig()!.bib_Type_Id) }}</h5>
+        <button *appCan="'add'" (click)="openAddField()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg flex items-center gap-1"><mat-icon class="text-[16px]">add</mat-icon> {{ 'CONFIG_ISBD.ADD_FIELD' | translate }}</button>
+      </div>
+
+      @for (f of fieldsOfSelectedConfig(); track f.id) {
+        <div class="border border-gray-200 rounded-lg mb-2 overflow-hidden">
+          <div class="flex items-center gap-2 px-3 py-2 bg-gray-50">
+            <button type="button" (click)="toggleExpand(f.id)" class="p-1 rounded text-gray-500 hover:bg-gray-200">
+              <mat-icon class="text-[20px]">{{ isExpanded(f.id) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            </button>
+            <span class="font-mono font-bold text-blue-700 w-12">{{ f.field }}</span>
+            <span class="text-xs text-gray-400 flex-1">
+              <span class="font-mono">{{ f.starttp }}</span>&hellip;<span class="font-mono">{{ f.stoptp }}</span>
+            </span>
+            <span class="text-[11px] text-gray-400">#{{ f.fieldindex }}</span>
+            <button *appCan="'edit'" (click)="openEditField(f)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50"><mat-icon class="text-[16px]">edit</mat-icon></button>
+            <button *appCan="'delete'" (click)="handleDelete('field', f.publicId)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50"><mat-icon class="text-[16px]">delete</mat-icon></button>
+          </div>
+
+          @if (isExpanded(f.id)) {
+            <div class="px-4 py-3 pl-10">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-bold text-gray-500 uppercase">{{ 'CONFIG_ISBD.SUBFIELD_RULES' | translate }}</span>
+                <button *appCan="'add'" type="button" (click)="openAddSubfield(f)" class="text-xs text-blue-600 hover:underline flex items-center gap-0.5"><mat-icon class="text-[14px]">add</mat-icon>{{ 'CONFIG_ISBD.ADD_SUBFIELD' | translate }}</button>
+              </div>
+              <div class="space-y-1">
+                @for (s of subfieldsOf(f.field); track s.id) {
+                  <div class="flex items-center gap-2 text-sm py-1 px-2 rounded hover:bg-gray-50">
+                    <span class="font-mono text-gray-600">${{ s.subfield }}</span>
+                    <span class="text-xs text-gray-400 flex-1 font-mono">{{ s.starttp }}&hellip;{{ s.stoptp }} <span class="text-gray-300">| next: {{ s.nexttp || '—' }}</span></span>
+                    <span class="text-[11px] text-gray-400">#{{ s.subfieldindex }}</span>
+                    <button *appCan="'edit'" (click)="openEditSubfield(s)" class="p-1 rounded text-blue-600 hover:bg-blue-50"><mat-icon class="text-[15px]">edit</mat-icon></button>
+                    <button *appCan="'delete'" (click)="handleDelete('subfield', s.publicId)" class="p-1 rounded text-red-500 hover:bg-red-50"><mat-icon class="text-[15px]">delete</mat-icon></button>
+                  </div>
+                }
+                @if (!subfieldsOf(f.field).length) { <p class="text-xs text-gray-400 py-1">{{ 'COMMON.NO_DATA' | translate }}</p> }
+              </div>
+            </div>
+          }
+        </div>
+      }
+      @if (!fieldsOfSelectedConfig().length) { <p class="text-center text-gray-400 text-sm py-8">{{ 'COMMON.NO_DATA' | translate }}</p> }
+    }
+  </div>
+</div>
+
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ (modalKind() === 'config' ? 'CONFIG_ISBD.ADD_CONFIG' : (editMode() ? 'COMMON.EDIT' : 'COMMON.ADD')) | translate }}
+          @if (modalKind() === 'field') { — {{ 'CONFIG_ISBD.FIELD_RULE' | translate }} }
+          @if (modalKind() === 'subfield') { — {{ 'CONFIG_ISBD.SUBFIELD_RULE' | translate }} <span class="text-sm text-gray-400 font-normal">({{ parentFieldTag() }})</span> }
+        </h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><mat-icon>close</mat-icon></button>
+      </div>
+
+      @if (modalKind() === 'config') {
+        <form [formGroup]="configForm" (ngSubmit)="onSubmit()" class="px-6 py-5">
+          <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.BIB_TYPE' | translate }} <span class="text-red-500">*</span></label>
+          <ng-select [items]="unconfiguredBibTypes()" bindLabel="name" bindValue="id" formControlName="BibTypeId"
+                     [searchable]="true" [clearable]="true"
+                     [placeholder]="'— ' + ('COMMON.SELECT' | translate) + ' —'"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                     [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+          </ng-select>
+        </form>
+      }
+      @if (modalKind() === 'field') {
+        <form [formGroup]="fieldForm" (ngSubmit)="onSubmit()" class="px-6 py-5 grid grid-cols-2 gap-3">
+          <div class="col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.TAG' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Field" type="text" maxlength="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.STARTTP' | translate }}</label>
+            <input formControlName="Starttp" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.STOPTP' | translate }}</label>
+            <input formControlName="Stoptp" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.INDEX' | translate }}</label>
+            <input formControlName="Fieldindex" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </form>
+      }
+      @if (modalKind() === 'subfield') {
+        <form [formGroup]="subfieldForm" (ngSubmit)="onSubmit()" class="px-6 py-5 grid grid-cols-2 gap-3">
+          <div class="col-span-2"><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.SUBFIELD_CODE' | translate }} <span class="text-red-500">*</span></label>
+            <input formControlName="Subfield" type="text" maxlength="1" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.STARTTP' | translate }}</label>
+            <input formControlName="Starttp" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.STOPTP' | translate }}</label>
+            <input formControlName="Stoptp" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.NEXTTP' | translate }}</label>
+            <input formControlName="Nexttp" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CONFIG_ISBD.INDEX' | translate }}</label>
+            <input formControlName="Subfieldindex" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </form>
+      }
+
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}

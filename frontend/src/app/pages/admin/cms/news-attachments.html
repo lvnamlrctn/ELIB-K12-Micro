@@ -1,0 +1,246 @@
+<!-- Header -->
+<div class="mb-5 flex items-center gap-3">
+  <button (click)="goBack()" class="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-100 text-gray-600 transition-colors flex-shrink-0">
+    <mat-icon class="text-[20px]">arrow_back</mat-icon>
+  </button>
+  <div class="min-w-0">
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'NEWS.ATTACH.TITLE' | translate }}</h4>
+    @if (newsTitle) { <p class="text-sm text-gray-500 mt-0.5 truncate">{{ newsTitle }}</p> }
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center justify-between">
+  <div class="flex flex-wrap gap-2">
+    <button *appCan="'add'; url: '/admin/news'" (click)="openUpload()"
+            class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">file_upload</mat-icon> {{ 'NEWS.ATTACH.ADD' | translate }}
+    </button>
+    @if (legacyCount() > 0) {
+      <button *appCan="'edit'; url: '/admin/news'" (click)="openSync()"
+              class="border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors">
+        <mat-icon class="text-[16px]">cloud_sync</mat-icon> {{ 'NEWS.ATTACH.SYNC' | translate }}
+      </button>
+    }
+  </div>
+  @if (files().length) {
+    <span class="text-sm text-gray-500">{{ 'NEWS.ATTACH.TOTAL' | translate: { n: files().length } }}</span>
+  }
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left border-collapse min-w-[680px]">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">
+          <th class="py-2 px-3 w-12 text-center">{{ 'EBOOK_FILES.TABLE_STT' | translate }}</th>
+          <th class="py-2 px-3">{{ 'NEWS.ATTACH.COL_FILE' | translate }}</th>
+          <th class="py-2 px-3 w-28 text-right">{{ 'EBOOK_FILES.TABLE_SIZE' | translate }}</th>
+          <th class="py-2 px-3 w-40">{{ 'NEWS.ATTACH.COL_DATE' | translate }}</th>
+          <th class="py-2 px-3 w-36 text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (f of files(); track f.publicId; let i = $index) {
+          <tr class="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+            <td class="py-2 px-3 text-center text-sm text-gray-600">{{ i + 1 }}</td>
+            <td class="py-2 px-3">
+              <div class="flex items-center gap-2 min-w-0">
+                <mat-icon class="text-gray-400 flex-shrink-0" style="font-size:22px;width:22px;height:22px;">{{ icon(ext(f)) }}</mat-icon>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-800 truncate max-w-md" [title]="f.name">{{ f.name || '—' }}</p>
+                  <div class="flex items-center gap-1 mt-0.5">
+                    @if (ext(f)) { <span class="text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{{ ext(f) }}</span> }
+                    @if (isLegacy(f)) {
+                      <span class="text-[10px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" [title]="f.url">{{ 'NEWS.ATTACH.LEGACY' | translate }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="py-2 px-3 text-right text-sm text-gray-700">{{ formatSize(f.fileSize) }}</td>
+            <td class="py-2 px-3 text-sm text-gray-600">{{ f.createdDate ? (f.createdDate | appDate:'datetime') : '—' }}</td>
+            <td class="py-2 px-3">
+              <div class="flex items-center justify-center gap-1">
+                <button (click)="open(f)" [disabled]="isLegacy(f)"
+                        class="w-7 h-7 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 flex items-center justify-center transition-colors"
+                        [title]="'EBOOK_FILES.VIEW_DOWNLOAD' | translate">
+                  <mat-icon class="text-[15px]">visibility</mat-icon>
+                </button>
+                <button (click)="open(f, true)" [disabled]="isLegacy(f)"
+                        class="w-7 h-7 rounded bg-slate-500 text-white hover:bg-slate-600 disabled:opacity-40 flex items-center justify-center transition-colors"
+                        [title]="'NEWS.ATTACH.DOWNLOAD' | translate">
+                  <mat-icon class="text-[15px]">download</mat-icon>
+                </button>
+                <button *appCan="'edit'; url: '/admin/news'" (click)="startRename(f)"
+                        class="w-7 h-7 rounded bg-amber-500 text-white hover:bg-amber-600 flex items-center justify-center transition-colors"
+                        [title]="'NEWS.ATTACH.RENAME' | translate">
+                  <mat-icon class="text-[15px]">edit</mat-icon>
+                </button>
+                <button *appCan="'delete'; url: '/admin/news'" (click)="deleting.set(f)"
+                        class="w-7 h-7 rounded bg-red-500 text-white hover:bg-red-600 flex items-center justify-center transition-colors"
+                        [title]="'COMMON.DELETE' | translate">
+                  <mat-icon class="text-[15px]">delete</mat-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="py-10 px-4 text-center text-gray-400">
+              <mat-icon class="text-4xl mb-2 block mx-auto">folder_open</mat-icon>
+              {{ 'NEWS.ATTACH.EMPTY_LIST' | translate }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+@if (showUploadModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-blue-700 flex items-center gap-2">
+          <mat-icon class="text-green-600">file_upload</mat-icon> {{ 'NEWS.ATTACH.ADD' | translate }}
+        </h3>
+        <button (click)="closeUpload()" class="text-gray-400 hover:text-gray-600 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+
+      <div class="px-5 py-4 overflow-y-auto">
+        <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-blue-400 cursor-pointer transition-colors mb-2">
+          <mat-icon class="text-gray-300 mb-1" style="font-size:36px;width:36px;height:36px;">upload_file</mat-icon>
+          <span class="text-sm text-gray-500">{{ 'NEWS.ATTACH.CHOOSE' | translate }}</span>
+          <input type="file" multiple class="hidden" [accept]="accept" (change)="onSelect($event)" [disabled]="uploading()">
+        </label>
+        <p class="text-xs text-gray-400 mb-3">{{ 'NEWS.ATTACH.HINT' | translate: { types: allowed.join(', ') } }}</p>
+
+        @if (rejected().length) {
+          <div class="mb-3 rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-700 space-y-0.5">
+            @for (r of rejected(); track r) { <div>{{ r }}</div> }
+          </div>
+        }
+
+        @if (selected().length) {
+          <ul class="mb-3 divide-y divide-gray-100 border border-gray-200 rounded-lg">
+            @for (file of selected(); track file) {
+              <li class="flex items-center gap-2 px-3 py-2 text-sm">
+                <mat-icon class="text-gray-400 text-[18px] w-[18px] h-[18px]">insert_drive_file</mat-icon>
+                <span class="flex-1 min-w-0 truncate" [title]="file.name">{{ file.name }}</span>
+                <span class="text-xs text-gray-400 shrink-0">{{ formatSize(file.size / 1024) }}</span>
+                @if (!uploading()) {
+                  <button type="button" (click)="removeSelected(file)" class="text-gray-400 hover:text-red-600"><mat-icon class="text-[16px] w-4 h-4">close</mat-icon></button>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        @if (selected().length === 1) {
+          <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'NEWS.ATTACH.DISPLAY_NAME' | translate }}</label>
+          <input [(ngModel)]="displayName" maxlength="255" [placeholder]="selected()[0].name"
+                 class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        }
+
+        @if (uploading()) {
+          <div class="mt-3">
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-green-500 transition-all" [style.width.%]="progress()"></div></div>
+            <p class="text-xs text-blue-600 mt-1 text-center">{{ 'EBOOK_FILES.UPLOADING' | translate }} {{ progress() }}%</p>
+          </div>
+        }
+      </div>
+
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeUpload()" [disabled]="uploading()"
+                class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm transition-colors disabled:opacity-50">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="upload()" [disabled]="!selected().length || uploading()"
+                class="flex-1 py-2 px-4 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm transition-colors shadow-sm flex items-center justify-center gap-1">
+          <mat-icon class="text-[16px]">file_upload</mat-icon>
+          {{ 'NEWS.ATTACH.UPLOAD_N' | translate: { n: selected().length } }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Rename -->
+@if (renaming(); as f) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <form (ngSubmit)="saveRename()" class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-base font-bold text-gray-800">{{ 'NEWS.ATTACH.RENAME' | translate }}</h3>
+        <button type="button" (click)="renaming.set(null)" class="text-gray-400 hover:text-gray-600"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-5 py-4">
+        <input [(ngModel)]="renameValue" name="rename" maxlength="255" required
+               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <p class="text-xs text-gray-400 mt-1">{{ 'NEWS.ATTACH.RENAME_HINT' | translate }}</p>
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="renaming.set(null)" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="submit" [disabled]="!renameValue.trim()" class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">{{ 'COMMON.SAVE' | translate }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<!-- Confirm Delete -->
+@if (deleting(); as f) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><mat-icon class="text-3xl">warning</mat-icon></div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3>
+        <p class="text-gray-600 text-sm mb-6 break-words">{{ f.name }}</p>
+        <div class="flex gap-3">
+          <button (click)="deleting.set(null)" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button (click)="confirmDelete()" class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 text-sm shadow-sm">{{ 'COMMON.CONFIRM' | translate }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Sync legacy files -->
+@if (showSync()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-amber-600">cloud_sync</mat-icon>{{ 'NEWS.ATTACH.SYNC' | translate }}</h3>
+        <button (click)="showSync.set(false)" [disabled]="syncing()" class="text-gray-400 hover:text-gray-600"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-5 py-4 overflow-y-auto text-sm text-gray-700 space-y-2">
+        @if (syncResult(); as r) {
+          <p>{{ 'NEWS.ATTACH.SYNC_RESULT' | translate: { synced: r.synced, failed: r.failed, total: r.total } }}</p>
+          @if (r.errors.length) {
+            <div class="max-h-60 overflow-y-auto rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-700 font-mono space-y-0.5">
+              @for (e of r.errors; track $index) { <div>{{ e }}</div> }
+            </div>
+          }
+        } @else {
+          <p>{{ 'NEWS.ATTACH.SYNC_DESC' | translate }}</p>
+        }
+      </div>
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="showSync.set(false)" [disabled]="syncing()" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 text-sm disabled:opacity-50">{{ 'COMMON.CLOSE' | translate }}</button>
+        @if (!syncResult()) {
+          <button (click)="runSync()" [disabled]="syncing()" class="flex-1 py-2 px-4 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm flex items-center justify-center gap-1">
+            @if (syncing()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> }
+            {{ 'NEWS.ATTACH.SYNC_RUN' | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}

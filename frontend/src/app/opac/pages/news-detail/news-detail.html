@@ -1,0 +1,125 @@
+<div class="container mx-auto px-4 py-8">
+  <nav class="flex items-center text-sm text-gray-500 mb-8 bg-white p-3 rounded shadow-sm border-l-4 border-main">
+    <a routerLink="/" class="hover:text-main flex items-center"><i class="fas fa-home mr-2"></i> Trang chủ</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <a routerLink="/category/150" class="hover:text-main">Tin tức</a>
+    <i class="fas fa-chevron-right mx-3 text-xs text-gray-300"></i>
+    <span class="text-main font-semibold">Chi tiết tin</span>
+  </nav>
+
+  @if (news(); as item) {
+    <article class="bg-white p-8 md:p-10 rounded-xl shadow-sm border border-gray-100 mb-12">
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-dark mb-4 leading-tight">{{ item.title }}</h1>
+        <div class="flex flex-wrap gap-6 text-gray-500 text-sm items-center">
+          <span class="flex items-center"><i class="far fa-calendar-alt text-main mr-2"></i> {{ item.date }}</span>
+          <span class="flex items-center"><i class="far fa-eye text-main mr-2"></i> {{ item.views }} lượt xem</span>
+          @if (avgRating() > 0) {
+            <div class="flex items-center gap-1 text-yellow-400 font-bold">
+              <i class="fas fa-star"></i> {{ avgRating() }} <span class="text-gray-400 font-normal ml-1">({{ ratingCount() }} đánh giá)</span>
+            </div>
+          }
+        </div>
+      </header>
+
+      <div class="font-semibold text-lg mb-6 text-gray-800 leading-relaxed">
+        {{ item.summary }}
+      </div>
+
+      <div class="prose max-w-none text-gray-700 leading-relaxed" [innerHTML]="item.content"></div>
+
+      @if (attachments().length) {
+        <section class="mt-8 border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <h3 class="font-semibold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-paperclip"></i> Tệp đính kèm</h3>
+          <ul class="space-y-2">
+            @for (f of attachments(); track f.id) {
+              <li class="flex items-center justify-between gap-3 text-sm">
+                <a [href]="f.url" target="_blank" rel="noopener" class="text-main hover:underline break-all flex items-center gap-2">
+                  <i class="fas" [class.fa-file-pdf]="f.ext === 'pdf'" [class.fa-file]="f.ext !== 'pdf'"></i>{{ f.name }}
+                </a>
+                <span class="text-gray-500 whitespace-nowrap">{{ formatSize(f.sizeKb) }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      <footer class="mt-12 pt-6 border-t border-gray-100 flex justify-between items-center">
+        <div class="flex gap-4 text-sm text-gray-600">
+          <button (click)="shareContent()" class="hover:text-main transition-colors flex items-center gap-2" title="Chia sẻ"><i class="fas fa-share-alt"></i> Chia sẻ</button>
+          <button (click)="printContent()" class="hover:text-main transition-colors flex items-center gap-2" title="In bài viết"><i class="fas fa-print"></i> In bài viết</button>
+        </div>
+      </footer>
+    </article>
+
+    <!-- Comments and Rating Section -->
+    <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+      <h3 class="text-lg font-bold text-dark mb-6 flex items-center gap-2">
+        <i class="fas fa-star text-yellow-400"></i> Đánh giá & Bình luận
+      </h3>
+
+      <div class="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
+        <h4 class="font-semibold text-dark mb-4">Gửi đánh giá của bạn</h4>
+        
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-sm text-gray-600">Đánh giá:</span>
+          <div class="flex text-xl cursor-pointer">
+            @for (star of [1,2,3,4,5]; track star) {
+              <i class="fas fa-star outline-none"
+                 tabindex="0"
+                 [class.text-yellow-400]="star <= commentRating()"
+                 [class.text-gray-300]="star > commentRating()"
+                 (click)="setRating(star)"
+                 (keydown.enter)="setRating(star)"
+                 (keydown.space)="setRating(star); $event.preventDefault()">
+              </i>
+            }
+          </div>
+        </div>
+
+        <form (ngSubmit)="submitComment()" class="flex flex-col gap-4">
+          <input type="text" [(ngModel)]="commentAuthor" name="author" placeholder="Tên hiển thị (VD: Nguyễn Văn A)" class="w-full p-3 border border-gray-300 rounded focus:border-main focus:ring-1 focus:ring-main outline-none transition-all" required>
+          <textarea [(ngModel)]="commentContent" name="content" rows="4" placeholder="Nội dung bình luận..." class="w-full p-3 border border-gray-300 rounded focus:border-main focus:ring-1 focus:ring-main outline-none transition-all" required></textarea>
+          <div class="text-right">
+            <button type="submit" [disabled]="!commentAuthor() || !commentContent()" class="bg-main text-white px-6 py-2.5 rounded font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <i class="fas fa-paper-plane mr-2"></i> Gửi bình luận
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        @if (firebaseComments().length > 0) {
+          @for (comment of firebaseComments(); track comment.id) {
+            <div class="flex gap-4 p-4 border-b border-gray-50 last:border-0">
+              <div class="w-12 h-12 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-main font-bold">
+                {{ comment.userName.charAt(0) }}
+              </div>
+              <div class="flex-1">
+                <div class="flex justify-between items-start mb-1">
+                  <h5 class="font-bold text-dark">{{ comment.userName }}</h5>
+                  <span class="text-xs text-gray-500">{{ comment.date }}</span>
+                </div>
+                
+                @if (comment.rating) {
+                  <div class="flex text-xs text-yellow-400 mb-2">
+                    @for (star of [1,2,3,4,5]; track star) {
+                      <i class="fas fa-star" [class.text-gray-200]="star > comment.rating"></i>
+                    }
+                  </div>
+                }
+                
+                <p class="text-gray-600 text-sm leading-relaxed">{{ comment.comment }}</p>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="text-center py-8 text-gray-500">
+            <i class="far fa-comments text-4xl mb-3 text-gray-300"></i>
+            <p>Chưa có bình luận nào. Hãy là người đầu tiên đánh giá bài viết này!</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

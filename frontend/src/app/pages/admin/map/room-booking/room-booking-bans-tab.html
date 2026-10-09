@@ -1,0 +1,115 @@
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+  <form (ngSubmit)="search()" class="flex flex-1 gap-2">
+    <input type="text" [(ngModel)]="keyword" name="keyword" [placeholder]="'STUDY_ROOM_BOOKING.BAN_SEARCH_PH' | translate"
+           class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+    <button type="submit" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"><mat-icon class="text-[18px] w-[18px] h-[18px]">search</mat-icon></button>
+  </form>
+  <label class="flex items-center gap-2 text-sm text-gray-700">
+    <input type="checkbox" [(ngModel)]="activeOnly" (ngModelChange)="search()" name="activeOnly" class="w-4 h-4">
+    {{ 'STUDY_ROOM_BOOKING.ACTIVE_ONLY' | translate }}
+  </label>
+  <button *appCan="'edit'" type="button" (click)="openAdd()"
+          class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg flex items-center text-sm shadow-sm">
+    <mat-icon class="text-sm mr-1.5">block</mat-icon> {{ 'STUDY_ROOM_BOOKING.ADD_BAN' | translate }}
+  </button>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (loading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex items-center justify-center"><mat-icon class="animate-spin text-blue-600 text-4xl">autorenew</mat-icon></div>
+  }
+  <div class="overflow-x-auto min-h-[150px]">
+    <table class="w-full min-w-[760px] text-sm">
+      <thead>
+        <tr class="bg-gray-50 border-b border-gray-200 text-left text-gray-600 font-medium">
+          <th class="py-3 px-4">{{ 'STUDY_ROOM_BOOKING.COL_READER' | translate }}</th>
+          <th class="py-3 px-4">{{ 'STUDY_ROOM_BOOKING.REASON' | translate }}</th>
+          <th class="py-3 px-4">{{ 'STUDY_ROOM_BOOKING.BAN_SOURCE' | translate }}</th>
+          <th class="py-3 px-4">{{ 'STUDY_ROOM_BOOKING.BANNED_UNTIL' | translate }}</th>
+          <th class="py-3 px-4">{{ 'STUDY_ROOM_BOOKING.COL_STATUS' | translate }}</th>
+          <th class="py-3 px-4 text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (b of bans(); track b.publicId) {
+          <tr class="border-b border-gray-100 hover:bg-gray-50/50">
+            <td class="py-3 px-4">
+              <div class="text-gray-800">{{ b.readerName }}</div>
+              <div class="text-xs text-gray-400 font-mono">{{ b.readerCardNo }}</div>
+            </td>
+            <td class="py-3 px-4 text-gray-700">{{ b.reason }}</td>
+            <td class="py-3 px-4 text-gray-600">{{ (b.source === 1 ? 'STUDY_ROOM_BOOKING.BAN_AUTO' : 'STUDY_ROOM_BOOKING.BAN_STAFF') | translate }}</td>
+            <td class="py-3 px-4 text-gray-700">{{ b.bannedUntil | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td class="py-3 px-4">
+              @if (isActive(b)) { <span class="text-xs font-bold px-2 py-1 rounded-full bg-red-50 text-red-600">{{ 'STUDY_ROOM_BOOKING.BAN_ACTIVE' | translate }}</span> }
+              @else if (b.liftedAt) { <span class="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600">{{ 'STUDY_ROOM_BOOKING.BAN_LIFTED' | translate }}</span> }
+              @else { <span class="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600">{{ 'STUDY_ROOM_BOOKING.BAN_EXPIRED' | translate }}</span> }
+            </td>
+            <td class="py-3 px-4 text-center">
+              @if (isActive(b)) {
+                <button *appCan="'edit'" (click)="lift(b)" class="text-xs font-bold text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded-lg hover:bg-emerald-50">{{ 'STUDY_ROOM_BOOKING.LIFT_BAN' | translate }}</button>
+              } @else { <span class="text-xs text-gray-300">—</span> }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (total() > pageSize) {
+    <div class="flex items-center justify-end gap-2 p-3 border-t border-gray-100 text-sm text-gray-600">
+      <button type="button" (click)="page(-1)" [disabled]="pageIndex <= 1" class="px-2 py-1 rounded-lg border border-gray-300 disabled:opacity-40"><mat-icon class="text-[18px] w-[18px] h-[18px]">chevron_left</mat-icon></button>
+      <span>{{ pageIndex }} / {{ lastPage() }}</span>
+      <button type="button" (click)="page(1)" [disabled]="pageIndex >= lastPage()" class="px-2 py-1 rounded-lg border border-gray-300 disabled:opacity-40"><mat-icon class="text-[18px] w-[18px] h-[18px]">chevron_right</mat-icon></button>
+    </div>
+  }
+</div>
+
+@if (showAdd()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-gray-800">{{ 'STUDY_ROOM_BOOKING.ADD_BAN' | translate }}</h3>
+        <button type="button" (click)="showAdd.set(false)" class="text-gray-400 hover:text-gray-600"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.COL_READER' | translate }} <span class="text-red-500">*</span></label>
+          @if (selectedReader(); as r) {
+            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 text-blue-800 text-sm">
+              <span>{{ readerLabel(r) }}</span>
+              <button type="button" (click)="selectedReader.set(null)" class="text-blue-500 hover:text-blue-700"><mat-icon class="text-[18px] w-[18px] h-[18px]">close</mat-icon></button>
+            </div>
+          } @else {
+            <form (ngSubmit)="findReaders()" class="flex gap-2">
+              <input type="text" [(ngModel)]="readerKeyword" name="readerKeyword" [placeholder]="'STUDY_ROOM_BOOKING.READER_SEARCH_PH' | translate"
+                     class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+              <button type="submit" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"><mat-icon class="text-[18px] w-[18px] h-[18px]">search</mat-icon></button>
+            </form>
+            @if (readerResults().length > 0) {
+              <ul class="mt-2 border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                @for (r of readerResults(); track r.id) {
+                  <li><button type="button" (click)="selectedReader.set(r)" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">{{ readerLabel(r) }}</button></li>
+                }
+              </ul>
+            }
+          }
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.BAN_DAYS' | translate }}</label>
+          <input type="number" min="1" max="365" [(ngModel)]="days" name="days" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.REASON' | translate }} <span class="text-red-500">*</span></label>
+          <textarea rows="3" maxlength="500" [(ngModel)]="reason" name="banReason" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+        </div>
+        <div class="pt-2 flex gap-3">
+          <button type="button" (click)="showAdd.set(false)" class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" (click)="saveBan()" [disabled]="!selectedReader() || !reason.trim() || saving()"
+                  class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">{{ 'STUDY_ROOM_BOOKING.ADD_BAN' | translate }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

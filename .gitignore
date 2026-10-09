@@ -1,0 +1,67 @@
+# ════════════════════════════════════════════════════════════════════════
+#  SECRET — không bao giờ commit (repo cũ từng lộ credential, TLS key)
+# ════════════════════════════════════════════════════════════════════════
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+**/nginx/ssl/
+**/secrets/
+**/demo-accounts.txt
+appsettings.*.local.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+# Monolith cũ: appsettings.json đang chứa secret thật → không đưa vào repo mới.
+# Bỏ dòng này chỉ sau khi đã chuyển hết secret ra biến môi trường.
+backend/ELIBAPI.API/appsettings.json
+
+# ════════════════════════════════════════════════════════════════════════
+#  Build / IDE
+# ════════════════════════════════════════════════════════════════════════
+bin/
+obj/
+**/temp-build/
+TestResults/
+*.user
+*.suo
+.vs/
+.idea/
+*.log
+*.tmp
+*.tmp.*
+artifacts/
+
+# Node / Angular / Nx
+node_modules/
+dist/
+.angular/
+.nx/
+coverage/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS
+Thumbs.db
+.DS_Store
+~$*
+
+# Dữ liệu/tài liệu nội bộ không thuộc mã nguồn
+*.xlsx
+*.xls
+*.docx
+*.dump
+*.bak
+
+# Script vận hành monolith: chứa chuỗi kết nối SQL Server thật (sa) → chỉ giữ ở máy.
+backend/scripts/

@@ -1,0 +1,30 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'PRINT_CARD.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden flex flex-wrap gap-2 items-center">
+  @if (printQueue.count() > 0) {
+    <button (click)="print()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">print</mat-icon> {{ 'PRINT_CARD.PRINT' | translate }} ({{ printQueue.count() }})</button>
+    <button (click)="clear()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[18px]">clear</mat-icon> {{ 'PRINT_CARD.CLEAR_ALL' | translate }}</button>
+  }
+</div>
+
+@if (printQueue.count() > 0) {
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:grid-cols-2 print:gap-2">
+    @for (bib of printQueue.queue(); track bib.bibId) {
+      @let card = toCard(bib);
+      <div class="border border-gray-300 rounded-lg p-3 w-full h-[7.5cm] flex flex-col relative bg-white print:break-inside-avoid">
+        <button (click)="remove(card.bibId)" class="absolute top-1 right-1 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 print:hidden"><mat-icon class="text-[16px]">close</mat-icon></button>
+        <div class="text-sm font-bold mb-2">{{ card.classSymbol || '—' }}</div>
+        <div class="text-sm font-semibold leading-snug mb-1">{{ card.title || '—' }}</div>
+        @if (card.author) { <div class="text-xs text-gray-700 mb-1">{{ card.author }}</div> }
+        @if (card.publisher) { <div class="text-xs text-gray-500 mt-auto">{{ card.publisher }}</div> }
+      </div>
+    }
+  </div>
+} @else {
+  <div class="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center text-gray-400 print:hidden">
+    <mat-icon class="text-5xl mb-2 text-gray-300">badge</mat-icon>
+    <p>{{ 'PRINT_CARD.EMPTY' | translate }}</p>
+  </div>
+}

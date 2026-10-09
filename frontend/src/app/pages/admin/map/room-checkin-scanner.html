@@ -1,0 +1,65 @@
+<div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-teal-600">qr_code_scanner</mat-icon>{{ 'ROOM_CHECKIN.TITLE' | translate }}</h3>
+      <button type="button" (click)="close()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><mat-icon>close</mat-icon></button>
+    </div>
+
+    <div class="p-6 space-y-4 overflow-y-auto">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="flex flex-col gap-1 text-xs font-bold text-gray-700">
+          {{ 'ROOM_CHECKIN.KIOSK_ROOM' | translate }}
+          <select class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  [ngModel]="kioskRoomId()" (ngModelChange)="setKioskRoom($event)">
+            <option [ngValue]="null">{{ 'ROOM_CHECKIN.ANY_ROOM' | translate }}</option>
+            @for (r of rooms; track r.id) { <option [ngValue]="r.id">{{ r.name }}</option> }
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-xs font-bold text-gray-700">
+          {{ 'ROOM_CHECKIN.CODE' | translate }}
+          <input #codeInput type="text" autocomplete="off" [(ngModel)]="code" (keydown.enter)="submitInput()" [disabled]="busy()"
+                 class="px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                 [placeholder]="'ROOM_CHECKIN.CODE_PLACEHOLDER' | translate">
+        </label>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" (click)="toggleCamera()"
+                class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                [ngClass]="cameraOn() ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-teal-600 text-white hover:bg-teal-700'">
+          <mat-icon class="text-[18px] w-[18px] h-[18px]">{{ cameraOn() ? 'videocam_off' : 'photo_camera' }}</mat-icon>
+          {{ (cameraOn() ? 'ROOM_CHECKIN.CAMERA_OFF' : 'ROOM_CHECKIN.CAMERA_ON') | translate }}
+        </button>
+        <app-face-capture [submitFn]="faceSubmit" (matched)="onFaceResult($event)" (click)="stopCamera()"
+                          titleKey="ROOM_CHECKIN.FACE" hintKey="ROOM_CHECKIN.FACE_HINT" openLabel="ROOM_CHECKIN.FACE"
+                          openClass="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors" />
+        @if (busy()) { <span class="text-sm text-teal-700 flex items-center gap-1"><mat-icon class="animate-spin text-[18px] w-[18px] h-[18px]">autorenew</mat-icon>{{ 'COMMON.LOADING' | translate }}</span> }
+      </div>
+      @if (cameraError()) { <p class="text-sm text-red-600">{{ cameraError() }}</p> }
+      @if (cameraOn()) {
+        <div class="relative rounded-xl overflow-hidden bg-black aspect-video">
+          <video #video playsinline muted class="w-full h-full object-cover"></video>
+          <div class="absolute inset-[18%] border-4 border-white/70 rounded-2xl pointer-events-none"></div>
+        </div>
+      }
+
+      @if (result(); as r) {
+        <div class="rounded-xl border-2 p-4" [ngClass]="r.ok ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'">
+          <p class="font-bold flex items-center gap-2" [ngClass]="r.ok ? 'text-emerald-700' : 'text-red-700'">
+            <mat-icon>{{ r.ok ? 'check_circle' : 'error' }}</mat-icon>{{ r.ok ? ('ROOM_CHECKIN.SUCCESS' | translate) : r.message }}
+          </p>
+          @if (r.booking; as b) {
+            <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm text-gray-700">
+              <dt class="text-gray-500">{{ 'ROOM_CHECKIN.ROOM' | translate }}</dt><dd class="font-semibold">{{ b.roomName || '—' }}</dd>
+              <dt class="text-gray-500">{{ 'ROOM_CHECKIN.READER' | translate }}</dt><dd class="font-semibold">{{ b.readerName || '—' }} @if (b.readerCardNo) { <span class="font-mono text-gray-500">({{ b.readerCardNo }})</span> }</dd>
+              <dt class="text-gray-500">{{ 'ROOM_CHECKIN.TIME' | translate }}</dt><dd>{{ b.startAt | date:'dd/MM/yyyy HH:mm' }} - {{ b.endAt | date:'HH:mm' }}</dd>
+              <dt class="text-gray-500">{{ 'ROOM_CHECKIN.PARTY' | translate }}</dt><dd>{{ b.partySize }}</dd>
+            </dl>
+          }
+        </div>
+      } @else {
+        <p class="text-sm text-gray-500">{{ 'ROOM_CHECKIN.HINT' | translate }}</p>
+      }
+    </div>
+  </div>
+</div>

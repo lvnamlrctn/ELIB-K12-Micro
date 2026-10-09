@@ -1,0 +1,280 @@
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, identity, tenant, notification, audit, media, gateway.
+# Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
+#
+# Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
+# Ra ngoài chỉ có cổng gateway; Postgres và RabbitMQ chỉ bind 127.0.0.1 của máy chạy (vào qua SSH tunnel).
+
+name: elib-dev
+
+x-dotnet-env: &dotnet-env
+  # Không dùng Development: máy DEV mở ra internet, Development bật trang lỗi chi tiết (lộ stack trace, header, cookie).
+  ASPNETCORE_ENVIRONMENT: Staging
+  Logging__LogLevel__Default: Information
+  Tenancy__GatewaySigningKey: ${GATEWAY_SIGNING_KEY:?chạy ./init-env.sh trước}
+  Messaging__Host: rabbitmq
+  Messaging__Username: ${RABBITMQ_USER:-elib}
+  Messaging__Password: ${RABBITMQ_PASSWORD:?chạy ./init-env.sh trước}
+
+x-service-build: &service-build
+  context: ../..
+  dockerfile: deploy/docker/service.Dockerfile
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?chạy ./init-env.sh trước}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?chạy ./init-env.sh trước}
+      TENANT_DB_PASSWORD: ${TENANT_DB_PASSWORD:?chạy ./init-env.sh trước}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?chạy ./init-env.sh trước}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:?chạy ./init-env.sh trước}
+      MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD:?chạy ./init-env.sh trước}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      # -h 127.0.0.1: trong lúc chạy script init, Postgres chỉ nghe unix socket — tránh báo "healthy" sớm.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Chạy lại script tạo DB mỗi lần `up` — volume đã khởi tạo thì docker-entrypoint-initdb.d không chạy nữa,
+  # service mới thêm vào stack vẫn có database + role riêng. Idempotent.
+  db-init:
+    image: postgres:17-alpine
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      POSTGRES_USER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      TENANT_DB_PASSWORD: ${TENANT_DB_PASSWORD}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD}
+      MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD}
+    volumes:
+      - ./postgres-init:/init:ro
+    entrypoint: ["sh", "/init/01-service-databases.sh"]
+
+  # Bắt mọi thư của DEV (SMTP nền tảng) — không gửi ra ngoài. Giao diện xem thư chỉ bind 127.0.0.1 (vào qua SSH tunnel).
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 2000
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+
+  # Kho file riêng của stack (KHÔNG dùng MinIO khác trên máy). Không mở cổng ra host: trình duyệt đi qua gateway /s3/**,
+  # service đi qua mạng nội bộ minio:9000.
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-09-07T16-13-09Z}
+    restart: unless-stopped
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-elib}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?chạy ./init-env.sh trước}
+      MINIO_BROWSER: "off"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-elib}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?chạy ./init-env.sh trước}
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  identity:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Identity/Elib.Identity.Api/Elib.Identity.Api.csproj
+        ASSEMBLY: Elib.Identity.Api
+    image: elib/identity:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__IdentityDb: Host=postgres;Database=elib_identity;Username=identity_app;Password=${IDENTITY_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      # Issuer là URL công khai — trùng với host trình duyệt dùng để đăng nhập.
+      # Sau nginx có TLS: IDENTITY_ISSUER=https://<DEV_DOMAIN>/ (xem README, mục "Tên miền thật").
+      Identity__Issuer: ${IDENTITY_ISSUER:-http://id.${DEV_DOMAIN:?đặt DEV_DOMAIN trong .env}:${GATEWAY_PORT:-8080}/}
+      Identity__RequireHttps: "false"
+      # Dev: khoá ký sinh mỗi lần khởi động — restart identity thì token cũ hết hiệu lực. Production dùng chứng chỉ trong secret.
+      Identity__UseEphemeralKeys: "true"
+      Identity__Clients__svc-gateway__ClientSecret: ${SVC_GATEWAY_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-tenant__ClientSecret: ${SVC_TENANT_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-notification__ClientSecret: ${SVC_NOTIFICATION_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-audit__ClientSecret: ${SVC_AUDIT_SECRET:?chạy ./init-env.sh trước}
+      # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
+      Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
+      ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
+      # App Admin (SPA, PKCE): /admin/ trên host hệ thống + mọi host đơn vị <subdomain>.<DEV_DOMAIN>.
+      Identity__Clients__elib-admin__RedirectUris__0: ${PUBLIC_ORIGIN:-http://${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/callback
+      Identity__Clients__elib-admin__PostLogoutRedirectUris__0: ${PUBLIC_ORIGIN:-http://${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/
+      Identity__Clients__elib-admin__RedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/callback
+      Identity__Clients__elib-admin__PostLogoutRedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/
+      Identity__BootstrapAdmin__UserName: sysadmin
+      Identity__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:?chạy ./init-env.sh trước}
+      # Email nhận OTP của sysadmin (khi bật SYSTEM_LOGIN_OTP). Thư DEV đi vào Mailpit.
+      Identity__BootstrapAdmin__Email: ${BOOTSTRAP_ADMIN_EMAIL:-sysadmin@${DEV_DOMAIN}}
+      Identity__SystemLogin__CaptchaEnabled: ${SYSTEM_LOGIN_CAPTCHA:-false}
+      Identity__SystemLogin__OtpEnabled: ${SYSTEM_LOGIN_OTP:-false}
+
+  tenant:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Tenant/Elib.Tenant.Api/Elib.Tenant.Api.csproj
+        ASSEMBLY: Elib.Tenant.Api
+    image: elib/tenant:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__TenantDb: Host=postgres;Database=elib_tenant;Username=tenant_app;Password=${TENANT_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_TENANT_SECRET}
+      # Provisioning chỉ chờ TenantSeeded từ các service đang chạy trong môi trường này.
+      Provisioning__DeployedServices__0: identity
+      Provisioning__DeployedServices__1: notification
+
+  notification:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Notification/Elib.Notification.Api/Elib.Notification.Api.csproj
+        ASSEMBLY: Elib.Notification.Api
+    image: elib/notification:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+      mailpit: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__NotificationDb: Host=postgres;Database=elib_notification;Username=notification_app;Password=${NOTIFICATION_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_NOTIFICATION_SECRET}
+      # SMTP nền tảng của DEV = Mailpit (thư không ra internet).
+      Notification__Smtp__Host: mailpit
+      Notification__Smtp__Port: "1025"
+      Notification__Smtp__Security: None
+      Notification__Smtp__FromAddress: no-reply@${DEV_DOMAIN}
+
+  audit:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Audit/Elib.Audit.Api/Elib.Audit.Api.csproj
+        ASSEMBLY: Elib.Audit.Api
+    image: elib/audit:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__AuditDb: Host=postgres;Database=elib_audit;Username=audit_app;Password=${AUDIT_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_AUDIT_SECRET}
+      Audit__RetentionDays: "365"
+
+  media:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Media/Elib.Media.Api/Elib.Media.Api.csproj
+        ASSEMBLY: Elib.Media.Api
+    image: elib/media:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      minio: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__MediaDb: Host=postgres;Database=elib_media;Username=media_app;Password=${MEDIA_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      # Endpoint phải trùng địa chỉ cluster "minio" của gateway: URL ký cho host này, gateway chuyển tiếp với đúng Host đó.
+      Storage__Endpoint: minio:9000
+      Storage__AccessKey: ${MINIO_ROOT_USER:-elib}
+      Storage__SecretKey: ${MINIO_ROOT_PASSWORD}
+
+  admin-web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+      args:
+        APP: admin
+    image: elib/admin-web:dev
+    restart: unless-stopped
+
+  gateway:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Gateway/Elib.Gateway/Elib.Gateway.csproj
+        ASSEMBLY: Elib.Gateway
+    image: elib/gateway:dev
+    restart: unless-stopped
+    depends_on:
+      identity: { condition: service_started }
+      tenant: { condition: service_started }
+      notification: { condition: service_started }
+      audit: { condition: service_started }
+      media: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      # Nghe đúng cổng công khai: URL trong discovery (jwks_uri…) dùng cổng này và phải gọi được cả từ trong mạng docker.
+      ASPNETCORE_HTTP_PORTS: ${GATEWAY_PORT:-8080}
+      ServiceClient__ClientSecret: ${SVC_GATEWAY_SECRET}
+      # Ghi đè CẢ HAI phần tử của mảng SystemHosts trong appsettings (mảng gộp theo chỉ số), thêm tên gốc làm host hệ thống.
+      Gateway__SystemHosts__0: quantri.${DEV_DOMAIN}
+      Gateway__SystemHosts__1: id.${DEV_DOMAIN}
+      Gateway__SystemHosts__2: ${DEV_DOMAIN}
+      # nginx trên máy host đi vào container qua địa chỉ bridge của docker — chỉ tin X-Forwarded-* từ dải này.
+      Gateway__TrustedProxyNetworks__0: 172.16.0.0/12
+    networks:
+      default:
+        # Service khác xác minh token: discovery của identity trỏ jwks_uri về http://id.<DEV_DOMAIN>:<port>/ —
+        # alias này để địa chỉ đó phân giải về gateway ngay trong mạng nội bộ, không phụ thuộc DNS/hairpin NAT.
+        aliases:
+          - id.${DEV_DOMAIN}
+    ports:
+      - "${GATEWAY_BIND:-0.0.0.0}:${GATEWAY_PORT:-8080}:${GATEWAY_PORT:-8080}"
+
+volumes:
+  pgdata:
+  rabbitdata:
+  miniodata:

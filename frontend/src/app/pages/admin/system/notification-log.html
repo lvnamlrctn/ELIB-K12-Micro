@@ -1,0 +1,166 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'NOTIFICATION_LOG.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filters Section -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 relative z-10">
+  <form [formGroup]="filterForm" (ngSubmit)="triggerSearch()">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_LOG.CHANNEL' | translate }}</label>
+        <ng-select [items]="channelOptions" bindLabel="label" bindValue="value" formControlName="channel"
+                   [clearable]="true" [placeholder]="'COMMON.ALL' | translate">
+        </ng-select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_LOG.EVENT_CODE' | translate }}</label>
+        <ng-select [items]="eventCodeOptions" bindLabel="label" bindValue="value" formControlName="eventCode"
+                   [clearable]="true" [placeholder]="'COMMON.ALL' | translate">
+        </ng-select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_LOG.SUCCESS' | translate }}</label>
+        <ng-select [items]="successOptions" bindLabel="label" bindValue="value" formControlName="success"
+                   [clearable]="true" [placeholder]="'COMMON.ALL' | translate">
+        </ng-select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_LOG.DATE_FROM' | translate }}</label>
+        <app-date-input formControlName="dateFrom"></app-date-input>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NOTIFICATION_LOG.DATE_TO' | translate }}</label>
+        <app-date-input formControlName="dateTo"></app-date-input>
+      </div>
+
+      @if (isPrivileged) {
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.TENANT' | translate }}</label>
+          <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" />
+        </div>
+      }
+    </div>
+
+    <div class="mt-4">
+      <button type="submit"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center transition-colors shadow-sm text-sm">
+        <mat-icon class="text-[18px] mr-2">search</mat-icon>{{ 'COMMON.SEARCH_BTN' | translate }}
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Table Section -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative z-0">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto min-h-[200px]">
+    <div class="min-w-[900px]">
+      <table mat-table [dataSource]="dataSource" class="w-full">
+
+        <ng-container matColumnDef="index">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 w-16">
+            {{ 'NOTIFICATION_LOG.INDEX' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element; let i = index" class="py-3 px-4 text-sm text-gray-700 border-b border-gray-100">
+            {{ rowIndex(i) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="channel">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NOTIFICATION_LOG.CHANNEL' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm border-b border-gray-100 whitespace-nowrap">
+            <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded"
+                  [class.bg-blue-50]="element.channel === 'SMS'" [class.text-blue-700]="element.channel === 'SMS'"
+                  [class.bg-purple-50]="element.channel === 'ZALO'" [class.text-purple-700]="element.channel === 'ZALO'">
+              {{ element.channel === 'ZALO' ? 'Zalo ZNS' : element.channel }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="recipient">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NOTIFICATION_LOG.RECIPIENT' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-700 border-b border-gray-100 font-mono whitespace-nowrap">
+            {{ element.recipient || '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="eventCode">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NOTIFICATION_LOG.EVENT_CODE' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100 whitespace-nowrap">
+            {{ element.eventCode || '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="success">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NOTIFICATION_LOG.SUCCESS' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100 whitespace-nowrap">
+            @if (element.success) {
+              <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">{{ 'NOTIFICATION_LOG.SUCCESS_YES' | translate }}</span>
+            } @else {
+              <span class="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700">{{ 'NOTIFICATION_LOG.SUCCESS_NO' | translate }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="errorMessage">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">
+            {{ 'NOTIFICATION_LOG.ERROR_MESSAGE' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100 max-w-xs">
+            <div class="line-clamp-2">{{ element.errorMessage || '—' }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="sentAt">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NOTIFICATION_LOG.SENT_AT' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100 whitespace-nowrap">
+            {{ element.sentAt ? (element.sentAt | appDate:'datetime') : '—' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="tenant">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'COMMON.TENANT' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap">
+            {{ element.tenantName ?? '—' }}
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50/50 transition-colors"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell py-8 text-center text-gray-400" [attr.colspan]="displayedColumns.length">
+            {{ 'COMMON.NO_DATA' | translate }}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <mat-paginator [length]="totalRecords"
+                 [pageSize]="pageSize" [pageIndex]="pageIndex"
+                 [pageSizeOptions]="pageSizeOptions"
+                 class="border-t border-gray-100"
+                 (page)="onPageChange($event)">
+  </mat-paginator>
+</div>

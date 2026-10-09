@@ -1,0 +1,23 @@
+[
+  {
+    "context": ["/data"],
+    "target": "http://103.97.134.58:8089",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/data": ""
+    }
+  },
+  {
+    "context": ["/api/Auth"],
+    "target": "http://localhost:5101",
+    "secure": false,
+    "changeOrigin": true
+  },
+  {
+    "context": ["/api"],
+    "target": "http://localhost:5101",
+    "secure": false,
+    "changeOrigin": true
+  }
+]

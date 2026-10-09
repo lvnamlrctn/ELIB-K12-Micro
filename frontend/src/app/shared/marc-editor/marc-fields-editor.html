@@ -1,0 +1,93 @@
+<div class="space-y-3">
+  <button type="button" (click)="openFieldPicker()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-1"><mat-icon class="text-[18px]">add</mat-icon> {{ 'BIB.ADD_FIELD' | translate }}</button>
+  @for (field of fields; track $index) {
+    <div class="border border-gray-200 rounded-lg p-3">
+      @if (fieldName(field.tag); as fn) {
+        <div class="text-sm font-bold text-blue-700 mb-1.5 truncate">{{ field.tag }} - {{ fn }}</div>
+      }
+      @if (isControlField(field.tag)) {
+        <div class="flex items-center gap-2">
+          <input [(ngModel)]="field.tag" [ngModelOptions]="{standalone:true}" [disabled]="isLockedControlField(field.tag)" placeholder="Tag" maxlength="3" class="w-16 px-2 py-1 text-sm font-mono font-bold border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400">
+          <input [(ngModel)]="field.value" [ngModelOptions]="{standalone:true}" [disabled]="isLockedControlField(field.tag)" placeholder="{{ 'BIB.SUBFIELD_VALUE' | translate }}" class="flex-1 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400">
+          @if (field.tag === '005') { <span class="text-xs text-gray-400 whitespace-nowrap">{{ 'BIB.AUTO_GENERATED' | translate }}</span> }
+          @if (field.tag === '001') { <span class="text-xs text-gray-400 whitespace-nowrap">{{ 'BIB.FIELD_LOCKED' | translate }}</span> }
+          <button type="button" (click)="removeField($index)" [disabled]="isProtectedControlField(field.tag)" class="p-1 rounded text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent" [title]="isProtectedControlField(field.tag) ? ('BIB.CONTROL_FIELD_LOCKED' | translate) : ('COMMON.DELETE' | translate)"><mat-icon class="text-[18px]">close</mat-icon></button>
+        </div>
+      } @else {
+        <div class="flex items-center gap-2 mb-2">
+          <input [(ngModel)]="field.tag" [ngModelOptions]="{standalone:true}" placeholder="Tag" maxlength="3" class="w-16 px-2 py-1 text-sm font-mono font-bold border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <input [(ngModel)]="field.ind1" [ngModelOptions]="{standalone:true}" placeholder="I1" maxlength="1" class="w-10 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <input [(ngModel)]="field.ind2" [ngModelOptions]="{standalone:true}" placeholder="I2" maxlength="1" class="w-10 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <span class="text-xs text-gray-400 ml-auto"></span>
+          <button type="button" (click)="openSubfieldPicker(field)" class="p-1 rounded text-green-600 hover:bg-green-50" [title]="'BIB.ADD_SUBFIELD' | translate"><mat-icon class="text-[18px]">add</mat-icon></button>
+          <button type="button" (click)="removeField($index)" class="p-1 rounded text-red-500 hover:bg-red-50" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">close</mat-icon></button>
+        </div>
+        <div class="space-y-1.5 pl-4">
+          @for (sub of field.subFields || []; track $index) {
+            <div class="flex items-center gap-2">
+              <span class="text-gray-400 font-mono text-sm">$</span>
+              <input [(ngModel)]="sub.code" [ngModelOptions]="{standalone:true}" placeholder="c" maxlength="1" class="w-10 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <input [(ngModel)]="sub.value" [ngModelOptions]="{standalone:true}" placeholder="{{ subFieldName(field.tag, sub.code) || ('BIB.SUBFIELD_VALUE' | translate) }}" class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <button type="button" (click)="removeSubField(field, $index)" class="p-1 rounded text-red-400 hover:bg-red-50"><mat-icon class="text-[16px]">remove</mat-icon></button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+  <button type="button" (click)="openFieldPicker()" class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-1"><mat-icon class="text-[18px]">add</mat-icon> {{ 'BIB.ADD_FIELD' | translate }}</button>
+</div>
+
+@if (showFieldPicker()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[80vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <h3 class="text-sm font-bold text-gray-800">{{ 'BIB.PICK_FIELD_TITLE' | translate }}</h3>
+        <button type="button" (click)="closeFieldPicker()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-5 py-3 border-b border-gray-100">
+        <input [(ngModel)]="fieldFilter" [ngModelOptions]="{standalone:true}" type="text" placeholder="{{ 'COMMON.SEARCH' | translate }}..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="overflow-y-auto px-2 py-2">
+        @for (d of filteredFieldDics(); track d.id) {
+          <button type="button" (click)="pickField(d)" class="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-blue-50 flex gap-2">
+            <span class="font-mono font-bold text-blue-700">{{ d.field }}</span>
+            <span class="text-gray-700 truncate">{{ d.vndescription || d.description }}</span>
+          </button>
+        }
+        @if (!filteredFieldDics().length) { <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.NO_DATA' | translate }}</p> }
+      </div>
+      <div class="px-5 py-3 border-t border-gray-100">
+        <button type="button" (click)="addFieldManual()" class="w-full py-1.5 text-sm text-blue-600 hover:underline">{{ 'BIB.ADD_MANUAL' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showSubfieldPicker()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[80vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <h3 class="text-sm font-bold text-gray-800">{{ 'BIB.PICK_SUBFIELD_TITLE' | translate }} — {{ subfieldTarget()?.tag }} {{ fieldName(subfieldTarget()?.tag || '') }}</h3>
+        <button type="button" (click)="closeSubfieldPicker()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-5 py-3 border-b border-gray-100">
+        <input [(ngModel)]="subfieldFilter" [ngModelOptions]="{standalone:true}" type="text" placeholder="{{ 'COMMON.SEARCH' | translate }}..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="overflow-y-auto px-2 py-2">
+        @for (d of filteredSubfieldDics(); track d.id) {
+          <button type="button" (click)="pickSubfield(d)" class="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-blue-50 flex gap-2">
+            <span class="font-mono font-bold text-blue-700">${{ d.subfield }}</span>
+            <span class="text-gray-700 truncate">{{ d.vndescription || d.description }}</span>
+          </button>
+        }
+        @if (!filteredSubfieldDics().length) { <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.NO_DATA' | translate }}</p> }
+      </div>
+      <div class="px-5 py-3 border-t border-gray-100">
+        @if (subfieldTarget(); as t) {
+          <button type="button" (click)="addSubFieldManual(t)" class="w-full py-1.5 text-sm text-blue-600 hover:underline">{{ 'BIB.ADD_MANUAL' | translate }}</button>
+        }
+      </div>
+    </div>
+  </div>
+}

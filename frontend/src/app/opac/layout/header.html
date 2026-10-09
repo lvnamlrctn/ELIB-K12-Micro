@@ -1,0 +1,158 @@
+<header class="bg-white shadow-md sticky top-0 z-50">
+  <div class="container mx-auto px-4 h-20 flex justify-between items-center">
+    <a routerLink="/" class="flex items-center no-underline" (click)="closeMenu()">
+      <div class="w-12 h-12 bg-main rounded-full flex items-center justify-center text-white font-bold text-base mr-3">
+        {{ tenant.logoText() }}
+      </div>
+      <div class="flex flex-col">
+        <h1 class="text-main font-bold text-lg leading-tight m-0">{{ tenant.name() || ('HEADER.APP_TITLE' | translate) }}</h1>
+        <p class="text-accent font-bold text-sm m-0">{{ 'HEADER.APP_SUBTITLE' | translate }}</p>
+      </div>
+    </a>
+
+    <!-- Mobile menu button -->
+    <button class="md:hidden text-gray-600 hover:text-main focus:outline-none p-2" (click)="toggleMobileMenu()">
+      <i class="fas text-2xl" [class.fa-bars]="!isMobileMenuOpen()" [class.fa-times]="isMobileMenuOpen()"></i>
+    </button>
+
+    <!-- Desktop menu -->
+    <nav class="hidden md:flex h-full">
+      <ul class="flex h-full m-0 p-0 list-none">
+        @for (item of menuItems(); track item.id) {
+          <li class="h-full relative group">
+            @if (item.children) {
+              <button class="flex items-center h-full px-4 text-dark font-semibold hover:text-main transition-colors border-b-2 border-transparent focus:outline-none">
+                {{item.label}} <i class="fas fa-chevron-down ml-1 text-xs"></i>
+              </button>
+              <ul class="absolute top-full left-0 w-56 bg-white shadow-lg rounded-b-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col py-2 z-50">
+                @for (child of item.children; track child.id) {
+                  <li class="relative group/sub">
+                    @if (child.children) {
+                      <a href="javascript:void(0)" class="flex justify-between items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-main">
+                        {{child.label}} <i class="fas fa-chevron-right text-xs"></i>
+                      </a>
+                      <ul class="absolute top-0 left-full w-48 bg-white shadow-lg rounded-lg opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-300 flex flex-col py-2 z-50 -ml-1">
+                        @for (subChild of child.children; track subChild.id) {
+                          <li><a [routerLink]="subChild.url" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-main">{{subChild.label}}</a></li>
+                        }
+                      </ul>
+                    } @else {
+                      <a [routerLink]="child.url" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-main">{{child.label}}</a>
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <a [routerLink]="item.url" routerLinkActive="text-main border-b-2 border-main" [routerLinkActiveOptions]="{exact: item.url === '/'}" class="flex items-center h-full px-4 text-dark font-semibold hover:text-main transition-colors border-b-2 border-transparent">{{item.label}}</a>
+            }
+          </li>
+        }
+        @if (authService.isAuthenticated()) {
+          <li class="h-full relative group">
+            <button class="flex items-center h-full px-4 text-main font-semibold hover:text-blue-700 transition-colors border-b-2 border-transparent focus:outline-none">
+              <i class="fas fa-user-circle mr-2 text-lg"></i> {{ authService.currentUser()?.fullName }} <i class="fas fa-chevron-down ml-1 text-xs"></i>
+            </button>
+            <ul class="absolute top-full right-0 w-48 bg-white shadow-lg rounded-b-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col py-2 z-50">
+              <li><a routerLink="/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">{{ 'HEADER.PROFILE' | translate }}</a></li>
+              <li><a href="javascript:void(0)" (click)="logout()" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">{{ 'HEADER.LOGOUT' | translate }}</a></li>
+            </ul>
+          </li>
+        } @else {
+          <li class="h-full">
+            <a routerLink="/login" routerLinkActive="text-main border-b-2 border-main" class="flex items-center h-full px-4 text-dark font-semibold hover:text-main transition-colors border-b-2 border-transparent">{{ 'HEADER.LOGIN' | translate }}</a>
+          </li>
+        }
+
+        <li class="h-full">
+          <a routerLink="/so-do-thu-vien" routerLinkActive="text-main border-b-2 border-main" class="flex items-center h-full px-4 text-dark font-semibold hover:text-main transition-colors border-b-2 border-transparent">
+            <i class="fas fa-map mr-1"></i> {{ 'HEADER.LIBRARY_MAP' | translate }}
+          </a>
+        </li>
+
+        <li class="h-full">
+          <a routerLink="/admin" class="flex items-center h-full px-4 text-dark font-semibold hover:text-main transition-colors border-b-2 border-transparent">
+            <i class="fas fa-user-shield mr-1"></i> {{ 'HEADER.ADMIN' | translate }}
+          </a>
+        </li>
+
+        <!-- Language Switcher -->
+        <li class="h-full relative group ml-2 items-center flex">
+          <button class="flex items-center h-8 px-3 rounded-md bg-gray-100 text-dark font-semibold hover:bg-main hover:text-white transition-colors focus:outline-none text-sm">
+            <i class="fas fa-globe mr-1"></i> {{ translate.currentLang | uppercase }} <i class="fas fa-chevron-down ml-1 text-[10px]"></i>
+          </button>
+          <ul class="absolute top-full right-0 mt-1 w-24 bg-white shadow-lg rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col overflow-hidden z-50 border border-gray-100">
+            <li><button (click)="translate.use('vi')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-main transition-colors" [class.bg-blue-50]="translate.currentLang === 'vi'">VI</button></li>
+            <li><button (click)="translate.use('en')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-main transition-colors" [class.bg-blue-50]="translate.currentLang === 'en'">EN</button></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+  </div>
+
+  <!-- Mobile menu -->
+  <div class="md:hidden bg-white border-t border-gray-100 overflow-hidden transition-all duration-300 ease-in-out" 
+       [class.max-h-0]="!isMobileMenuOpen()" [class.max-h-screen]="isMobileMenuOpen()">
+    <ul class="flex flex-col m-0 p-0 list-none py-2">
+      @if (authService.isAuthenticated()) {
+        <li class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <div class="flex items-center">
+            <div class="w-10 h-10 bg-main rounded-full flex items-center justify-center text-white font-bold mr-3">
+              {{ authService.currentUser()?.fullName?.charAt(0) }}
+            </div>
+            <div>
+              <div class="font-bold text-dark">{{ authService.currentUser()?.fullName }}</div>
+              <div class="text-xs text-gray-500">{{ authService.currentUser()?.email }}</div>
+            </div>
+          </div>
+          <a routerLink="/profile" (click)="closeMenu()" class="text-sm text-main hover:text-blue-700 font-semibold">{{ 'HEADER.PROFILE' | translate }}</a>
+        </li>
+      }
+      
+      @for (item of menuItems(); track item.id) {
+        <li>
+          @if (item.children) {
+            <button (click)="toggleDropdown(item.id)" class="w-full flex justify-between items-center px-6 py-3 text-dark font-semibold hover:bg-gray-50 hover:text-main transition-colors border-l-4 border-transparent focus:outline-none">
+              {{item.label}} 
+              <i class="fas transition-transform duration-300" [class.fa-chevron-down]="activeDropdown() !== item.id" [class.fa-chevron-up]="activeDropdown() === item.id"></i>
+            </button>
+            <ul class="bg-gray-50 overflow-hidden transition-all duration-300" [class.max-h-0]="activeDropdown() !== item.id" [class.max-h-[500px]]="activeDropdown() === item.id">
+              @for (child of item.children; track child.id) {
+                <li>
+                  @if (child.children) {
+                    <div class="px-10 py-2 text-sm font-semibold text-gray-700">{{child.label}}</div>
+                    <ul class="pl-4">
+                      @for (subChild of child.children; track subChild.id) {
+                        <li><a [routerLink]="subChild.url" (click)="closeMenu()" class="block px-10 py-2 text-sm text-gray-500 hover:text-main">{{subChild.label}}</a></li>
+                      }
+                    </ul>
+                  } @else {
+                    <a [routerLink]="child.url" (click)="closeMenu()" class="block px-10 py-2 text-sm text-gray-600 hover:text-main">{{child.label}}</a>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <a [routerLink]="item.url" (click)="closeMenu()" routerLinkActive="text-main bg-gray-50" [routerLinkActiveOptions]="{exact: item.url === '/'}" class="block px-6 py-3 text-dark font-semibold hover:bg-gray-50 hover:text-main transition-colors border-l-4 border-transparent hover:border-main">{{item.label}}</a>
+          }
+        </li>
+      }
+      
+      @if (authService.isAuthenticated()) {
+        <li>
+          <a href="javascript:void(0)" (click)="logout()" class="block px-6 py-3 text-red-600 font-semibold hover:bg-gray-50 transition-colors border-l-4 border-transparent hover:border-red-600">{{ 'HEADER.LOGOUT' | translate }}</a>
+        </li>
+      } @else {
+        <li>
+          <a routerLink="/login" (click)="closeMenu()" routerLinkActive="text-main bg-gray-50" class="block px-6 py-3 text-dark font-semibold hover:bg-gray-50 hover:text-main transition-colors border-l-4 border-transparent hover:border-main">{{ 'HEADER.LOGIN' | translate }}</a>
+        </li>
+      }
+
+      <li>
+        <a routerLink="/so-do-thu-vien" (click)="closeMenu()" class="block px-6 py-3 text-dark font-semibold hover:bg-gray-50 hover:text-main transition-colors border-l-4 border-transparent hover:border-main">{{ 'HEADER.LIBRARY_MAP' | translate }}</a>
+      </li>
+      <li>
+        <a routerLink="/admin" (click)="closeMenu()" class="block px-6 py-3 text-dark font-semibold hover:bg-gray-50 hover:text-main transition-colors border-l-4 border-transparent hover:border-main">{{ 'HEADER.ADMIN' | translate }}</a>
+      </li>
+    </ul>
+  </div>
+</header>

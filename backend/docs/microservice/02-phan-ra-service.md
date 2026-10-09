@@ -1,0 +1,181 @@
+# 02 — Phân rã service
+
+## 1. Nguyên tắc tách
+
+1. **Mỗi bounded context là một service.** Mỗi service sở hữu duy nhất một database và là nguồn sự thật (source of truth) cho dữ liệu của mình. Service khác chỉ đọc qua API, event hoặc bản sao cục bộ.
+2. **Ranh giới đi theo gói bán.** Không có service nào thuộc hai gói, để tắt một gói không làm hỏng gói khác.
+3. **Dữ liệu cùng thay đổi trong một transaction thì ở cùng service.** Ví dụ: phiếu mượn, gia hạn và phiếu phạt cùng nằm trong `circulation`.
+4. **Không tách quá mịn.** Các danh mục nhỏ (MARC, từ điển, trạng thái) đi theo service dùng chúng.
+5. **Nhiều service có thể chạy chung pod ở profile nhỏ** ([06](06-nen-tang-k8s.md#2-profile-triển-khai)), nhưng **ranh giới DB không bao giờ gộp**.
+
+## 2. Danh sách service
+
+| Gói | Service | Trách nhiệm | Dữ liệu sở hữu (tiêu biểu) | Scale |
+|---|---|---|---|---|
+| **Nền tảng** (bắt buộc) | `identity` | Đăng nhập nhân viên/bạn đọc, OTP/captcha, phát token, vai trò, quyền, module, xác thực bạn đọc qua LDAP/API ngoài | Users, Roles, Permissions, Modules, GroupUsers | Thấp–vừa |
+| | `tenant` | Đơn vị, tổ chức, tham số hệ thống, **license module**, khởi tạo đơn vị mới, danh mục tham chiếu chung | Tenants, Orgs, SystemParameters, Nations, Degrees… | Thấp |
+| | `patron` | Hồ sơ bạn đọc, loại bạn đọc, nhóm, lớp/khoá, import, ảnh, thẻ, khoá thẻ | Readers, ReaderTypes, GroupReaders, Classes | Vừa |
+| | `notification` | Gửi Email/SMS/Zalo ZNS theo template, nhật ký gửi, báo cáo định kỳ qua email | NotificationChannelConfigs, NotificationLogs, ScheduledReports | Theo hàng đợi |
+| | `media` | Upload, presigned URL, ảnh bìa, xử lý ảnh, file server cũ | (metadata file) + MinIO | Vừa |
+| | `audit` | Nhật ký thao tác, lịch sử thay đổi, log SIP2, giám sát tác vụ hàng loạt (AdminTask) | UserLogs, Sip2Logs, AdminTasks* | Theo hàng đợi |
+| **Sách in** | `catalog` | Biên mục MARC21/AACR2/ISBD, worksheet, từ điển (tác giả, phân loại, từ khoá, NXB…), nhật ký biên mục | Bibs, BibXmls, Marc*, Dic*, Worksheet* | Vừa |
+| | `holdings` | Bản sách (đăng ký cá biệt), kho, tủ/ngăn, giao nhận, chuyển kho, kiểm kê, thanh lý, mất sách, xuất kho | Barcodes, Stores, Inventories, Thanhlys, AbMoves | Vừa |
+| | `circulation` | Mượn/trả/gia hạn, đặt mượn, chính sách lưu thông, điểm lưu thông, **tính phạt**, sao chụp, SIP2 | BookOuts, BookIns, PolicyCircs, CFineTickets, CPhotos | **Cao** (giờ cao điểm) |
+| | `acquisition` | Đơn đặt, phiếu nhận, nguồn, nhà cung cấp, ngân sách, quỹ, báo cáo bổ sung | AbOrders, AbReceipts, Budgets, Funds, Suppliers | Thấp |
+| | `serials` | Ấn phẩm định kỳ: kỳ phát hành, mẫu, đăng ký, đóng tập | Serials, SerialItems, PatternMagazines | Thấp |
+| **Thư viện số** | `digital` | Tài liệu số, bộ sưu tập, file, metadata schema, chính sách truy cập, mượn/đặt trước số, trang đọc, theo dõi đọc, đánh giá, nộp tài liệu. Có worker `digital-indexer` (Python): trích xuất text/OCR | EbookItems, EbookFiles, PolicyDigitals, EbookItemLoans | **Cao** (trang đọc) |
+| **Tra cứu** | `search` | Read model Elasticsearch (sách in, ebook, chunk nội dung + vector), tìm kiếm hợp nhất, failover, Z39.50 (Zebra server + client), không gian nghiên cứu, tìm kiếm đã lưu | SearchObservations, ReaderWorkspaces, Z3950Configs + chỉ mục ES | **Cao** |
+| **Mở rộng** (tuỳ chọn) | `payment` | Thu phí qua VietQR/VNPAY/Sepay (phạt, sao chụp, cấp lại thẻ…), đối soát, hết hạn giao dịch | PaymentTransactions | Thấp |
+| | `space` | Sơ đồ thư viện, phòng học nhóm, đặt phòng, check-in (gồm khuôn mặt), kiểm soát ra vào, quầy tiếp đón, chìa khoá tủ | Map*, RoomBookings, Access*, KeyIns/KeyOuts | Vừa |
+| | `ai` | Hỏi đáp RAG (SSE), trợ lý tìm tài liệu, phân tích ảnh bìa, nhận diện khuôn mặt, chất lượng tìm kiếm, thống kê chat | Cache hội thoại, thống kê (DB riêng) | **Cao**, cô lập |
+| | `portal` | CMS: tin tức, sự kiện, banner, menu, trang, album, video, liên kết, bộ đếm truy cập | News, Banners, Menus, Pages… | Vừa (OPAC) |
+| | `reporting` | Dashboard, báo cáo tổng hợp liên phân hệ, kiểm tra chất lượng dữ liệu, trung tâm công việc | Read model từ event (DB riêng) | Thấp |
+| **K12** | `school` | Chương trình đào tạo (Evaluate), EOffice (công văn), Gamification (huy hiệu) | EvaluatePrograms, MonHocs, Documents (eoffice), Badges | Thấp |
+
+Ngoài ra còn **`gateway`** (YARP), không có dữ liệu nghiệp vụ. Gateway làm hai việc: định tuyến, và ghép dữ liệu cho một số màn hình OPAC (BFF), ví dụ `MyLibrary` ([03 §2](03-giao-tiep.md#2-gateway--bff)).
+
+### Context map
+
+```mermaid
+flowchart TB
+  identity -->|ReaderAuth, Permission| ALL((mọi service))
+  tenant -->|TenantProvisioned, ModuleLicenseChanged, tham số| ALL
+  patron -->|ReaderCreated/Updated/Blocked| circulation & digital & space & payment & search
+  catalog -->|BibPublished/Updated/Deleted| holdings & circulation & search & acquisition
+  acquisition -->|ReceiptCompleted| holdings
+  holdings -->|ItemAdded/StatusChanged/Removed| circulation & search
+  circulation -->|LoanCreated/Returned/Overdue| holdings & search & notification & reporting & school
+  circulation -->|ChargeIssued| payment
+  patron -->|ChargeIssued cấp lại thẻ| payment
+  payment -->|PaymentSucceeded| circulation & patron
+  digital -->|EbookPublished, EbookTextExtracted| search
+  search -->|RetrieveChunks gRPC| ai
+  space -->|MatchFace gRPC| ai
+  serials -->|IssueReceived| holdings
+```
+
+## 3. Quyết định sở hữu cho các điểm coupling
+
+| Dữ liệu dùng chéo | Chủ sở hữu | Cách service khác dùng |
+|---|---|---|
+| Bạn đọc (`Readers`) | `patron` | `circulation`/`digital`/`space`/`payment` giữ `PatronReplica` (id, mã thẻ, họ tên, loại, lớp, trạng thái khoá, hạn thẻ), cập nhật bằng event |
+| Ảnh bạn đọc | `patron` (file ở `media`) | `ai` nhận URL presigned khi so khớp khuôn mặt |
+| Biểu ghi (`Bibs`, `BibXmls`) | `catalog` | Service khác chỉ giữ **snapshot hiển thị** (nhan đề, tác giả, ký hiệu phân loại, ảnh bìa), cập nhật qua `BibUpdated` |
+| Bản sách (`Barcodes`) | `holdings` (vị trí, trạng thái vật lý: sẵn sàng / mất / thanh lý / đang xử lý) | `circulation` giữ `ItemReplica`. **Trạng thái "đang mượn" do `circulation` sở hữu**, không ghi ngược vào holdings. Holdings chỉ nhận event để hiển thị |
+| Phạt / phí | `circulation` (phạt, sao chụp), `patron` (cấp lại thẻ) phát `ChargeIssued` | `payment` thu tiền; `PaymentSucceeded` báo ngược để đánh dấu đã nộp |
+| Người dùng nhân viên (`Users`) | `identity` | Service khác chỉ lưu `UserId` + tên snapshot trong nhật ký |
+| Đơn vị / tổ chức (`Tenants`, `Orgs`) | `tenant` | Mỗi service giữ bảng `TenantReplica` (id, mã, trạng thái, module được bán) |
+| Từ điển MARC dùng cho OPAC | `catalog` | `search` index sẵn nhãn hiển thị |
+
+## 4. Gom service khi triển khai nhỏ
+
+Với profile "cụm theo tỉnh" ([06](06-nen-tang-k8s.md#2-profile-triển-khai)), các service tải thấp được build thành image riêng nhưng có thể chạy chung một **host process**. Mỗi service vẫn dùng connection string và database riêng. Các nhóm gộp:
+
+- `platform-host`: `tenant`, `notification`, `audit`, `media`
+- `backoffice-host`: `acquisition`, `serials`, `school`, `reporting`
+
+Cách làm: mỗi service là một assembly đăng ký qua `AddXxxService()`. Host gộp gọi nhiều `AddXxxService()` liền nhau. Ở profile SaaS, mỗi service chạy host riêng.
+
+---
+
+## Phụ lục A — Ánh xạ controller
+
+Đây là checklist parity: 306 controller nghiệp vụ của monolith (không tính `BaseApi`, `Generic`, `PublicBase`), mỗi controller xuất hiện đúng **một** lần. Tên viết không có hậu tố `Controller`. Thư mục gốc là `ELIBAPI.API/Controllers/`.
+
+| Service | Controller |
+|---|---|
+| `identity` | `Auth`, `Users`, `GroupUser`, `Roles`, `Permission`, `Module`, `ModuleRoles`, `ReaderAuthTest`, `ReaderTrackingLogin`, `AdminPreference`, `PbRoles`, `PbPrivate` |
+| `tenant` | `Tenant`, `Org`, `SystemParameter`, `SystemPara`, `SystemInfo`, `SystemDescription`, `Currency`, `Nation`, `Ethenic`, `Prof`, `Degree`, `ChucVu`, `PhongBan`, `PublicTenant`, `PublicSystemParameter` |
+| `patron` | `Reader`, `ReaderType`, `GroupReader`, `ReaderInGroup`, `ReaderDelete`, `ConfigImportReader`, `Class`, `Course`, `PublicReader` |
+| `notification` | `NotificationChannelConfig`, `NotificationLog`, `ScheduledReport` |
+| `audit` | `UserLog`, `EntityHistory`, `Sip2Log`, `AdminJob`, `AdminTask`, `AdminTaskMonitor`, `AdminTaskRetention` |
+| `catalog` | `Aacr2Field`, `Aacr2Subfield`, `Bib`, `BibData`, `BibType`, `BibWorksheet`, `BibXml`, `BookGroup`, `BookGroupDetail`, `CatalogueBibType`, `CatalogueBook`, `CatalogueClassLabel`, `CatalogueDicClass`, `CatalogueWorkSheet`, `ConfigAacr2`, `ConfigIsbd`, `DBibStatus`, `DFixField`, `DFixFieldPost`, `DFixFieldValue`, `DPublisher`, `DicAuthor`, `DicClass`, `DicCountries`, `DicGeographicAreas`, `DicKeyword`, `DicLanguage`, `DicPublisher`, `DocGroup`, `FixedFieldValue`, `IsbdField`, `IsbdSubfield`, `LinhVucNghienCuu`, `LogBienMuc`, `MarcBibLevel`, `MarcCodeList`, `MarcConvert`, `MarcField`, `MarcIndicator`, `MarcRecordType`, `MarcSubField`, `MarcType`, `MaterialsType`, `PrintBookAndDigital`, `RecordType`, `WorksheetField`, `WorksheetSubfield` |
+| `holdings` | `Barcode`, `BarcodeStatus`, `Cabinet`, `CabinetCompartment`, `Inventory`, `InventoryBarcode`, `KiemKe`, `LostBook`, `Thanhly`, `Store`, `StoreType`, `StoreInventory`, `StoreLiquidate`, `StoreLostBook`, `StoreMapShelving`, `StoreReRegisterBarcode`, `StoreShelving`, `StoreStatistics`, `StoreBookReport`, `BookOutStore`, `AbDeliverer`, `AbDelivererDetail`, `AbDelivererStatus`, `AbMove`, `AbMoveDetail`, `CatalogueDeliverer`, `CatalogueMove`, `DExportReason`, `DExhibitionLocation`, `DBookOutUnit` |
+| `circulation` | `BookIn`, `BookOut`, `CFine`, `CFineMethod`, `CFineType`, `CFineTicket`, `CPhoto`, `CQueueStatus`, `CRenew`, `CRenewData`, `CircPlace`, `CirculationCircPolicy`, `CirculationFine`, `CirculationHistory`, `CirculationLoan`, `CirculationReport`, `CirculationRequest`, `PolicyCirc`, `PolicyCircDocGroup`, `PolicyCircFine`, `Lydophat`, `BookRequest` |
+| `acquisition` | `AbOrder`, `AbOrderDetail`, `AbReceipt`, `AbReceiptDetail`, `AbSource`, `AhReceipt`, `AcquisitionReport`, `BibDataOrder`, `BibOrder`, `BibXmlOrder`, `Budget`, `Fund`, `OrderStatus`, `ReceiptStatus`, `Supplier`, `CatalogueBookOrder`, `CatalogueOrder`, `CatalogueReceipt` |
+| `serials` | `Serial`, `SerialItem`, `FrequencyMagazine`, `MagazineBinding`, `MagazineFrequency`, `MagazineMagazineType`, `MagazinePattern`, `MagazineReport`, `MagazineSerial`, `MagazineType`, `PartemMagazineDetail`, `PatternMagazine`, `SubcriptionStatus` |
+| `digital` | `CollectionPermistionUser`, `DigType`, `EbookAccess`, `EbookCollection`, `EbookFile`, `EbookItem`, `EbookItemLoan`, `EbookItemReservation`, `EbookItemXml`, `EbookLog`, `EbookReview`, `EbookSubject`, `EbookTopic`, `IntroBookCategory`, `IntroBooks`, `MetaDataFieldRegistery`, `MetaDataValue`, `MetadataSchemaRegistry`, `PolicyDigital`, `PolicyDigitalByCollection`, `ReadingTracking`, `TheodoiBienmucEbook`, `DocumentSubmission`, `PublicDigType`, `PublicEbook`, `PublicEbookCollection`, `PublicEbookFavorite`, `PublicEbookReview`, `PublicEbookSubject`, `PublicEbookTopic` |
+| `search` | `Book`, `PublicUnifiedSearch`, `PublicPrintBook`, `PublicEbookSearch`, `PublicSearchZ3950`, `PublicZ3950Config`, `OpacZ3950`, `OpacZ3950Config`, `Z3950Group`, `ReaderWorkspace` |
+| `payment` | `Payment`, `PaymentReader`, `PaymentWebhook` |
+| `space` | `AccessControl`, `AccessDevice`, `MapBuilding`, `MapEquipment`, `MapFloor`, `MapFloorUtility`, `MapObject`, `MapShelfDetail`, `MapShelfRow`, `PublicLibraryMap`, `RoomBooking`, `RoomBookingAdmin`, `RoomBookingConfig`, `CheckIn`, `CheckOut`, `KeyIn`, `KeyOut`, `PbKey`, `DKey`, `ConfigReceiption`, `ReceiptionBorrowKey`, `ReceiptionCheck`, `ReceiptionReport`, `ReceiptionStatistics`, `TrackingToLibrary` |
+| `ai` | `PublicChat`, `AdminStatChat`, `SearchQuality`, `FaceRecognition` |
+| `portal` | `Ads`, `AdsGroup`, `AttachFile`, `Banner`, `Category`, `CmsItem`, `Contact`, `ContactGroup`, `Counter`, `Customer`, `EventNews`, `ItemType`, `Link`, `LinkGroup`, `Media`, `Menu`, `MenuType`, `News`, `NewsComment`, `Page`, `Photo`, `PhotoAlbum`, `Video`, `PublicBanner`, `PublicCategory`, `PublicCounter`, `PublicHomeBanner`, `PublicHyperLink`, `PublicMedia`, `PublicMenu`, `PublicNews`, `PublicPhoto`, `PublicPhotoAlbum` |
+| `reporting` | `Dashboard`, `DashboardLibrary`, `PublicStatistic`, `DataQuality`, `WorkCenter`, `DocumentUnitReport` |
+| `school` | `Agency`, `Document`, `DocumentFile`, `DocumentType`, `EofficeTopic`, `CourseOption`, `DonVi`, `EvaluateCourse`, `EvaluateDegree`, `EvaluateProgram`, `Knowledge`, `MonHoc`, `NganhHoc`, `NganhHocReport`, `NganhMonHoc`, `SubjectTree`, `TaiLieu`, `Badge` |
+| `gateway` (BFF) | `MyLibrary` |
+
+Ghi chú:
+- **`media` không có controller riêng.** Endpoint upload hiện nằm rải rác (`AttachFile`, `EbookFile`, `Media`…). Khi viết lại, phần upload và presigned URL chuyển sang `media`; phần metadata vẫn thuộc service nghiệp vụ.
+- **Báo cáo chỉ thuộc một phân hệ thì ở lại service đó** (`CirculationReport`, `AcquisitionReport`, `MagazineReport`, `StoreBookReport`, `ReceiptionReport`). `reporting` chỉ giữ báo cáo liên phân hệ.
+- **`Book`** (gọi Elasticsearch) chuyển sang `search`. Phần ghi biểu ghi sách thuộc `catalog`.
+
+### Tiến độ port
+
+| Controller | Trạng thái | Ghi chú |
+|---|---|---|
+| tenant: `Tenant` | ✅ | `/api/system/tenant/tenants` — chỉ quản trị nền tảng, thêm license và saga khởi tạo |
+| tenant: `SystemParameter`, `Currency`, `Nation`, `Ethenic`, `Prof`, `Degree`, `ChucVu` | ✅ | `Crud` building block, cùng 8 endpoint và mã quyền. Đổi tên tài nguyên: `nationalities`, `ethnicities`, `academic-titles` (Prof = học hàm học vị), `degrees` (trình độ), `positions`, `currencies`, `system-parameters` |
+| tenant: `Org` | ✅ | Thêm `GetTree`, `UpdateOrder`, `Move`, `DeleteWithChildren`; chặn chuyển vào nhánh con, `Delete` thường chặn khi còn con |
+| tenant: `PublicSystemParameter` | ✅ | `/api/opac/tenant/parameters` — **chỉ trả tham số công khai** (monolith trả mọi mã, kể cả `READER_AUTH_CONFIG`) |
+| tenant: `PublicTenant` | ✅ | `ResolveByHost` do gateway + `/api/opac/tenant/features` (có `logoUrl`, `logoText`); `Manifest.json` → `/api/opac/tenant/manifest.json` (icon `sizes: any`, monolith khai 192/512 cho cùng một ảnh). `Search`/`SearchAll` (danh sách đơn vị công khai) chưa port — chờ OPAC liên trường |
+| tenant: (mới) nhận diện đơn vị | ✅ | `PUT /api/system/tenant/tenants/{id}/branding`: logo chỉ nhận file media của chính đơn vị (`/s3/media-public/{id}/tenant-logo/…`), không nhận URL ngoài; nhật ký `TENANT_BRANDING` |
+| tenant: `SystemPara`, `SystemInfo`, `SystemDescription`, `PhongBan` | ⛔ Không port | Không có mã nghiệp vụ hay màn hình nào dùng — chỉ còn controller CRUD |
+| tenant: `Import` Excel (Org, Nation, Ethenic, Prof, Degree, ChucVu) | ⏳ | Làm chung một lần trong `Crud` |
+| tenant: (mới) `resync` | ✅ | `POST /api/system/tenant/tenants/{id}/resync` phát lại `TenantUpdated` + `ModuleLicenseChanged` để service thêm sau dựng bản sao đơn vị |
+| notification: kênh email (`NotificationChannelConfig`) | ✅ | `/api/admin/notification/email-settings`: SMTP riêng của đơn vị (mật khẩu mã hoá Data Protection, không trả về API), không có thì dùng SMTP nền tảng; chặn SMTP trỏ vào mạng nội bộ; gửi thử theo mẫu `TEST_EMAIL` |
+| notification: mẫu email | ✅ | `email-templates` (`Crud`, quyền `NOTIFICATION_TEMPLATES`); mẫu mặc định `TEST_EMAIL`, `LOGIN_OTP` seed khi khởi tạo đơn vị, đơn vị chưa có mẫu thì dùng mẫu mặc định; biến `{{ ten_bien }}` được mã hoá HTML |
+| notification: `NotificationLog` | ✅ | `notification-logs/Search` chỉ đọc; **không lưu nội dung thư** (có thể chứa OTP); chống gửi trùng theo `DeduplicationKey` |
+| notification: consumer `NotificationRequested` | ✅ | Chỉ kênh email; lỗi SMTP ghi nhật ký, không retry (tránh gửi trùng thư đã tới nơi) |
+| notification: SMS, Zalo ZNS, `ScheduledReport` | ⏳ | GĐ2 (cùng `reporting`) |
+| identity: `Module`, `ModuleRoles`, `Permission` | ✅ | Danh mục quyền trong code (`PermissionCatalog`, lọc theo license) thay bảng `Module`; quyền gán cho **vai trò** (monolith gán cả theo người dùng — bỏ). `GET /api/admin/identity/permission-catalog`; lưu vai trò kiểm tra mã quyền có trong danh mục; vai trò quản trị mặc định khoá tên + "*" |
+| identity: CAPTCHA đăng nhập | ✅ | Tham số `ADMIN_LOGIN_CAPTCHA_ENABLED` của đơn vị (identity đọc từ tenant, cache 5 phút, xoá qua `SystemParameterChanged`); ảnh **PNG** tự vẽ (monolith dùng SVG `<text>` — máy đọc thẳng được đáp án) |
+| identity: OTP đăng nhập | ✅ | `ADMIN_LOGIN_OTP_ENABLED`; mã 6 số qua `NotificationRequested` (sysadmin: `SystemNotificationRequested`, bật bằng `Identity:SystemLogin:OtpEnabled`); tài khoản không có email thì không áp dụng |
+| identity: (mới) đóng vai đơn vị | ✅ | `POST /api/system/identity/impersonation` → vé 60 giây dùng một lần → `/account/impersonate` trên host đơn vị → token `imp=readonly` 30 phút; chỉ quyền `:view`; phát `AuditRecorded` (thay "thấy gộp mọi đơn vị" của `ReadOnlyPolicy`) |
+| identity: bạn đọc (`Reader*`, đăng nhập LDAP/API) | ⏳ | GĐ1 cùng service `patron` |
+| audit: `UserLog` | ✅ | `audit_logs` (theo đơn vị, RLS) ghi từ `AuditRecorded`: building block `Crud` tự phát cho mọi Thêm/Sửa/Xoá/Đổi trạng thái; identity phát đăng nhập (cả thất bại, không ghi mật khẩu), đổi mật khẩu, tài khoản, vai trò. `POST /api/admin/audit/audit-logs/Search` (quyền `SYSTEM_LOG`) |
+| audit: (mới) nhật ký nền tảng | ✅ | `platform_audit_logs` từ `SystemAuditRecorded`: tạo/sửa/tạm ngưng/kích hoạt đơn vị, bán phân hệ, đồng bộ, tạo quản trị đơn vị, đăng nhập sysadmin, vào xem đơn vị. `/api/system/audit/audit-logs/Search` |
+| audit: hạn lưu | ✅ | `Audit:RetentionDays` (mặc định 365), xoá mỗi ngày |
+| audit: `EntityHistory` (diff trước/sau), `Sip2Log`, `AdminTask*` | ⏳ | `AuditRecorded.ChangesJson` đã có chỗ; SIP2 ở GĐ1 (circulation), AdminTask khi có tác vụ hàng loạt |
+| media: upload (thay `MinioService` + endpoint upload rải rác) | ✅ | Hai bước qua URL ký: `POST /api/admin/media/files/uploads` → trình duyệt PUT thẳng vào MinIO qua gateway `/s3/**` → `…/{id}/complete` kiểm tra dung lượng + magic bytes (PNG/JPG/GIF/WEBP/PDF; không nhận SVG/HTML). File luôn vào `media-private` trước; file công khai chỉ được chép sang `media-public` (Content-Type theo nội dung thật) sau khi kiểm tra. `/s3` trả kèm `nosniff` + CSP `sandbox`, bỏ `Authorization`/`Cookie`, không cho liệt kê bucket |
+| media: tải file riêng tư | ✅ | `GET …/files/{id}/download` → URL ký 5 phút; bản ghi `media_files` theo đơn vị (RLS); upload bỏ dở quá 24 giờ tự dọn |
+| media: logo đơn vị | ✅ | Purpose `tenant-logo` (2 MB, chỉ quản trị nền tảng upload hộ: `/api/system/media/files/uploads`) |
+| media: ảnh đại diện người dùng, ảnh bìa, xử lý ảnh (resize/thumbnail), file server cũ, ClamAV | ⏳ | Ảnh đại diện + bìa: thêm purpose khi port identity profile / catalog; xử lý ảnh và quét virus khi có tài liệu bạn đọc nộp (GĐ2) |
+
+## Phụ lục B — Ánh xạ DbSet (242 bảng)
+
+| Service | DbSet |
+|---|---|
+| `identity` | `Users`, `Roles`, `Permissions`, `Modules`, `ModuleRoles`, `GroupUsers`, `PbPrivates`, `PbRoles`, `ReaderTrackingLogins`, `AdminUiPreferences` |
+| `tenant` | `Tenants`, `Orgs`, `SystemParameters`, `SystemParas`, `SystemInfos`, `SystemDescriptions`, `Currencies`, `Nations`, `Ethenics`, `Profs`, `Degrees`, `ChucVus`, `PhongBans` |
+| `patron` | `Readers`, `ReaderPhotos`, `ReaderDeletes`, `ReaderInGroups`, `ReaderTypes`, `GroupReaders`, `ConfigImportReaders`, `Classes`, `Courses`, `ReaderPreferences` |
+| `notification` | `NotificationChannelConfigs`, `NotificationLogs`, `ScheduledReports` |
+| `audit` | `UserLogs`, `Sip2Logs`, `AdminTasks`, `AdminTaskChunks`, `AdminWorkerHeartbeats`, `AdminTaskControlEvents`, `AdminTaskRetentionRuns`, `AdminWorkAssignments` |
+| `catalog` | `Bibs`, `BibXmls`, `BibDatas`, `BibTypes`, `BibWorksheets`, `BookGroups`, `BookGroupDetails`, `Aacr2Fields`, `Aacr2Subfields`, `ConfigAacr2s`, `ConfigIsbds`, `IsbdFields`, `IsbdSubfields`, `Countries`, `Languages`, `GeographicAreas`, `DBibStatuses`, `DPublishers`, `DFixFields`, `DFixFieldPosts`, `DFixFieldValues`, `FixedFieldValues`, `DicAuthors`, `DicClasses`, `DicKeywords`, `DicPublishers`, `LinhVucNghienCuus`, `LogBienMucs`, `MarcCodeLists`, `MarcFields`, `MarcIndicators`, `MarcSubFields`, `MarcBibLevels`, `MarcRecordTypes`, `MarcTypes`, `MaterialsTypes`, `RecordTypes`, `WorksheetFields`, `WorksheetSubfields`, `PrintBookAndDigitals`, `DocGroups` |
+| `holdings` | `Barcodes`, `BarcodeStatuses`, `Stores`, `StoreTypes`, `Cabinets`, `CabinetCompartments`, `Inventories`, `InventoryBarcodes`, `KiemKes`, `Thanhlys`, `LostBooks`, `BookOutStores`, `DExportReasons`, `DExhibitionLocations`, `DBookOutUnits`, `AbMoves`, `AbMoveDetails`, `AbDeliverers`, `AbDelivererDetails`, `AbDelivererStatuses` |
+| `circulation` | `BookIns`, `BookOuts`, `CFines`, `CFineMethods`, `CFineTypes`, `CFineTickets`, `CPhotos`, `CQueueStatuses`, `CRenews`, `CRenewDatas`, `CircPlaces`, `CircPlaceStores`, `CircPlaceReaderTypes`, `PolicyCircs`, `PolicyCircDocGroups`, `PolicyCircFines`, `Lydophats`, `BookRequests` |
+| `acquisition` | `AbOrders`, `AbOrderDetails`, `AbReceipts`, `AbReceiptDetails`, `AbSources`, `AhReceipts`, `BibOrders`, `BibDataOrders`, `BibXmlOrders`, `FixedFieldValueOrders`, `Budgets`, `Funds`, `Suppliers`, `OrderStatuses`, `ReceiptStatuses` |
+| `serials` | `Serials`, `SerialItems`, `SerialBindings`, `SerialBindingItems`, `FrequencyMagazines`, `MagazineTypes`, `PatternMagazines`, `PartemMagazineDetails`, `SubcriptionStatuses` |
+| `digital` | `EbookItems`, `EbookItemXmls`, `EbookFiles`, `EbookCollections`, `CollectionPermistionUsers`, `DigTypes`, `EbookAccesses`, `EbookLogs`, `EbookItemLoans`, `EbookItemReservations`, `EbookSubjects`, `EbookTopics`, `EbookReviews`, `EbookFavorites`, `IntroBooks`, `IntroBookCategories`, `MetaDataFieldRegisteries`, `MetadataSchemaRegistries`, `MetaDataValues`, `PolicyDigitals`, `PolicyDigitalByCollections`, `TheodoiBienmucEbooks`, `DocumentSubmissions`, `DigitalStorageAuditResults` |
+| `search` | `SearchObservations`, `ReaderSavedSearches`, `ReaderWorkspaces`, `Z3950Configs`, `Z3950Groups` |
+| `payment` | `PaymentTransactions` |
+| `space` | `MapBuildings`, `MapFloors`, `MapFloorUtilities`, `MapObjects`, `MapShelfDetails`, `MapShelfRows`, `MapEquipments`, `RoomBookings`, `RoomBookingConfigs`, `RoomBookingBans`, `RoomOpeningHours`, `RoomSpecialDays`, `RoomBookingMembers`, `AccessDevices`, `AccessStaffCards`, `AccessScanLogs`, `AccessCommands`, `CheckIns`, `CheckOuts`, `KeyIns`, `KeyOuts`, `PbKeys`, `DKeys`, `ConfigReceiptions`, `TrackingToLibraries` |
+| `portal` | `News`, `Categories`, `ContactGroups`, `Menus`, `MenuTypes`, `Photos`, `PhotoAlbums`, `AttachFiles`, `ADS`, `ADSGroups`, `Banners`, `Contacts`, `Counters`, `Customers`, `EventNews`, `CmsItems`, `ItemTypes`, `Links`, `LinkGroups`, `NewsComments`, `Pages`, `Supportonlines`, `Videos` |
+| `school` | `EvaluatePrograms`, `EvaluateCourses`, `EvaluateDegrees`, `CourseOptions`, `Knowledges`, `MonHocs`, `NganhHocs`, `NganhMonHocs`, `TaiLieus`, `DonVis`, `Agencies`, `Documents`, `DocumentFiles`, `DocumentTypes`, `EofficeTopics`, `Badges`, `ReaderBadges` |
+
+Ba service `ai`, `reporting` và `media` không kế thừa bảng nào. Dữ liệu của chúng là dữ liệu mới: read model, cache hội thoại và metadata file.
+
+## Phụ lục C — Job nền
+
+| Job hiện tại | Service mới | Ghi chú |
+|---|---|---|
+| `DueSoonReminderJob` | `circulation` | Phát `LoanDueSoon`; việc gửi tin do `notification` đảm nhận |
+| `BookRequestExpiryJob` | `circulation` | |
+| `EbookLoanExpiryJob` | `digital` | |
+| `DigitalStorageAuditJob` | `digital` | |
+| `RoomBookingExpiryJob` | `space` | |
+| `PaymentExpiryJob` | `payment` | |
+| `BadgeEvaluationJob` | `school` | Chuyển sang xử lý theo event (`LoanReturned`, `EbookRead`…). Job chỉ còn đối soát hằng đêm |
+| `SavedSearchAlertJob`, `SearchObservationPurgeJob`, `ZebraExportJob` | `search` | Zebra export chuyển sang tăng dần theo `BibUpdated` |
+| `ScheduledReportEmailJob` | `notification` | Lấy dữ liệu từ `reporting` |
+| `AdminTaskRetentionJob`, `AdminTaskWorker` | `audit` + building block `AdminTasks` | Tác vụ hàng loạt chạy trong service sở hữu dữ liệu; `audit` chỉ giám sát |
+| `PurgeDeletedRecordsJob` | Mọi service (building block `Persistence`) | Mỗi service tự dọn soft-delete của mình |

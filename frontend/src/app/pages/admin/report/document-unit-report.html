@@ -1,0 +1,102 @@
+<div class="mb-5 print:hidden">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'DOC_UNIT_REPORT.TITLE' | translate }}</h4>
+</div>
+
+<div class="hidden print:block mb-4">
+  <h4 class="text-xl font-bold text-gray-800">{{ 'DOC_UNIT_REPORT.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-5 print:hidden" [formGroup]="searchForm">
+  <div class="flex flex-wrap gap-1 mb-4">
+    @for (t of reportTypes; track t.value) {
+      <button type="button" (click)="changeReportType(t.value)"
+              [class.bg-blue-600]="reportType()===t.value" [class.text-white]="reportType()===t.value"
+              [class.text-gray-600]="reportType()!==t.value" [class.bg-gray-100]="reportType()!==t.value"
+              class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors">{{ t.label | translate }}</button>
+    }
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+    @if (isPrivileged) {
+      <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id" formControlName="tenantId"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'DOC_UNIT_REPORT.ALL_UNITS' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select>
+    }
+    <app-date-input formControlName="fromDate"></app-date-input>
+    <app-date-input formControlName="toDate"></app-date-input>
+    <button (click)="load()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors"><mat-icon class="text-[18px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+  </div>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center print:hidden">
+  <button (click)="exportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">file_download</mat-icon> {{ 'DOC_UNIT_REPORT.EXPORT_EXCEL' | translate }}</button>
+  <button (click)="print()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">print</mat-icon> {{ 'DOC_UNIT_REPORT.PRINT' | translate }}</button>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px] print:hidden"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div>
+  }
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="bg-gray-50 text-gray-500 uppercase text-xs">
+          <th class="py-2 px-3">{{ 'DOC_UNIT_REPORT.UNIT' | translate }}</th>
+          @if (reportType() !== 'digital') {
+            <th class="py-2 px-3 text-right">{{ 'DOC_UNIT_REPORT.BIB_COUNT' | translate }}</th>
+            <th class="py-2 px-3 text-right">{{ 'DOC_UNIT_REPORT.BARCODE_COUNT' | translate }}</th>
+          }
+          @if (reportType() !== 'print') {
+            <th class="py-2 px-3 text-right">{{ 'DOC_UNIT_REPORT.EBOOK_COUNT' | translate }}</th>
+          }
+          @if (reportType() === 'summary') {
+            <th class="py-2 px-3 text-right">{{ 'DOC_UNIT_REPORT.TOTAL' | translate }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.tenantId) {
+          <tr class="border-b border-gray-100">
+            <td class="py-2 px-3 font-medium text-gray-800">{{ row.tenantName }}</td>
+            @if (reportType() !== 'digital') {
+              <td class="py-2 px-3 text-right">{{ row.bibCount }}</td>
+              <td class="py-2 px-3 text-right">{{ row.barcodeCount }}</td>
+            }
+            @if (reportType() !== 'print') {
+              <td class="py-2 px-3 text-right">{{ row.ebookCount }}</td>
+            }
+            @if (reportType() === 'summary') {
+              <td class="py-2 px-3 text-right font-semibold">{{ row.bibCount + row.ebookCount }}</td>
+            }
+          </tr>
+        }
+        @if (rows().length === 0) {
+          <tr><td [attr.colspan]="reportType() === 'summary' ? 5 : (reportType() === 'digital' ? 2 : 3)" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+        }
+      </tbody>
+      @if (rows().length > 0) {
+        <tfoot>
+          <tr class="bg-gray-50 font-semibold border-t border-gray-200">
+            <td class="py-2 px-3">{{ 'DOC_UNIT_REPORT.TOTAL_ROW' | translate }}</td>
+            @if (reportType() !== 'digital') {
+              <td class="py-2 px-3 text-right">{{ totalBib() }}</td>
+              <td class="py-2 px-3 text-right">{{ totalBarcode() }}</td>
+            }
+            @if (reportType() !== 'print') {
+              <td class="py-2 px-3 text-right">{{ totalEbook() }}</td>
+            }
+            @if (reportType() === 'summary') {
+              <td class="py-2 px-3 text-right">{{ totalAll() }}</td>
+            }
+          </tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+</div>
+
+<div class="hidden print:block">
+  <app-report-signoff />
+</div>

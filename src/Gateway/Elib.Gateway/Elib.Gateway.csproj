@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Yarp.ReverseProxy" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+  </ItemGroup>
+</Project>

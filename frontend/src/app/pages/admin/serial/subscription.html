@@ -1,0 +1,217 @@
+<div class="print:hidden">
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'SUBSCRIPTION.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5">
+  <form [formGroup]="searchForm" (ngSubmit)="triggerSearch()" class="flex flex-wrap gap-2 items-center">
+    <button *appCan="'add'" type="button" (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}</button>
+    <input formControlName="title" [placeholder]="'SUBSCRIPTION.SEARCH_TITLE' | translate" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48">
+    <input formControlName="author" [placeholder]="'BIB.COL_AUTHOR' | translate" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
+    <input formControlName="issn" placeholder="ISSN" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-32">
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+  </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+      <ng-container matColumnDef="title"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'BIB.COL_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.title || '—' }}</td></ng-container>
+      <ng-container matColumnDef="issn"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">ISSN</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.issn || '—' }}</td></ng-container>
+      <ng-container matColumnDef="frequency"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'FREQUENCY.TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.frequencyName || getFrequencyName(row.frequencyId) }}</td></ng-container>
+      <ng-container matColumnDef="startTime"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SUBSCRIPTION.START_TIME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.startTime ? (row.startTime | appDate) : '—' }}</td></ng-container>
+      <ng-container matColumnDef="endTime"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SUBSCRIPTION.END_TIME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.endTime ? (row.endTime | appDate) : '—' }}</td></ng-container>
+      <ng-container matColumnDef="store"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'STORE.TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.storeName || getStoreName(row.storeId) }}</td></ng-container>
+      <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.STATUS' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100"><span class="px-2 py-0.5 rounded-full text-xs font-medium" [class]="statusClass(row.status)">{{ getStatusLabel(row.status) }}</span></td></ng-container>
+      <ng-container matColumnDef="approved"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SUBSCRIPTION.APPROVE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100">
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium" [class]="row.approved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">{{ (row.approved ? 'SUBSCRIPTION.APPROVED' : 'SUBSCRIPTION.NOT_APPROVED') | translate }}</span>
+      </td></ng-container>
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right"><div class="flex items-center justify-end gap-1">
+          <button (click)="printOrder(row)" class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" [title]="'COMMON.PRINT' | translate"><mat-icon class="text-[18px]">print</mat-icon></button>
+          @if (!row.approved) { <button (click)="requestApprove(row)" class="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors" [title]="'SUBSCRIPTION.APPROVE' | translate"><mat-icon class="text-[18px]">check_circle</mat-icon></button> }
+          <button (click)="openIssues(row)" class="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors" [title]="'SUBSCRIPTION.RECEIVE_ISSUES' | translate"><mat-icon class="text-[18px]">inventory_2</mat-icon></button>
+          @if (!row.approved) {
+            <button *appCan="'edit'" (click)="openEditModal(row)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" [title]="'COMMON.EDIT' | translate"><mat-icon class="text-[18px]">edit</mat-icon></button>
+            <button *appCan="'delete'" (click)="handleDelete(row)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+          }
+        </div></td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">subscriptions</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>
+
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">subscriptions</mat-icon>{{ (editMode() ? 'SUBSCRIPTION.EDIT_TITLE' : 'SUBSCRIPTION.ADD_TITLE') | translate }}</h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5 overflow-y-auto">
+        <!-- Thông tin ấn phẩm -->
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{{ 'SUBSCRIPTION.SECTION_BIB' | translate }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          <div class="md:col-span-2"><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'BIB.COL_TITLE' | translate }}</label><input formControlName="Title" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.BIB_ID' | translate }}</label><input formControlName="BibId" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">ISSN</label><input formControlName="Issn" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div class="md:col-span-2"><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'MAGAZINE_TYPE.TITLE' | translate }}</label>
+            <ng-select [items]="magazineTypes()" bindLabel="name" bindValue="id" formControlName="MagazineTypeId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+        </div>
+
+        <!-- Lịch xuất bản & mẫu đánh số -->
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{{ 'SUBSCRIPTION.SECTION_SCHEDULE' | translate }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'FREQUENCY.TITLE' | translate }}</label>
+            <ng-select [items]="frequencies()" bindLabel="name" bindValue="id" formControlName="FrequencyId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'PATTERN.TITLE' | translate }}</label>
+            <ng-select [items]="patterns()" bindLabel="name" bindValue="id" formControlName="PatternId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.START_TIME' | translate }}</label><app-date-input formControlName="StartTime"></app-date-input></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.END_TIME' | translate }}</label><app-date-input formControlName="EndTime"></app-date-input></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.FIRST_TIME' | translate }}</label><app-date-input formControlName="FirstTime"></app-date-input></div>
+          <div class="grid grid-cols-3 gap-2">
+            <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.START_X' | translate }}</label><input formControlName="StartX" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.START_Y' | translate }}</label><input formControlName="StartY" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.START_Z' | translate }}</label><input formControlName="StartZ" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          </div>
+        </div>
+
+        <!-- Điều khiển đăng ký (ILS) -->
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{{ 'SUBSCRIPTION.SECTION_CONTROL' | translate }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.TYPE' | translate }}</label>
+            <ng-select [items]="typeOptions" bindValue="id" formControlName="SubscriptionType"
+                       [searchable]="true" [clearable]="false"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ 'SUBSCRIPTION.TYPE_' + item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ 'SUBSCRIPTION.TYPE_' + item.label | translate }}</ng-template>
+            </ng-select></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'COMMON.STATUS' | translate }}</label>
+            <ng-select [items]="statusOptions" bindValue="id" formControlName="Status"
+                       [searchable]="true" [clearable]="false"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ 'SUBSCRIPTION.STATUS_' + item.label | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ 'SUBSCRIPTION.STATUS_' + item.label | translate }}</ng-template>
+            </ng-select></div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.LENGTH' | translate }}</label><input formControlName="SubscriptionLength" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+            <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.LENGTH_UNIT' | translate }}</label>
+              <ng-select [items]="unitOptions" bindValue="id" formControlName="LengthUnit"
+                         [searchable]="true" [clearable]="false"
+                         [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                <ng-template ng-label-tmp let-item="item">{{ 'SUBSCRIPTION.UNIT_' + item.label | translate }}</ng-template>
+                <ng-template ng-option-tmp let-item="item">{{ 'SUBSCRIPTION.UNIT_' + item.label | translate }}</ng-template>
+              </ng-select></div>
+          </div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.GRACE_DAYS' | translate }}</label><input formControlName="GraceDays" type="number" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </div>
+
+        <!-- Bổ sung & lưu trữ -->
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{{ 'SUBSCRIPTION.SECTION_HOLDING' | translate }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'STORE.TITLE' | translate }}</label>
+            <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="StoreId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUPPLIER.TITLE' | translate }}</label>
+            <ng-select [items]="suppliers()" bindLabel="name" bindValue="id" formControlName="SupplierId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.CALL_NUMBER' | translate }}</label><input formControlName="CallNumber" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.LOCATE' | translate }}</label><input formControlName="Locate" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.PUBLIC_NOTE' | translate }}</label><textarea formControlName="PublicNote" rows="2" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.INTERNAL_NOTE' | translate }}</label><textarea formControlName="InternalNote" rows="2" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+        </div>
+      </form>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmApprove()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-emerald-600 text-3xl">check_circle</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'SUBSCRIPTION.APPROVE_CONFIRM_TITLE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'SUBSCRIPTION.APPROVE_CONFIRM_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirmApprove()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmApproveExecute()" [disabled]="isApproving()" class="flex-1 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isApproving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">check_circle</mat-icon> } {{ 'SUBSCRIPTION.APPROVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+</div>
+
+@if (printSubject().length > 0) {
+  <div class="hidden print:block p-8">
+    @for (item of printSubject(); track item.id) {
+      <div class="mb-6">
+        <h3 class="text-xl font-bold text-center mb-1">{{ 'SUBSCRIPTION.PRINT_TITLE' | translate }}</h3>
+        <p class="text-center text-sm text-gray-500 mb-5">{{ 'SUBSCRIPTION.TITLE' | translate }}</p>
+        <table class="w-full text-sm border-collapse">
+          <tbody>
+            <tr class="border-b"><td class="py-1.5 font-semibold w-48">{{ 'BIB.COL_TITLE' | translate }}</td><td class="py-1.5">{{ item.title || '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">ISSN</td><td class="py-1.5">{{ item.issn || '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'MAGAZINE_TYPE.TITLE' | translate }}</td><td class="py-1.5">{{ item.magazineTypeName || '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'FREQUENCY.TITLE' | translate }}</td><td class="py-1.5">{{ item.frequencyName || getFrequencyName(item.frequencyId) }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'PATTERN.TITLE' | translate }}</td><td class="py-1.5">{{ item.patternName || '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'SUPPLIER.TITLE' | translate }}</td><td class="py-1.5">{{ item.supplierName || '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'STORE.TITLE' | translate }}</td><td class="py-1.5">{{ item.storeName || getStoreName(item.storeId) }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'SUBSCRIPTION.START_TIME' | translate }}</td><td class="py-1.5">{{ item.startTime ? (item.startTime | appDate) : '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'SUBSCRIPTION.END_TIME' | translate }}</td><td class="py-1.5">{{ item.endTime ? (item.endTime | appDate) : '—' }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'COMMON.STATUS' | translate }}</td><td class="py-1.5">{{ getStatusLabel(item.status) }}</td></tr>
+            <tr class="border-b"><td class="py-1.5 font-semibold">{{ 'SUBSCRIPTION.APPROVE' | translate }}</td><td class="py-1.5">{{ (item.approved ? 'SUBSCRIPTION.APPROVED' : 'SUBSCRIPTION.NOT_APPROVED') | translate }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+}

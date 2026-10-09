@@ -1,0 +1,270 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
+@import "@ng-select/ng-select/themes/default.theme.css";
+@import "@angular/material/prebuilt-themes/azure-blue.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* OPAC public-site theme colors */
+  --color-main: #4879bb;
+  --color-dark: #333333;
+  --color-accent: #d32f2f;
+  --color-orange: #ff9800;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5); 
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8); 
+}
+
+/* Custom styles for Mat Paginator */
+.mat-mdc-paginator {
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+}
+
+.mat-mdc-paginator-container {
+  padding: 12px 24px !important;
+  justify-content: space-between !important;
+  border-top: 1px solid #f3f4f6 !important;
+  flex-wrap: wrap !important;
+}
+
+.mat-mdc-paginator-page-size {
+  margin-right: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.mat-mdc-paginator-page-size-label {
+  margin: 0 !important;
+  color: #6b7280 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+}
+
+.mat-mdc-paginator-page-size-select {
+  margin: 0 !important;
+  width: 80px !important;
+}
+
+.mat-mdc-paginator-page-size-select .mdc-text-field--outlined {
+  background-color: #f9fafb !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.2s !important;
+}
+
+.mat-mdc-paginator-page-size-select .mdc-notched-outline {
+  display: none !important;
+}
+
+.mat-mdc-paginator-page-size-select .mat-mdc-text-field-wrapper {
+  background-color: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  padding: 0 12px !important;
+}
+
+.mat-mdc-paginator-page-size-select .mat-mdc-text-field-wrapper.mdc-text-field--focused {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+  background-color: #ffffff !important;
+}
+
+.mat-mdc-paginator-page-size-select .mat-mdc-form-field-infix {
+  padding: 8px 0 !important;
+  min-height: unset !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.mat-mdc-paginator-page-size-select .mat-mdc-select-value {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  padding-right: 4px;
+}
+
+.mat-mdc-paginator-range-label {
+  color: #4b5563 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  margin: 0 16px !important;
+}
+
+.mat-mdc-paginator-range-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.mat-mdc-paginator-range-actions .mat-mdc-icon-button {
+  color: #6b7280 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.5rem !important;
+  height: 36px !important;
+  width: 36px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  transition: all 0.2s !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.mat-mdc-paginator-range-actions .mat-mdc-icon-button:hover:not([disabled]) {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+.mat-mdc-paginator-range-actions .mat-mdc-icon-button[disabled] {
+  opacity: 0.5 !important;
+  background-color: #f9fafb !important;
+  border-color: #f3f4f6 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 639px) {
+  .mat-mdc-paginator-container {
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+  
+  .mat-mdc-paginator-page-size {
+    margin-right: 0 !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  
+  .mat-mdc-paginator-range-actions {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+/* Style for the mat-select dropdown panel inside paginator */
+.mat-mdc-select-panel {
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #f3f4f6 !important;
+  background-color: #ffffff !important;
+}
+
+.mat-mdc-select-panel .mdc-list-item {
+  color: #4b5563 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  transition: all 0.2s !important;
+}
+
+.mat-mdc-select-panel .mdc-list-item:hover {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+}
+
+.mat-mdc-select-panel .mdc-list-item--selected {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+}
+
+/* ng-select — combobox tìm kiếm kiểu select2, khớp style input/filter hiện có */
+.ng-select.ng-select-single .ng-select-container {
+  height: 38px;
+  min-height: 38px;
+  border-radius: 0.5rem;
+  border-color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+.ng-select .ng-select-container {
+  border-radius: 0.5rem;
+  border-color: #d1d5db;
+}
+
+.ng-select.ng-select-focused:not(.ng-select-opened) > .ng-select-container {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-placeholder {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.ng-select .ng-value-container .ng-input > input {
+  font-size: 0.875rem;
+}
+
+.ng-dropdown-panel {
+  border-radius: 0.5rem;
+  border-color: #f3f4f6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  font-size: 0.875rem;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
+  padding: 8px 16px;
+  color: #4b5563;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-marked {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected.ng-option-marked {
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+/* ---- Câu trả lời Markdown trong các khung chat AI (ngx-markdown, class "chat-md") -------------
+   Không có plugin typography nên tự đặt khoảng cách/tiêu đề/danh sách tối thiểu cho bong bóng chat. */
+.chat-md { display: block; line-height: 1.55; overflow-wrap: anywhere; }
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md p { margin: 0.4em 0; }
+.chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4 { font-weight: 700; margin: 0.75em 0 0.35em; line-height: 1.3; }
+.chat-md h1 { font-size: 1.15em; }
+.chat-md h2 { font-size: 1.08em; }
+.chat-md h3, .chat-md h4 { font-size: 1em; }
+.chat-md ul, .chat-md ol { margin: 0.35em 0; padding-left: 1.3em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md li { margin: 0.15em 0; }
+.chat-md li > p { margin: 0; }
+.chat-md strong { font-weight: 700; }
+.chat-md a { color: inherit; text-decoration: underline; }
+.chat-md code { font-family: ui-monospace, monospace; font-size: 0.9em; background: rgb(15 23 42 / 0.06); padding: 0.05em 0.3em; border-radius: 4px; }
+.chat-md pre { background: rgb(15 23 42 / 0.06); padding: 0.6em; border-radius: 8px; overflow-x: auto; }
+.chat-md blockquote { border-left: 3px solid rgb(148 163 184); padding-left: 0.7em; color: rgb(71 85 105); margin: 0.4em 0; }
+/* Bảng danh sách (chat thống kê): cuộn ngang trong bong bóng hẹp thay vì tràn khung. */
+.chat-md table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0.4em 0; font-size: 0.9em; overflow-wrap: normal; }
+.chat-md th { background: rgb(248 250 252); font-weight: 600; white-space: nowrap; text-align: left; }
+.chat-md td { vertical-align: top; }
+.chat-md td:nth-child(2) { min-width: 10rem; }
+.chat-md td:first-child, .chat-md th:first-child { text-align: right; color: rgb(100 116 139); }
+.chat-md th, .chat-md td { border: 1px solid rgb(226 232 240); padding: 0.25em 0.5em; }

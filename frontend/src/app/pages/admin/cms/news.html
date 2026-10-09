@@ -1,0 +1,499 @@
+<!-- Page Title -->
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'NEWS.TITLE' | translate }}</h4>
+</div>
+
+<!-- Filters Section -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 relative z-10">
+  <form [formGroup]="filterForm" (ngSubmit)="triggerSearch()">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NEWS.CATEGORY' | translate }}</label>
+        <ng-select formControlName="categoryId" [items]="categories" bindLabel="label" bindValue="id"
+                   [searchable]="true" [clearable]="true"
+                   [placeholder]="'NEWS.ALL_CATEGORIES' | translate"
+                   [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                   [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+        </ng-select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NEWS.STATUS' | translate }}</label>
+        <select formControlName="status"
+          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <option value="">{{ 'NEWS.ALL_STATUS' | translate }}</option>
+          <option value="2">{{ 'NEWS.STATUS_PUBLISHED' | translate }}</option>
+          <option value="1">{{ 'NEWS.STATUS_DRAFT' | translate }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NEWS.ARTICLE_TITLE' | translate }}</label>
+        <input type="text" formControlName="keyword"
+          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          [placeholder]="'NEWS.SEARCH_PLACEHOLDER' | translate">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NEWS.DATE_FROM' | translate }}</label>
+        <app-date-input formControlName="dateFrom"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'NEWS.DATE_TO' | translate }}</label>
+        <app-date-input formControlName="dateTo"></app-date-input>
+      </div>
+      @if (isPrivileged) {
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'COMMON.TENANT' | translate }}</label>
+          <ng-select formControlName="tenantId" [items]="tenantOptions" bindLabel="name" bindValue="id"
+                     (change)="triggerSearch()"
+                     [searchable]="true" [clearable]="true"
+                     [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                     [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+          </ng-select>
+        </div>
+      }
+    </div>
+    <div class="mt-4 flex gap-2">
+      <button type="submit"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center text-sm transition-colors shadow-sm">
+        <mat-icon class="text-[18px] mr-2">search</mat-icon>{{ 'COMMON.SEARCH_BTN' | translate }}
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Actions Bar -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-5 flex gap-3 items-center">
+  <button *appCan="'add'" (click)="openAddModal()"
+    class="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-1.5 px-3 rounded-lg flex items-center text-sm transition-colors shadow-sm">
+    <mat-icon class="text-sm mr-1.5">add</mat-icon>{{ 'COMMON.ADD_BTN' | translate }}
+  </button>
+  <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0"
+    class="border border-red-500 text-red-500 hover:bg-red-50 font-medium py-1.5 px-3 rounded-lg flex items-center text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+    <mat-icon class="text-sm mr-1.5 pt-0.5">delete</mat-icon>{{ 'COMMON.DELETE_SELECTED' | translate }}
+  </button>
+</div>
+
+<!-- Table Section -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative z-0">
+  @if (isLoading()) {
+    <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+      <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+    </div>
+  }
+  <div class="overflow-x-auto min-h-[200px]">
+    <div class="min-w-[900px]">
+      <table mat-table [dataSource]="dataSource" class="w-full">
+
+        <!-- Checkbox -->
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="w-12 px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded"
+              (change)="$event ? masterToggle() : null"
+              [checked]="selection.hasValue() && isAllSelected()"
+              [indeterminate]="selection.hasValue() && !isAllSelected()">
+          </th>
+          <td mat-cell *matCellDef="let row" class="w-12 px-4 py-3 border-b border-gray-100">
+            <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded"
+              (click)="$event.stopPropagation()"
+              (change)="$event ? selection.toggle(row) : null"
+              [checked]="selection.isSelected(row)">
+          </td>
+        </ng-container>
+
+        <!-- STT -->
+        <ng-container matColumnDef="index">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 w-14">
+            {{ 'SYSTEM_LOG.INDEX' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element; let i = index" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">
+            {{ rowIndex(i) }}
+          </td>
+        </ng-container>
+
+        <!-- Category -->
+        <ng-container matColumnDef="categoryName">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">
+            {{ 'NEWS.CATEGORY' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-blue-600 border-b border-gray-100 whitespace-nowrap">
+            {{ element.categoryName || '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Title + Thumb -->
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">
+            {{ 'NEWS.ARTICLE_TITLE' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+              @if (element.thumb) {
+                <img [src]="element.thumb" alt="" class="w-12 h-10 object-cover rounded border border-gray-200 flex-shrink-0">
+              } @else {
+                <div class="w-12 h-10 bg-gray-100 rounded border border-gray-200 flex-shrink-0 flex items-center justify-center">
+                  <mat-icon class="text-gray-400 text-lg">image</mat-icon>
+                </div>
+              }
+              <span class="text-sm font-medium text-blue-700 hover:underline cursor-pointer line-clamp-2"
+                (click)="openEditModal(element); $event.stopPropagation()">
+                {{ element.title || '—' }}
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Last Update -->
+        <ng-container matColumnDef="lastUpDate">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NEWS.LAST_UPDATE' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100 whitespace-nowrap">
+            {{ element.lastUpDate ? (element.lastUpDate | appDate:'datetime') : '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Total View -->
+        <ng-container matColumnDef="totalView">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-center font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'NEWS.TOTAL_VIEW' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-center text-sm text-gray-600 border-b border-gray-100">
+            {{ element.totalView ?? 0 }}
+          </td>
+        </ng-container>
+
+        <!-- Status Toggle -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-center font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200">
+            {{ 'NEWS.STATUS' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-center border-b border-gray-100">
+            <button type="button"
+              (click)="toggleStatus(element); $event.stopPropagation()"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+              [class.bg-blue-600]="element.status === 2"
+              [class.bg-gray-300]="element.status !== 2">
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                [class.translate-x-6]="element.status === 2"
+                [class.translate-x-1]="element.status !== 2">
+              </span>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Đơn vị (chỉ super-admin) -->
+        <ng-container matColumnDef="tenant">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-left font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+            {{ 'COMMON.TENANT' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100 whitespace-nowrap">
+            {{ element.tenantName ?? '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Actions -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-center font-medium text-sm text-gray-600 bg-gray-50 border-b border-gray-200 w-32">
+            {{ 'COMMON.ACTIONS' | translate }}
+          </th>
+          <td mat-cell *matCellDef="let element" class="py-3 px-4 border-b border-gray-100">
+            <div class="flex items-center justify-center gap-2">
+              <button (click)="openAttachments(element); $event.stopPropagation()"
+                class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors"
+                [title]="'NEWS.ATTACHMENTS' | translate">
+                <mat-icon class="text-[18px]">attach_file</mat-icon>
+              </button>
+              <button *appCan="'edit'" (click)="openEditModal(element); $event.stopPropagation()"
+                class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors"
+                [title]="'COMMON.EDIT' | translate">
+                <mat-icon class="text-[18px]">edit</mat-icon>
+              </button>
+              <button *appCan="'delete'" (click)="handleDelete(element); $event.stopPropagation()"
+                class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                [title]="'COMMON.DELETE' | translate">
+                <mat-icon class="text-[18px]">delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+          class="hover:bg-gray-50/50 transition-colors cursor-pointer"
+          (click)="selection.toggle(row)"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell py-8 text-center text-gray-400" [attr.colspan]="displayedColumns.length">
+            {{ 'COMMON.NO_DATA' | translate }}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <mat-paginator [length]="totalRecords"
+                 [pageSize]="pageSize" [pageIndex]="pageIndex"
+                 [pageSizeOptions]="pageSizeOptions"
+                 class="border-t border-gray-100"
+                 (page)="onPageChange($event)">
+  </mat-paginator>
+</div>
+
+<!-- Add/Edit Modal (fullscreen) -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] overflow-y-auto bg-gray-100">
+    <!-- Modal Header -->
+    <div class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <h3 class="text-lg font-bold text-blue-700">
+          {{ editMode() ? ('NEWS.MODAL_EDIT_TITLE' | translate) : ('NEWS.MODAL_ADD_TITLE' | translate) }}
+        </h3>
+        <button (click)="requestClose()" class="text-gray-400 hover:text-gray-700 transition-colors">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="max-w-7xl mx-auto px-6 py-6">
+      <form [formGroup]="newsForm" (ngSubmit)="onSubmit()">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <!-- LEFT: Basic Info (2 cols wide) -->
+          <div class="lg:col-span-2 space-y-5">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <h4 class="text-base font-semibold text-blue-600 border-b border-gray-100 pb-3 mb-5">
+                {{ 'NEWS.BASIC_INFO' | translate }}
+              </h4>
+
+              <!-- Category -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.CATEGORY' | translate }}</label>
+                <select formControlName="CategoryId"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [value]="null">{{ 'NEWS.ALL_CATEGORIES' | translate }}</option>
+                  @for (cat of categories; track cat.id) {
+                    <option [value]="cat.id">{{ cat.label }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Title -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  {{ 'NEWS.ARTICLE_TITLE' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <input type="text" formControlName="Title"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  [placeholder]="'NEWS.SEARCH_PLACEHOLDER' | translate"
+                  [class.border-red-400]="newsForm.get('Title')?.invalid && newsForm.get('Title')?.touched">
+                @if (newsForm.get('Title')?.invalid && newsForm.get('Title')?.touched) {
+                  <p class="mt-1 text-xs text-red-500">{{ 'NEWS.VALIDATION_TITLE' | translate }}</p>
+                }
+              </div>
+
+              <!-- Date Range -->
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.START_DATE' | translate }}</label>
+                  <app-date-input formControlName="StartTime"></app-date-input>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.END_DATE' | translate }}</label>
+                  <app-date-input formControlName="EndTime"></app-date-input>
+                </div>
+              </div>
+
+              <!-- Brief -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.BRIEF' | translate }}</label>
+                @if (isBrowser && Editor() && editorConfig()) {
+                  <ckeditor [editor]="Editor()" [config]="editorConfig()"
+                    [data]="briefContentInitial" (change)="onBriefChange($event)" (ready)="onEditorReady($event, 'brief')"
+                    class="block border border-gray-300 rounded-lg overflow-hidden">
+                  </ckeditor>
+                } @else {
+                  <div class="w-full h-32 border border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center">
+                    <mat-icon class="animate-spin text-gray-400">autorenew</mat-icon>
+                  </div>
+                }
+              </div>
+
+              <!-- Content -->
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.CONTENT' | translate }}</label>
+                @if (isBrowser && Editor() && editorConfig()) {
+                  <ckeditor [editor]="Editor()" [config]="editorConfig()"
+                    [data]="contentInitial" (change)="onContentChange($event)" (ready)="onEditorReady($event, 'content')"
+                    class="block border border-gray-300 rounded-lg overflow-hidden">
+                  </ckeditor>
+                } @else {
+                  <div class="w-full h-48 border border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center">
+                    <mat-icon class="animate-spin text-gray-400">autorenew</mat-icon>
+                  </div>
+                }
+              </div>
+
+              <!-- Source & Author -->
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.SOURCE' | translate }}</label>
+                  <input type="text" formControlName="Source"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    [placeholder]="'NEWS.SOURCE' | translate">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'NEWS.AUTHOR' | translate }}</label>
+                  <input type="text" formControlName="Author"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    [placeholder]="'NEWS.AUTHOR' | translate">
+                </div>
+              </div>
+
+              <!-- Toggles -->
+              <div class="flex gap-8 items-center mb-2">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <span class="text-sm font-medium text-gray-700">{{ 'NEWS.ALLOW_COMMENT' | translate }}</span>
+                  <button type="button"
+                    (click)="newsForm.patchValue({ AllowComment: newsForm.get('AllowComment')?.value === 1 ? 0 : 1 })"
+                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                    [class.bg-blue-600]="newsForm.get('AllowComment')?.value === 1"
+                    [class.bg-gray-300]="newsForm.get('AllowComment')?.value !== 1">
+                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                      [class.translate-x-6]="newsForm.get('AllowComment')?.value === 1"
+                      [class.translate-x-1]="newsForm.get('AllowComment')?.value !== 1">
+                    </span>
+                  </button>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <span class="text-sm font-medium text-gray-700">{{ 'NEWS.STATUS' | translate }}</span>
+                  <button type="button"
+                    (click)="newsForm.patchValue({ Status: newsForm.get('Status')?.value === 2 ? 1 : 2 })"
+                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                    [class.bg-blue-600]="newsForm.get('Status')?.value === 2"
+                    [class.bg-gray-300]="newsForm.get('Status')?.value !== 2">
+                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                      [class.translate-x-6]="newsForm.get('Status')?.value === 2"
+                      [class.translate-x-1]="newsForm.get('Status')?.value !== 2">
+                    </span>
+                  </button>
+                </label>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3">
+              <button type="submit" [disabled]="isSaving()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg flex items-center transition-colors shadow-sm disabled:opacity-50">
+                @if (isSaving()) {
+                  <mat-icon class="animate-spin mr-2 text-[18px]">autorenew</mat-icon>
+                }
+                {{ 'COMMON.SAVE' | translate }}
+              </button>
+              <button type="button" (click)="requestClose()"
+                class="border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-6 rounded-lg transition-colors">
+                {{ 'NEWS.BACK' | translate }}
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT: Meta & Image -->
+          <div class="lg:col-span-1 space-y-4">
+
+            <!-- Types -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <h4 class="text-sm font-semibold text-blue-600 border-b border-gray-100 pb-2 mb-3">
+                {{ 'NEWS.TYPES' | translate }}
+              </h4>
+              <label class="flex items-center gap-2 mb-2 cursor-pointer">
+                <input type="checkbox" formControlName="TypesHomepage"
+                  class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded">
+                <span class="text-sm text-gray-700">{{ 'NEWS.TYPE_HOMEPAGE' | translate }}</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" formControlName="TypesNotification"
+                  class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded">
+                <span class="text-sm text-gray-700">{{ 'NEWS.TYPE_NOTIFICATION' | translate }}</span>
+              </label>
+            </div>
+
+            <!-- SEO -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <h4 class="text-sm font-semibold text-blue-600 border-b border-gray-100 pb-2 mb-3">
+                {{ 'NEWS.SEO_INFO' | translate }}
+              </h4>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">MetaTitle</label>
+                  <input type="text" formControlName="MetaTitle"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">MetaKeyword</label>
+                  <input type="text" formControlName="MetaKeyword"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'CMS.META_DESCRIPTION' | translate }}</label>
+                  <textarea formControlName="MetaDescription" rows="2"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none">
+                  </textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">{{ 'NEWS.KEYWORD' | translate }}</label>
+                  <input type="text" formControlName="Keyword"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+            </div>
+
+            <!-- Image -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <h4 class="text-sm font-semibold text-blue-600 border-b border-gray-100 pb-2 mb-3">
+                {{ 'NEWS.IMAGE_SECTION' | translate }}
+              </h4>
+              @if (thumbPreviewUrl()) {
+                <div class="mb-3">
+                  <img [src]="thumbPreviewUrl()" alt="Thumb" class="w-full h-36 object-cover rounded-lg border border-gray-200">
+                </div>
+              }
+              <label class="flex items-center gap-2 cursor-pointer border border-dashed border-gray-300 rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                <mat-icon class="text-gray-400">upload_file</mat-icon>
+                <span class="text-sm text-gray-600">{{ 'NEWS.CHOOSE_IMAGE' | translate }}</span>
+                <input type="file" accept="image/*" class="hidden" (change)="onThumbSelected($event)">
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Confirm Delete Modal -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+          <mat-icon class="text-3xl">warning</mat-icon>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">{{ 'COMMON.DELETE_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-500 mb-6">{{ 'COMMON.DELETE_CONFIRM_MSG' | translate }}</p>
+        <div class="flex gap-3">
+          <button (click)="closeConfirm()"
+            class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmActionExecute()"
+            class="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm">
+            {{ 'COMMON.DELETE_CONFIRM_BTN' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<app-media-library-picker (picked)="onMediaPicked($event)" />

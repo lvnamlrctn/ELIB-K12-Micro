@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.BuildingBlocks.Persistence\Elib.BuildingBlocks.Persistence.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Messaging\Elib.BuildingBlocks.Messaging.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.BuildingBlocks.Domain\Elib.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
+    <ProjectReference Include="..\Elib.BuildingBlocks.Authorization\Elib.BuildingBlocks.Authorization.csproj" />
+  </ItemGroup>
+</Project>

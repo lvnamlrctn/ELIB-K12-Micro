@@ -1,0 +1,9 @@
+@if (isPrivileged) {
+  <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+             [(ngModel)]="tenantId" (change)="onChange()"
+             [searchable]="true" [clearable]="true"
+             [placeholder]="'COMMON.ALL_TENANTS' | translate"
+             [notFoundText]="'COMMON.NO_RESULTS' | translate"
+             [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+  </ng-select>
+}

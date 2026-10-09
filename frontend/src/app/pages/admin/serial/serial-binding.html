@@ -1,0 +1,189 @@
+<div class="print:hidden">
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'SERIAL_BINDING.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5" [formGroup]="searchForm">
+  <div class="flex flex-wrap gap-2 items-center">
+    <button *appCan="'add'" type="button" (click)="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm"><mat-icon class="text-[16px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}</button>
+    <input formControlName="accessionNo" [placeholder]="'SERIAL_BINDING.ACCESSION_NO' | translate" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
+    <input formControlName="volumeTitle" [placeholder]="'SERIAL_BINDING.VOLUME_TITLE' | translate" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-56">
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button type="button" (click)="triggerSearch()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+    <button type="button" (click)="printSelectedLabels()" [disabled]="selection.selected.length === 0" class="border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+      <mat-icon class="text-[16px]">print</mat-icon> {{ 'SERIAL_BINDING.PRINT_SPINE_LABELS_SELECTED' | translate }} ({{ selection.selected.length }})
+    </button>
+  </div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 border-b border-gray-200 bg-gray-50 w-10"><mat-checkbox (change)="masterToggle()" [checked]="isAllSelected()"></mat-checkbox></th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100"><mat-checkbox (click)="$event.stopPropagation()" (change)="selection.toggle(row)" [checked]="selection.isSelected(row)"></mat-checkbox></td>
+      </ng-container>
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+      <ng-container matColumnDef="accessionNo"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SERIAL_BINDING.ACCESSION_NO' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-mono text-gray-800 border-b border-gray-100">{{ row.accessionNo || '—' }}</td></ng-container>
+      <ng-container matColumnDef="volumeTitle"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SERIAL_BINDING.VOLUME_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.volumeTitle || row.subscriptionTitle || '—' }}</td></ng-container>
+      <ng-container matColumnDef="store"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'STORE.TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.storeName || getStoreName(row.storeId) }}</td></ng-container>
+      <ng-container matColumnDef="bindingDate"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SERIAL_BINDING.BINDING_DATE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.bindingDate ? (row.bindingDate | appDate) : '—' }}</td></ng-container>
+      <ng-container matColumnDef="itemCount"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'SERIAL_BINDING.ITEM_COUNT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100 text-right">{{ row.itemCount ?? (row.items?.length || 0) }}</td></ng-container>
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right"><div class="flex items-center justify-end gap-1">
+          <button (click)="printSingleLabel(row)" class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" [title]="'SERIAL_BINDING.PRINT_SPINE_LABEL' | translate"><mat-icon class="text-[18px]">print</mat-icon></button>
+          <button *appCan="'edit'" (click)="openEditModal(row)" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors" [title]="'COMMON.EDIT' | translate"><mat-icon class="text-[18px]">edit</mat-icon></button>
+          <button *appCan="'delete'" (click)="handleDelete(row)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors" [title]="'COMMON.DELETE' | translate"><mat-icon class="text-[18px]">delete</mat-icon></button>
+        </div></td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">menu_book</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>
+
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-blue-600">menu_book</mat-icon>{{ (editMode() ? 'SERIAL_BINDING.EDIT_TITLE' : 'SERIAL_BINDING.ADD_TITLE') | translate }}</h3>
+        <button (click)="closeModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <form [formGroup]="dataForm" (ngSubmit)="onSubmit()" class="px-6 py-5 overflow-y-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SERIAL_BINDING.ACCESSION_NO' | translate }}</label><input formControlName="AccessionNo" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'STORE.TITLE' | translate }}</label>
+            <ng-select [items]="stores()" bindLabel="name" bindValue="id" formControlName="StoreId"
+                       [searchable]="true" [clearable]="true"
+                       [placeholder]="'COMMON.SELECT' | translate"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                       [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+            </ng-select></div>
+          <div class="md:col-span-2"><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SERIAL_BINDING.VOLUME_TITLE' | translate }}</label><input formControlName="VolumeTitle" [placeholder]="dataForm.getRawValue().SubscriptionTitle || ''" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SERIAL_BINDING.BINDING_DATE' | translate }}</label><app-date-input formControlName="BindingDate"></app-date-input></div>
+          <div><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'SUBSCRIPTION.TITLE' | translate }}</label><input formControlName="SubscriptionTitle" readonly class="w-full px-3 py-2 text-sm border border-gray-200 bg-gray-50 rounded-lg text-gray-500"></div>
+          <div class="md:col-span-2"><label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'COMMON.NOTE' | translate }}</label><textarea formControlName="Note" rows="2" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea></div>
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ 'SERIAL_BINDING.ISSUES_IN_VOLUME' | translate }} ({{ items().length }})</p>
+          <button type="button" (click)="openAddIssuesModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[14px]">add</mat-icon> {{ 'SERIAL_BINDING.ADD_ISSUES' | translate }}</button>
+        </div>
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          @if (items().length === 0) {
+            <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.NO_DATA' | translate }}</p>
+          } @else {
+            <table class="w-full text-sm">
+              <tbody>
+                @for (it of items(); track it.issueId) {
+                  <tr class="border-b border-gray-100 last:border-0">
+                    <td class="py-1.5 px-3 font-medium text-gray-700">{{ it.serialSeq || ('#' + it.issueId) }}</td>
+                    <td class="py-1.5 px-3 text-gray-500">{{ it.publishedDate ? (it.publishedDate | appDate) : '—' }}</td>
+                    <td class="py-1.5 px-3 text-right"><button type="button" (click)="removeItem(it.issueId)" class="p-1 rounded text-red-500 hover:bg-red-50"><mat-icon class="text-[16px]">close</mat-icon></button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+      </form>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          @if (isSaving()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> } {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showAddIssuesModal()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-emerald-600">inventory_2</mat-icon>{{ 'SERIAL_BINDING.ADD_ISSUES' | translate }}</h3>
+        <button (click)="closeAddIssuesModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="px-6 py-5 overflow-y-auto">
+        @if (!pickedSubscription()) {
+          <div class="flex gap-2 mb-3">
+            <input [ngModel]="issueSearchTitle()" (ngModelChange)="issueSearchTitle.set($event)" (keydown.enter)="searchIssueSubscriptions()" [placeholder]="'SERIAL_BINDING.SEARCH_TITLE' | translate" class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <button type="button" (click)="searchIssueSubscriptions()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2 px-4 rounded-lg flex items-center gap-1"><mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+          </div>
+          @if (isSearchingIssues()) {
+            <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.LOADING' | translate }}</p>
+          } @else if (issueSearchResults().length === 0) {
+            <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.NO_DATA' | translate }}</p>
+          } @else {
+            <div class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+              @for (s of issueSearchResults(); track s.id) {
+                <button type="button" (click)="pickSubscription(s)" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between">
+                  <span class="font-medium text-gray-800">{{ s.title || '—' }}</span>
+                  <span class="text-xs text-gray-400">{{ s.issn || '' }}</span>
+                </button>
+              }
+            </div>
+          }
+        } @else {
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gray-700">{{ pickedSubscription()?.title }}</p>
+            <button type="button" (click)="pickedSubscription.set(null)" class="text-xs text-blue-600 hover:underline">{{ 'SERIAL_BINDING.SEARCH_TITLE' | translate }}</button>
+          </div>
+          @if (isSearchingIssues()) {
+            <p class="text-center text-sm text-gray-400 py-6">{{ 'COMMON.LOADING' | translate }}</p>
+          } @else if (candidateIssues().length === 0) {
+            <p class="text-center text-sm text-gray-400 py-6">{{ 'SERIAL_BINDING.NO_RECEIVED_ISSUES' | translate }}</p>
+          } @else {
+            <p class="text-xs text-gray-400 mb-2">{{ 'SERIAL_BINDING.SELECT_ISSUES' | translate }}</p>
+            <div class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+              @for (i of candidateIssues(); track i.id) {
+                <label class="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                  <mat-checkbox (click)="$event.stopPropagation()" (change)="candidateSelection.toggle(i)" [checked]="candidateSelection.isSelected(i)"></mat-checkbox>
+                  <span class="font-medium text-gray-700">{{ i.serialSeq || ('#' + i.id) }}</span>
+                  <span class="text-xs text-gray-400 ml-auto">{{ i.publishedDate ? (i.publishedDate | appDate) : '' }}</span>
+                </label>
+              }
+            </div>
+          }
+        }
+      </div>
+      <div class="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button type="button" (click)="closeAddIssuesModal()" class="flex-1 py-2 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="button" (click)="confirmAddIssues()" [disabled]="!pickedSubscription() || candidateSelection.selected.length === 0" class="flex-1 py-2 px-4 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">check</mat-icon> {{ 'COMMON.SELECT' | translate }} ({{ candidateSelection.selected.length }})</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center"><div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon></div><h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3><p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p></div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button (click)="confirmActionExecute()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors"><mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+</div>
+
+@if (printTarget().length > 0) {
+  <div class="hidden print:block p-6">
+    <div class="flex flex-wrap gap-4">
+      @for (item of printTarget(); track item.id) {
+        <div class="w-[3cm] h-[10cm] border border-gray-400 rounded flex flex-col justify-between items-center text-center py-3 px-1">
+          <span class="text-[10px] text-gray-500">{{ item.storeName || getStoreName(item.storeId) }}</span>
+          <span class="text-xs font-bold leading-tight [writing-mode:vertical-rl]">{{ item.volumeTitle || item.subscriptionTitle || '—' }}</span>
+          <span class="text-[10px] text-gray-600">{{ spineRange(item) }}</span>
+          <span class="text-xs font-mono font-semibold text-blue-700">{{ item.accessionNo || '—' }}</span>
+        </div>
+      }
+    </div>
+  </div>
+}

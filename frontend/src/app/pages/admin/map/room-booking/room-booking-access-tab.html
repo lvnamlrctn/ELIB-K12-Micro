@@ -1,0 +1,216 @@
+<!-- Thiết bị -->
+<section class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5 overflow-hidden">
+  <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h3 class="font-bold text-gray-800">{{ 'STUDY_ROOM_BOOKING.DEVICES' | translate }}</h3>
+      <p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.DEVICES_HINT' | translate }}</p>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" (click)="showGuide.set(!showGuide())" class="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1">
+        <mat-icon class="text-[18px] w-[18px] h-[18px]">integration_instructions</mat-icon>{{ 'STUDY_ROOM_BOOKING.INTEGRATION_GUIDE' | translate }}
+      </button>
+      <button *appCan="'edit'" type="button" (click)="openDevice()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+        <mat-icon class="text-[18px] w-[18px] h-[18px]">add</mat-icon>{{ 'STUDY_ROOM_BOOKING.ADD_DEVICE' | translate }}
+      </button>
+    </div>
+  </div>
+  @if (showGuide()) {
+    <div class="px-4 py-3 bg-slate-50 border-b border-gray-100 text-xs text-slate-700 space-y-1 font-mono overflow-x-auto">
+      <p class="font-sans font-semibold text-slate-800">{{ 'STUDY_ROOM_BOOKING.GUIDE_HEADERS' | translate }}</p>
+      <p>X-Device-Code: &lt;mã thiết bị&gt; · X-Device-Key: &lt;khoá API&gt;</p>
+      <p>POST {{ apiBase }}/Verify &nbsp; body: {{ '{' }}"uid":"04A1B2C3","scannedAt":"2026-10-05T09:00:00+07:00"{{ '}' }}</p>
+      <p class="font-sans">→ data.allowed (true/false), data.reason, data.validUntil</p>
+      <p>GET {{ apiBase }}/Commands &nbsp; → [{{ '{' }}"id","command":"OPEN","expiresAt"{{ '}' }}] ({{ 'STUDY_ROOM_BOOKING.GUIDE_POLL' | translate }})</p>
+      <p>POST {{ apiBase }}/Commands/&lt;id&gt;/Ack</p>
+    </div>
+  }
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[760px] text-sm">
+      <thead><tr class="bg-gray-50 text-left text-gray-600">
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.DEVICE_CODE' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.DEVICE_NAME' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.COL_ROOM' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.LAST_SEEN' | translate }}</th>
+        <th class="py-2 px-4 text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
+      </tr></thead>
+      <tbody>
+        @for (d of devices(); track d.publicId) {
+          <tr class="border-t border-gray-100">
+            <td class="py-2 px-4 font-mono font-semibold text-gray-800">{{ d.code }} @if (!d.isActive) { <span class="ml-1 text-[10px] font-sans px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">{{ 'STUDY_ROOM_BOOKING.INACTIVE' | translate }}</span> }</td>
+            <td class="py-2 px-4 text-gray-700">{{ d.name }}</td>
+            <td class="py-2 px-4 text-gray-700">{{ d.roomName || roomName(d.mapObjectId) }}</td>
+            <td class="py-2 px-4">
+              <span class="inline-flex items-center gap-1 text-xs" [class]="online(d) ? 'text-emerald-700' : 'text-gray-500'">
+                <span class="w-2 h-2 rounded-full" [class]="online(d) ? 'bg-emerald-500' : 'bg-gray-300'"></span>
+                {{ d.lastSeenAt ? (d.lastSeenAt | date:'dd/MM/yyyy HH:mm') : ('STUDY_ROOM_BOOKING.NEVER' | translate) }}
+              </span>
+            </td>
+            <td class="py-2 px-4 text-center whitespace-nowrap">
+              <button *appCan="'edit'" (click)="unlock(d)" [title]="'STUDY_ROOM_BOOKING.UNLOCK' | translate" class="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">lock_open</mat-icon></button>
+              <button *appCan="'edit'" (click)="openDevice(d)" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">edit</mat-icon></button>
+              <button *appCan="'edit'" (click)="regenerate(d)" [title]="'STUDY_ROOM_BOOKING.REGEN_KEY' | translate" class="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">key</mat-icon></button>
+              <button *appCan="'delete'" (click)="deleteDevice(d)" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">delete</mat-icon></button>
+            </td>
+          </tr>
+        } @empty { <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Thẻ quản trị -->
+<section class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5 overflow-hidden">
+  <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h3 class="font-bold text-gray-800">{{ 'STUDY_ROOM_BOOKING.STAFF_CARDS' | translate }}</h3>
+      <p class="text-xs text-gray-500">{{ 'STUDY_ROOM_BOOKING.STAFF_CARDS_HINT' | translate }}</p>
+    </div>
+    <button *appCan="'edit'" type="button" (click)="openCard()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1">
+      <mat-icon class="text-[18px] w-[18px] h-[18px]">add</mat-icon>{{ 'STUDY_ROOM_BOOKING.ADD_STAFF_CARD' | translate }}
+    </button>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[520px] text-sm">
+      <thead><tr class="bg-gray-50 text-left text-gray-600">
+        <th class="py-2 px-4">UID</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.CARD_LABEL' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.COL_STATUS' | translate }}</th>
+        <th class="py-2 px-4 text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
+      </tr></thead>
+      <tbody>
+        @for (c of cards(); track c.publicId) {
+          <tr class="border-t border-gray-100">
+            <td class="py-2 px-4 font-mono">{{ c.cardUid }}</td>
+            <td class="py-2 px-4 text-gray-700">{{ c.label }}</td>
+            <td class="py-2 px-4"><span class="text-xs font-semibold" [class]="c.isActive ? 'text-emerald-700' : 'text-gray-500'">{{ (c.isActive ? 'STUDY_ROOM_BOOKING.ACTIVE' : 'STUDY_ROOM_BOOKING.INACTIVE') | translate }}</span></td>
+            <td class="py-2 px-4 text-center whitespace-nowrap">
+              <button *appCan="'edit'" (click)="openCard(c)" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">edit</mat-icon></button>
+              <button *appCan="'delete'" (click)="deleteCard(c)" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 inline-flex items-center justify-center"><mat-icon class="text-[18px]">delete</mat-icon></button>
+            </td>
+          </tr>
+        } @empty { <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Nhật ký -->
+<section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+  <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap items-end gap-3">
+    <h3 class="font-bold text-gray-800 mr-auto">{{ 'STUDY_ROOM_BOOKING.SCAN_LOGS' | translate }}</h3>
+    <app-date-input class="block w-40" [(ngModel)]="logFrom"></app-date-input>
+    <app-date-input class="block w-40" [(ngModel)]="logTo"></app-date-input>
+    <select [(ngModel)]="logAllowed" class="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+      <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+      <option [ngValue]="true">{{ 'STUDY_ROOM_BOOKING.ALLOWED' | translate }}</option>
+      <option [ngValue]="false">{{ 'STUDY_ROOM_BOOKING.DENIED' | translate }}</option>
+    </select>
+    <form (ngSubmit)="searchLogs()" class="flex gap-2">
+      <input type="text" [(ngModel)]="logKeyword" name="logKeyword" [placeholder]="'STUDY_ROOM_BOOKING.LOG_SEARCH_PH' | translate" class="w-56 px-2 py-1.5 border border-gray-300 rounded-lg text-sm">
+      <button type="submit" class="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"><mat-icon class="text-[18px] w-[18px] h-[18px]">search</mat-icon></button>
+    </form>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[860px] text-sm">
+      <thead><tr class="bg-gray-50 text-left text-gray-600">
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.TIME' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.DEVICE_CODE' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.COL_ROOM' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.CARD_OR_READER' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.BAN_SOURCE' | translate }}</th>
+        <th class="py-2 px-4">{{ 'STUDY_ROOM_BOOKING.RESULT' | translate }}</th>
+      </tr></thead>
+      <tbody>
+        @for (l of logs(); track l.id) {
+          <tr class="border-t border-gray-100">
+            <td class="py-2 px-4 whitespace-nowrap text-gray-700">{{ l.createdAt | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+            <td class="py-2 px-4 font-mono text-gray-700">{{ l.deviceCode }}</td>
+            <td class="py-2 px-4 text-gray-700">{{ l.roomName }}</td>
+            <td class="py-2 px-4">
+              @if (l.readerName) { <div class="text-gray-800">{{ l.readerName }} <span class="text-xs text-gray-400 font-mono">{{ l.readerCardNo }}</span></div> }
+              <div class="text-xs text-gray-400 font-mono">{{ l.cardUid }}</div>
+            </td>
+            <td class="py-2 px-4 text-gray-600">{{ sourceLabel(l.source) }}</td>
+            <td class="py-2 px-4">
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full" [class]="l.allowed ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">{{ (l.allowed ? 'STUDY_ROOM_BOOKING.ALLOWED' : 'STUDY_ROOM_BOOKING.DENIED') | translate }}</span>
+              <div class="text-xs text-gray-500 mt-0.5">{{ l.reason }}</div>
+            </td>
+          </tr>
+        } @empty { <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+      </tbody>
+    </table>
+  </div>
+  @if (logTotal() > logSize) {
+    <div class="flex items-center justify-end gap-2 p-3 border-t border-gray-100 text-sm text-gray-600">
+      <button type="button" (click)="logPageMove(-1)" [disabled]="logPage <= 1" class="px-2 py-1 rounded-lg border border-gray-300 disabled:opacity-40"><mat-icon class="text-[18px] w-[18px] h-[18px]">chevron_left</mat-icon></button>
+      <span>{{ logPage }} / {{ lastLogPage() }}</span>
+      <button type="button" (click)="logPageMove(1)" [disabled]="logPage >= lastLogPage()" class="px-2 py-1 rounded-lg border border-gray-300 disabled:opacity-40"><mat-icon class="text-[18px] w-[18px] h-[18px]">chevron_right</mat-icon></button>
+    </div>
+  }
+</section>
+
+@if (deviceModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <form (ngSubmit)="saveDevice()" class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+      <h3 class="text-lg font-bold text-gray-800">{{ (editingDevice ? 'STUDY_ROOM_BOOKING.EDIT_DEVICE' : 'STUDY_ROOM_BOOKING.ADD_DEVICE') | translate }}</h3>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.DEVICE_CODE' | translate }} <span class="text-red-500">*</span></label>
+        <input type="text" maxlength="100" [(ngModel)]="device.code" name="code" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+        <p class="text-xs text-gray-400 mt-1">{{ 'STUDY_ROOM_BOOKING.DEVICE_CODE_HINT' | translate }}</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.DEVICE_NAME' | translate }}</label>
+        <input type="text" maxlength="200" [(ngModel)]="device.name" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.COL_ROOM' | translate }}</label>
+        <select [(ngModel)]="device.mapObjectId" name="room" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <option [ngValue]="null">{{ 'STUDY_ROOM_BOOKING.SHARED_DOOR' | translate }}</option>
+          @for (r of rooms(); track r.id) { <option [ngValue]="r.id">{{ r.name }}</option> }
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" [(ngModel)]="device.isActive" name="active" class="w-4 h-4">{{ 'STUDY_ROOM_BOOKING.ACTIVE' | translate }}</label>
+      <div class="flex gap-3 pt-2">
+        <button type="button" (click)="deviceModal.set(false)" class="flex-1 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="submit" [disabled]="!device.code.trim()" class="flex-1 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">{{ 'COMMON.SAVE' | translate }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (issuedKey(); as k) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><mat-icon class="text-amber-600">key</mat-icon>{{ 'STUDY_ROOM_BOOKING.KEY_ISSUED' | translate }}</h3>
+      <p class="text-sm text-gray-600">{{ 'STUDY_ROOM_BOOKING.KEY_ISSUED_HINT' | translate: { code: k.code } }}</p>
+      <div class="flex gap-2">
+        <input readonly [value]="k.key" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono bg-gray-50">
+        <button type="button" (click)="copyKey()" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"><mat-icon class="text-[18px] w-[18px] h-[18px]">content_copy</mat-icon></button>
+      </div>
+      <div class="flex justify-end pt-2">
+        <button type="button" (click)="issuedKey.set(null)" class="py-2 px-5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">{{ 'STUDY_ROOM_BOOKING.KEY_SAVED' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (cardModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <form (ngSubmit)="saveCard()" class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+      <h3 class="text-lg font-bold text-gray-800">{{ (editingCard ? 'STUDY_ROOM_BOOKING.EDIT_STAFF_CARD' : 'STUDY_ROOM_BOOKING.ADD_STAFF_CARD') | translate }}</h3>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">UID <span class="text-red-500">*</span></label>
+        <input type="text" maxlength="64" [(ngModel)]="card.cardUid" name="uid" required [placeholder]="'READER.CARD_UID_PH' | translate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">{{ 'STUDY_ROOM_BOOKING.CARD_LABEL' | translate }}</label>
+        <input type="text" maxlength="200" [(ngModel)]="card.label" name="label" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+      </div>
+      <label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" [(ngModel)]="card.isActive" name="cardActive" class="w-4 h-4">{{ 'STUDY_ROOM_BOOKING.ACTIVE' | translate }}</label>
+      <div class="flex gap-3 pt-2">
+        <button type="button" (click)="cardModal.set(false)" class="flex-1 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">{{ 'COMMON.CANCEL' | translate }}</button>
+        <button type="submit" [disabled]="!card.cardUid.trim()" class="flex-1 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">{{ 'COMMON.SAVE' | translate }}</button>
+      </div>
+    </form>
+  </div>
+}

@@ -1,0 +1,160 @@
+<div class="p-4">
+  <div class="mb-4">
+    <h4 class="text-2xl font-bold text-gray-800">{{ 'READING_TRACKING.TITLE' | translate }}</h4>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 border-b border-gray-200 mb-5">
+    <button type="button" (click)="setTab('stats')"
+            class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
+            [class.border-blue-600]="activeTab() === 'stats'" [class.text-blue-600]="activeTab() === 'stats'"
+            [class.border-transparent]="activeTab() !== 'stats'" [class.text-gray-500]="activeTab() !== 'stats'">
+      <i class="fas fa-chart-line mr-1.5"></i>{{ 'READING_TRACKING.TAB_STATS' | translate }}
+    </button>
+    <button type="button" (click)="setTab('detail')"
+            class="px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"
+            [class.border-blue-600]="activeTab() === 'detail'" [class.text-blue-600]="activeTab() === 'detail'"
+            [class.border-transparent]="activeTab() !== 'detail'" [class.text-gray-500]="activeTab() !== 'detail'">
+      <i class="fas fa-list mr-1.5"></i>{{ 'READING_TRACKING.TAB_DETAIL' | translate }}
+    </button>
+  </div>
+
+  <!-- TAB THỐNG KÊ -->
+  <div [hidden]="activeTab() !== 'stats'">
+    <div class="flex flex-wrap items-end gap-3 mb-5">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ 'READING_TRACKING.FROM_DATE' | translate }}</label>
+        <app-date-input [(ngModel)]="statFrom"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ 'READING_TRACKING.TO_DATE' | translate }}</label>
+        <app-date-input [(ngModel)]="statTo"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ 'READING_TRACKING.GROUP_BY' | translate }}</label>
+        <select [(ngModel)]="groupBy" class="p-2 border border-gray-300 rounded text-sm outline-none focus:border-blue-500 bg-white">
+          <option value="day">{{ 'READING_TRACKING.GROUP_DAY' | translate }}</option>
+          <option value="month">{{ 'READING_TRACKING.GROUP_MONTH' | translate }}</option>
+        </select>
+      </div>
+      @if (isPrivileged) {
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.TENANT' | translate }}</label>
+          <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+                     [(ngModel)]="tenantId" (change)="onTenantChange()"
+                     [searchable]="true" [clearable]="true"
+                     [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                     [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+          </ng-select>
+        </div>
+      }
+      <button type="button" (click)="loadStats()" class="bg-blue-600 text-white px-5 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors">
+        <i class="fas fa-filter mr-1.5"></i>{{ 'READING_TRACKING.APPLY' | translate }}
+      </button>
+    </div>
+
+    <!-- Thẻ tổng -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white p-5 rounded-xl border-l-[5px] border-emerald-500 shadow-sm">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'READING_TRACKING.TOTAL_READS' | translate }}</p>
+        <h5 class="text-3xl font-bold text-gray-800">{{ stats()?.totalReads | number }}</h5>
+      </div>
+      <div class="bg-white p-5 rounded-xl border-l-[5px] border-cyan-400 shadow-sm">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'READING_TRACKING.TOTAL_DOCS' | translate }}</p>
+        <h5 class="text-3xl font-bold text-gray-800">{{ stats()?.totalDocuments | number }}</h5>
+      </div>
+      <div class="bg-white p-5 rounded-xl border-l-[5px] border-blue-500 shadow-sm">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'READING_TRACKING.TOTAL_READERS' | translate }}</p>
+        <h5 class="text-3xl font-bold text-gray-800">{{ stats()?.totalReaders | number }}</h5>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+      <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'READING_TRACKING.CHART_TITLE' | translate }}</h5>
+      @if (statsLoading()) {
+        <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+        </div>
+      }
+      <div class="relative h-[320px] w-full">
+        <canvas #statsChart></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB CHI TIẾT -->
+  <div [hidden]="activeTab() !== 'detail'">
+    <div class="flex flex-wrap items-end gap-3 mb-4">
+      <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.SEARCH' | translate }}</label>
+        <input type="text" [(ngModel)]="keyword" (keyup.enter)="triggerSearch()"
+               placeholder="{{ 'READING_TRACKING.SEARCH_PLACEHOLDER' | translate }}"
+               class="w-full p-2 border border-gray-300 rounded text-sm outline-none focus:border-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ 'READING_TRACKING.FROM_DATE' | translate }}</label>
+        <app-date-input [(ngModel)]="detailFrom"></app-date-input>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">{{ 'READING_TRACKING.TO_DATE' | translate }}</label>
+        <app-date-input [(ngModel)]="detailTo"></app-date-input>
+      </div>
+      @if (isPrivileged) {
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">{{ 'COMMON.TENANT' | translate }}</label>
+          <ng-select [items]="tenantOptions" bindLabel="name" bindValue="id"
+                     [(ngModel)]="tenantId" (change)="onTenantChange()"
+                     [searchable]="true" [clearable]="true"
+                     [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                     [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                     [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+          </ng-select>
+        </div>
+      }
+      <button type="button" (click)="triggerSearch()" class="bg-blue-600 text-white px-5 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors">
+        <i class="fas fa-search mr-1.5"></i>{{ 'COMMON.SEARCH' | translate }}
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+      @if (detailLoading()) {
+        <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      }
+      <table mat-table [dataSource]="dataSource" class="w-full">
+        <ng-container matColumnDef="stt">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">STT</th>
+          <td mat-cell *matCellDef="let row; let i = index">{{ getRowIndex(i) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="reader">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'READING_TRACKING.COL_READER' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.readerName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="doc">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'READING_TRACKING.COL_DOC' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.itemTitle }}</td>
+        </ng-container>
+        <ng-container matColumnDef="time">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'READING_TRACKING.COL_TIME' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.readAt | appDate:'datetime' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="tenant">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'COMMON.TENANT' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.tenantName ?? '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef class="!font-semibold !text-gray-700">{{ 'READING_TRACKING.COL_DURATION' | translate }}</th>
+          <td mat-cell *matCellDef="let row">{{ row.duration }} {{ 'READING_TRACKING.MINUTES' | translate }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+      </table>
+      @if (!detailLoading() && dataSource.length === 0) {
+        <div class="text-center py-10 text-gray-400 text-sm">{{ 'COMMON.NO_DATA' | translate }}</div>
+      }
+      <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" showFirstLastButtons (page)="onPageChange($event)"></mat-paginator>
+    </div>
+  </div>
+</div>

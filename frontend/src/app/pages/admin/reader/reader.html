@@ -1,0 +1,1677 @@
+<div class="print:hidden">
+<!-- Page title -->
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'READER.TITLE' | translate }}</h4>
+</div>
+
+<!-- Search filters -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5">
+  <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+    <mat-icon class="text-blue-600 text-lg">search</mat-icon>
+    <h2 class="text-base font-semibold text-gray-700">{{ 'COMMON.SEARCH_FILTERS' | translate }}</h2>
+    <button type="button" (click)="toggleFilters()" class="ml-auto p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" [title]="(filtersCollapsed() ? 'COMMON.EXPAND' : 'COMMON.COLLAPSE') | translate">
+      <mat-icon>{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</mat-icon>
+    </button>
+  </div>
+  @if (!filtersCollapsed()) {
+  <div class="p-5" [formGroup]="searchForm">
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+    <!-- Row 1 -->
+    <input formControlName="lastName" type="text" (keydown.enter)="triggerSearch()"
+           [placeholder]="'READER.LAST_NAME' | translate"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="firstName" type="text" (keydown.enter)="triggerSearch()"
+           [placeholder]="'READER.FIRST_NAME' | translate"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input formControlName="cardno" type="text" (keydown.enter)="triggerSearch()"
+           [placeholder]="'READER.CARD_CODE' | translate"
+           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <select formControlName="classId"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+      <option [ngValue]="null">{{ 'READER.SELECT_CLASS' | translate }}</option>
+      @for (c of academicClasses; track c.id) {
+        <option [ngValue]="c.id">{{ c.name }}</option>
+      }
+    </select>
+
+    <!-- Row 2 -->
+    <select formControlName="courseId"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+      <option [ngValue]="null">{{ 'READER.SELECT_COURSE' | translate }}</option>
+      @for (c of courses; track c.id) {
+        <option [ngValue]="c.id">{{ c.name }}</option>
+      }
+    </select>
+    <select formControlName="readerTypeId"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+      <option [ngValue]="null">{{ 'READER.SELECT_READER_TYPE' | translate }}</option>
+      @for (rt of readerTypes; track rt.id) {
+        <option [ngValue]="rt.id">{{ rt.name }}</option>
+      }
+    </select>
+    <select formControlName="status"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+      <option [ngValue]="null">{{ 'READER.SELECT_STATUS' | translate }}</option>
+      <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
+      <option [ngValue]="1">{{ 'COMMON.HIDDEN' | translate }}</option>
+    </select>
+    @if (isPrivileged) {
+      <ng-select formControlName="tenantId" [items]="tenantOptions" bindLabel="name" bindValue="id"
+                 [searchable]="true" [clearable]="true"
+                 [placeholder]="'COMMON.ALL_TENANTS' | translate"
+                 [notFoundText]="'COMMON.NO_RESULTS' | translate"
+                 [typeToSearchText]="'COMMON.TYPE_TO_SEARCH' | translate">
+      </ng-select>
+    }
+    <button (click)="triggerSearch()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-1 text-sm shadow-sm transition-colors">
+      <mat-icon class="text-[18px]">search</mat-icon>
+      {{ 'COMMON.SEARCH_BTN' | translate }}
+    </button>
+
+    <!-- Row 3: date ranges -->
+    <div>
+      <label class="block text-xs text-gray-500 mb-0.5">{{ 'READER.ISSUED_FROM' | translate }}</label>
+      <app-date-input formControlName="issuedFrom"></app-date-input>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-0.5">{{ 'READER.ISSUED_TO' | translate }}</label>
+      <app-date-input formControlName="issuedTo"></app-date-input>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-0.5">{{ 'READER.EXPIRED_FROM' | translate }}</label>
+      <app-date-input formControlName="expiredFrom"></app-date-input>
+    </div>
+    <div>
+      <label class="block text-xs text-gray-500 mb-0.5">{{ 'READER.EXPIRED_TO' | translate }}</label>
+      <app-date-input formControlName="expiredTo"></app-date-input>
+    </div>
+  </div>
+  </div>
+  }
+</div>
+
+<!-- Toolbar -->
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5 flex flex-wrap gap-2 items-center justify-between">
+  <div class="flex flex-wrap gap-2 items-center">
+    <button *appCan="'export'" (click)="openExportModal()"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">file_download</mat-icon>
+      {{ 'READER.EXPORT' | translate }}
+    </button>
+    <button *appCan="'import'" (click)="openImportModal()"
+            class="border border-green-600 text-green-600 hover:bg-green-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors">
+      <mat-icon class="text-[16px]">file_upload</mat-icon>
+      {{ 'READER.IMPORT' | translate }}
+    </button>
+    <button *appCan="'edit'" (click)="openUploadZipModal()"
+            class="border border-teal-600 text-teal-600 hover:bg-teal-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors">
+      <mat-icon class="text-[16px]">folder_zip</mat-icon>
+      {{ 'READER.UPLOAD_PHOTOS_ZIP' | translate }}
+    </button>
+    <button (click)="openBatchModal()"
+            class="border border-purple-600 text-purple-600 hover:bg-purple-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors">
+      <mat-icon class="text-[16px]">tune</mat-icon>
+      Xử lý theo lô
+    </button>
+    <button *appCan="'add'" (click)="openAddModal()"
+            class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors shadow-sm">
+      <mat-icon class="text-[16px]">add</mat-icon>
+      {{ 'COMMON.ADD_BTN' | translate }}
+    </button>
+    <button *appCan="'delete'" (click)="deleteSelected()" [disabled]="selection.selected.length === 0"
+            class="border border-red-500 text-red-500 hover:bg-red-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      <mat-icon class="text-[16px]">delete</mat-icon>
+      {{ 'COMMON.DELETE_SELECTED' | translate }}
+    </button>
+    <button (click)="printSelectedCards()" [disabled]="selection.selected.length === 0"
+            class="border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      <mat-icon class="text-[16px]">print</mat-icon>
+      {{ 'READER.PRINT_SELECTED_CARDS' | translate }} ({{ selection.selected.length }})
+    </button>
+    <button *appCan="'edit'" (click)="openBulkResetPasswordModal()" [disabled]="selection.selected.length === 0"
+            class="border border-amber-500 text-amber-600 hover:bg-amber-50 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      <mat-icon class="text-[16px]">lock_reset</mat-icon>
+      {{ 'READER.BULK_RESET_PASSWORD' | translate }} ({{ selection.selected.length }})
+    </button>
+  </div>
+
+  <div class="flex items-center gap-2">
+  <app-admin-table-preferences pageKey="readers" [columns]="prefColumns" [read]="readTableSettings" [defaultPageSize]="defaultPageSize" (apply)="applyTableSettings($event)"></app-admin-table-preferences>
+
+  <!-- View mode toggle -->
+  <div class="flex border border-gray-300 rounded-lg overflow-hidden">
+    <button (click)="viewMode.set('table')"
+            [class]="viewMode() === 'table' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+            class="px-3 py-1.5 flex items-center gap-1 text-sm transition-colors" title="Dạng bảng">
+      <mat-icon class="text-[18px]">view_list</mat-icon>
+    </button>
+    <button (click)="viewMode.set('card')"
+            [class]="viewMode() === 'card' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+            class="px-3 py-1.5 flex items-center gap-1 text-sm border-l border-gray-300 transition-colors" title="Dạng thẻ">
+      <mat-icon class="text-[18px]">grid_view</mat-icon>
+    </button>
+  </div>
+  </div>
+</div>
+
+<!-- ===== TABLE VIEW ===== -->
+@if (viewMode() === 'table') {
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+    @if (isLoading()) {
+      <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
+        <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+        <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+      </div>
+    }
+    <div class="overflow-x-auto w-full">
+      <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse min-w-[800px]">
+
+        <!-- Checkbox -->
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 w-10 text-center border-b border-gray-200 bg-gray-50">
+            <input type="checkbox" (change)="$event ? masterToggle() : null"
+                   [checked]="selection.hasValue() && isAllSelected()"
+                   [indeterminate]="selection.hasValue() && !isAllSelected()"
+                   class="rounded text-blue-500 border-gray-300 cursor-pointer">
+          </th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-center border-b border-gray-100">
+            <input type="checkbox" (click)="$event.stopPropagation()"
+                   (change)="$event ? selection.toggle(row) : null"
+                   [checked]="selection.isSelected(row)"
+                   class="rounded text-blue-500 border-gray-300 cursor-pointer">
+          </td>
+        </ng-container>
+
+        <!-- STT -->
+        <ng-container matColumnDef="stt">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 w-12 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">STT</th>
+          <td mat-cell *matCellDef="let row; let i = index" class="py-3 px-4 text-center text-sm text-gray-500 border-b border-gray-100">{{ getRowIndex(i) }}</td>
+        </ng-container>
+
+        <!-- Mã thẻ -->
+        <ng-container matColumnDef="cardno">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.CARD_CODE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm font-mono text-gray-700 border-b border-gray-100">{{ row.cardno }}</td>
+        </ng-container>
+
+        <!-- Họ tên -->
+        <ng-container matColumnDef="fullName">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.FULL_NAME' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 border-b border-gray-100">
+            <div class="flex items-center gap-2">
+              @if (row.photo) {
+                <img [src]="row.photo" class="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0" alt="">
+              } @else {
+                <div class="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0">
+                  <mat-icon class="text-blue-400 text-[16px]">person</mat-icon>
+                </div>
+              }
+              <span class="text-sm font-medium text-gray-800">{{ getDisplayName(row) }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Loại độc giả -->
+        <ng-container matColumnDef="readerType">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.READER_TYPE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.readerTypeName ?? '—' }}</td>
+        </ng-container>
+
+        <!-- Đơn vị (chỉ super-admin) -->
+        <ng-container matColumnDef="tenant">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td>
+        </ng-container>
+
+        <!-- Ngày cấp -->
+        <ng-container matColumnDef="issueDate">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.ISSUED_DATE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">
+            {{ row.issueDate ? (row.issueDate | appDate) : '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Ngày hết hạn -->
+        <ng-container matColumnDef="expireDate">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.EXPIRED_DATE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm border-b border-gray-100">
+            <span [class]="isExpired(row.expireDate) ? 'text-red-500 font-medium' : 'text-gray-600'">
+              {{ row.expireDate ? (row.expireDate | appDate) : '—' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Trạng thái -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.STATUS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-center border-b border-gray-100">
+            <label class="relative inline-flex items-center cursor-pointer" (click)="$event.stopPropagation()">
+              <input type="checkbox" class="sr-only peer" [checked]="row.status === 2"
+                     (change)="toggleStatus(row)">
+              <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer
+                          peer-checked:after:translate-x-full peer-checked:after:border-white
+                          after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                          after:bg-white after:border-gray-300 after:border after:rounded-full
+                          after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </td>
+        </ng-container>
+
+        <!-- Giới tính (tuỳ chọn) -->
+        <ng-container matColumnDef="gender">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.GENDER' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">
+            {{ row.sex === 1 ? ('READER.GENDER_MALE' | translate) : row.sex === 0 ? ('READER.GENDER_FEMALE' | translate) : '—' }}
+          </td>
+        </ng-container>
+
+        <!-- Ngày sinh (tuỳ chọn) -->
+        <ng-container matColumnDef="birthDate">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.BIRTH_DATE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.birthDate ? (row.birthDate | appDate) : '—' }}</td>
+        </ng-container>
+
+        <!-- CCCD (tuỳ chọn) -->
+        <ng-container matColumnDef="citizenId">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.CITIZEN_ID' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm font-mono text-gray-600 border-b border-gray-100">{{ row.citizenId || '—' }}</td>
+        </ng-container>
+
+        <!-- UID thẻ chip (tuỳ chọn) -->
+        <ng-container matColumnDef="cardUid">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.CARD_UID' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm font-mono text-gray-600 border-b border-gray-100">{{ row.cardUid || '—' }}</td>
+        </ng-container>
+
+        <!-- Email (tuỳ chọn) -->
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.EMAIL' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.email || '—' }}</td>
+        </ng-container>
+
+        <!-- Điện thoại (tuỳ chọn) -->
+        <ng-container matColumnDef="phone">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.PHONE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.phone || '—' }}</td>
+        </ng-container>
+
+        <!-- Địa chỉ (tuỳ chọn) -->
+        <ng-container matColumnDef="address">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.ADDRESS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.address || '—' }}</td>
+        </ng-container>
+
+        <!-- Lớp học (tuỳ chọn) -->
+        <ng-container matColumnDef="class">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.ACADEMIC_CLASS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ getClassName(row.classId) || '—' }}</td>
+        </ng-container>
+
+        <!-- Khóa học (tuỳ chọn) -->
+        <ng-container matColumnDef="course">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.COURSE' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ getCourseName(row.courseId) || '—' }}</td>
+        </ng-container>
+
+        <!-- Bộ phận / Đơn vị (tuỳ chọn) -->
+        <ng-container matColumnDef="department">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50">{{ 'READER.DEPARTMENT' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 text-sm text-gray-600 border-b border-gray-100">{{ row.orgName || getOrgName(row.orgId) || '—' }}</td>
+        </ng-container>
+
+        <!-- Thao tác -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="py-3 px-4 text-center text-xs font-medium text-gray-600 border-b border-gray-200 bg-gray-50 w-24">{{ 'COMMON.ACTIONS' | translate }}</th>
+          <td mat-cell *matCellDef="let row" class="py-3 px-4 border-b border-gray-100">
+            <div class="flex items-center justify-center gap-2">
+              <button *appCan="'edit'" (click)="openEditModal(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors"
+                      [title]="'COMMON.EDIT' | translate">
+                <mat-icon class="text-[18px]">edit</mat-icon>
+              </button>
+              <button (click)="openLockModal(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors"
+                      [title]="'READER.LOCK_CARD' | translate">
+                <mat-icon class="text-[18px]">lock</mat-icon>
+              </button>
+              <button *appCan="'edit'" (click)="openResetPasswordModal(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors"
+                      [title]="'READER.RESET_PASSWORD' | translate">
+                <mat-icon class="text-[18px]">key</mat-icon>
+              </button>
+              <button *appCan="'delete'" (click)="handleDelete(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors"
+                      [title]="'COMMON.DELETE' | translate">
+                <mat-icon class="text-[18px]">delete</mat-icon>
+              </button>
+              <button (click)="printSingleCard(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors"
+                      [title]="'READER.PRINT_CARD' | translate">
+                <mat-icon class="text-[18px]">print</mat-icon>
+              </button>
+              <button *appCan="'edit'" (click)="openCardReissuePaymentQr(row); $event.stopPropagation()"
+                      class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors"
+                      [title]="'READER.CARD_REISSUE_FEE' | translate">
+                <mat-icon class="text-[18px]">qr_code_2</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns()" class="bg-gray-50"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns();"
+            class="hover:bg-gray-50/50 transition-colors cursor-pointer"
+            (click)="selection.toggle(row)"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="py-8 px-4 text-center text-gray-400" [attr.colspan]="displayedColumns().length">
+            {{ 'COMMON.NO_DATA' | translate }}
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator [length]="totalRecords"
+                   [pageSize]="pageSize" [pageIndex]="pageIndex"
+                   [pageSizeOptions]="pageSizeOptions"
+                   (page)="onPageChange($event)"
+                   aria-label="Select page">
+    </mat-paginator>
+  </div>
+}
+
+<!-- ===== CARD VIEW ===== -->
+@if (viewMode() === 'card') {
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    @if (isLoading()) {
+      <div class="flex flex-col items-center justify-center py-12">
+        <mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon>
+        <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
+      </div>
+    } @else if (dataSource.length === 0) {
+      <div class="text-center py-12 text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</div>
+    } @else {
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        @for (item of dataSource; track item.id) {
+          <div class="border border-gray-300 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-white">
+
+            <!-- Card header -->
+            <div class="bg-blue-700 text-white text-center py-1 text-[11px] font-bold tracking-[0.18em] relative">
+              THẺ THƯ VIỆN
+              <div class="absolute top-1 right-1.5">
+                <input type="checkbox" [checked]="selection.isSelected(item)" (change)="selection.toggle(item)"
+                       class="rounded border-blue-300 cursor-pointer w-3.5 h-3.5 opacity-80 hover:opacity-100">
+              </div>
+            </div>
+
+            <!-- Body: photo + info -->
+            <div class="flex p-2 gap-2" style="min-height:104px">
+              <!-- Passport photo -->
+              <div class="flex-shrink-0 overflow-hidden bg-gray-100 border border-gray-200" style="width:72px;height:96px">
+                @if (item.photo) {
+                  <img [src]="item.photo" alt="" class="w-full h-full object-cover">
+                } @else {
+                  <div class="w-full h-full flex items-center justify-center">
+                    <mat-icon class="text-gray-300" style="font-size:44px;width:44px;height:44px">person</mat-icon>
+                  </div>
+                }
+              </div>
+
+              <!-- Info -->
+              <div class="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <div class="font-bold text-[13px] text-gray-900 leading-tight" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" [title]="getDisplayName(item)">
+                  {{ getDisplayName(item) | uppercase }}
+                </div>
+                @if (item.readerTypeName) {
+                  <div class="text-[11px] text-gray-600 truncate">{{ item.readerTypeName }}</div>
+                }
+                @if (isPrivileged && item.tenantName) {
+                  <div class="text-[11px] text-blue-600 truncate">{{ item.tenantName }}</div>
+                }
+                @if (getCourseName(item.courseId)) {
+                  <div class="text-[11px] text-gray-500 truncate">{{ getCourseName(item.courseId) }}</div>
+                }
+                @if (getClassName(item.classId)) {
+                  <div class="text-[11px] text-gray-500 truncate">{{ getClassName(item.classId) }}</div>
+                }
+                @if (item.issueDate || item.expireDate) {
+                  <div class="text-[11px] text-gray-500 mt-0.5">
+                    {{ item.issueDate ? (item.issueDate | appDate) : '' }}
+                    @if (item.issueDate && item.expireDate) { - }
+                    {{ item.expireDate ? (item.expireDate | appDate) : '' }}
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Barcode Code 128 -->
+            <div class="px-2 pt-1 pb-0.5 bg-white border-t border-gray-100 text-center">
+              @if (item.cardno) {
+                <svg [appBarcode]="item.cardno" class="w-full" style="display:block"></svg>
+              } @else {
+                <div class="flex items-center justify-center text-gray-200" style="height:44px">
+                  <mat-icon>barcode_reader</mat-icon>
+                </div>
+              }
+              <div class="font-mono text-[11px] text-blue-700 tracking-widest -mt-1 pb-0.5">
+                {{ item.cardno || '—' }}
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex border-t border-gray-100 divide-x divide-gray-100">
+              <button *appCan="'edit'" (click)="openEditModal(item)"
+                      class="flex-1 py-1.5 text-blue-600 hover:bg-blue-50 flex items-center justify-center gap-0.5 text-xs transition-colors">
+                <mat-icon style="font-size:14px;width:14px;height:14px">edit</mat-icon>
+                {{ 'COMMON.EDIT' | translate }}
+              </button>
+              <button (click)="openLockModal(item)"
+                      class="flex-1 py-1.5 text-amber-600 hover:bg-amber-50 flex items-center justify-center gap-0.5 text-xs transition-colors">
+                <mat-icon style="font-size:14px;width:14px;height:14px">lock</mat-icon>
+                {{ 'READER.LOCK_CARD' | translate }}
+              </button>
+              <button *appCan="'edit'" (click)="openResetPasswordModal(item)"
+                      class="flex-1 py-1.5 text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-0.5 text-xs transition-colors">
+                <mat-icon style="font-size:14px;width:14px;height:14px">key</mat-icon>
+                {{ 'READER.RESET_PASSWORD' | translate }}
+              </button>
+              <button *appCan="'delete'" (click)="handleDelete(item)"
+                      class="flex-1 py-1.5 text-red-500 hover:bg-red-50 flex items-center justify-center gap-0.5 text-xs transition-colors">
+                <mat-icon style="font-size:14px;width:14px;height:14px">delete</mat-icon>
+                {{ 'COMMON.DELETE' | translate }}
+              </button>
+              <button (click)="printSingleCard(item)"
+                      class="flex-1 py-1.5 text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-0.5 text-xs transition-colors">
+                <mat-icon style="font-size:14px;width:14px;height:14px">print</mat-icon>
+                {{ 'READER.PRINT_CARD' | translate }}
+              </button>
+            </div>
+
+          </div>
+        }
+      </div>
+
+      <mat-paginator [length]="totalRecords"
+                     [pageSize]="pageSize" [pageIndex]="pageIndex"
+                     [pageSizeOptions]="pageSizeOptions"
+                     (page)="onPageChange($event)"
+                     class="mt-4 rounded-lg border border-gray-100"
+                     aria-label="Select page">
+      </mat-paginator>
+    }
+  </div>
+}
+
+<!-- ===== ADD / EDIT MODAL ===== -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+       (click)="requestClose()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[94vh] flex flex-col overflow-hidden"
+         (click)="$event.stopPropagation()">
+
+      <!-- Modal header -->
+      <div class="p-5 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+        <h3 class="text-lg font-bold text-gray-800">
+          {{ (editMode() ? 'READER.EDIT_TITLE' : 'READER.ADD_TITLE') | translate }}
+        </h3>
+        <div class="flex items-center gap-3">
+          @if (editMode() && editingPublicId()) {
+            <button type="button" (click)="openHistory()"
+                    class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+              <mat-icon style="font-size:18px;width:18px;height:18px">history</mat-icon>
+              {{ 'READER.VIEW_HISTORY' | translate }}
+            </button>
+          }
+          <button (click)="requestClose()" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal body -->
+      <div class="overflow-y-auto flex-1 p-5" [formGroup]="dataForm">
+        <div class="flex gap-5">
+
+          <!-- Left: Photo -->
+          <div class="flex-shrink-0 w-32 flex flex-col items-center gap-2">
+            <div class="w-28 h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-400 transition-colors"
+                 (click)="triggerPhotoClick()">
+              @if (photoPreviewUrl()) {
+                <img [src]="photoPreviewUrl()!" class="w-full h-full object-cover" alt="">
+              } @else {
+                <div class="flex flex-col items-center text-gray-300">
+                  <mat-icon style="font-size:40px;width:40px;height:40px">person</mat-icon>
+                  <span class="text-[10px] mt-1">Click để chọn</span>
+                </div>
+              }
+            </div>
+            <input id="photoInput" type="file" accept="image/*" class="hidden" (change)="onPhotoChange($event)">
+            <button type="button" (click)="clearPhoto()"
+                    class="text-xs text-gray-500 hover:text-red-500 border border-gray-300 rounded-lg px-2 py-1 w-full text-center transition-colors">
+              {{ 'READER.SET_DEFAULT' | translate }}
+            </button>
+          </div>
+
+          <!-- Right: Form fields -->
+          <div class="flex-1 min-w-0">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+
+              <!-- Mã thẻ -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.CARD_CODE' | translate }}</label>
+                <div class="relative">
+                  <input formControlName="CardNo"
+                         (blur)="checkCardNo($any($event.target).value)"
+                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+                         [class.border-red-400]="cardnoExists()">
+                  @if (isCheckingCardno()) {
+                    <mat-icon class="absolute right-2 top-1/2 -translate-y-1/2 animate-spin text-blue-400 text-[18px]">autorenew</mat-icon>
+                  } @else if (cardnoExists()) {
+                    <mat-icon class="absolute right-2 top-1/2 -translate-y-1/2 text-red-400 text-[18px]">error</mat-icon>
+                  } @else if (dataForm.get('CardNo')?.value) {
+                    <mat-icon class="absolute right-2 top-1/2 -translate-y-1/2 text-green-400 text-[18px]">check_circle</mat-icon>
+                  }
+                </div>
+                @if (cardnoExists()) {
+                  <p class="text-xs text-red-500 mt-0.5">{{ 'READER.CARDNO_EXISTS' | translate }}</p>
+                }
+              </div>
+
+              <!-- Số căn cước công dân -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.CITIZEN_ID' | translate }}</label>
+                <input formControlName="CitizenId" maxlength="20" inputmode="numeric"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+              <!-- UID chip thẻ (đầu đọc kiểm soát cửa) -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.CARD_UID' | translate }}</label>
+                <input formControlName="CardUid" maxlength="64" [placeholder]="'READER.CARD_UID_PH' | translate"
+                       class="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+              <!-- Loại độc giả -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.READER_TYPE' | translate }}</label>
+                <select formControlName="ReaderTypeId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_READER_TYPE' | translate }} --</option>
+                  @for (rt of readerTypes; track rt.id) {
+                    <option [ngValue]="rt.id">{{ rt.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Tên (FirstName) -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">
+                  {{ 'READER.FIRST_NAME' | translate }} <span class="text-red-500">*</span>
+                </label>
+                <input formControlName="FirstName"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       [class.border-red-400]="dataForm.get('FirstName')?.invalid && dataForm.get('FirstName')?.touched">
+              </div>
+
+              <!-- Họ (LastName) -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.LAST_NAME' | translate }}</label>
+                <input formControlName="LastName"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+              <!-- Ngày sinh -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.BIRTH_DATE' | translate }}</label>
+                <app-date-input formControlName="BirthDate"></app-date-input>
+              </div>
+
+              <!-- Giới tính -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.GENDER' | translate }}</label>
+                <div class="flex items-center gap-5 py-2">
+                  <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                    <input type="radio" formControlName="Sex" [value]="1" class="accent-blue-600"> Nam
+                  </label>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                    <input type="radio" formControlName="Sex" [value]="0" class="accent-blue-600"> Nữ
+                  </label>
+                </div>
+              </div>
+
+              <!-- Khóa học -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.COURSE' | translate }}</label>
+                <select formControlName="CourseId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_COURSE' | translate }} --</option>
+                  @for (c of courses; track c.id) {
+                    <option [ngValue]="c.id">{{ c.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Lớp học -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.ACADEMIC_CLASS' | translate }}</label>
+                <select formControlName="ClassId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_CLASS' | translate }} --</option>
+                  @for (c of academicClasses; track c.id) {
+                    <option [ngValue]="c.id">{{ c.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Dân tộc -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.ETHNIC' | translate }}</label>
+                <select formControlName="EthenicId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_ETHNIC' | translate }} --</option>
+                  @for (e of ethnics; track e.id) {
+                    <option [ngValue]="e.id">{{ e.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Trình độ -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.DEGREE' | translate }}</label>
+                <select formControlName="DegreeId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_DEGREE' | translate }} --</option>
+                  @for (d of degrees; track d.id) {
+                    <option [ngValue]="d.id">{{ d.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Học hàm -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.PROF' | translate }}</label>
+                <select formControlName="ProfId"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_PROF' | translate }} --</option>
+                  @for (p of profs; track p.id) {
+                    <option [ngValue]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.EMAIL' | translate }}</label>
+                <input formControlName="Email" type="email"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+              <!-- Điện thoại -->
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.PHONE' | translate }}</label>
+                <input formControlName="Phone" type="tel"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+              <!-- Ngày cấp -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.ISSUED_DATE' | translate }}</label>
+                <app-date-input formControlName="IssueDate"></app-date-input>
+              </div>
+
+              <!-- Ngày hết hạn -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.EXPIRED_DATE' | translate }}</label>
+                <app-date-input formControlName="ExpireDate"></app-date-input>
+              </div>
+
+              <!-- Trạng thái & Đã đổi mật khẩu -->
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'COMMON.STATUS' | translate }}</label>
+                <select formControlName="Status"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option [ngValue]="null">-- {{ 'READER.SELECT_STATUS' | translate }} --</option>
+                  <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
+                  <option [ngValue]="1">{{ 'COMMON.HIDDEN' | translate }}</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-3 pt-5">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only peer"
+                         [checked]="dataForm.get('RequiredChangePassword')?.value === 2"
+                         (change)="dataForm.get('RequiredChangePassword')?.setValue($any($event.target).checked ? 2 : 1)">
+                  <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer
+                              peer-checked:after:translate-x-full peer-checked:after:border-white
+                              after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                              after:bg-white after:border-gray-300 after:border after:rounded-full
+                              after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+                <span class="text-sm text-gray-700">{{ 'READER.IS_CHANGE_PASSWORD' | translate }}</span>
+              </div>
+
+              <!-- Mật khẩu & Nhắc lại (cùng dòng) -->
+              <div class="col-span-2 grid grid-cols-2 gap-x-4">
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.PASSWORD' | translate }}</label>
+                  <input formControlName="Password" type="password"
+                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         [placeholder]="editMode() ? '••••••••' : ''">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.CONFIRM_PASSWORD' | translate }}</label>
+                  <input formControlName="ConfirmPassword" type="password"
+                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         [class.border-red-400]="dataForm.hasError('passwordMismatch') && dataForm.get('ConfirmPassword')?.touched"
+                         [placeholder]="editMode() ? '••••••••' : ''">
+                  @if (dataForm.hasError('passwordMismatch') && dataForm.get('ConfirmPassword')?.touched) {
+                    <p class="text-xs text-red-500 mt-1">{{ 'READER.PASSWORD_MISMATCH' | translate }}</p>
+                  }
+                </div>
+              </div>
+
+              <!-- Địa chỉ (full width) -->
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-700 mb-1">{{ 'READER.ADDRESS' | translate }}</label>
+                <input formControlName="Address"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Ảnh khuôn mặt bổ sung (ReaderPhoto) -->
+        <div class="mt-5 pt-5 border-t border-gray-100">
+          <label class="block text-xs font-bold text-gray-700 mb-2">{{ 'READER.EXTRA_PHOTOS' | translate }}</label>
+          @if (!editingPublicId()) {
+            <p class="text-xs text-gray-400 italic">{{ 'READER.EXTRA_PHOTOS_NEED_SAVE' | translate }}</p>
+          } @else {
+            <div class="flex flex-wrap gap-3">
+              @if (isLoadingExtraPhotos()) {
+                <div class="flex items-center gap-2 text-xs text-gray-400">
+                  <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+                  {{ 'COMMON.LOADING' | translate }}
+                </div>
+              } @else {
+                @for (p of extraPhotos(); track p.id) {
+                  <div class="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                    <img [src]="p.photoUrl" class="w-full h-full object-cover" alt="">
+                    <button type="button" (click)="deleteExtraPhoto(p)"
+                            class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-500/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            [title]="'COMMON.DELETE' | translate">
+                      <mat-icon style="font-size:14px;width:14px;height:14px">close</mat-icon>
+                    </button>
+                  </div>
+                }
+                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors"
+                     (click)="extraPhotoInput.click()">
+                  @if (isAddingExtraPhoto()) {
+                    <mat-icon class="animate-spin text-gray-400" style="font-size:22px;width:22px;height:22px">autorenew</mat-icon>
+                  } @else {
+                    <mat-icon class="text-gray-300" style="font-size:24px;width:24px;height:24px">add_a_photo</mat-icon>
+                  }
+                </div>
+                <input #extraPhotoInput type="file" accept="image/*" capture="environment" class="hidden" (change)="onAddExtraPhoto($event)">
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Đợt 16 — Lý do sửa (tuỳ chọn), phục vụ Lịch sử thay đổi theo hồ sơ -->
+      <div class="px-5 pt-3 flex-shrink-0">
+        <label class="block text-xs font-medium text-gray-500 mb-1">{{ 'READER.CHANGE_REASON' | translate }}</label>
+        <input type="text" [ngModel]="changeReason()" (ngModelChange)="changeReason.set($event)"
+               [placeholder]="'READER.CHANGE_REASON_PLACEHOLDER' | translate"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+
+      <!-- Modal footer -->
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl flex-shrink-0">
+        <button type="button" (click)="requestClose()"
+                class="py-2 px-5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button type="button" (click)="onSubmit()" [disabled]="isSaving()"
+                class="py-2 px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          @if (isSaving()) { Đang lưu... }
+          @else { {{ 'COMMON.SAVE' | translate }} }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== CONFIRM DELETE DIALOG ===== -->
+@if (showConfirmDelete()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <mat-icon class="text-3xl" style="font-size:32px;width:32px;height:32px">warning</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">{{ 'COMMON.DELETE_CONFIRM_TITLE' | translate }}</h3>
+        <p class="text-gray-500 text-sm mb-6">{{ 'COMMON.DELETE_CONFIRM_MSG' | translate }}</p>
+        <div class="flex gap-3">
+          <button (click)="closeConfirm()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmActionExecute()"
+                  class="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm">
+            {{ 'COMMON.DELETE_CONFIRM_BTN' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== EXPORT FIELDS DIALOG ===== -->
+@if (showExportModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col" style="max-height:90vh">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-blue-600">file_download</mat-icon>
+          {{ 'READER.EXPORT_TITLE' | translate }}
+        </h3>
+        <button (click)="closeExportModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+        @if (exportFieldsLoading()) {
+          <div class="flex flex-col items-center justify-center py-10 text-gray-400">
+            <mat-icon class="animate-spin text-blue-500 text-3xl mb-2">autorenew</mat-icon>
+            <span class="text-sm">{{ 'READER.EXPORT_FIELDS_LOADING' | translate }}</span>
+          </div>
+        } @else if (exportFields.length === 0) {
+          <p class="text-center text-gray-400 text-sm py-8">{{ 'COMMON.NO_DATA' | translate }}</p>
+        } @else {
+          <!-- Select all toggle -->
+          <label class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-200 mb-3">
+            <input type="checkbox" [checked]="isAllExportSelected()" (change)="toggleSelectAllExport()"
+                   class="rounded text-blue-500 border-gray-300 cursor-pointer">
+            <span class="text-sm font-semibold text-gray-700">{{ 'READER.EXPORT_SELECT_ALL' | translate }}</span>
+            <span class="ml-auto text-xs text-gray-400">{{ selectedExportKeys().length }}/{{ exportFields.length }}</span>
+          </label>
+
+          <!-- Field list -->
+          <div class="grid grid-cols-2 gap-1.5">
+            @for (f of exportFields; track getFieldKey(f)) {
+              <label class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-blue-50 cursor-pointer border border-transparent hover:border-blue-200 transition-colors"
+                     [class.bg-blue-50]="isExportFieldSelected(f)"
+                     [class.border-blue-200]="isExportFieldSelected(f)">
+                <input type="checkbox" [checked]="isExportFieldSelected(f)" (change)="toggleExportField(f)"
+                       class="rounded text-blue-500 border-gray-300 cursor-pointer flex-shrink-0">
+                <span class="text-sm text-gray-700 truncate" [title]="getFieldLabel(f)">{{ getFieldLabel(f) }}</span>
+              </label>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeExportModal()"
+                class="py-2 px-5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button *appCan="'export'" (click)="confirmExport()" [disabled]="selectedExportKeys().length === 0 || exportFieldsLoading()"
+                class="py-2 px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5">
+          <mat-icon class="text-[16px]">file_download</mat-icon>
+          {{ 'READER.EXPORT_CONFIRM' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== IMPORT MODAL ===== -->
+@if (showImportModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden" style="max-height:90vh">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-green-600">file_upload</mat-icon>
+          {{ 'READER.IMPORT' | translate }}
+        </h3>
+        <button (click)="closeImportModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+
+        @if (!importResult()) {
+          <!-- Tab strip: Dữ liệu / Ảnh -->
+          <div class="flex border-b border-gray-100 mb-4 -mt-1">
+            <button type="button" (click)="importActiveTab.set('data')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
+                    [class.border-green-600]="importActiveTab() === 'data'" [class.text-green-700]="importActiveTab() === 'data'"
+                    [class.border-transparent]="importActiveTab() !== 'data'" [class.text-gray-500]="importActiveTab() !== 'data'">
+              Dữ liệu
+            </button>
+            @if (!importBackground()) {
+              <button type="button" (click)="importActiveTab.set('photos')"
+                      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px"
+                      [class.border-green-600]="importActiveTab() === 'photos'" [class.text-green-700]="importActiveTab() === 'photos'"
+                      [class.border-transparent]="importActiveTab() !== 'photos'" [class.text-gray-500]="importActiveTab() !== 'photos'">
+                Ảnh
+                @if (importPhotoZipFile()) { <span class="ml-1 w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> }
+              </button>
+            } @else {
+              <span class="px-4 py-2 text-sm font-medium text-gray-300 cursor-not-allowed" title="Không khả dụng khi bật Xử lý nền">
+                Ảnh
+              </span>
+            }
+          </div>
+        }
+
+        @if (!importResult() && importActiveTab() === 'data') {
+          <!-- File picker -->
+          <div class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-400 hover:bg-green-50 cursor-pointer transition-colors"
+               (click)="fileInput.click()">
+            <mat-icon class="text-gray-300 mb-1" style="font-size:36px;width:36px;height:36px">upload_file</mat-icon>
+            @if (importFile()) {
+              <span class="text-sm text-green-700 font-medium px-2 text-center break-all">{{ importFile()!.name }}</span>
+            } @else {
+              <span class="text-sm text-gray-400">Click để chọn file .xlsx / .xls</span>
+            }
+          </div>
+          <input #fileInput type="file" accept=".xlsx,.xls" class="hidden" (change)="onImportFileSelect($event)">
+
+          <!-- Ghép cột Excel ↔ trường bạn đọc (Đợt 20, port ELIB-LRC): chọn dòng tiêu đề, cột nào là trường nào,
+               hoặc "Họ và Tên" một cột; hoặc dùng bố cục cột cố định cũ (B=Số thẻ … P=Số CCCD). -->
+          @if (importFile()) {
+            <div class="mt-3">
+              <app-reader-import-mapping [file]="importFile()"
+                                         (mappingChange)="importMapping.set($event)"
+                                         (validChange)="importMappingValid.set($event)"></app-reader-import-mapping>
+            </div>
+          }
+
+          <!-- Loại bạn đọc áp dụng cho cả file -->
+          <div class="mt-3">
+            <label class="block text-xs font-bold text-gray-700 mb-1">
+              {{ 'READER.READER_TYPE' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <select [ngModel]="importReaderTypeId()" (ngModelChange)="importReaderTypeId.set($event)" [ngModelOptions]="{standalone: true}"
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white">
+              <option [ngValue]="null">-- {{ 'READER.SELECT_READER_TYPE' | translate }} --</option>
+              @for (rt of readerTypes; track rt.id) {
+                <option [ngValue]="rt.id">{{ rt.name }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Cách tra Lớp/Khóa học/Đơn vị trong file: Theo Tên (mặc định, giữ nguyên hành vi cũ)
+               hoặc Theo Mã (nhập thẳng Id số của Lớp/Khóa học/Đơn vị) -->
+          <div class="mt-3 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50">
+            <p class="text-xs font-bold text-gray-700 mb-2">Cách tra Lớp / Khóa học / Đơn vị</p>
+
+            <div class="flex items-center justify-between py-1">
+              <span class="text-xs text-gray-600">Lớp</span>
+              <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+                <button type="button" (click)="importClassByCode.set(false)"
+                        [class.bg-green-600]="!importClassByCode()" [class.text-white]="!importClassByCode()"
+                        [class.bg-white]="importClassByCode()" [class.text-gray-500]="importClassByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo tên</button>
+                <button type="button" (click)="importClassByCode.set(true)"
+                        [class.bg-green-600]="importClassByCode()" [class.text-white]="importClassByCode()"
+                        [class.bg-white]="!importClassByCode()" [class.text-gray-500]="!importClassByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo mã</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between py-1">
+              <span class="text-xs text-gray-600">Khóa học</span>
+              <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+                <button type="button" (click)="importCourseByCode.set(false)"
+                        [class.bg-green-600]="!importCourseByCode()" [class.text-white]="!importCourseByCode()"
+                        [class.bg-white]="importCourseByCode()" [class.text-gray-500]="importCourseByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo tên</button>
+                <button type="button" (click)="importCourseByCode.set(true)"
+                        [class.bg-green-600]="importCourseByCode()" [class.text-white]="importCourseByCode()"
+                        [class.bg-white]="!importCourseByCode()" [class.text-gray-500]="!importCourseByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo mã</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between py-1">
+              <span class="text-xs text-gray-600">Đơn vị</span>
+              <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+                <button type="button" (click)="importOrgByCode.set(false)"
+                        [class.bg-green-600]="!importOrgByCode()" [class.text-white]="!importOrgByCode()"
+                        [class.bg-white]="importOrgByCode()" [class.text-gray-500]="importOrgByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo tên</button>
+                <button type="button" (click)="importOrgByCode.set(true)"
+                        [class.bg-green-600]="importOrgByCode()" [class.text-white]="importOrgByCode()"
+                        [class.bg-white]="!importOrgByCode()" [class.text-gray-500]="!importOrgByCode()"
+                        class="px-2.5 py-1 transition-colors">Theo mã</button>
+              </div>
+            </div>
+
+            <p class="mt-1 text-xs text-gray-400 leading-relaxed">
+              "Theo mã": nhập trực tiếp Id số của Lớp/Khóa học/Đơn vị vào cột tương ứng thay vì Tên.
+            </p>
+          </div>
+
+          <!-- Tự tạo Lớp/Khóa học/Đơn vị chưa có (Đợt 20) — chỉ áp dụng cho mục đang tra "Theo tên";
+               bản ghi mới thuộc đơn vị của tài khoản đang nhập. -->
+          <label class="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 cursor-pointer">
+            <input type="checkbox" class="mt-0.5 rounded text-green-600 border-gray-300"
+                   [checked]="importAutoCreateRefs()" (change)="importAutoCreateRefs.set($any($event.target).checked)">
+            <span>
+              <span class="block text-sm font-medium text-gray-700">Tự động tạo Lớp/Khóa học/Đơn vị nếu chưa có</span>
+              <span class="block text-xs text-gray-400 leading-relaxed">Chỉ với mục tra "Theo tên". Tắt: tên không khớp sẽ để trống trường đó.</span>
+            </span>
+          </label>
+
+          <!-- Overwrite toggle -->
+          <div class="mt-3 flex items-start gap-3 px-3 py-2.5 rounded-xl border"
+               [class.border-orange-200]="importOverwrite()"
+               [class.bg-orange-50]="importOverwrite()"
+               [class.border-gray-200]="!importOverwrite()"
+               [class.bg-gray-50]="!importOverwrite()">
+            <label class="relative inline-flex items-center cursor-pointer mt-0.5 flex-shrink-0">
+              <input type="checkbox" class="sr-only peer"
+                     [checked]="importOverwrite()"
+                     (change)="importOverwrite.set($any($event.target).checked)">
+              <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer
+                          peer-checked:after:translate-x-full peer-checked:after:border-white
+                          after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                          after:bg-white after:border-gray-300 after:border after:rounded-full
+                          after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+            </label>
+            <div>
+              <p class="text-sm font-medium" [class.text-orange-700]="importOverwrite()" [class.text-gray-700]="!importOverwrite()">Ghi đè dữ liệu</p>
+              <p class="text-xs text-gray-400 leading-relaxed">Cập nhật bản ghi đã tồn tại thay vì bỏ qua</p>
+            </div>
+          </div>
+
+          <!-- Xử lý nền (Đợt 10) — chỉ hiện khi hệ thống đã bật AdminTasks:Enabled -->
+          @if (adminTasksEnabled()) {
+            <div class="mt-3 flex items-start gap-3 px-3 py-2.5 rounded-xl border"
+                 [class.border-blue-200]="importBackground()"
+                 [class.bg-blue-50]="importBackground()"
+                 [class.border-gray-200]="!importBackground()"
+                 [class.bg-gray-50]="!importBackground()">
+              <label class="relative inline-flex items-center cursor-pointer mt-0.5 flex-shrink-0">
+                <input type="checkbox" class="sr-only peer"
+                       [checked]="importBackground()"
+                       (change)="importBackground.set($any($event.target).checked)">
+                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer
+                            peer-checked:after:translate-x-full peer-checked:after:border-white
+                            after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                            after:bg-white after:border-gray-300 after:border after:rounded-full
+                            after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+              </label>
+              <div>
+                <p class="text-sm font-medium" [class.text-blue-700]="importBackground()" [class.text-gray-700]="!importBackground()">Xử lý nền</p>
+                <p class="text-xs text-gray-400 leading-relaxed">Cho phép file lớn hơn (tối đa 10.000 dòng), xem trước rồi mới xác nhận ghi tại trang "Tác vụ nền"</p>
+              </div>
+            </div>
+          }
+        }
+
+        @if (!importResult() && importActiveTab() === 'photos' && !importBackground()) {
+          <!-- Tab Ảnh: zip ảnh khớp theo Cardno, nối tiếp sau khi import Excel thành công (chỉ chế độ đồng bộ) -->
+          <div class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-teal-400 hover:bg-teal-50 cursor-pointer transition-colors"
+               (click)="photoZipInput.click()">
+            <mat-icon class="text-gray-300 mb-1" style="font-size:36px;width:36px;height:36px">folder_zip</mat-icon>
+            @if (importPhotoZipFile()) {
+              <span class="text-sm text-teal-700 font-medium px-2 text-center break-all">{{ importPhotoZipFile()!.name }}</span>
+            } @else {
+              <span class="text-sm text-gray-400">{{ 'READER.UPLOAD_PHOTOS_ZIP_PICK' | translate }}</span>
+            }
+          </div>
+          <input #photoZipInput type="file" accept=".zip" class="hidden" (change)="onImportPhotoZipFileSelect($event)">
+
+          <p class="mt-3 text-xs text-gray-400 leading-relaxed">
+            {{ 'READER.UPLOAD_PHOTOS_ZIP_HINT' | translate }}
+          </p>
+          <p class="mt-2 text-xs text-gray-400 leading-relaxed">
+            Tùy chọn — nếu chọn file .zip, ảnh sẽ được tải lên và khớp theo Số thẻ (Cardno) ngay sau khi dữ
+            liệu Excel nhập thành công.
+          </p>
+        }
+
+        @if (!importResult()) {
+          @if (isImporting()) {
+            <div class="flex items-center justify-center gap-2 mt-3 text-green-600 text-sm font-medium">
+              <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon>
+              Đang import dữ liệu...
+            </div>
+          }
+
+        } @else {
+          <!-- Result section -->
+          <div class="text-center mb-4">
+            @if (importResult()!.failed === 0) {
+              <div class="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-green-600" style="font-size:2rem;width:2rem;height:2rem">check_circle</mat-icon>
+              </div>
+            } @else {
+              <div class="w-14 h-14 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <mat-icon class="text-yellow-500" style="font-size:2rem;width:2rem;height:2rem">warning</mat-icon>
+              </div>
+            }
+            <p class="font-semibold text-gray-800">Kết quả import</p>
+            @if (importResult()!.message) {
+              <p class="text-xs text-gray-400 mt-0.5">{{ importResult()!.message }}</p>
+            }
+          </div>
+
+          <div class="flex gap-3 mb-4">
+            <div class="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-green-600">{{ importResult()!.imported }}</p>
+              <p class="text-xs text-green-700 mt-0.5">Thành công</p>
+            </div>
+            <div class="flex-1 bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-red-500">{{ importResult()!.failed }}</p>
+              <p class="text-xs text-red-600 mt-0.5">Lỗi</p>
+            </div>
+          </div>
+
+          @if (importResult()!.photoZip) {
+            <div class="mb-4">
+              <p class="text-xs font-semibold text-gray-500 mb-2">Kết quả tải ảnh</p>
+              <div class="flex gap-3">
+                <div class="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+                  <p class="text-xl font-bold text-green-600">{{ importResult()!.photoZip!.matched }}</p>
+                  <p class="text-xs text-green-700 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_MATCHED' | translate }}</p>
+                </div>
+                <div class="flex-1 bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+                  <p class="text-xl font-bold text-amber-600">{{ importResult()!.photoZip!.notFound }}</p>
+                  <p class="text-xs text-amber-700 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_NOT_FOUND' | translate }}</p>
+                </div>
+                <div class="flex-1 bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                  <p class="text-xl font-bold text-red-500">{{ importResult()!.photoZip!.failed }}</p>
+                  <p class="text-xs text-red-600 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_FAILED' | translate }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (importResult()!.createdRefs?.length) {
+            <div class="border border-green-100 rounded-xl bg-green-50/50 px-3 py-2 max-h-28 overflow-y-auto mb-2">
+              <p class="text-xs font-semibold text-green-700 mb-1">Đã tự tạo {{ importResult()!.createdRefs!.length }} danh mục</p>
+              @for (c of importResult()!.createdRefs!; track c) {
+                <p class="text-xs text-green-700 leading-relaxed py-0.5">• {{ c }}</p>
+              }
+            </div>
+          }
+          @if (importResult()!.errors.length > 0) {
+            <div class="border border-red-100 rounded-xl bg-red-50/50 px-3 py-2 max-h-36 overflow-y-auto">
+              <p class="text-xs font-semibold text-red-600 mb-1">Chi tiết lỗi</p>
+              @for (e of importResult()!.errors; track e) {
+                <p class="text-xs text-red-500 leading-relaxed py-0.5">• {{ e }}</p>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+        @if (importResult()) {
+          <button (click)="closeImportModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CLOSE' | translate }}
+          </button>
+          <button (click)="importResult.set(null); importFile.set(null); importOverwrite.set(false); importPhotoZipFile.set(null); importActiveTab.set('data')"
+                  class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm flex items-center justify-center gap-1.5">
+            <mat-icon class="text-[16px]">refresh</mat-icon>
+            Import lại
+          </button>
+        } @else {
+          <button (click)="closeImportModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button *appCan="'import'" (click)="confirmImport()" [disabled]="!importFile() || isImporting() || !importReaderTypeId() || !importMappingValid()"
+                  class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+            @if (isImporting()) {
+              <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+            } @else {
+              <mat-icon class="text-[16px]">file_upload</mat-icon>
+            }
+            {{ (importBackground() ? 'ADMIN_TASKS.PREVIEW' : 'READER.IMPORT') | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== UPLOAD ẢNH HÀNG LOẠT (ZIP) MODAL ===== -->
+@if (showUploadZipModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" style="max-height:90vh">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-teal-600">folder_zip</mat-icon>
+          {{ 'READER.UPLOAD_PHOTOS_ZIP' | translate }}
+        </h3>
+        <button (click)="closeUploadZipModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-5 py-4">
+
+        @if (!uploadZipResult()) {
+          <!-- File picker -->
+          <div class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-teal-400 hover:bg-teal-50 cursor-pointer transition-colors"
+               (click)="zipFileInput.click()">
+            <mat-icon class="text-gray-300 mb-1" style="font-size:36px;width:36px;height:36px">upload_file</mat-icon>
+            @if (uploadZipFile()) {
+              <span class="text-sm text-teal-700 font-medium px-2 text-center break-all">{{ uploadZipFile()!.name }}</span>
+            } @else {
+              <span class="text-sm text-gray-400">{{ 'READER.UPLOAD_PHOTOS_ZIP_PICK' | translate }}</span>
+            }
+          </div>
+          <input #zipFileInput type="file" accept=".zip" class="hidden" (change)="onUploadZipFileSelect($event)">
+
+          <p class="mt-3 text-xs text-gray-400 leading-relaxed">
+            {{ 'READER.UPLOAD_PHOTOS_ZIP_HINT' | translate }}
+          </p>
+
+          @if (isUploadingZip()) {
+            <div class="flex items-center justify-center gap-2 mt-3 text-teal-600 text-sm font-medium">
+              <mat-icon class="animate-spin text-[18px]">autorenew</mat-icon>
+              {{ 'COMMON.LOADING' | translate }}
+            </div>
+          }
+
+        } @else {
+          <!-- Result summary -->
+          <div class="flex gap-3 mb-4">
+            <div class="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-green-600">{{ uploadZipResult()!.matched }}</p>
+              <p class="text-xs text-green-700 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_MATCHED' | translate }}</p>
+            </div>
+            <div class="flex-1 bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-amber-600">{{ uploadZipResult()!.notFound }}</p>
+              <p class="text-xs text-amber-700 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_NOT_FOUND' | translate }}</p>
+            </div>
+            <div class="flex-1 bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+              <p class="text-2xl font-bold text-red-500">{{ uploadZipResult()!.failed }}</p>
+              <p class="text-xs text-red-600 mt-0.5">{{ 'READER.UPLOAD_PHOTOS_ZIP_FAILED' | translate }}</p>
+            </div>
+          </div>
+
+          @if (uploadZipResult()!.results.length > 0) {
+            <div class="border border-gray-100 rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="bg-gray-50 text-gray-500">
+                    <th class="py-1.5 px-2">{{ 'READER.UPLOAD_PHOTOS_ZIP_FILE' | translate }}</th>
+                    <th class="py-1.5 px-2">{{ 'READER.CARD_CODE' | translate }}</th>
+                    <th class="py-1.5 px-2 text-center">{{ 'COMMON.STATUS' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of uploadZipResult()!.results; track r.fileName) {
+                    <tr class="border-t border-gray-100">
+                      <td class="py-1.5 px-2 break-all">{{ r.fileName }}</td>
+                      <td class="py-1.5 px-2 font-mono">{{ r.cardNo }}</td>
+                      <td class="py-1.5 px-2 text-center">
+                        @if (r.matched) {
+                          <mat-icon class="text-green-500" style="font-size:16px;width:16px;height:16px">check_circle</mat-icon>
+                        } @else {
+                          <span class="text-red-500" [title]="r.error">{{ r.error || '—' }}</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+        @if (uploadZipResult()) {
+          <button (click)="closeUploadZipModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CLOSE' | translate }}
+          </button>
+        } @else {
+          <button (click)="closeUploadZipModal()"
+                  class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+            {{ 'COMMON.CANCEL' | translate }}
+          </button>
+          <button (click)="confirmUploadZip()" [disabled]="!uploadZipFile() || isUploadingZip()"
+                  class="flex-1 py-2 px-4 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+            @if (isUploadingZip()) {
+              <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+            } @else {
+              <mat-icon class="text-[16px]">file_upload</mat-icon>
+            }
+            {{ 'READER.UPLOAD_PHOTOS_ZIP' | translate }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== BATCH MODAL ===== -->
+@if (showBatchModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-purple-600">tune</mat-icon>
+          Xử lý theo lô
+        </h3>
+        <button (click)="closeBatchModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-5 py-4 flex flex-col gap-4">
+
+        <!-- Info banner -->
+        <div class="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+          <mat-icon class="text-blue-500 flex-shrink-0 mt-0.5" style="font-size:16px;width:16px;height:16px">info</mat-icon>
+          <p class="text-xs text-blue-700 leading-relaxed">
+            Thao tác sẽ áp dụng cho <strong>tất cả bạn đọc</strong> thỏa điều kiện tìm kiếm hiện tại.
+          </p>
+        </div>
+
+        <!-- Action dropdown -->
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Thao tác</label>
+          <select (change)="onBatchActionChange($any($event.target).value)"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+            <option value="">-- Chọn thao tác --</option>
+            @for (a of batchActions; track a.key) {
+              <option [value]="a.key">{{ a.label }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Dynamic value input -->
+        @if (batchAction()) {
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Giá trị mới</label>
+
+            @if (batchActionType() === 'class') {
+              <select (change)="batchSelectValue.set($any($event.target).value ? +$any($event.target).value : null)"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                <option value="">-- Chọn lớp học --</option>
+                @for (c of academicClasses; track c.id) {
+                  <option [value]="c.id">{{ c.name }}</option>
+                }
+              </select>
+            }
+
+            @if (batchActionType() === 'course') {
+              <select (change)="batchSelectValue.set($any($event.target).value ? +$any($event.target).value : null)"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                <option value="">-- Chọn khóa học --</option>
+                @for (c of courses; track c.id) {
+                  <option [value]="c.id">{{ c.name }}</option>
+                }
+              </select>
+            }
+
+            @if (batchActionType() === 'readerType') {
+              <select (change)="batchSelectValue.set($any($event.target).value ? +$any($event.target).value : null)"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                <option value="">-- Chọn loại độc giả --</option>
+                @for (rt of readerTypes; track rt.id) {
+                  <option [value]="rt.id">{{ rt.name }}</option>
+                }
+              </select>
+            }
+
+            @if (batchActionType() === 'date') {
+              <app-date-input [ngModel]="batchDateValue()" (dateChange)="batchDateValue.set($event)" [ngModelOptions]="{ standalone: true }"></app-date-input>
+            }
+
+            @if (batchActionType() === 'password') {
+              <input type="password" (input)="batchPasswordValue.set($any($event.target).value)"
+                     placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400">
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeBatchModal()"
+                class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmBatch()"
+                [disabled]="isBatching() || !batchAction() ||
+                            (batchActionType() === 'date' ? !batchDateValue() :
+                             batchActionType() === 'password' ? batchPasswordValue().length < 6 : !batchSelectValue())"
+                class="flex-1 py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+          @if (isBatching()) {
+            <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon>
+            Đang xử lý...
+          } @else {
+            <mat-icon class="text-[16px]">check_circle</mat-icon>
+            Thực hiện
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== LOCK CARD DIALOG ===== -->
+@if (showLockModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-amber-500">lock</mat-icon>
+          {{ 'READER.LOCK_CARD' | translate }}
+        </h3>
+        <button (click)="closeLockModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-5 py-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          {{ 'READER.LOCK_REASON' | translate }}
+          <span class="text-red-500">*</span>
+        </label>
+        <textarea [formControl]="lockReason" rows="3"
+                  [placeholder]="'READER.LOCK_REASON_PLACEHOLDER' | translate"
+                  class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+                  [class.border-red-400]="lockReason.invalid && lockReason.touched"
+                  [class.border-gray-300]="!(lockReason.invalid && lockReason.touched)">
+        </textarea>
+        @if (lockReason.invalid && lockReason.touched) {
+          <p class="text-xs text-red-500 mt-1">{{ 'READER.LOCK_REASON_REQUIRED' | translate }}</p>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeLockModal()"
+                class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmLock()" [disabled]="isLocking()"
+                class="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+          <mat-icon class="text-[16px]">lock</mat-icon>
+          @if (isLocking()) { Đang xử lý... }
+          @else { {{ 'READER.LOCK_CARD' | translate }} }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== RESET PASSWORD DIALOG ===== -->
+@if (showResetPwdModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-indigo-500">key</mat-icon>
+          {{ 'READER.RESET_PASSWORD_TITLE' | translate }}
+        </h3>
+        <button (click)="closeResetPasswordModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-5 py-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          {{ 'READER.NEW_PASSWORD' | translate }}
+          <span class="text-red-500">*</span>
+        </label>
+        <input [formControl]="resetPwdControl" type="password"
+               [placeholder]="'READER.RESET_PASSWORD_PLACEHOLDER' | translate"
+               class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+               [class.border-red-400]="resetPwdControl.invalid && resetPwdControl.touched"
+               [class.border-gray-300]="!(resetPwdControl.invalid && resetPwdControl.touched)">
+        @if (resetPwdControl.invalid && resetPwdControl.touched) {
+          <p class="text-xs text-red-500 mt-1">{{ 'READER.RESET_PASSWORD_MIN' | translate }}</p>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeResetPasswordModal()"
+                class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmResetPassword()" [disabled]="isResettingPwd()"
+                class="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+          <mat-icon class="text-[16px]">key</mat-icon>
+          @if (isResettingPwd()) { {{ 'COMMON.PROCESSING' | translate }} }
+          @else { {{ 'READER.RESET_PASSWORD' | translate }} }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ===== BULK RESET PASSWORD DIALOG (theo lựa chọn) ===== -->
+@if (showBulkResetPwdModal()) {
+  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <mat-icon class="text-amber-500">lock_reset</mat-icon>
+          {{ 'READER.BULK_RESET_PASSWORD_TITLE' | translate }} ({{ selection.selected.length }})
+        </h3>
+        <button (click)="closeBulkResetPasswordModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+          <mat-icon class="text-[18px]">close</mat-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="px-5 py-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          {{ 'READER.NEW_PASSWORD' | translate }}
+          <span class="text-red-500">*</span>
+        </label>
+        <input [formControl]="bulkResetPwdControl" type="password"
+               [placeholder]="'READER.RESET_PASSWORD_PLACEHOLDER' | translate"
+               class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
+               [class.border-red-400]="bulkResetPwdControl.invalid && bulkResetPwdControl.touched"
+               [class.border-gray-300]="!(bulkResetPwdControl.invalid && bulkResetPwdControl.touched)">
+        @if (bulkResetPwdControl.invalid && bulkResetPwdControl.touched) {
+          <p class="text-xs text-red-500 mt-1">{{ 'READER.RESET_PASSWORD_MIN' | translate }}</p>
+        }
+      </div>
+
+      <!-- Footer -->
+      <div class="flex gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+        <button (click)="closeBulkResetPasswordModal()"
+                class="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="confirmBulkResetPassword()" [disabled]="isBulkResettingPwd()"
+                class="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+          <mat-icon class="text-[16px]">lock_reset</mat-icon>
+          @if (isBulkResettingPwd()) { {{ 'COMMON.PROCESSING' | translate }} }
+          @else { {{ 'READER.RESET_PASSWORD' | translate }} }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+</div>
+
+<!-- ===== KHỐI IN THẺ (chỉ hiện khi in) ===== -->
+@if (printTarget().length > 0) {
+  <div class="hidden print:block">
+    <div class="grid grid-cols-2 gap-4">
+      @for (item of printTarget(); track item.id) {
+        <div class="border border-gray-300 rounded-lg overflow-hidden">
+          <div class="bg-blue-700 text-white text-center py-1 text-[11px] font-bold tracking-[0.18em]">THẺ THƯ VIỆN</div>
+          <div class="flex p-2 gap-2" style="min-height:104px">
+            <div class="flex-shrink-0 overflow-hidden bg-gray-100 border border-gray-200" style="width:72px;height:96px">
+              @if (item.photo) {
+                <img [src]="item.photo" alt="" class="w-full h-full object-cover">
+              } @else {
+                <div class="w-full h-full flex items-center justify-center">
+                  <mat-icon class="text-gray-300" style="font-size:44px;width:44px;height:44px">person</mat-icon>
+                </div>
+              }
+            </div>
+            <div class="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+              <div class="font-bold text-[13px] text-gray-900 leading-tight">{{ getDisplayName(item) | uppercase }}</div>
+              @if (item.readerTypeName) { <div class="text-[11px] text-gray-600 truncate">{{ item.readerTypeName }}</div> }
+              @if (getCourseName(item.courseId)) { <div class="text-[11px] text-gray-500 truncate">{{ getCourseName(item.courseId) }}</div> }
+              @if (getClassName(item.classId)) { <div class="text-[11px] text-gray-500 truncate">{{ getClassName(item.classId) }}</div> }
+              @if (item.issueDate || item.expireDate) {
+                <div class="text-[11px] text-gray-500 mt-0.5">
+                  {{ item.issueDate ? (item.issueDate | appDate) : '' }}
+                  @if (item.issueDate && item.expireDate) { - }
+                  {{ item.expireDate ? (item.expireDate | appDate) : '' }}
+                </div>
+              }
+            </div>
+          </div>
+          <div class="px-2 pt-1 pb-0.5 bg-white border-t border-gray-100 text-center">
+            @if (item.cardno) {
+              <svg [appBarcode]="item.cardno" class="w-full" style="display:block"></svg>
+            } @else {
+              <div class="flex items-center justify-center text-gray-200" style="height:44px"><mat-icon>barcode_reader</mat-icon></div>
+            }
+            <div class="font-mono text-[11px] text-blue-700 tracking-widest -mt-1 pb-0.5">{{ item.cardno || '—' }}</div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (cardReissuePaymentReaderId(); as rid) {
+  <app-payment-qr-dialog mode="staff" [readerId]="rid" targetType="CARD_REISSUE" [targetId]="null"
+    (paid)="closeCardReissuePaymentQr()" (closed)="closeCardReissuePaymentQr()">
+  </app-payment-qr-dialog>
+}

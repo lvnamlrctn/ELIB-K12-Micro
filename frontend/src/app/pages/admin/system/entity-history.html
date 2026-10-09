@@ -1,0 +1,99 @@
+<div class="p-4 md:p-6 max-w-4xl mx-auto">
+  <h1 class="text-xl font-semibold text-gray-800 mb-1">{{ 'ENTITY_HISTORY.TITLE' | translate }}</h1>
+  <p class="text-xs text-gray-400 mb-4 font-mono">{{ type() }} · {{ id() }}</p>
+
+  @if (type() && id()) {
+    <form class="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex flex-wrap items-end gap-3" (ngSubmit)="applyFilters()">
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        {{ 'ENTITY_HISTORY.FILTER_FROM' | translate }}
+        <input type="date" name="from" [(ngModel)]="fromDate" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        {{ 'ENTITY_HISTORY.FILTER_TO' | translate }}
+        <input type="date" name="to" [(ngModel)]="toDate" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800">
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500 min-w-40">
+        {{ 'ENTITY_HISTORY.FILTER_ACTOR' | translate }}
+        <select name="actor" [(ngModel)]="actorId" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+          <option [ngValue]="null">{{ 'ENTITY_HISTORY.FILTER_ALL' | translate }}</option>
+          @for (a of actors(); track a.id) { <option [ngValue]="a.id">{{ a.name || ('#' + a.id) }}</option> }
+        </select>
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-gray-500 min-w-40">
+        {{ 'ENTITY_HISTORY.FILTER_ACTION' | translate }}
+        <select name="action" [(ngModel)]="action" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-800 bg-white">
+          <option value="">{{ 'ENTITY_HISTORY.FILTER_ALL' | translate }}</option>
+          @for (a of actionOptions; track a) { <option [value]="a">{{ actionLabel(a) }}</option> }
+        </select>
+      </label>
+      <div class="flex gap-2">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg">{{ 'COMMON.SEARCH' | translate }}</button>
+        <button type="button" (click)="clearFilters()" class="py-1.5 px-3 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">{{ 'ENTITY_HISTORY.FILTER_CLEAR' | translate }}</button>
+      </div>
+    </form>
+  }
+
+  @if (!type() || !id()) {
+    <p class="text-sm text-gray-500">{{ 'ENTITY_HISTORY.MISSING_PARAMS' | translate }}</p>
+  } @else if (isLoading()) {
+    <p class="text-sm text-gray-400 text-center py-10">{{ 'COMMON.LOADING' | translate }}</p>
+  } @else if (loadError()) {
+    <p class="text-sm text-red-600 text-center py-10">{{ 'COMMON.LOAD_ERROR' | translate }}</p>
+  } @else if (events().length === 0) {
+    <p class="text-sm text-gray-400 text-center py-10">{{ (hasFilters ? 'ENTITY_HISTORY.NO_EVENTS_FILTERED' : 'ENTITY_HISTORY.NO_EVENTS') | translate }}</p>
+  } @else {
+    <div class="flex flex-col gap-3">
+      @for (evt of events(); track evt.id) {
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+            <div class="text-sm">
+              <span class="font-semibold text-gray-800">{{ evt.actorName || ('ENTITY_HISTORY.UNKNOWN_ACTOR' | translate) }}</span>
+              <span class="text-gray-400"> · </span>
+              <span class="font-medium text-blue-600">{{ actionLabel(evt.action) }}</span>
+            </div>
+            <span class="text-xs text-gray-400 whitespace-nowrap">{{ evt.timestamp | appDate:'datetime' }}</span>
+          </div>
+
+          <p class="text-xs text-gray-500 mb-3">
+            {{ 'ENTITY_HISTORY.REASON' | translate }}:
+            @if (evt.reason) { <span class="text-gray-700">{{ evt.reason }}</span> }
+            @else { <span class="italic text-gray-400">{{ 'ENTITY_HISTORY.NO_REASON' | translate }}</span> }
+          </p>
+
+          @if (evt.changes.length > 0) {
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs border-collapse">
+                <thead>
+                  <tr class="text-gray-400 uppercase text-[10px]">
+                    <th class="text-left py-1 pr-3 font-medium">{{ 'ENTITY_HISTORY.COL_FIELD' | translate }}</th>
+                    <th class="text-left py-1 pr-3 font-medium">{{ 'ENTITY_HISTORY.COL_BEFORE' | translate }}</th>
+                    <th class="text-left py-1 font-medium">{{ 'ENTITY_HISTORY.COL_AFTER' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of evt.changes; track c.field) {
+                    <tr class="border-t border-gray-100">
+                      <td class="py-1.5 pr-3 text-gray-600 whitespace-nowrap">{{ fieldLabel(c.field) }}</td>
+                      <td class="py-1.5 pr-3 text-red-600 font-mono break-all">{{ displayValue(c.oldValue) }}</td>
+                      <td class="py-1.5 text-green-700 font-mono break-all">{{ displayValue(c.newValue) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (next() !== null) {
+      <div class="text-center mt-4">
+        <button type="button" (click)="loadMore()" [disabled]="isLoadingMore()"
+                class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+          @if (isLoadingMore()) { {{ 'COMMON.LOADING' | translate }} }
+          @else { {{ 'ENTITY_HISTORY.LOAD_MORE' | translate }} }
+        </button>
+      </div>
+    }
+  }
+</div>

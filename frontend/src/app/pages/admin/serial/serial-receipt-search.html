@@ -1,0 +1,58 @@
+<div class="print:hidden">
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'SERIAL_RECEIPT_SEARCH.TITLE' | translate }}</h4>
+</div>
+
+<div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 mb-5">
+  <form [formGroup]="searchForm" (ngSubmit)="triggerSearch()" class="flex flex-wrap gap-2 items-end">
+    <div><label class="block text-xs font-medium text-gray-500 mb-1">{{ 'BIB.COL_TITLE' | translate }}</label><input formControlName="title" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"></div>
+    <div><label class="block text-xs font-medium text-gray-500 mb-1">{{ 'BIB.COL_AUTHOR' | translate }}</label><input formControlName="author" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"></div>
+    <div><label class="block text-xs font-medium text-gray-500 mb-1">ISSN</label><input formControlName="issn" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"></div>
+    <div><label class="block text-xs font-medium text-gray-500 mb-1">{{ 'COMMON.FROM' | translate }}</label><app-date-input formControlName="startTimeFrom"></app-date-input></div>
+    <div><label class="block text-xs font-medium text-gray-500 mb-1">{{ 'COMMON.TO' | translate }}</label><app-date-input formControlName="startTimeTo"></app-date-input></div>
+    @if (isPrivileged) { <app-tenant-filter-select [(tenantId)]="tenantId" (tenantIdChange)="onTenantChange()" /> }
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">search</mat-icon> {{ 'COMMON.SEARCH' | translate }}</button>
+    <button type="button" (click)="resetSearch()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-1.5 px-3 rounded-lg flex items-center gap-1 transition-colors"><mat-icon class="text-[16px]">refresh</mat-icon> {{ 'COMMON.RESET' | translate }}</button>
+  </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+  @if (isLoading()) { <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]"><mat-icon class="animate-spin text-blue-600 text-4xl mb-2">autorenew</mat-icon></div> }
+  <div class="overflow-x-auto w-full">
+    <table mat-table [dataSource]="dataSource" class="w-full text-left border-collapse">
+      <ng-container matColumnDef="stt"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 w-12">STT</th><td mat-cell *matCellDef="let row; let i = index" class="py-2 px-3 text-sm text-gray-600 border-b border-gray-100">{{ getRowIndex(i) }}</td></ng-container>
+      <ng-container matColumnDef="title"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'BIB.COL_TITLE' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm font-medium text-gray-800 border-b border-gray-100">{{ row.title || '—' }}</td></ng-container>
+      <ng-container matColumnDef="issn"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">ISSN</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.issn || '—' }}</td></ng-container>
+      <ng-container matColumnDef="startTime"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SUBSCRIPTION.START_TIME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.startTime ? (row.startTime | appDate) : '—' }}</td></ng-container>
+      <ng-container matColumnDef="endTime"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'SUBSCRIPTION.END_TIME' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.endTime ? (row.endTime | appDate) : '—' }}</td></ng-container>
+      <ng-container matColumnDef="tenant"><th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50">{{ 'COMMON.TENANT' | translate }}</th><td mat-cell *matCellDef="let row" class="py-2 px-3 text-sm text-gray-700 border-b border-gray-100">{{ row.tenantName ?? '—' }}</td></ng-container>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 bg-gray-50 text-right">{{ 'COMMON.ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let row" class="py-2 px-3 border-b border-gray-100 text-right">
+          <button (click)="printReceipt(row)" class="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" [title]="'SERIAL_RECEIPT_SEARCH.PRINT_RECEIPT' | translate"><mat-icon class="text-[18px]">print</mat-icon></button>
+          <button (click)="openIssues(row)" class="px-2 py-1 rounded-lg text-green-600 hover:bg-green-50 transition-colors text-sm inline-flex items-center gap-1" [title]="'SUBSCRIPTION.RECEIVE_ISSUES' | translate"><mat-icon class="text-[18px]">inventory_2</mat-icon> {{ 'SERIAL_ISSUE.TITLE' | translate }}</button>
+        </td>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="hover:bg-gray-50 transition-colors"></tr>
+      <tr class="mat-row" *matNoDataRow><td [attr.colspan]="displayedColumns.length" class="py-12 text-center text-gray-400 text-sm"><mat-icon class="text-4xl mb-2 text-gray-300">search</mat-icon><p>{{ 'COMMON.NO_DATA' | translate }}</p></td></tr>
+    </table>
+  </div>
+  <mat-paginator [length]="totalRecords" [pageSize]="pageSize" [pageIndex]="pageIndex" [pageSizeOptions]="pageSizeOptions" (page)="onPageChange($event)" showFirstLastButtons class="border-t border-gray-100"></mat-paginator>
+</div>
+</div>
+
+@if (printSubject(); as sub) {
+  <div class="hidden print:block p-8">
+    <h3 class="text-xl font-bold text-center mb-1">{{ 'SERIAL_RECEIPT_SEARCH.TITLE' | translate }}</h3>
+    <p class="text-center text-sm text-gray-500 mb-5">{{ sub.title }} @if (sub.issn) { ({{ sub.issn }}) }</p>
+    <table class="w-full text-sm border-collapse">
+      <thead><tr class="border-b-2 border-gray-700"><th class="text-left py-1.5">STT</th><th class="text-left py-1.5">{{ 'SERIAL_ISSUE.SEQ' | translate }}</th><th class="text-left py-1.5">{{ 'SERIAL_ISSUE.PUBLISHED_DATE' | translate }}</th><th class="text-left py-1.5">{{ 'COMMON.STATUS' | translate }}</th></tr></thead>
+      <tbody>
+        @for (i of printIssues(); track i.id; let idx = $index) {
+          <tr class="border-b border-gray-200"><td class="py-1">{{ idx + 1 }}</td><td class="py-1">{{ i.serialSeq || '—' }}</td><td class="py-1">{{ i.publishedDate ? (i.publishedDate | appDate) : '—' }}</td><td class="py-1">{{ 'SERIAL_ISSUE.STATUS_' + (i.status === 1 ? 'RECEIVED' : i.status === 2 ? 'CLAIMED' : i.status === 3 ? 'MISSING' : 'EXPECTED') | translate }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

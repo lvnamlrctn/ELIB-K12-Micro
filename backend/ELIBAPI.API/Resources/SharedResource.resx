@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="AddSuccess" xml:space="preserve">
+    <value>Added successfully.</value>
+  </data>
+  <data name="UpdateSuccess" xml:space="preserve">
+    <value>Updated successfully.</value>
+  </data>
+  <data name="DeleteSuccess" xml:space="preserve">
+    <value>Deleted successfully.</value>
+  </data>
+  <data name="OnlyOneMainDocumentPerSubject" xml:space="preserve">
+    <value>This subject already has a main document — only one main document is allowed per subject.</value>
+  </data>
+  <data name="ChangeStatusSuccess" xml:space="preserve">
+    <value>Status updated successfully.</value>
+  </data>
+  <data name="NotFound" xml:space="preserve">
+    <value>Data not found.</value>
+  </data>
+  <data name="Success" xml:space="preserve">
+    <value>Success.</value>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>You do not have permission to perform this action.</value>
+  </data>
+  <data name="ForbiddenDepartment" xml:space="preserve">
+    <value>You do not have permission to modify data from another department.</value>
+  </data>
+  <data name="Unauthorized" xml:space="preserve">
+    <value>You are not logged in or your token has expired.</value>
+  </data>
+  <data name="InternalError" xml:space="preserve">
+    <value>An internal server error occurred.</value>
+  </data>
+  <data name="FileNotFound" xml:space="preserve">
+    <value>Uploaded file not found.</value>
+  </data>
+  <data name="ColumnNameNotFound" xml:space="preserve">
+    <value>Column 'Name' not found in Excel file.</value>
+  </data>
+  <data name="NoDataToImport" xml:space="preserve">
+    <value>No valid data to import.</value>
+  </data>
+  <data name="ImportSuccess" xml:space="preserve">
+    <value>Imported successfully ({0} records).</value>
+  </data>
+  <data name="InvalidImageType" xml:space="preserve">
+    <value>Invalid file. Only JPEG, PNG, GIF and WEBP images are accepted.</value>
+  </data>
+  <data name="UploadSuccess" xml:space="preserve">
+    <value>Image uploaded successfully.</value>
+  </data>
+</root>

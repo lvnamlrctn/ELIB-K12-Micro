@@ -1,0 +1,400 @@
+<div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'CIRC_PLACE.TITLE' | translate }}</h4>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+
+  <!-- ===== Cột trái: cây điểm lưu thông ===== -->
+  <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+      <h5 class="text-sm font-semibold text-gray-700">{{ 'CIRC_PLACE.LIST_TITLE' | translate }}</h5>
+      <button *appCan="'add'" (click)="selectNewPlace()"
+              class="text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-2 py-1 flex items-center gap-1 transition-colors">
+        <mat-icon class="text-[14px]">add</mat-icon> {{ 'COMMON.ADD' | translate }}
+      </button>
+    </div>
+
+    @if (loadingPlaces()) {
+      <div class="p-6 flex flex-col items-center justify-center text-blue-600">
+        <mat-icon class="animate-spin text-3xl mb-1">autorenew</mat-icon>
+        <p class="text-xs">{{ 'COMMON.LOADING' | translate }}</p>
+      </div>
+    }
+
+    <div class="max-h-[70vh] overflow-y-auto">
+      @for (place of places(); track place.id) {
+        <div class="border-b border-gray-50">
+          <div class="flex items-center gap-1 px-2 py-2 cursor-pointer hover:bg-gray-50 transition-colors"
+               [class.bg-blue-50]="selectedKind()==='place' && selectedPlace()?.id===place.id"
+               (click)="selectPlace(place)">
+            <button (click)="toggleExpand(place); $event.stopPropagation()" class="p-0.5 text-gray-400 hover:text-gray-600">
+              <mat-icon class="text-[18px]">{{ isExpanded(place) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+            </button>
+            <mat-icon class="text-[16px] text-amber-500">place</mat-icon>
+            <span class="text-sm flex-1 truncate text-gray-800">{{ place.name || '—' }}</span>
+            <button *appCan="'delete'" (click)="confirmDeletePlace(place); $event.stopPropagation()"
+                    class="p-1 text-gray-300 hover:text-red-500 transition-colors">
+              <mat-icon class="text-[15px]">delete</mat-icon>
+            </button>
+          </div>
+
+          @if (isExpanded(place)) {
+            @if (loadingPolicyFor() === place.id) {
+              <div class="pl-10 py-1.5 text-xs text-gray-400">{{ 'COMMON.LOADING' | translate }}</div>
+            }
+            @for (policy of policiesByPlace()[place.id]; track policy.publicId) {
+              <div class="flex items-center gap-1.5 pl-10 pr-2 py-1.5 cursor-pointer hover:bg-gray-50 text-sm transition-colors"
+                   [class.bg-blue-50]="selectedKind()==='policy' && selectedPolicy()?.publicId===policy.publicId"
+                   (click)="selectPolicy(place, policy)">
+                <mat-icon class="text-[15px] text-gray-400">person</mat-icon>
+                <span class="truncate text-gray-700">{{ policy.readerTypeName || '—' }}</span>
+                @if (policy.storeName) { <span class="text-xs text-gray-400 truncate">— {{ policy.storeName }}</span> }
+              </div>
+            }
+            @if (policiesByPlace()[place.id] && policiesByPlace()[place.id].length === 0) {
+              <div class="pl-10 py-1.5 text-xs text-gray-400 italic">{{ 'CIRC_PLACE.NO_READER_TYPE' | translate }}</div>
+            }
+          }
+        </div>
+      }
+      @if (!loadingPlaces() && places().length === 0) {
+        <div class="p-8 text-center text-sm text-gray-400">
+          <mat-icon class="text-4xl mb-2 text-gray-300">place</mat-icon>
+          <p>{{ 'COMMON.NO_DATA' | translate }}</p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- ===== Cột phải: chi tiết ===== -->
+  <div class="lg:col-span-2 space-y-5">
+
+    @if (selectedKind() === null) {
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center text-gray-400">
+        <mat-icon class="text-5xl mb-3 text-gray-300">touch_app</mat-icon>
+        <p class="text-sm">{{ 'CIRC_PLACE.SELECT_HINT' | translate }}</p>
+      </div>
+    }
+
+    <!-- ---------- Panel: Thông tin điểm lưu thông ---------- -->
+    @if (selectedKind() === 'place') {
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h5 class="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <mat-icon class="text-blue-600">place</mat-icon>
+          {{ 'CIRC_PLACE.INFO_TITLE' | translate }}
+        </h5>
+        <form [formGroup]="placeForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.CODE' | translate }}</label>
+            <input formControlName="Code" type="text" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.WORK_FOLLOW' | translate }}</label>
+            <ng-select [items]="cirWorkFollowOptions" bindValue="value" formControlName="CirWorkFollow"
+                       [searchable]="true" [clearable]="true"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.key | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.key | translate }}</ng-template>
+            </ng-select>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">
+              {{ 'CIRC_PLACE.NAME' | translate }} <span class="text-red-500">*</span>
+            </label>
+            <input formControlName="Name" type="text"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   [class.border-red-400]="placeForm.get('Name')?.invalid && placeForm.get('Name')?.touched">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.CIR_TYPE' | translate }}</label>
+            <ng-select [items]="cirTypeOptions" bindValue="value" formControlName="CirType"
+                       [searchable]="true" [clearable]="true"
+                       [notFoundText]="'COMMON.NO_RESULTS' | translate">
+              <ng-template ng-label-tmp let-item="item">{{ item.key | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.key | translate }}</ng-template>
+            </ng-select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.LIMIT_BOOK' | translate }}</label>
+            <input formControlName="LimitBook" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.ACCESS_VALIDTIME' | translate }}</label>
+            <input formControlName="AccessRequestValidtime" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex items-center gap-2 pt-6">
+            <input formControlName="AutoAccept" type="checkbox" id="autoAccept" class="rounded text-blue-500 border-gray-300">
+            <label for="autoAccept" class="text-sm text-gray-700">{{ 'CIRC_PLACE.AUTO_ACCEPT' | translate }}</label>
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-blue-700 mb-1">{{ 'CIRC_PLACE.WORK_SESSION' | translate }}</label>
+            <input formControlName="WorkSession" type="text" placeholder="T2_6:00-23:59;T3_6:00-23:59;..."
+                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </form>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h5 class="text-sm font-semibold text-gray-700 mb-3">{{ 'CIRC_PLACE.STORES' | translate }}</h5>
+          <div class="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+            @for (s of allStores(); track s.id) {
+              <label class="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" [checked]="selectedStoreIds().has(s.id)" (change)="toggleStore(s.id)" class="rounded text-blue-500 border-gray-300">
+                <span class="text-gray-700">{{ s.name }}</span>
+              </label>
+            }
+            @if (!allStores().length) {
+              <p class="px-3 py-4 text-xs text-gray-400 text-center">{{ 'COMMON.NO_DATA' | translate }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h5 class="text-sm font-semibold text-gray-700 mb-3">{{ 'CIRC_PLACE.READER_TYPES' | translate }}</h5>
+          <div class="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+            @for (rt of allReaderTypes(); track rt.id) {
+              <label class="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" [checked]="selectedReaderTypeIds().has(rt.id)" (change)="toggleReaderType(rt.id)" class="rounded text-blue-500 border-gray-300">
+                <span class="text-gray-700">{{ rt.name }}</span>
+              </label>
+            }
+            @if (!allReaderTypes().length) {
+              <p class="px-3 py-4 text-xs text-gray-400 text-center">{{ 'COMMON.NO_DATA' | translate }}</p>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button (click)="savePlace()" [disabled]="savingPlace()"
+                class="py-2 px-5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm">
+          @if (savingPlace()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> }
+          {{ 'COMMON.SAVE' | translate }}
+        </button>
+      </div>
+    }
+
+    <!-- ---------- Panel: Chính sách lưu thông cho loại bạn đọc ---------- -->
+    @if (selectedKind() === 'policy') {
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h5 class="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <mat-icon class="text-blue-600">person</mat-icon>
+          {{ 'CIRC_PLACE.POLICY_TITLE' | translate }} — {{ selectedPolicy()?.readerTypeName }}
+        </h5>
+
+        <form [formGroup]="policyForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_BOOK' | translate }}</label>
+            <input formControlName="NumberOfBook" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_BOOK_ACCEPT' | translate }}</label>
+            <input formControlName="NumberOfBookAccept" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_DATE' | translate }}</label>
+            <input formControlName="NumberOfDate" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_RENEW_QTY' | translate }}</label>
+            <input formControlName="NumberOfRenewQty" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_RENEW' | translate }}</label>
+            <input formControlName="NumberOfRenew" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_RENEW_DAYS' | translate }}</label>
+            <input formControlName="NumberOfRenewDays" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_REQUEST' | translate }}</label>
+            <input formControlName="NumberOfRequest" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_REQUEST_COUNT' | translate }}</label>
+            <input formControlName="NumberOfRequestCount" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-blue-700 mb-1">{{ 'CIRC_POLICY.NUMBER_OF_REQUEST_DAYS' | translate }}</label>
+            <input formControlName="NumberOfRequestDays" type="number" min="0" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div class="md:col-span-3 flex items-center gap-2 pt-1">
+            <input formControlName="AllowOpacRequest" type="checkbox" id="allowOpac" class="rounded text-blue-500 border-gray-300">
+            <label for="allowOpac" class="text-sm text-gray-700">{{ 'CIRC_POLICY.ALLOW_OPAC_REQUEST' | translate }}</label>
+          </div>
+        </form>
+
+        <div class="flex justify-end mt-3">
+          <button (click)="savePolicy()" [disabled]="savingPolicy()"
+                  class="py-2 px-5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm">
+            @if (savingPolicy()) { <mat-icon class="animate-spin text-[16px]">autorenew</mat-icon> } @else { <mat-icon class="text-[16px]">save</mat-icon> }
+            {{ 'COMMON.SAVE' | translate }}
+          </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mt-6 border-t border-gray-100 pt-4">
+          <div class="flex gap-1 border-b border-gray-200 mb-4">
+            <button (click)="activeTab.set('docgroup')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    [class.border-blue-600]="activeTab()==='docgroup'" [class.text-blue-600]="activeTab()==='docgroup'"
+                    [class.border-transparent]="activeTab()!=='docgroup'" [class.text-gray-500]="activeTab()!=='docgroup'">
+              {{ 'CIRC_POLICY.TAB_DOC_GROUP' | translate }}
+            </button>
+            <button (click)="activeTab.set('fine')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    [class.border-blue-600]="activeTab()==='fine'" [class.text-blue-600]="activeTab()==='fine'"
+                    [class.border-transparent]="activeTab()!=='fine'" [class.text-gray-500]="activeTab()!=='fine'">
+              {{ 'CIRC_POLICY.TAB_FINE' | translate }}
+            </button>
+          </div>
+
+          @if (activeTab() === 'docgroup') {
+            <table class="w-full text-sm mb-3">
+              <thead>
+                <tr class="text-xs font-semibold text-gray-500 uppercase border-b border-gray-200">
+                  <th class="py-2 text-left">{{ 'CIRC_POLICY.DOC_GROUP_NAME' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.NUMBER_OF_BOOK' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.NUMBER_OF_REQUEST' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.NUMBER_OF_RENEW_QTY' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.NUMBER_OF_BOOK_ACCEPT' | translate }}</th>
+                  <th class="py-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of docGroupRows(); track row.id) {
+                  <tr class="border-b border-gray-50">
+                    <td class="py-1.5">{{ row.docGroupName || '—' }}</td>
+                    <td class="py-1.5 text-center">{{ row.numberOfBook ?? '—' }}</td>
+                    <td class="py-1.5 text-center">{{ row.numberOfRequest ?? '—' }}</td>
+                    <td class="py-1.5 text-center">{{ row.numberOfRenewQty ?? '—' }}</td>
+                    <td class="py-1.5 text-center">{{ row.numberOfBookAccept ?? '—' }}</td>
+                    <td class="py-1.5 text-right">
+                      <button (click)="removeDocGroupRow(row)" class="p-1 text-gray-300 hover:text-red-500"><mat-icon class="text-[16px]">delete</mat-icon></button>
+                    </td>
+                  </tr>
+                }
+                @if (!docGroupRows().length) {
+                  <tr><td colspan="6" class="py-4 text-center text-gray-400 text-xs">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+                }
+              </tbody>
+            </table>
+
+            @if (!showAddDocGroup()) {
+              <button (click)="openAddDocGroup()" class="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                <mat-icon class="text-[16px]">add</mat-icon> {{ 'CIRC_POLICY.ADD_DOC_GROUP' | translate }}
+              </button>
+            } @else {
+              <div class="grid grid-cols-2 md:grid-cols-5 gap-2 items-end bg-gray-50 p-3 rounded-lg">
+                <ng-select [items]="allDocGroups()" bindLabel="name" bindValue="id"
+                           [(ngModel)]="newDocGroup.docGroupId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'CIRC_POLICY.DOC_GROUP_NAME' | translate"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select>
+                <input type="number" [(ngModel)]="newDocGroup.numberOfBook" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.NUMBER_OF_BOOK' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <input type="number" [(ngModel)]="newDocGroup.numberOfRequest" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.NUMBER_OF_REQUEST' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <input type="number" [(ngModel)]="newDocGroup.numberOfRenewQty" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.NUMBER_OF_RENEW_QTY' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <input type="number" [(ngModel)]="newDocGroup.numberOfBookAccept" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.NUMBER_OF_BOOK_ACCEPT' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <div class="col-span-2 md:col-span-5 flex gap-2 justify-end">
+                  <button (click)="showAddDocGroup.set(false)" class="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded-lg">{{ 'COMMON.CANCEL' | translate }}</button>
+                  <button (click)="saveNewDocGroup()" class="px-3 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-lg">{{ 'COMMON.SAVE' | translate }}</button>
+                </div>
+              </div>
+            }
+          }
+
+          @if (activeTab() === 'fine') {
+            <table class="w-full text-sm mb-3">
+              <thead>
+                <tr class="text-xs font-semibold text-gray-500 uppercase border-b border-gray-200">
+                  <th class="py-2 text-left">{{ 'CIRC_POLICY.FINE_TYPE' | translate }}</th>
+                  <th class="py-2 text-left">{{ 'CIRC_POLICY.FINE_METHOD' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.HOLD_CARD_DAYS' | translate }}</th>
+                  <th class="py-2 text-center">{{ 'CIRC_POLICY.FINE_AMOUNT' | translate }}</th>
+                  <th class="py-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of fineRows(); track row.id) {
+                  <tr class="border-b border-gray-50">
+                    <td class="py-1.5">{{ fineTypeName(row.fineTypeId) }}</td>
+                    <td class="py-1.5">{{ fineMethodName(row.fineMethodId) }}</td>
+                    <td class="py-1.5 text-center">{{ row.holdCardDays ?? '—' }}</td>
+                    <td class="py-1.5 text-center">{{ row.fineAmount ?? '—' }}</td>
+                    <td class="py-1.5 text-right">
+                      <button (click)="editFineRow(row)" class="p-1 text-gray-300 hover:text-blue-600"><mat-icon class="text-[16px]">edit</mat-icon></button>
+                      <button (click)="removeFineRow(row)" class="p-1 text-gray-300 hover:text-red-500"><mat-icon class="text-[16px]">delete</mat-icon></button>
+                    </td>
+                  </tr>
+                }
+                @if (!fineRows().length) {
+                  <tr><td colspan="5" class="py-4 text-center text-gray-400 text-xs">{{ 'COMMON.NO_DATA' | translate }}</td></tr>
+                }
+              </tbody>
+            </table>
+
+            @if (!showAddFine()) {
+              <button (click)="openAddFine()" class="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                <mat-icon class="text-[16px]">add</mat-icon> {{ 'CIRC_POLICY.ADD_FINE' | translate }}
+              </button>
+            } @else {
+              <div class="grid grid-cols-2 md:grid-cols-5 gap-2 items-end bg-gray-50 p-3 rounded-lg">
+                <ng-select [items]="allFineTypes()" bindLabel="name" bindValue="id"
+                           [(ngModel)]="newFine.fineTypeId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'CIRC_POLICY.FINE_TYPE' | translate"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select>
+                <ng-select [items]="allFineMethods()" bindLabel="name" bindValue="id"
+                           [(ngModel)]="newFine.fineMethodId" [ngModelOptions]="{standalone:true}"
+                           [searchable]="true" [clearable]="true"
+                           [placeholder]="'CIRC_POLICY.FINE_METHOD' | translate"
+                           [notFoundText]="'COMMON.NO_RESULTS' | translate">
+                </ng-select>
+                <input type="number" [(ngModel)]="newFine.holdCardDays" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.HOLD_CARD_DAYS' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <input type="number" [(ngModel)]="newFine.fineAmount" [ngModelOptions]="{standalone:true}" placeholder="{{ 'CIRC_POLICY.FINE_AMOUNT' | translate }}" class="px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                <div class="col-span-2 md:col-span-5 flex gap-2 justify-end">
+                  <button (click)="cancelFineForm()" class="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded-lg">{{ 'COMMON.CANCEL' | translate }}</button>
+                  <button (click)="saveNewFine()" class="px-3 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-lg">{{ (editingFinePublicId() ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}</button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Confirm delete điểm lưu thông -->
+@if (showDeletePlaceConfirm()) {
+  <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-6 py-5 text-center">
+        <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+          <mat-icon class="text-red-500 text-3xl">delete_forever</mat-icon>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-1">{{ 'COMMON.CONFIRM_DELETE' | translate }}</h3>
+        <p class="text-sm text-gray-500">{{ 'COMMON.CONFIRM_DELETE_MSG' | translate }}</p>
+      </div>
+      <div class="flex gap-3 px-6 pb-5">
+        <button (click)="closeDeletePlaceConfirm()" class="flex-1 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          {{ 'COMMON.CANCEL' | translate }}
+        </button>
+        <button (click)="doDeletePlace()" class="flex-1 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg flex items-center justify-center gap-1 transition-colors">
+          <mat-icon class="text-[16px]">delete</mat-icon> {{ 'COMMON.DELETE' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

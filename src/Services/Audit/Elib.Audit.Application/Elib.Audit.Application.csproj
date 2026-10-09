@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Elib.Audit.Domain\Elib.Audit.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Tenancy\Elib.BuildingBlocks.Tenancy.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Elib.BuildingBlocks.Crud\Elib.BuildingBlocks.Crud.csproj" />
+  </ItemGroup>
+</Project>

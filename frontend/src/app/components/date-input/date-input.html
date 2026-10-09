@@ -1,0 +1,8 @@
+<div class="relative">
+  <input [formControl]="control" [matDatepicker]="picker"
+         (dateChange)="onDateChange()" (blur)="onBlur()"
+         placeholder="dd/mm/yyyy"
+         class="w-full pl-3 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400">
+  <mat-datepicker-toggle [for]="picker" class="absolute right-0.5 top-1/2 -translate-y-1/2 scale-90"></mat-datepicker-toggle>
+  <mat-datepicker #picker></mat-datepicker>
+</div>

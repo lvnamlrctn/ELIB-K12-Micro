@@ -1,0 +1,26 @@
+<Project>
+  <!-- Áp dụng cho mọi project trong src/ (hệ microservice mới). Monolith cũ ở backend/ KHÔNG chịu ảnh hưởng. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <InvariantGlobalization>false</InvariantGlobalization>
+
+    <Company>MDATA</Company>
+    <Product>ELIB K12 Platform</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <!-- Project test: không đóng gói, cho phép tên method kiểu Should_X_When_Y -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- CA1707: tên test có dấu _ ; CA1001: xUnit dọn tài nguyên qua IAsyncLifetime.DisposeAsync -->
+    <NoWarn>$(NoWarn);CA1707;CA1001</NoWarn>
+  </PropertyGroup>
+</Project>

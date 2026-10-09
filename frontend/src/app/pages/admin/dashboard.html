@@ -1,0 +1,585 @@
+<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+  <h4 class="text-2xl font-bold text-gray-800">{{ 'DASHBOARD.TITLE' | translate }}</h4>
+  @if (roles().length > 1) {
+    <div class="inline-flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm" role="tablist" [attr.aria-label]="'DASHBOARD.ROLE_TABS' | translate">
+      @for (r of roles(); track r.id) {
+        <button type="button" role="tab" [attr.aria-selected]="role() === r.id" (click)="selectRole(r.id)"
+                class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                [class]="role() === r.id ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'">
+          {{ r.label | translate }}
+        </button>
+      }
+    </div>
+  }
+</div>
+
+<!-- ===== Tổng quan (dashboard gốc) — [hidden] thay @if để các canvas/ViewChild luôn tồn tại ===== -->
+<div [hidden]="role() !== 'overview'">
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6">
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+    <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+      <span class="material-icons text-2xl">menu_book</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.TOTAL_DOCS' | translate }}</p>
+      <h5 class="text-2xl font-bold text-gray-800">
+        @if (loading()) {
+          <span class="animate-pulse bg-gray-200 text-transparent rounded">0000</span>
+        } @else {
+          {{ dashboardData()?.stats?.totalDocs | number }}
+        }
+      </h5>
+      <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.TOTAL_DOCS_CAPTION' | translate }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+    <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+      <span class="material-icons text-2xl">check_circle</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DIGITAL_BOOKS' | translate }}</p>
+      <h5 class="text-2xl font-bold text-gray-800">
+        @if (loading()) {
+          <span class="animate-pulse bg-gray-200 text-transparent rounded">0000</span>
+        } @else {
+          {{ dashboardData()?.stats?.digitalBooks | number }}
+        }
+      </h5>
+      <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.DIGITAL_BOOKS_CAPTION' | translate }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+    <div class="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+      <span class="material-icons text-2xl">inventory_2</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.PRINT_STOCK' | translate }}</p>
+      <h5 class="text-2xl font-bold text-gray-800">
+        @if (loading()) {
+          <span class="animate-pulse bg-gray-200 text-transparent rounded">0000</span>
+        } @else {
+          {{ dashboardData()?.stats?.printBooksInStock | number }}
+        }
+      </h5>
+      <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.PRINT_STOCK_CAPTION' | translate }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+    <div class="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+      <span class="material-icons text-2xl">donut_large</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DIGITIZATION_RATE' | translate }}</p>
+      <h5 class="text-2xl font-bold text-gray-800">
+        @if (loading()) {
+          <span class="animate-pulse bg-gray-200 text-transparent rounded">0000</span>
+        } @else {
+          {{ dashboardData()?.stats?.digitizationRate }}%
+        }
+      </h5>
+      <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.DIGITIZATION_RATE_CAPTION' | translate }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+    <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+      <span class="material-icons text-2xl">warning_amber</span>
+    </div>
+    <div class="min-w-0">
+      <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.OVERDUE_READERS' | translate }}</p>
+      <h5 class="text-2xl font-bold text-gray-800">
+        @if (loading()) {
+          <span class="animate-pulse bg-gray-200 text-transparent rounded">0000</span>
+        } @else {
+          {{ dashboardData()?.overdueReaders | number }}
+        }
+      </h5>
+      <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.OVERDUE_READERS_CAPTION' | translate }}</p>
+    </div>
+  </div>
+</div>
+
+<a routerLink="/admin/work-center"
+  class="flex items-center gap-4 bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 hover:border-blue-200 hover:shadow transition-shadow">
+  <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+    <span class="material-icons text-2xl">assignment_turned_in</span>
+  </div>
+  <div class="min-w-0">
+    <p class="text-sm font-semibold text-gray-800">{{ 'DASHBOARD.WORK_CENTER' | translate }}</p>
+    <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.WORK_CENTER_CAPTION' | translate }}</p>
+  </div>
+  <span class="material-icons text-gray-300 ml-auto">chevron_right</span>
+</a>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+  <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.BORROW_TREND' | translate }}</h5>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">
+        {{ borrowTrendTotal() | number }} {{ 'DASHBOARD.BORROW_TREND_UNIT' | translate }}
+      </span>
+    </div>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    }
+    <div class="relative h-[300px] w-full">
+      <canvas #borrowTrendChart></canvas>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col relative">
+    <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.TYPE_DISTRIBUTION' | translate }}</h5>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      </div>
+    }
+    <div class="flex-1 overflow-y-auto max-h-[300px] pr-1 space-y-4">
+      @for (item of dashboardData()?.typeDistribution ?? []; track item.label) {
+        <div>
+          <div class="flex items-baseline justify-between text-sm mb-1">
+            <span class="font-semibold text-gray-800 truncate">{{ item.label }}</span>
+            <span class="text-gray-500 shrink-0 ml-2">{{ item.count | number }} · {{ item.percentage }}%</span>
+          </div>
+          <div class="h-2 rounded-full bg-gray-100">
+            <div class="h-2 rounded-full bg-purple-500" [style.width.%]="typeBarWidth(item)"></div>
+          </div>
+        </div>
+      }
+    </div>
+    <div class="mt-4 pt-3 border-t border-gray-100 text-sm text-gray-500">
+      {{ 'DASHBOARD.TYPE_DISTRIBUTION_FOOTER' | translate: { count: (dashboardData()?.stats?.digitalBooks | number) } }}
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+  <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.DAILY_TREND' | translate }}</h5>
+      <span class="text-xs text-gray-400">{{ 'DASHBOARD.DAILY_TREND_CAPTION' | translate }}</span>
+    </div>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    }
+    <div class="relative h-[260px] w-full">
+      <canvas #dailyTrendChart></canvas>
+    </div>
+  </div>
+
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col relative">
+    <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.OVERDUE_BUCKETS' | translate }}</h5>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+      </div>
+    } @else {
+      <div class="flex-1 flex flex-col justify-center space-y-4">
+        @for (bucket of dashboardData()?.overdueBuckets ?? []; track bucket.label) {
+          <div>
+            <div class="flex items-baseline justify-between text-sm mb-1">
+              <span class="font-semibold text-gray-800">{{ bucket.label }}</span>
+              <span class="text-gray-500">{{ bucket.count | number }}</span>
+            </div>
+            <div class="h-2 rounded-full bg-gray-100">
+              <div class="h-2 rounded-full" [class.bg-amber-400]="bucket.label !== 'Trên 30 ngày'" [class.bg-red-600]="bucket.label === 'Trên 30 ngày'"
+                   [style.width.%]="overdueBucketBarWidth(bucket)"></div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 mt-6" [hidden]="!loading() && !(dashboardData()?.fundBudgetVsSpending ?? []).length">
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.FUND_BUDGET' | translate }}</h5>
+      <span class="text-xs text-gray-400">{{ 'DASHBOARD.FUND_BUDGET_CAPTION' | translate }}</span>
+    </div>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    }
+    <div class="relative h-[260px] w-full">
+      <canvas #fundBudgetChart></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 gap-6 mt-6">
+  <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.TOP5_BORROWED' | translate }}</h5>
+      <span class="text-xs text-gray-400">{{ 'DASHBOARD.TOP5_BORROWED_CAPTION' | translate }}</span>
+    </div>
+    @if (loading()) {
+      <div class="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-xl">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    }
+    <div class="space-y-4">
+      @for (item of dashboardData()?.top5Borrowed ?? []; track item.bibId; let i = $index) {
+        <div class="flex items-center gap-4">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+               [class.bg-amber-500]="i === 0" [class.text-white]="i === 0"
+               [class.bg-gray-100]="i !== 0" [class.text-gray-600]="i !== 0">
+            {{ i + 1 }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-gray-800 truncate">{{ item.title }}</span>
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 shrink-0">
+                {{ 'DASHBOARD.TAG_PRINT_BOOK' | translate }}
+              </span>
+            </div>
+            <p class="text-xs text-gray-400 truncate">
+              {{ 'DASHBOARD.AUTHOR_LABEL' | translate }}: {{ item.author }} · DDC: {{ item.ddc }}
+            </p>
+            <div class="h-2 rounded-full bg-gray-100 mt-1.5">
+              <div class="h-2 rounded-full"
+                   [class.bg-amber-500]="i === 0" [class.bg-blue-400]="i !== 0"
+                   [style.width.%]="top5BarWidth(item)"></div>
+            </div>
+          </div>
+          <div class="text-sm font-bold shrink-0" [class.text-amber-500]="i === 0" [class.text-gray-600]="i !== 0">
+            {{ item.count | number }} {{ 'DASHBOARD.UNIT_TURNS' | translate }}
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== Lưu thông (Đợt 21) ===== -->
+<div [hidden]="role() !== 'circulation'">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+    <a [routerLink]="canOpenCircReport() ? '/admin/circulation-report' : null" [queryParams]="{ reportType: 7 }"
+       class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4 hover:border-red-200 transition-colors">
+      <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0"><span class="material-icons text-2xl">warning_amber</span></div>
+      <div class="min-w-0">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.OVERDUE_READERS' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ loading() ? '…' : (dashboardData()?.overdueReaders | number) }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.CIRC_OPEN_OVERDUE' | translate }}</p>
+      </div>
+    </a>
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+      <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><span class="material-icons text-2xl">outbox</span></div>
+      <div class="min-w-0">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.CIRC_BORROWED_TODAY' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ loading() ? '…' : ((today()?.borrowed ?? 0) | number) }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.CIRC_14_DAYS' | translate: { count: dailyTotals().borrowed } }}</p>
+      </div>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4">
+      <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><span class="material-icons text-2xl">move_to_inbox</span></div>
+      <div class="min-w-0">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.CIRC_RETURNED_TODAY' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ loading() ? '…' : ((today()?.returned ?? 0) | number) }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.CIRC_14_DAYS' | translate: { count: dailyTotals().returned } }}</p>
+      </div>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <p class="text-sm text-gray-500 font-medium mb-2">{{ 'DASHBOARD.CIRC_REPORTS' | translate }}</p>
+      @if (canOpenCircReport()) {
+        <div class="flex flex-col gap-1.5 text-sm">
+          <a routerLink="/admin/circulation-report" [queryParams]="{ reportType: 2 }" class="text-blue-600 hover:underline flex items-center gap-1"><span class="material-icons text-[16px]">chevron_right</span>{{ 'CIRC_REPORT.RT_2' | translate }}</a>
+          <a routerLink="/admin/circulation-report" [queryParams]="{ reportType: 7 }" class="text-blue-600 hover:underline flex items-center gap-1"><span class="material-icons text-[16px]">chevron_right</span>{{ 'CIRC_REPORT.RT_7' | translate }}</a>
+          <a routerLink="/admin/circulation-report" [queryParams]="{ reportType: 10 }" class="text-blue-600 hover:underline flex items-center gap-1"><span class="material-icons text-[16px]">chevron_right</span>{{ 'CIRC_REPORT.RT_10' | translate }}</a>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-100 relative">
+      <div class="flex items-center justify-between mb-4">
+        <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.DAILY_TREND' | translate }}</h5>
+        <span class="text-xs text-gray-400">{{ 'DASHBOARD.DAILY_TREND_CAPTION' | translate }}</span>
+      </div>
+      <div class="relative h-[260px] w-full"><canvas #circDailyChart></canvas></div>
+    </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+      <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.OVERDUE_BUCKETS' | translate }}</h5>
+      <div class="flex-1 flex flex-col justify-center space-y-4">
+        @for (bucket of dashboardData()?.overdueBuckets ?? []; track bucket.label) {
+          <div>
+            <div class="flex items-baseline justify-between text-sm mb-1">
+              <span class="font-semibold text-gray-800">{{ bucket.label }}</span>
+              <span class="text-gray-500 tabular-nums">{{ bucket.count | number }}</span>
+            </div>
+            <div class="h-2 rounded-full bg-gray-100">
+              <div class="h-2 rounded-full" [class.bg-amber-400]="bucket.label !== 'Trên 30 ngày'" [class.bg-red-600]="bucket.label === 'Trên 30 ngày'"
+                   [style.width.%]="overdueBucketBarWidth(bucket)"></div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Biên mục (Đợt 21) — tải khi mở tab ===== -->
+<div [hidden]="role() !== 'cataloging'">
+  @if (catalogingError()) {
+    <div class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-4 mb-6 flex items-center justify-between gap-3">
+      {{ 'DASHBOARD.CATALOGING_LOAD_FAILED' | translate }}
+      <button type="button" (click)="loadCataloging(true)" class="text-sm font-medium underline">{{ 'COMMON.RETRY' | translate }}</button>
+    </div>
+  }
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6 mb-6">
+    <a [routerLink]="canOpenBibs() ? '/admin/catalog-bibs' : null"
+       class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4 hover:border-blue-200 transition-colors">
+      <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><span class="material-icons text-2xl">menu_book</span></div>
+      <div class="min-w-0">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.CATALOGING_TITLES' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ catalogingLoading() || !cataloging() ? '…' : (cataloging()!.printTitles | number) }}</h5>
+      </div>
+    </a>
+    <a [routerLink]="canOpenCircReport() ? '/admin/circulation-report' : null" [queryParams]="{ reportType: 9 }"
+       class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4 hover:border-amber-200 transition-colors">
+      <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><span class="material-icons text-2xl">inventory_2</span></div>
+      <div class="min-w-0">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.NEVER_BORROWED' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ catalogingLoading() || !cataloging() ? '…' : (cataloging()!.neverBorrowedCopies | number) }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.NEVER_BORROWED_CAPTION' | translate }}</p>
+      </div>
+    </a>
+  </div>
+
+  @if (qualityRulesVisible().length) {
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.QUALITY_TITLE' | translate }}</h5>
+        <a routerLink="/admin/data-quality" class="text-sm text-blue-600 hover:underline">{{ 'DASHBOARD.QUALITY_OPEN' | translate }}</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        @for (r of qualityRulesVisible(); track r.key) {
+          <a routerLink="/admin/data-quality" [queryParams]="{ rule: r.key }"
+             class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border transition-colors"
+             [class]="qualityCount(r.key) > 0 ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50' : 'border-green-100 bg-green-50/40 hover:bg-green-50'">
+            <span class="text-sm text-gray-700">{{ r.label | translate }}</span>
+            <span class="text-sm font-bold tabular-nums" [class]="qualityCount(r.key) > 0 ? 'text-amber-700' : 'text-green-700'">{{ qualityCount(r.key) | number }}</span>
+          </a>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <div class="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <div class="flex items-center justify-between mb-4">
+        <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.WEEKLY_ADDED' | translate }}</h5>
+        <span class="text-xs text-gray-400">{{ 'DASHBOARD.WEEKLY_ADDED_CAPTION' | translate }}</span>
+      </div>
+      <div class="relative h-[240px] w-full"><canvas #weeklyAddedChart></canvas></div>
+    </div>
+    <div class="xl:col-span-3 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <div class="flex items-center justify-between mb-3">
+        <h5 class="text-lg font-semibold text-gray-800">{{ 'DASHBOARD.NEVER_BORROWED_TOP' | translate }}</h5>
+        @if (canOpenCircReport()) {
+          <a routerLink="/admin/circulation-report" [queryParams]="{ reportType: 9 }" class="text-sm text-blue-600 hover:underline">{{ 'DASHBOARD.NEVER_BORROWED_REPORT' | translate }}</a>
+        }
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="text-xs text-gray-500">
+            <tr><th class="py-2 pr-3">{{ 'BIB.COL_TITLE' | translate }}</th><th class="py-2 pr-3 w-24 text-right">{{ 'DASHBOARD.NEVER_BORROWED_COPIES' | translate }}</th><th class="py-2 w-28 text-right">{{ 'DASHBOARD.NEVER_BORROWED_SINCE' | translate }}</th></tr>
+          </thead>
+          <tbody>
+            @for (b of cataloging()?.neverBorrowedTop ?? []; track b.bibId) {
+              <tr class="border-t border-gray-100">
+                <td class="py-2 pr-3">
+                  @if (b.mfn != null && canOpenBibs()) {
+                    <a [routerLink]="['/admin/catalog-bibs/edit', b.mfn]" class="font-medium text-gray-800 hover:text-blue-600">{{ b.title || ('MFN ' + b.mfn) }}</a>
+                  } @else { <span class="font-medium text-gray-800">{{ b.title || '—' }}</span> }
+                  @if (b.author) { <div class="text-xs text-gray-400">{{ b.author }}</div> }
+                </td>
+                <td class="py-2 pr-3 text-right tabular-nums">{{ b.copies | number }}</td>
+                <td class="py-2 text-right tabular-nums text-gray-500">{{ b.catalogedAt ? (b.catalogedAt | date:'dd/MM/yyyy') : '—' }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="3" class="py-8 text-center text-gray-400">{{ (catalogingLoading() ? 'COMMON.LOADING' : 'COMMON.NO_DATA') | translate }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== Bổ sung & Kho (Đợt 22.4) ===== -->
+<div [hidden]="role() !== 'acquisition'">
+  @if (acquisitionLoading() && !acquisition()) {
+    <div class="text-center py-10 text-gray-400">{{ 'COMMON.LOADING' | translate }}</div>
+  } @else {
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <h5 class="text-sm font-semibold text-gray-600 mb-3">{{ 'DASHBOARD.ACQ_ORDERS_BY_STATUS' | translate }}</h5>
+        @for (s of acquisition()?.ordersByStatus ?? []; track s.status) {
+          <div class="flex justify-between text-sm py-1"><span class="text-gray-600">{{ 'DASHBOARD.STATUS' | translate }} {{ s.status ?? '—' }}</span><span class="font-semibold tabular-nums">{{ s.count | number }}</span></div>
+        } @empty { <p class="text-sm text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</p> }
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <h5 class="text-sm font-semibold text-gray-600 mb-3">{{ 'DASHBOARD.ACQ_RECEIPTS_BY_STATUS' | translate }}</h5>
+        @for (s of acquisition()?.receiptsByStatus ?? []; track s.status) {
+          <div class="flex justify-between text-sm py-1"><span class="text-gray-600">{{ 'DASHBOARD.STATUS' | translate }} {{ s.status ?? '—' }}</span><span class="font-semibold tabular-nums">{{ s.count | number }}</span></div>
+        } @empty { <p class="text-sm text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</p> }
+      </div>
+      <a routerLink="/admin/ab-receipts" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center hover:border-amber-200 transition-colors">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.ACQ_UNREGISTERED_LINES' | translate }}</p>
+        <h5 class="text-2xl font-bold text-amber-600 tabular-nums">{{ (acquisition()?.unregisteredLines ?? 0) | number }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.ACQ_UNREGISTERED_LINES_CAPTION' | translate }}</p>
+      </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.ACQ_STORE_FILL_RATE' | translate }}</h5>
+        <div class="space-y-3">
+          @for (s of acquisition()?.storeFillRate ?? []; track s.storeId) {
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-gray-700">{{ s.name }}</span>
+                <span class="text-gray-500 tabular-nums">{{ s.capacity == null ? ('DASHBOARD.ACQ_NOT_CONFIGURED' | translate) : (s.count + ' / ' + s.capacity) }}</span>
+              </div>
+              @if (s.fillRate != null) {
+                <div class="h-2 rounded-full bg-gray-100"><div class="h-2 rounded-full" [class]="fillRateBarColor(s.fillRate)" [style.width.%]="s.fillRate"></div></div>
+              }
+            </div>
+          } @empty { <p class="text-sm text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</p> }
+        </div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.ACQ_BUDGET_VS_SPENT' | translate }}</h5>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-xs text-gray-500"><tr><th class="py-2 pr-3">{{ 'DASHBOARD.ACQ_FUND' | translate }}</th><th class="py-2 pr-3 text-right">{{ 'DASHBOARD.ACQ_SPENT' | translate }}</th><th class="py-2 text-right">{{ 'DASHBOARD.ACQ_BUDGET' | translate }}</th></tr></thead>
+            <tbody>
+              @for (f of acquisition()?.budgetVsSpent ?? []; track f.fundId) {
+                <tr class="border-t border-gray-100">
+                  <td class="py-2 pr-3">{{ f.name }}</td>
+                  <td class="py-2 pr-3 text-right tabular-nums" [class.text-red-600]="f.budget != null && f.spent > f.budget">{{ f.spent | number:'1.0-0' }}</td>
+                  <td class="py-2 text-right tabular-nums text-gray-500">{{ f.budget != null ? (f.budget | number:'1.0-0') : ('DASHBOARD.ACQ_NOT_CONFIGURED' | translate) }}</td>
+                </tr>
+              } @empty { <tr><td colspan="3" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ===== Tài liệu số (Đợt 22.4) ===== -->
+<div [hidden]="role() !== 'digital'">
+  @if (digitalLoading() && !digital()) {
+    <div class="text-center py-10 text-gray-400">{{ 'COMMON.LOADING' | translate }}</div>
+  } @else {
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DIGITAL_TOTAL_SIZE' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800">{{ formatBytes(digital()?.totalSizeBytes ?? 0) }}</h5>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+        <h5 class="text-sm font-semibold text-gray-600 mb-3">{{ 'DASHBOARD.DIGITAL_FORMAT_DIST' | translate }}</h5>
+        <div class="flex flex-wrap gap-2">
+          @for (f of digital()?.formatDistribution ?? []; track f.format) {
+            <span class="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-100 text-sm text-gray-700">.{{ f.format }} · {{ f.count | number }} · {{ formatBytes(f.sizeBytes) }}</span>
+          } @empty { <p class="text-sm text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</p> }
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.DIGITAL_TOP_READ' | translate }}</h5>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="text-xs text-gray-500"><tr><th class="py-2 pr-3">{{ 'BIB.COL_TITLE' | translate }}</th><th class="py-2 w-24 text-right">{{ 'DASHBOARD.DIGITAL_READS' | translate }}</th></tr></thead>
+          <tbody>
+            @for (b of digital()?.topRead ?? []; track b.itemId) {
+              <tr class="border-t border-gray-100">
+                <td class="py-2 pr-3">
+                  <span class="font-medium text-gray-800">{{ b.title || '—' }}</span>
+                  @if (b.author) { <div class="text-xs text-gray-400">{{ b.author }}</div> }
+                </td>
+                <td class="py-2 text-right tabular-nums">{{ b.count | number }}</td>
+              </tr>
+            } @empty { <tr><td colspan="2" class="py-8 text-center text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ===== Không gian & Phòng học (Đợt 22.4) ===== -->
+<div [hidden]="role() !== 'space'">
+  @if (spaceLoading() && !space()) {
+    <div class="text-center py-10 text-gray-400">{{ 'COMMON.LOADING' | translate }}</div>
+  } @else {
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.SPACE_IN_USE' | translate }}</p>
+        <h5 class="text-2xl font-bold text-blue-600 tabular-nums">{{ (space()?.roomsInUse ?? 0) | number }}</h5>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.SPACE_FREE' | translate }}</p>
+        <h5 class="text-2xl font-bold text-emerald-600 tabular-nums">{{ (space()?.roomsFree ?? 0) | number }}</h5>
+      </div>
+      <a routerLink="/admin/study-room-bookings" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:border-amber-200 transition-colors">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.SPACE_NO_SHOW_RATE' | translate }}</p>
+        <h5 class="text-2xl font-bold text-amber-600 tabular-nums">{{ space()?.noShowRate != null ? (space()!.noShowRate + '%') : '—' }}</h5>
+        <p class="text-xs text-gray-400 mt-0.5">{{ 'DASHBOARD.SPACE_NO_SHOW_CAPTION' | translate: { count: space()?.noShowCount ?? 0, total: space()?.noShowSample ?? 0 } }}</p>
+      </a>
+    </div>
+  }
+</div>
+
+<!-- ===== DevOps & Vận hành (Đợt 22.4) — chỉ tài khoản hệ thống ===== -->
+<div [hidden]="role() !== 'devops'">
+  @if (devopsLoading() && !devops()) {
+    <div class="text-center py-10 text-gray-400">{{ 'COMMON.LOADING' | translate }}</div>
+  } @else {
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <a routerLink="/healthz" target="_blank" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:border-emerald-200 transition-colors">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DEVOPS_HEALTH' | translate }}</p>
+        <h5 class="text-lg font-bold text-emerald-600">/healthz, /ready</h5>
+      </a>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DEVOPS_RATE_LIMIT' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ (devops()?.rateLimitRejected24h ?? 0) | number }}</h5>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DEVOPS_STORAGE_ORPHAN' | translate }}</p>
+        <h5 class="text-2xl font-bold text-gray-800 tabular-nums">{{ devops()?.digitalStorage?.orphanCount ?? '—' }}</h5>
+        @if (devops()?.digitalStorage; as ds) { <p class="text-xs text-gray-400 mt-0.5">{{ formatBytes(ds.totalSizeBytes) }} · {{ ds.runAt | date:'dd/MM HH:mm' }}</p> }
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+        <p class="text-sm text-gray-500 font-medium mb-1">{{ 'DASHBOARD.DEVOPS_STORAGE_BROKEN' | translate }}</p>
+        <h5 class="text-2xl font-bold text-red-600 tabular-nums">{{ devops()?.digitalStorage?.brokenFileCount ?? '—' }}</h5>
+      </div>
+    </div>
+
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+      <h5 class="text-lg font-semibold text-gray-800 mb-4">{{ 'DASHBOARD.DEVOPS_JOBS_BY_STATE' | translate }}</h5>
+      <div class="flex flex-wrap gap-3">
+        @for (j of devops()?.jobsByState ?? []; track j.state) {
+          <span class="px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 text-sm text-gray-700">{{ j.state }} · <strong class="tabular-nums">{{ j.count | number }}</strong></span>
+        } @empty { <p class="text-sm text-gray-400">{{ 'COMMON.NO_DATA' | translate }}</p> }
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="AddSuccess" xml:space="preserve">
+    <value>Thêm mới thành công.</value>
+  </data>
+  <data name="UpdateSuccess" xml:space="preserve">
+    <value>Cập nhật thành công.</value>
+  </data>
+  <data name="DeleteSuccess" xml:space="preserve">
+    <value>Xoá thành công.</value>
+  </data>
+  <data name="OnlyOneMainDocumentPerSubject" xml:space="preserve">
+    <value>Môn học này đã có Tài liệu chính — mỗi môn chỉ được phép có 1 Tài liệu chính.</value>
+  </data>
+  <data name="ChangeStatusSuccess" xml:space="preserve">
+    <value>Cập nhật trạng thái thành công.</value>
+  </data>
+  <data name="NotFound" xml:space="preserve">
+    <value>Không tìm thấy dữ liệu.</value>
+  </data>
+  <data name="Success" xml:space="preserve">
+    <value>Thành công.</value>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>Bạn không có quyền thực hiện thao tác này.</value>
+  </data>
+  <data name="ForbiddenDepartment" xml:space="preserve">
+    <value>Bạn không có quyền chỉnh sửa dữ liệu của phòng ban khác.</value>
+  </data>
+  <data name="Unauthorized" xml:space="preserve">
+    <value>Bạn chưa đăng nhập hoặc token đã hết hạn.</value>
+  </data>
+  <data name="InternalError" xml:space="preserve">
+    <value>Đã xảy ra lỗi máy chủ nội bộ.</value>
+  </data>
+  <data name="FileNotFound" xml:space="preserve">
+    <value>Không tìm thấy tệp tin tải lên.</value>
+  </data>
+  <data name="ColumnNameNotFound" xml:space="preserve">
+    <value>Không tìm thấy cột 'Name' trong tệp Excel.</value>
+  </data>
+  <data name="NoDataToImport" xml:space="preserve">
+    <value>Không có dữ liệu hợp lệ để nhập.</value>
+  </data>
+  <data name="ImportSuccess" xml:space="preserve">
+    <value>Nhập dữ liệu thành công ({0} bản ghi).</value>
+  </data>
+  <data name="InvalidImageType" xml:space="preserve">
+    <value>Tệp không hợp lệ. Chỉ chấp nhận ảnh JPEG, PNG, GIF và WEBP.</value>
+  </data>
+  <data name="UploadSuccess" xml:space="preserve">
+    <value>Tải ảnh lên thành công.</value>
+  </data>
+</root>

@@ -1,0 +1,47 @@
+# Profile cú pháp trừu tượng (abstract syntax) cho biểu ghi MARC của ELIB.
+# Dựa trên tab/usmarc.abs của Index Data, bổ sung ánh xạ ISBN (020$a), ISSN (022$a) và Chủ đề (650)
+# — đây là các điểm truy cập thư viện bạn hay dùng khi tra cứu liên thư viện qua Z39.50.
+#
+# Tên "elib" phải khớp với `recordType: grs.marc.elib` trong zebra.cfg.
+# Các file usmarc.tag / usmarc.mar / usmarc-b.est / bib1.att lấy từ gói idzebra của hệ thống
+# (/usr/share/idzebra-2.0/tab — mục thứ 2 trong profilePath), không cần chép vào repo.
+
+name elib
+reference USmarc
+attset bib1.att
+tagset usmarc.tag
+
+marc usmarc.mar
+
+esetname B usmarc-b.est
+esetname F @
+
+all any
+
+elm 008			other		Date:w:range(data,7,10)
+elm 245			title		-
+elm 245/?		title		!:w
+elm 245/?/a		title		!:w,!:p
+
+elm 100			Author-name-personal	-
+elm 100/?		Author-name-personal	!:w,!:p,Author:w,Author:p
+
+elm 110			Author-name-corporate	-
+elm 110/?		Author-name-corporate	!:w,!:p,Author:w,Author:p
+
+elm 111			Author-name-conference	-
+elm 111/?		Author-name-conference	!:w,!:p,Author:w,Author:p
+
+elm 260			Place-publication	-
+elm 260/?		Place-publication	-
+elm 260/?/a		Place-publication	!:w
+elm 260/?/b		Publisher		!:w
+elm 260/?/c		Date			!:w
+
+elm 020			ISBN		-
+elm 020/?/a		ISBN		!:w
+elm 022			ISSN		-
+elm 022/?/a		ISSN		!:w
+elm 650			Subject-heading	-
+elm 650/?		Subject-heading	!:w
+elm 650/?/a		Subject-heading	!:w,!:p
