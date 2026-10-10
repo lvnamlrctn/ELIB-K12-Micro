@@ -1,11 +1,12 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Api, Bib, BibType, CrudClient, IsbnMatch, MarcField, MarcFieldDef, STATUS_ACTIVE, Worksheet, errorMessage } from '../../core/api';
+import { Api, Bib, BibType, CrudClient, IsbnMatch, MarcField, MarcFieldDef, MarcPreviewRecord, STATUS_ACTIVE, Worksheet, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
+import { MarcPick } from './marc-tools';
 
 /** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
 const BLANK_FIELDS: MarcField[] = [
@@ -18,12 +19,15 @@ const BLANK_FIELDS: MarcField[] = [
 /** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor],
+  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" title="Quay lại"><span class="material-icons">arrow_back</span></a>
       <h4 class="page-title">{{ bib() ? 'Sửa biểu ghi' : 'Biên mục mới' }}</h4>
       @if (bib(); as b) { <span class="text-sm text-gray-500">MFN <b class="font-mono">{{ b.mfn }}</b> · {{ b.title }}</span> }
+      @if (canSave()) {
+        <button type="button" class="btn-secondary ml-auto" (click)="picking.set(true)"><span class="material-icons text-[18px]">upload_file</span> Nạp từ file MARC</button>
+      }
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 relative">
@@ -78,6 +82,8 @@ const BLANK_FIELDS: MarcField[] = [
         }
       </div>
     </div>
+
+    @if (picking()) { <app-marc-pick (chosen)="useRecord($event)" (closed)="picking.set(false)" /> }
   `,
 })
 export class BibEdit implements OnInit {
@@ -99,6 +105,7 @@ export class BibEdit implements OnInit {
   protected readonly dupes = signal<IsbnMatch[]>([]);
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
+  protected readonly picking = signal(false);
   protected bibTypeId: number | null = null;
   protected status = STATUS_ACTIVE;
   protected leader = '';
@@ -184,6 +191,20 @@ export class BibEdit implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** Nạp biểu ghi đọc từ file: thay toàn bộ trường, Leader và loại biểu ghi (nếu nhận ra theo Leader). */
+  protected async useRecord(r: MarcPreviewRecord): Promise<void> {
+    this.picking.set(false);
+    if (r.bibTypeId != null && r.bibTypeId !== this.bibTypeId) {
+      this.bibTypeId = r.bibTypeId;
+      await this.loadWorksheets();
+    }
+    this.worksheetId.set(null);
+    this.leader = r.leader;
+    this.fields.set(structuredClone(r.fields));
+    this.dupes.set([]);
+    this.toastr.success(`Đã nạp ${r.fields.length} trường từ file — kiểm tra rồi bấm Lưu biểu ghi.`);
   }
 
   private hasData(): boolean {

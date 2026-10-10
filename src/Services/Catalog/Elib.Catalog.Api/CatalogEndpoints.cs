@@ -1,5 +1,6 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Domain;
 using Elib.Catalog.Application;
 using Elib.Catalog.Domain;
 
@@ -31,8 +32,33 @@ public static class CatalogEndpoints
         bibs.MapGet("/CheckIsbn", [PermissionAny("CATALOG_BIBS:view", "CATALOG_BIBS:add")] (string? isbn, Guid? excludePublicId, BibResource r, CancellationToken ct)
             => r.CheckIsbnAsync(isbn, excludePublicId, ct));
 
+        // File MARC (multipart, trường "file"): ISO2709 .mrc, MARCXML .xml hoặc text MARC hệ cũ — định dạng nhận theo nội dung.
+        bibs.MapPost("/PreviewMarc", [PermissionAny("CATALOG_BIBS:add", "CATALOG_BIBS:edit")] async (IFormFile file, BibResource r, CancellationToken ct)
+            => await r.PreviewMarcAsync(await ReadAsync(file, ct), file.FileName, ct)).DisableAntiforgery();
+        bibs.MapPost("/ImportMarc", [Permission("CATALOG_BIBS", "add")] async (IFormFile file, long? bibTypeId, int? status, bool? skipDuplicates, bool? skipInvalid,
+            BibResource r, CancellationToken ct) =>
+        {
+            var result = await r.ImportMarcAsync(await ReadAsync(file, ct), file.FileName,
+                new MarcImportOptions(bibTypeId, status, skipDuplicates ?? true, skipInvalid ?? false), ct);
+            return result.Rejected ? Results.Json(result, statusCode: StatusCodes.Status400BadRequest) : Results.Ok(result);
+        }).DisableAntiforgery();
+        bibs.MapPost("/ExportMarc", [Permission("CATALOG_BIBS", "view")] async (MarcExportRequest request, BibResource r, CancellationToken ct) =>
+        {
+            var file = await r.ExportMarcAsync(request, ct);
+            return Results.File(file.Content, file.ContentType, file.FileName);
+        });
+
         // Từ điển MARC21 dùng chung — cán bộ nào dùng phân hệ Biên mục cũng đọc được (màn biên mục, biểu mẫu).
         api.MapGet("/marc21/fields", () => Marc21Definitions.Fields).WithTags("Marc21");
         return app;
+    }
+
+    private static async Task<byte[]> ReadAsync(IFormFile file, CancellationToken ct)
+    {
+        if (file.Length is 0 or > BibResource.MaxMarcFileBytes)
+            throw new BusinessRuleException("IMPORT_FILE_SIZE", $"File rỗng hoặc lớn hơn {BibResource.MaxMarcFileBytes / 1024 / 1024} MB.");
+        using var buffer = new MemoryStream((int)file.Length);
+        await file.CopyToAsync(buffer, ct);
+        return buffer.ToArray();
     }
 }

@@ -21,7 +21,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
  15. bạn đọc (patron): danh mục, thêm, trùng số thẻ, tìm, khoá/mở thẻ, sửa hàng loạt, nhập Excel, nhật ký,
      ảnh thẻ (media, riêng tư) + gán ảnh theo số thẻ, xuất Excel theo bộ lọc.
  16. biên mục (catalog): loại biểu ghi + biểu mẫu mặc định (tự dựng bản sao đơn vị khi service mới triển khai), từ điển MARC21,
-     biên mục biểu ghi theo biểu mẫu (001/003/005/008 tự sinh), tìm không dấu, trùng ISBN, ẩn khỏi OPAC, nhật ký, xoá.
+     biên mục biểu ghi theo biểu mẫu (001/003/005/008 tự sinh), tìm không dấu, trùng ISBN, ẩn khỏi OPAC, nhật ký,
+     xuất ISO2709 + nhập lại (bỏ qua trùng), nhập MARCXML (biểu ghi lỗi: từ chối cả file / bỏ qua), xoá.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -643,6 +644,35 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(s == 204 and s2 == 200 and json.loads(body2)["status"] == 1, "ẩn biểu ghi khỏi OPAC", f"{s} {body[:100]}")
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"Dế Mèn phiêu lưu ký {tag}")
     step("nhật ký có biên mục biểu ghi (catalog → audit)")
+
+    # Xuất/nhập file MARC: xuất biểu ghi vừa biên mục rồi nhập lại → bị bỏ qua vì trùng ISBN; MARCXML mới → nhập được.
+    s, h, mrc = tb.request("POST", f"{C}/bibs/ExportMarc", token=token, binary=True,
+                           json_body={"search": {"keyword": f"de men phieu luu ky {tag}"}, "format": "iso2709"})
+    expect(s == 200 and mrc[24:].find(b"") > 0 and mrc.endswith(b"") and f"Dế Mèn phiêu lưu ký {tag}".encode() in mrc,
+           f"xuất ISO2709 ({len(mrc)} byte, UTF-8)", str(mrc[:200]))
+    s, _, body = tb.request("POST", f"{C}/bibs/ImportMarc", token=token, raw=multipart("file", "xuat.mrc", mrc, "application/marc"))
+    r = json.loads(body) if s == 200 else {}
+    expect(r.get("total") == 1 and r.get("imported") == 0 and r.get("skipped") == 1, "nhập lại file vừa xuất: bỏ qua biểu ghi trùng ISBN", body[:300])
+    xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<collection xmlns="http://www.loc.gov/MARC21/slim"><record><leader>00000nam a2200000 a 4500</leader>
+<controlfield tag="001">CU-123</controlfield>
+<datafield tag="100" ind1="1" ind2=" "><subfield code="a">Nguyễn Nhật Ánh</subfield></datafield>
+<datafield tag="245" ind1="1" ind2="0"><subfield code="a">Mắt biếc {tag} /</subfield><subfield code="c">Nguyễn Nhật Ánh</subfield></datafield>
+<datafield tag="260" ind1=" " ind2=" "><subfield code="b">Trẻ,</subfield><subfield code="c">2019</subfield></datafield>
+</record><record><leader>00000nam a2200000 a 4500</leader><datafield tag="100" ind1="1" ind2=" "><subfield code="a">Thiếu nhan đề</subfield></datafield></record>
+</collection>'''.encode()
+    s, _, body = tb.request("POST", f"{C}/bibs/ImportMarc", token=token, raw=multipart("file", "cu.xml", xml, "application/xml"))
+    expect(s == 400 and json.loads(body).get("rejected") and json.loads(body)["errors"][0]["record"] == 2,
+           "MARCXML có biểu ghi lỗi → không nhập gì, báo lỗi theo số thứ tự biểu ghi", body[:300])
+    s, _, body = tb.request("POST", f"{C}/bibs/ImportMarc?skipInvalid=true", token=token, raw=multipart("file", "cu.xml", xml, "application/xml"))
+    r = json.loads(body) if s == 200 else {}
+    s2, _, body2 = tb.request("POST", f"{C}/bibs/Search", token=token, json_body={"keyword": f"mat biec {tag}"})
+    found = json.loads(body2)["items"] if s2 == 200 else []
+    expect(r.get("imported") == 1 and r.get("failed") == 1 and len(found) == 1 and found[0]["author"] == "Nguyễn Nhật Ánh",
+           f"nhập MARCXML bỏ qua biểu ghi lỗi (MFN mới {found and found[0]['mfn']})", body[:300])
+    s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{found[0]['publicId']}", token=token) if found else (0, None, None)
+    expect(s == 204, "xoá biểu ghi nhập thử")
+
     s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{bib['publicId']}", token=token)
     s2, _, _ = tb.request("GET", f"{C}/bibs/GetByMfn/{bib['mfn']}", token=token)
     expect(s == 204 and s2 == 404, "xoá biểu ghi thử")

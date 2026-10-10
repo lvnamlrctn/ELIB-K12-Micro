@@ -5,11 +5,12 @@ import { Api, Bib, BibSearch, BibType, CrudClient, CrudPage, STATUS_ACTIVE, erro
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
+import { MarcExport, MarcImport } from './marc-tools';
 
 /** Biên mục biểu ghi — danh sách (monolith: /admin/catalog-bibs, quyền CATALOG_BIBS). */
 @Component({
   selector: 'app-bibs',
-  imports: [FormsModule, RouterLink, Loading, Paginator, ConfirmDelete],
+  imports: [FormsModule, RouterLink, Loading, Paginator, ConfirmDelete, MarcImport, MarcExport],
   template: `
     <div class="mb-5"><h4 class="page-title">Biên mục biểu ghi</h4></div>
 
@@ -37,9 +38,14 @@ import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
     </div>
 
     <div class="panel flex gap-2 items-center justify-between flex-wrap">
-      @if (can('add')) {
-        <a routerLink="/catalog-bibs/new" class="btn-add"><span class="material-icons text-[18px]">add</span> Biên mục mới</a>
-      } @else { <span></span> }
+      <div class="flex gap-2 flex-wrap">
+        @if (can('add')) {
+          <a routerLink="/catalog-bibs/new" class="btn-add"><span class="material-icons text-[18px]">add</span> Biên mục mới</a>
+          <button type="button" class="btn-secondary" (click)="importing.set(true)"><span class="material-icons text-[18px]">upload_file</span> Nhập MARC</button>
+        }
+        <button type="button" class="btn-secondary" (click)="exporting.set(true)" [disabled]="!page()?.totalCount">
+          <span class="material-icons text-[18px]">download</span> Xuất MARC</button>
+      </div>
       <span class="text-sm text-gray-500">{{ page()?.totalCount ?? 0 }} biểu ghi</span>
     </div>
 
@@ -90,6 +96,8 @@ import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
     @if (deleting(); as b) {
       <app-confirm-delete [busy]="saving()" [message]="'Xoá biểu ghi MFN ' + b.mfn + ' — ' + b.title + '?'" (confirmed)="remove(b)" (cancelled)="deleting.set(null)" />
     }
+    @if (importing()) { <app-marc-import [types]="types()" (imported)="find()" (closed)="importing.set(false)" /> }
+    @if (exporting()) { <app-marc-export [search]="search" [total]="page()?.totalCount ?? 0" (closed)="exporting.set(false)" /> }
   `,
 })
 export class Bibs implements OnInit {
@@ -105,6 +113,8 @@ export class Bibs implements OnInit {
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly deleting = signal<Bib | null>(null);
+  protected readonly importing = signal(false);
+  protected readonly exporting = signal(false);
 
   async ngOnInit(): Promise<void> {
     void this.load();

@@ -65,6 +65,15 @@ export interface Bib {
 export interface BibSearch extends CrudSearch { bibTypeId?: number | null; isbn?: string | null; ddc?: string | null; }
 export interface BibInput { bibTypeId: number | null; worksheetId?: number | null; leader?: string | null; fields: MarcField[]; status?: number | null; }
 export interface IsbnMatch { publicId: string; mfn: number; title: string; }
+/** Nhập/xuất file MARC (ISO2709 .mrc, MARCXML .xml, text MARC hệ cũ). record: thứ tự trong file, đếm từ 1. */
+export interface MarcImportError { record: number; title: string | null; message: string; }
+export interface MarcImportResult {
+  total: number; imported: number; skipped: number; failed: number; errors: MarcImportError[]; rejected: boolean; detail: string;
+}
+export interface MarcImportOptions { bibTypeId: number | null; status: number; skipDuplicates: boolean; skipInvalid: boolean; }
+export interface MarcPreviewRecord { record: number; leader: string; fields: MarcField[]; title: string | null; bibTypeId: number | null; error: string | null; }
+export interface MarcFilePreview { total: number; records: MarcPreviewRecord[]; }
+export type MarcFormat = 'iso2709' | 'marcxml';
 
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
@@ -156,6 +165,12 @@ async function putToStorage(uploadUrl: string, file: File): Promise<void> {
   if (!response.ok) {
     throw new HttpErrorResponse({ status: response.status, error: { detail: `Không tải được file lên kho (lỗi ${response.status}).` } });
   }
+}
+
+function fileForm(file: File): FormData {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  return form;
 }
 
 /** Lưu blob thành file tải về. */
@@ -288,6 +303,21 @@ export class Api {
   worksheetsByBibType(bibTypeId: number) { return this.get<Worksheet[]>(`/api/admin/catalog/worksheets/GetByBibType/${bibTypeId}`); }
   bibByMfn(mfn: number) { return this.get<Bib>(`/api/admin/catalog/bibs/GetByMfn/${mfn}`); }
   checkIsbn(isbn: string, excludePublicId?: string) { return this.get<IsbnMatch[]>('/api/admin/catalog/bibs/CheckIsbn', { isbn, excludePublicId }); }
+  previewMarc(file: File) { return this.post<MarcFilePreview>('/api/admin/catalog/bibs/PreviewMarc', fileForm(file)); }
+  /** Nhập file MARC. Bị từ chối (có biểu ghi lỗi) → body 400 vẫn là MarcImportResult, trả về như kết quả thường. */
+  async importMarc(file: File, o: MarcImportOptions): Promise<MarcImportResult> {
+    const params: Record<string, string | number | boolean> = { status: o.status, skipDuplicates: o.skipDuplicates, skipInvalid: o.skipInvalid };
+    if (o.bibTypeId != null) params['bibTypeId'] = o.bibTypeId;
+    try {
+      return await firstValueFrom(this.http.post<MarcImportResult>('/api/admin/catalog/bibs/ImportMarc', fileForm(file), { params }));
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && (e.error as MarcImportResult | null)?.rejected) return e.error as MarcImportResult;
+      throw e;
+    }
+  }
+  exportMarc(search: BibSearch, format: MarcFormat) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/catalog/bibs/ExportMarc', { search, format }, { responseType: 'blob' })));
+  }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */

@@ -38,7 +38,7 @@ public sealed record IsbnMatch(Guid PublicId, long Mfn, string Title);
 /// Biểu ghi thư mục (monolith: CatalogueBookController, quyền CATALOG_BIBS). Ngoài 8 endpoint chuẩn: GetByMfn, CheckIsbn.
 /// Mọi thay đổi phát <see cref="BibChanged"/> (outbox, cùng transaction) cho bản sao ở holdings/circulation/search.
 /// </summary>
-public sealed class BibResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock)
+public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock)
     : CrudResource<BibResource, Bib, BibSearch, BibRequest, BibDto>(db)
 {
     protected override string EntityName => "Biểu ghi";
