@@ -61,8 +61,8 @@ public sealed partial class CirculationJobScheduler(IServiceScopeFactory scopes,
             try
             {
                 var result = await scope.ServiceProvider.GetRequiredService<CirculationJobs>().RunAsync(ct);
-                if (result.DueSoon + result.Overdue + result.ExpiredHolds > 0)
-                    LogRan(logger, tenantId, result.DueSoon, result.Overdue, result.ExpiredHolds);
+                if (result.DueSoon + result.Overdue + result.ExpiredHolds + result.AssignedHolds > 0)
+                    LogRan(logger, tenantId, result.DueSoon, result.Overdue, result.ExpiredHolds, result.AssignedHolds);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -71,8 +71,9 @@ public sealed partial class CirculationJobScheduler(IServiceScopeFactory scopes,
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Đơn vị {TenantId}: nhắc {DueSoon} lượt sắp đến hạn, {Overdue} lượt quá hạn, {Expired} đặt mượn hết hạn giữ")]
-    private static partial void LogRan(ILogger logger, long tenantId, int dueSoon, int overdue, int expired);
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Đơn vị {TenantId}: nhắc {DueSoon} lượt sắp đến hạn, {Overdue} lượt quá hạn, {Expired} đặt mượn hết hạn giữ, giữ bản cho {Assigned} đặt mượn")]
+    private static partial void LogRan(ILogger logger, long tenantId, int dueSoon, int overdue, int expired, int assigned);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Việc định kỳ lưu thông lỗi ở đơn vị {TenantId}")]
     private static partial void LogTenantFailed(ILogger logger, long tenantId, Exception exception);

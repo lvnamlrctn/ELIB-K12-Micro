@@ -90,9 +90,18 @@ public sealed class HoldsApiTests(CirculationApiFactory factory) : CirculationTe
         var holds = await Read<CrudPage<HoldDto>>(await staff.PostAsJsonAsync(U("/api/holds/Search"), new HoldSearch { Mfn = holdMfn }, Json));
         Assert.Equal([("NH-G", HoldStatus.Ready), ("NH-F", HoldStatus.Expired)], holds.Items.Select(h => (h.CardNo, h.Status)));
 
-        // Ngày 15: quá hạn 1 ngày → báo quá hạn một lần.
+        // Ngày 15: quá hạn 1 ngày → báo quá hạn một lần; giữ chỗ của G (hết ngày 14) cũng hết hạn.
         Factory.Clock.Advance(TimeSpan.FromDays(3));
-        Assert.Equal(1, (await RunJobs(tenantId)).Overdue);
+        Assert.Equal(new CirculationJobResult(0, 1, 1), await RunJobs(tenantId));
         Assert.Equal(0, (await RunJobs(tenantId)).Overdue);
+
+        // Hết bản (CP001 giữ cho H), I xếp hàng; kho xếp giá thêm một bản → job giữ ngay bản mới cho I.
+        await Publish(Reader(tenantId, "NH-H"), Reader(tenantId, "NH-I"));
+        Assert.Equal(("CP001", HoldStatus.Ready), (await Read<HoldDto>(await Place(staff, "NH-H", mfn: holdMfn))) is var hh ? (hh.Barcode, hh.Status) : default);
+        Assert.Equal(HoldStatus.Waiting, (await Read<HoldDto>(await Place(staff, "NH-I", mfn: holdMfn))).Status);
+        await Publish(Item(tenantId, "CP002", holdMfn));
+        Assert.Equal(1, (await RunJobs(tenantId)).AssignedHolds);
+        var i = (await Read<CrudPage<HoldDto>>(await staff.PostAsJsonAsync(U("/api/holds/Search"), new HoldSearch { CardNo = "NH-I" }, Json))).Items.Single();
+        Assert.Equal((HoldStatus.Ready, "CP002"), (i.Status, i.Barcode));
     }
 }

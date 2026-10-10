@@ -210,9 +210,8 @@ public sealed class LoanResource(
         var now = clock.GetUtcNow();
         loan.Return(now, request.CircPlaceId, actor.Id);
         await PublishAsync(loan, ct);
-        await Db.SaveChangesAsync(ct); // lượt đã đóng trước khi xét giữ bản cho đặt mượn
         var item = await Db.Set<ItemReplica>().FirstOrDefaultAsync(i => i.ItemPublicId == loan.ItemPublicId, ct);
-        var next = item is null ? null : await holds.AssignNextAsync(item, ct);
+        var next = item is null ? null : await holds.AssignNextAsync(item, ct, returningLoan: loan.PublicId);
         await Record(loan, CrudChange.Updated, $"Trả ĐKCB {loan.Barcode} — thẻ {loan.CardNo}" + (loan.OverdueDays(now) is > 0 and var d ? $", quá hạn {d} ngày" : "")
             + (next is null ? "" : $"; giữ cho đặt mượn thẻ {next.CardNo}"), ct);
         await Db.SaveChangesAsync(ct);

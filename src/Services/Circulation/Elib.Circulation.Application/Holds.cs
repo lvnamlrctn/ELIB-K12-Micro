@@ -69,11 +69,12 @@ public sealed class HoldAllocator(ICrudDbContext db, ReaderNotifier notifier, Ti
     /// <summary>
     /// Bản sách vừa rảnh (trả, đặt mượn hết hạn/huỷ): giữ cho đặt mượn đang chờ sớm nhất của biểu ghi và báo bạn đọc. Bản không sẵn
     /// sàng, đang có người mượn hoặc đã giữ cho người khác thì thôi. Trả về đặt mượn vừa được giữ bản.
+    /// <paramref name="returningLoan"/>: lượt vừa trả nhưng chưa lưu (cùng transaction) — không tính là đang mượn.
     /// </summary>
-    public async Task<Hold?> AssignNextAsync(ItemReplica item, CancellationToken ct)
+    public async Task<Hold?> AssignNextAsync(ItemReplica item, CancellationToken ct, Guid? returningLoan = null)
     {
         if (item.Deleted || item.Status != ItemReplica.Available) return null;
-        if (await db.Set<Loan>().AnyAsync(l => l.ItemPublicId == item.ItemPublicId && l.ReturnedAt == null, ct)) return null;
+        if (await db.Set<Loan>().AnyAsync(l => l.ItemPublicId == item.ItemPublicId && l.ReturnedAt == null && l.PublicId != returningLoan, ct)) return null;
         if (db.Set<Hold>().Local.Any(h => h.ItemPublicId == item.ItemPublicId && h.Status == HoldStatus.Ready)
             || await db.Set<Hold>().AnyAsync(h => h.ItemPublicId == item.ItemPublicId && h.Status == HoldStatus.Ready, ct)) return null;
         var next = await db.Set<Hold>().Where(h => h.Mfn == item.Mfn && h.Status == HoldStatus.Waiting)
@@ -245,12 +246,12 @@ public sealed class HoldResource(ICrudDbContext db, Replicas replicas, HoldAlloc
     }
 }
 
-public sealed record CirculationJobResult(int DueSoon, int Overdue, int ExpiredHolds);
+public sealed record CirculationJobResult(int DueSoon, int Overdue, int ExpiredHolds, int AssignedHolds = 0);
 
 /// <summary>
 /// Việc định kỳ của một đơn vị (monolith: DueSoonReminderJob, BookRequestExpiryJob) — chạy trong ngữ cảnh đơn vị:
 /// nhắc sách sắp đến hạn (còn 1–2 ngày), báo quá hạn (một lần, chỉ lượt quá hạn trong 7 ngày gần nhất), huỷ giữ chỗ hết hạn và
-/// chuyển bản cho người kế tiếp. Mỗi lượt chỉ nhắc một lần (ghi ngày đã nhắc).
+/// chuyển bản cho người kế tiếp, giữ bản trống (bản mới xếp giá, lần giữ bị lỡ) cho đặt mượn đang chờ. Mỗi lượt chỉ nhắc một lần.
 /// </summary>
 public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, HoldAllocator queue, TimeProvider clock)
 {
@@ -272,7 +273,26 @@ public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, 
             l => l.ReturnedAt == null && l.OverdueNotifiedOn == null && l.DueAt < startOfToday && l.DueAt >= lookback,
             CirculationTemplates.Overdue, l => l.MarkOverdueNotified(today), "loan-overdue", ct);
         var expired = await ExpireHoldsAsync(now, ct);
-        return new CirculationJobResult(dueSoon, overdue, expired);
+        var assigned = await AssignWaitingAsync(ct);
+        return new CirculationJobResult(dueSoon, overdue, expired, assigned);
+    }
+
+    private async Task<int> AssignWaitingAsync(CancellationToken ct)
+    {
+        var mfns = await db.Set<Hold>().Where(h => h.Status == HoldStatus.Waiting).Select(h => h.Mfn).Distinct().OrderBy(m => m).Take(Batch).ToListAsync(ct);
+        var assigned = 0;
+        foreach (var mfn in mfns)
+        {
+            var waiting = await db.Set<Hold>().Where(h => h.Mfn == mfn && h.Status == HoldStatus.Waiting).OrderBy(h => h.RequestedAt).ThenBy(h => h.Id).ToListAsync(ct);
+            foreach (var hold in waiting)
+            {
+                if (await queue.FreeItemAsync(mfn, ct) is not { } item) break;
+                await queue.AssignAsync(hold, item, ct);
+                await db.SaveChangesAsync(ct); // từng bản: FreeItemAsync đọc DB để không giữ một bản cho hai người
+                assigned++;
+            }
+        }
+        return assigned;
     }
 
     private async Task<int> RemindAsync(Expression<Func<Loan, bool>> due, string template, Action<Loan> mark, string key, CancellationToken ct)
