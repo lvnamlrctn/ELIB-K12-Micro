@@ -14,6 +14,15 @@ public sealed record ReaderChanged : IntegrationEvent
     public long? ClassId { get; init; }
     public long? CourseId { get; init; }
 
+    /// <summary>Tên loại bạn đọc/lớp/khoá lúc phát event — để màn mượn trả hiển thị, không phải gọi patron.</summary>
+    public string? ReaderTypeName { get; init; }
+
+    public string? ClassName { get; init; }
+    public string? CourseName { get; init; }
+
+    /// <summary>Ảnh thẻ (file ở media, riêng tư).</summary>
+    public Guid? PhotoId { get; init; }
+
     /// <summary>2 = hoạt động, 1 = bị khoá (quy ước Status của monolith).</summary>
     public int Status { get; init; }
 

@@ -206,6 +206,17 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         return new ShelveResult(shelved, notFound, skipped);
     }
 
+    /// <summary>
+    /// Trạng thái hiện tại theo số ĐKCB, đúng dạng event <see cref="ItemChanged"/> — circulation gọi qua /internal khi bản sao
+    /// chưa có bản sách (service mới triển khai, event chưa tới). Không có → null.
+    /// </summary>
+    public async Task<ItemChanged?> CurrentStateAsync(string barcode, CancellationToken ct)
+    {
+        var key = Item.Key(barcode);
+        var item = await Set.AsNoTracking().FirstOrDefaultAsync(x => x.BarcodeKey == key, ct);
+        return item is null ? null : ToEvent(item, deleted: false, await StoreNamesAsync(ct));
+    }
+
     private static string NormalizePrefix(string? prefix)
     {
         var p = (prefix ?? "").Trim().ToUpperInvariant();
@@ -231,7 +242,11 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
     private Task PublishAsync(Item item, bool deleted, Dictionary<long, string> stores, CancellationToken ct)
     {
         if (item.PublicId == Guid.Empty) item.PublicId = Guid.CreateVersion7(); // bản mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(new ItemChanged
+        return publisher.Publish(ToEvent(item, deleted, stores), ct);
+    }
+
+    private ItemChanged ToEvent(Item item, bool deleted, Dictionary<long, string> stores) =>
+        new()
         {
             TenantId = tenant.RequireTenantId(),
             Actor = new EventActor(actor.Id, actor.Kind),
@@ -244,6 +259,5 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
             Status = item.Status,
             Deleted = deleted,
             Version = item.Version,
-        }, ct);
-    }
+        };
 }

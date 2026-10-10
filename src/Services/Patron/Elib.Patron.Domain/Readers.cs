@@ -129,8 +129,12 @@ public sealed partial class Reader : TenantEntity, IHasStatus
 
     public void Unlock() => ChangeStatus(IHasStatus.Active);
 
-    /// <summary>Đổi/xoá ảnh thẻ. Không tăng <see cref="Version"/>: ảnh không nằm trong bản sao bạn đọc ở service khác.</summary>
-    public void SetPhoto(Guid? photoId) => PhotoId = photoId == Guid.Empty ? null : photoId;
+    /// <summary>Đổi/xoá ảnh thẻ — ảnh có trong bản sao bạn đọc (màn mượn trả) nên tăng <see cref="Version"/>.</summary>
+    public void SetPhoto(Guid? photoId)
+    {
+        PhotoId = photoId == Guid.Empty ? null : photoId;
+        Version++;
+    }
 
     /// <summary>Sửa hàng loạt (monolith: BulkUpdate/BatchUpdate) — chỉ các trường được gửi.</summary>
     public void ApplyBulk(long? readerTypeId, long? classId, long? courseId, DateOnly? issueDate, DateOnly? expireDate)

@@ -8,6 +8,7 @@ import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import { BIB_TYPES } from './pages/catalog/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
+import { CIRC_PLACES, LOAN_POLICIES } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -64,6 +65,10 @@ export const routes: Routes = [
       catalog('stores', STORES),
       { path: 'books', loadComponent: () => import('./pages/holdings/items').then((m) => m.Items), canActivate: [tenantGuard, permissionGuard('DOC_SEARCH')], title: 'Tìm kiếm tài liệu' },
       { path: 'shelving', loadComponent: () => import('./pages/holdings/shelving').then((m) => m.Shelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], title: 'Xếp giá' },
+      catalog('circ-places', CIRC_PLACES),
+      catalog('circ-policies', LOAN_POLICIES),
+      { path: 'borrow', loadComponent: () => import('./pages/circulation/borrow').then((m) => m.Borrow), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'Mượn / Trả' },
+      { path: 'loan-history', loadComponent: () => import('./pages/circulation/loan-history').then((m) => m.LoanHistory), canActivate: [tenantGuard, permissionGuard('LOAN_HISTORY')], title: 'Lịch sử lưu thông' },
       {
         path: 'system-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
         canActivate: [tenantGuard, permissionGuard('SYSTEM_LOG')], data: { scope: 'tenant' }, title: 'Nhật ký hệ thống',

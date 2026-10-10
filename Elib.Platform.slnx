@@ -60,6 +60,13 @@
     <Project Path="src/Services/Holdings/Elib.Holdings.Infrastructure/Elib.Holdings.Infrastructure.csproj" />
     <Project Path="src/Services/Holdings/tests/Elib.Holdings.Tests/Elib.Holdings.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Circulation/">
+    <Project Path="src/Services/Circulation/Elib.Circulation.Api/Elib.Circulation.Api.csproj" />
+    <Project Path="src/Services/Circulation/Elib.Circulation.Application/Elib.Circulation.Application.csproj" />
+    <Project Path="src/Services/Circulation/Elib.Circulation.Domain/Elib.Circulation.Domain.csproj" />
+    <Project Path="src/Services/Circulation/Elib.Circulation.Infrastructure/Elib.Circulation.Infrastructure.csproj" />
+    <Project Path="src/Services/Circulation/tests/Elib.Circulation.Tests/Elib.Circulation.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />

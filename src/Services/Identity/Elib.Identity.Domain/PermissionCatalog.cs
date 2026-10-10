@@ -29,6 +29,8 @@ public static class PermissionCatalog
     private const string CatalogLicense = "CATALOG";
     private const string StoreGroup = "Quản lý Kho";
     private const string HoldingsLicense = "HOLDINGS";
+    private const string CirculationGroup = "Lưu thông";
+    private const string CirculationLicense = "CIRCULATION";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -52,6 +54,11 @@ public static class PermissionCatalog
         new("STORE_TYPES", "Loại kho", StoreGroup, Crud, HoldingsLicense),
         new("STORES", "Kho", StoreGroup, Crud, HoldingsLicense),
         new("MAP_SHELVING", "Xếp giá", StoreGroup, [View, Edit], HoldingsLicense),
+
+        new("BORROW", "Mượn/Trả", CirculationGroup, [View, Add, Edit], CirculationLicense),
+        new("LOAN_HISTORY", "Lịch sử lưu thông", CirculationGroup, [View], CirculationLicense),
+        new("CIRC_POLICIES", "Chính sách lưu thông", CirculationGroup, Crud, CirculationLicense),
+        new("CIRC_PLACES", "Điểm lưu thông", CirculationGroup, Crud, CirculationLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

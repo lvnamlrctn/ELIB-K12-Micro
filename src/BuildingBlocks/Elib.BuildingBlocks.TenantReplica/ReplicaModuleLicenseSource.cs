@@ -9,8 +9,11 @@ namespace Elib.BuildingBlocks.TenantReplica;
 /// <summary>
 /// License đọc từ bản sao trong DB của service, cache ngắn (xoá ngay khi consumer cập nhật bản sao).
 /// Đơn vị không ở trạng thái Active → không có module nào (fail-closed).
+/// Đọc bằng DbContext RIÊNG (scope mới): consumer gọi kiểm tra license khi đang trong transaction của outbox, còn factory của
+/// HybridCache chạy ngoài execution strategy của transaction đó → dùng chung DbContext thì Npgsql báo
+/// "does not support user-initiated transactions" và event bị retry cho tới khi cache có sẵn.
 /// </summary>
-public sealed class ReplicaModuleLicenseSource<TDbContext>(TDbContext db, HybridCache cache, TimeProvider clock) : IModuleLicenseSource
+public sealed class ReplicaModuleLicenseSource<TDbContext>(IServiceScopeFactory scopes, HybridCache cache, TimeProvider clock) : IModuleLicenseSource
     where TDbContext : DbContext
 {
     private static readonly HybridCacheEntryOptions Options = new()
@@ -23,8 +26,8 @@ public sealed class ReplicaModuleLicenseSource<TDbContext>(TDbContext db, Hybrid
     {
         var modules = await cache.GetOrCreateAsync(
             $"tenant-modules:{tenantId}",
-            (db, tenantId, clock),
-            static async (state, ct) => await LoadAsync(state.db, state.tenantId, state.clock, ct),
+            (scopes, tenantId, clock),
+            static async (state, ct) => await LoadAsync(state.scopes, state.tenantId, state.clock, ct),
             Options,
             tags: [ReplicaWriter.CacheTag(tenantId)],
             cancellationToken: cancellationToken);
@@ -32,8 +35,10 @@ public sealed class ReplicaModuleLicenseSource<TDbContext>(TDbContext db, Hybrid
         return modules.Contains(moduleCode.Trim().ToUpperInvariant(), StringComparer.Ordinal);
     }
 
-    private static async Task<string[]> LoadAsync(TDbContext db, long tenantId, TimeProvider clock, CancellationToken ct)
+    private static async Task<string[]> LoadAsync(IServiceScopeFactory scopes, long tenantId, TimeProvider clock, CancellationToken ct)
     {
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TDbContext>();
         var replica = await db.Set<TenantReplicaRecord>().AsNoTracking().Include(t => t.Modules)
             .FirstOrDefaultAsync(t => t.TenantId == tenantId, ct);
         if (replica is null || replica.Status != "Active") return [];

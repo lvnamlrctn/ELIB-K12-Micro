@@ -219,8 +219,16 @@ public sealed class HoldingsApiTests : IClassFixture<HoldingsApiFactory>, IAsync
         var deleted = _factory.PublishedOf<ItemChanged>().Single(e => e.ItemPublicId == item.PublicId && e.Deleted);
         Assert.Equal(1, deleted.Version);
         Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync(U($"/api/stores/Delete/{store.PublicId}"))).StatusCode);
+        // Nội bộ (circulation): trạng thái theo mã, chỉ service token.
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/items/by-barcode/lh000001"))).StatusCode); // đã xoá
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenantId}/items/by-barcode/LH000001"))).StatusCode);
+
         // Mã của bản đã xoá dùng lại được.
-        Assert.Equal("LH000001", (await Read<ItemDto>(await staff.PostAsJsonAsync(U("/api/items/Add"), new ItemRequest(bib.Mfn, "LH000001"), Json))).Barcode);
+        var reused = await Read<ItemDto>(await staff.PostAsJsonAsync(U("/api/items/Add"), new ItemRequest(bib.Mfn, "LH000001"), Json));
+        Assert.Equal("LH000001", reused.Barcode);
+        var state = await Read<ItemChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/items/by-barcode/lh000001")));
+        Assert.Equal((reused.PublicId, bib.Mfn, "I", false), (state.ItemPublicId, state.Mfn, state.Status, state.Deleted));
     }
 
     [Fact]

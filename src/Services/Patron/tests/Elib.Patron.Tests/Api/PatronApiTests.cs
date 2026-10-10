@@ -287,7 +287,9 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         var page = await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { Keyword = "PH-" }, Json));
         Assert.Equal(["PH-1", "PH-2"], page.Items.OrderBy(r => r.CardNo).Select(r => r.CardNo));
         Assert.Equal([p1, p2], page.Items.OrderBy(r => r.CardNo).Select(r => r.PhotoId!.Value));
-        Assert.Equal(before, _factory.PublishedOf<ReaderChanged>().Count(e => e.ReaderPublicId == r1.PublicId)); // ảnh không phát ReaderChanged
+        // Ảnh có trong bản sao bạn đọc (màn mượn trả) → phát ReaderChanged kèm PhotoId.
+        Assert.Equal(before + 1, _factory.PublishedOf<ReaderChanged>().Count(e => e.ReaderPublicId == r1.PublicId));
+        Assert.Equal(p1, _factory.PublishedOf<ReaderChanged>().Where(e => e.ReaderPublicId == r1.PublicId).MaxBy(e => e.Version)!.PhotoId);
 
         // Đơn vị khác không gán được ảnh cho bạn đọc của đơn vị này.
         var other = Staff(Interlocked.Increment(ref _nextTenantId));
@@ -310,5 +312,24 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         var typesOnly = Staff(tenantId, "READER_TYPES:view", "READER_TYPES:add");
         Assert.Equal(HttpStatusCode.Created, (await typesOnly.PostAsJsonAsync(U("/api/reader-types/Add"), new NameRequest("Phụ huynh"), Json)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await typesOnly.PostAsJsonAsync(U("/api/readers/Lock/" + Guid.NewGuid()), new LockReaderRequest(null), Json)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reader_event_carries_catalog_names_and_internal_state_is_for_services_only()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        var type = await AddNamed(staff, "reader-types", "Học sinh");
+        var cls = await AddNamed(staff, "classes", "6A1");
+        var created = await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("hs-77", "Phạm", "Minh", ReaderTypeId: type.Id, ClassId: cls.Id)));
+
+        var e = _factory.PublishedOf<ReaderChanged>().Single(x => x.ReaderPublicId == created.PublicId);
+        Assert.Equal(("Học sinh", "6A1", (string?)null), (e.ReaderTypeName, e.ClassName, e.CourseName));
+
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        var state = await Read<ReaderChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/hs-77")));
+        Assert.Equal((created.PublicId, "HS-77", "Phạm Minh", "6A1", tenantId), (state.ReaderPublicId, state.CardNo, state.FullName, state.ClassName, state.TenantId));
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/KHONGCO"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/HS-77"))).StatusCode);
     }
 }

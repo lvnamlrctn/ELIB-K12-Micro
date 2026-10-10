@@ -48,7 +48,16 @@ public sealed class BibSnapshots(ICrudDbContext db, ICatalogBibs catalog, ITenan
         if (snapshot is null && await catalog.GetAsync(tenant.RequireTenantId(), mfn, ct) is { } state)
         {
             snapshot = await ApplyAsync(state, ct);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                // Consumer BibChanged vừa ghi cùng biểu ghi (trùng khoá) → dùng bản của consumer.
+                db.Set<BibSnapshot>().Entry(snapshot).State = EntityState.Detached;
+                snapshot = await db.Set<BibSnapshot>().FirstOrDefaultAsync(x => x.BibPublicId == state.BibPublicId, ct);
+            }
         }
         return snapshot is { Deleted: false } ? snapshot : throw new NotFoundException("Biểu ghi", mfn);
     }

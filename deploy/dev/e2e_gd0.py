@@ -25,6 +25,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      xuất ISO2709 + nhập lại (bỏ qua trùng), nhập MARCXML (biểu ghi lỗi: từ chối cả file / bỏ qua), xoá.
  17. kho (holdings): loại kho + kho chung mặc định, đăng ký ĐKCB theo lô (nhan đề lấy từ catalog), số tiếp theo, trùng mã,
      xếp giá bằng mã quét, tìm theo trạng thái, kho còn sách không xoá được, nhật ký, dọn.
+ 18. lưu thông (circulation): quầy + chính sách mặc định, thông tin bạn đọc ở quầy, mượn (bản chưa xếp giá bị từ chối),
+     không mượn trùng, gia hạn, trả bằng mã quét, lịch sử, nhật ký.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -723,6 +725,62 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": prefix})
     tb.request("DELETE", f"{C}/bibs/Delete/{kbib['publicId']}", token=token)
     expect(s == 200 and json.loads(body)["totalCount"] == 0, "dọn ĐKCB và biểu ghi thử")
+
+    print("18. Lưu thông (service circulation)")
+    L = "/api/admin/circulation"
+    places = []
+    for _ in range(30):  # circulation vừa triển khai: chờ tự dựng bản sao đơn vị + seed quầy mượn trả
+        s, _, body = tb.request("POST", f"{L}/circ-places/SearchAll", token=token, json_body={})
+        places = json.loads(body) if s == 200 else []
+        if any(x["code"] == "QUAY" for x in places): break
+        time.sleep(2)
+    quay = next((x for x in places if x["code"] == "QUAY"), None)
+    s, _, body = tb.request("POST", f"{L}/loan-policies/SearchAll", token=token, json_body={})
+    expect(quay is not None and s == 200 and any(p["loanDays"] == 14 for p in json.loads(body)), "quầy mượn trả + chính sách mặc định 14 ngày", f"{s} {body[:200]}")
+
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
+        {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": f"Hoàng tử bé {tag}"}]}]})
+    lbib = json.loads(body) if s == 201 else {}
+    lprefix = f"L{tag.upper()}-"
+    s, _, body = tb.request("POST", f"{H}/items/Register", token=token, json_body={"mfn": lbib.get("mfn"), "quantity": 2, "prefix": lprefix, "digits": 3})
+    litems = json.loads(body) if s == 200 else []
+    tb.request("POST", f"{H}/items/Shelve", token=token, json_body={"barcodes": [f"{lprefix}001"]})
+    lcard = f"LT{tag.upper()}"
+    s, _, body = tb.request("POST", f"{P}/readers/Add", token=token, json_body={"cardNo": lcard, "lastName": "Lê", "firstName": "Mượn"})
+    lreader = json.loads(body) if s == 201 else {}
+    expect(len(litems) == 2 and lreader, f"chuẩn bị biểu ghi MFN {lbib.get('mfn')}, 2 ĐKCB (1 đã xếp giá), bạn đọc {lcard}", body[:200])
+
+    s, _, body = tb.request("POST", f"{L}/loans/Reader", token=token, json_body={"cardNo": lcard.lower(), "circPlaceId": quay["id"]})
+    panel = json.loads(body) if s == 200 else {}
+    expect(panel.get("fullName") == "Lê Mượn" and panel.get("canBorrow") and panel.get("loanDays") == 14, "thông tin bạn đọc ở quầy (bản sao từ patron)", body[:300])
+    lb1 = None
+    for _ in range(15):  # bản sách vừa xếp giá: bản sao ở circulation cập nhật qua ItemChanged
+        s, _, body = tb.request("POST", f"{L}/loans/Checkout", token=token,
+                                json_body={"cardNo": lcard, "barcodes": [f"{lprefix}001".lower(), f"{lprefix}002"], "circPlaceId": quay["id"]})
+        r = json.loads(body) if s == 200 else {}
+        if r.get("succeeded") == 1: break
+        time.sleep(1)
+    lines = r.get("lines", [])
+    expect(r.get("succeeded") == 1 and lines[0]["loan"]["title"] == f"Hoàng tử bé {tag}" and "chưa xếp giá" in lines[1]["message"],
+           "mượn: bản đã xếp giá thành công, bản chưa xếp giá bị từ chối", body[:400])
+    loan = lines[0]["loan"] if lines and lines[0]["loan"] else {}
+    s, _, body = tb.request("POST", f"{L}/loans/Checkout", token=token, json_body={"cardNo": lcard, "barcodes": [f"{lprefix}001"], "circPlaceId": quay["id"]})
+    expect(s == 200 and json.loads(body)["lines"][0]["message"] == "Bạn đọc đang mượn tài liệu này.", "không mượn trùng bản đang mượn", body[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Renew", token=token, json_body={"loanId": loan.get("publicId"), "reason": "E2E gia hạn"})
+    expect(s == 200 and json.loads(body)["renewCount"] == 1, "gia hạn (lý do bắt buộc)", body[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Search", token=token, json_body={"cardNo": lcard, "state": "open"})
+    expect(s == 200 and json.loads(body)["totalCount"] == 1, "lịch sử: 1 lượt đang mượn", body[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Return", token=token, json_body={"barcode": f" {lprefix}001 ", "circPlaceId": quay["id"]})
+    expect(s == 200 and json.loads(body)["loan"]["returnedAt"] and json.loads(body)["overdueDays"] == 0, "trả bằng mã quét", body[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Search", token=token, json_body={"cardNo": lcard, "state": "returned"})
+    expect(s == 200 and json.loads(body)["totalCount"] == 1, "lịch sử: lượt đã trả", body[:200])
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"thẻ {lcard}")
+    step("nhật ký có lượt mượn (circulation → audit)")
+    for i in litems:
+        tb.request("DELETE", f"{H}/items/Delete/{i['publicId']}", token=token)
+    tb.request("DELETE", f"{C}/bibs/Delete/{lbib['publicId']}", token=token)
+    s, _, _ = tb.request("DELETE", f"{P}/readers/Delete/{lreader['publicId']}", token=token)
+    expect(s == 204, "dọn bạn đọc, ĐKCB, biểu ghi thử (lượt mượn giữ làm lịch sử)")
 
 
 if __name__ == "__main__":

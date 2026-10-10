@@ -18,11 +18,14 @@ export interface CrudColumn {
 export interface CrudField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select';
+  /** 'multiselect': danh sách ô tích, giá trị là mảng (vd các kho được mượn tại điểm lưu thông). */
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect';
   /** Lựa chọn của ô 'select'. */
   options?: { value: string | number; label: string }[];
   /** Lựa chọn lấy từ API khi mở màn (vd danh sách loại kho); thêm sẵn lựa chọn trống "—". */
   optionsFrom?: (api: Api) => Promise<{ value: string | number; label: string }[]>;
+  /** Nhãn của lựa chọn trống (mặc định "—"), vd "Mọi loại bạn đọc". */
+  emptyLabel?: string;
   required?: boolean;
   placeholder?: string;
   hint?: string;
@@ -228,6 +231,18 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                       @for (o of optionsOf(f); track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
                     </select>
                   }
+                  @case ('multiselect') {
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2.5">
+                      @for (o of optionsOf(f); track o.value) {
+                        @if (o.value !== null) {
+                          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                            <input type="checkbox" class="rounded border-gray-300" [checked]="isChecked(item, f.key, o.value)" (change)="toggleValue(item, f.key, o.value)" />
+                            {{ o.label }}
+                          </label>
+                        }
+                      } @empty { <span class="text-sm text-gray-400">Chưa có lựa chọn nào.</span> }
+                    </div>
+                  }
                   @case ('status') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]">
                       <option [ngValue]="2">Hoạt động</option>
@@ -303,9 +318,19 @@ export class CrudPage implements OnInit {
     return this.loadedOptions()[field.key] ?? field.options ?? [];
   }
 
+  protected isChecked(item: Row, key: string, value: unknown): boolean {
+    return Array.isArray(item[key]) && (item[key] as unknown[]).includes(value);
+  }
+
+  protected toggleValue(item: Row, key: string, value: unknown): void {
+    const current = Array.isArray(item[key]) ? (item[key] as unknown[]) : [];
+    item[key] = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+  }
+
   protected optionLabel(key: string, value: unknown): string {
-    if (value == null || value === '') return '—';
     const field = this.config().fields.find((f) => f.key === key);
+    if (Array.isArray(value)) return value.length ? value.map((v) => this.optionLabel(key, v)).join(', ') : (field?.emptyLabel ?? '—');
+    if (value == null || value === '') return field?.emptyLabel ?? '—';
     return (field ? this.optionsOf(field) : []).find((o) => o.value === value)?.label ?? String(value);
   }
 
@@ -313,7 +338,7 @@ export class CrudPage implements OnInit {
     for (const field of this.config().fields.filter((f) => f.optionsFrom)) {
       try {
         const options = await field.optionsFrom!(this.api);
-        this.loadedOptions.update((all) => ({ ...all, [field.key]: [{ value: null, label: '—' }, ...options] }));
+        this.loadedOptions.update((all) => ({ ...all, [field.key]: [{ value: null, label: field.emptyLabel ?? '—' }, ...options] }));
       } catch {
         /* thiếu quyền xem danh mục liên quan — ô chọn để trống */
       }

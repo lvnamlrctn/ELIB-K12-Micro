@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, circulation, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -39,6 +39,7 @@ services:
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD:?chạy ./init-env.sh trước}
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?chạy ./init-env.sh trước}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD:?chạy ./init-env.sh trước}
+      CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -70,6 +71,7 @@ services:
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD}
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD}
+      CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -155,6 +157,7 @@ services:
       Identity__Clients__svc-patron__ClientSecret: ${SVC_PATRON_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-catalog__ClientSecret: ${SVC_CATALOG_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-holdings__ClientSecret: ${SVC_HOLDINGS_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-circulation__ClientSecret: ${SVC_CIRCULATION_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -193,6 +196,7 @@ services:
       Provisioning__DeployedServices__2: patron
       Provisioning__DeployedServices__3: catalog
       Provisioning__DeployedServices__4: holdings
+      Provisioning__DeployedServices__5: circulation
 
   notification:
     build:
@@ -316,6 +320,28 @@ services:
       ServiceClient__ClientSecret: ${SVC_HOLDINGS_SECRET}
       Catalog__Url: http://catalog:8080
 
+  # GĐ1: lưu thông — điểm lưu thông, chính sách, mượn/trả/gia hạn; bản sao bạn đọc/bản sách/biểu ghi (thiếu thì hỏi service gốc).
+  circulation:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Circulation/Elib.Circulation.Api/Elib.Circulation.Api.csproj
+        ASSEMBLY: Elib.Circulation.Api
+    image: elib/circulation:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__CirculationDb: Host=postgres;Database=elib_circulation;Username=circulation_app;Password=${CIRCULATION_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_CIRCULATION_SECRET}
+      Patron__Url: http://patron:8080
+      Holdings__Url: http://holdings:8080
+      Catalog__Url: http://catalog:8080
+
   admin-web:
     build:
       context: ../..
@@ -353,6 +379,7 @@ services:
       patron: { condition: service_started }
       catalog: { condition: service_started }
       holdings: { condition: service_started }
+      circulation: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

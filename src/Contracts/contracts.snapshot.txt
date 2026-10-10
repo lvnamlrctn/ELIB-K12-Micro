@@ -13,6 +13,19 @@ type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.Inte
   Status : System.Int32
   Title : System.String required
   Version : System.Int64
+type Elib.Contracts.Events.Circulation.LoanChanged class : Elib.Contracts.Events.IntegrationEvent
+  Barcode : System.String required
+  CardNo : System.String required
+  CircPlaceId : Nullable<System.Int64>
+  DueAt : System.DateTimeOffset required
+  ItemPublicId : System.Guid required
+  LoanPublicId : System.Guid required
+  LoanedAt : System.DateTimeOffset required
+  Mfn : System.Int64 required
+  ReaderPublicId : System.Guid required
+  RenewCount : System.Int32
+  ReturnedAt : Nullable<System.DateTimeOffset>
+  Version : System.Int64
 type Elib.Contracts.Events.EventActor class
   Id : Nullable<System.Int64>
   Kind : System.String
@@ -34,12 +47,16 @@ type Elib.Contracts.Events.IntegrationEvent abstract
 type Elib.Contracts.Events.Patron.ReaderChanged class : Elib.Contracts.Events.IntegrationEvent
   CardNo : System.String required
   ClassId : Nullable<System.Int64>
+  ClassName : System.String?
   CourseId : Nullable<System.Int64>
+  CourseName : System.String?
   Deleted : System.Boolean
   ExpireDate : Nullable<System.DateOnly>
   FullName : System.String required
+  PhotoId : Nullable<System.Guid>
   ReaderPublicId : System.Guid required
   ReaderTypeId : Nullable<System.Int64>
+  ReaderTypeName : System.String?
   Status : System.Int32
   Version : System.Int64
 type Elib.Contracts.Events.Platform.AuditRecorded class : Elib.Contracts.Events.IntegrationEvent

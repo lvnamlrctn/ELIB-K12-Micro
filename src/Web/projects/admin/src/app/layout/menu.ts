@@ -90,6 +90,17 @@ export class Menu {
         ],
       },
       {
+        title: 'Lưu thông',
+        icon: 'swap_vert',
+        module: 'CIRCULATION',
+        children: [
+          { title: 'Mượn / Trả', icon: 'swap_vert', link: '/borrow', perm: 'BORROW' },
+          { title: 'Lịch sử lưu thông', icon: 'history', link: '/loan-history', perm: 'LOAN_HISTORY' },
+          { title: 'Chính sách lưu thông', icon: 'rule', link: '/circ-policies', perm: 'CIRC_POLICIES' },
+          { title: 'Điểm lưu thông', icon: 'place', link: '/circ-places', perm: 'CIRC_PLACES' },
+        ],
+      },
+      {
         title: 'Quản lý Kho',
         icon: 'store',
         module: 'HOLDINGS',

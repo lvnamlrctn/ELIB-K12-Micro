@@ -1,5 +1,6 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Patron.Application;
 
 namespace Elib.Patron.Api;
@@ -30,6 +31,12 @@ public static class PatronEndpoints
             => r.SetPhotoAsync(publicId, request.FileId, ct));
         readers.MapPost("/Photos", [Permission("READERS", "edit")] (ReaderPhotosRequest request, ReaderResource r, CancellationToken ct)
             => r.SetPhotosAsync(request, ct));
+        // Nội bộ: service khác lấy trạng thái bạn đọc khi bản sao chưa có (không qua gateway, chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/readers/by-card/{cardNo}", async (long tenantId, string cardNo, ITenantContext tenant, ReaderResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.CurrentStateAsync(cardNo, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
         readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
             => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));

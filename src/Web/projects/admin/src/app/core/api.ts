@@ -99,6 +99,26 @@ export interface RegisterItems { mfn: number; quantity: number; prefix: string; 
 export interface NextBarcode { prefix: string; number: number; barcode: string; }
 export interface ShelveResult { shelved: number; notFound: string[]; skipped: string[]; }
 
+// ── Lưu thông (service circulation) ──
+export interface CircPlace { id: number; publicId: string; code: string; name: string; storeIds: number[]; }
+export interface Loan {
+  id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; itemPublicId: string; barcode: string;
+  mfn: number; title: string | null; author: string | null; circPlaceId: number | null; storeName: string | null; loanedAt: string; dueAt: string;
+  returnedAt: string | null; renewCount: number; note: string | null; version: number;
+}
+export interface ReaderPanel {
+  readerPublicId: string; cardNo: string; fullName: string; readerTypeName: string | null; className: string | null; courseName: string | null;
+  photoId: string | null; expireDate: string | null; isLocked: boolean; isExpired: boolean; hasOverdue: boolean; canBorrow: boolean;
+  blockReason: string | null; loanDays: number; maxLoans: number | null; maxRenewals: number | null; currentLoans: Loan[];
+}
+export interface CheckoutLine { barcode: string; success: boolean; message: string; loan: Loan | null; }
+export interface CheckoutResult { succeeded: number; failed: number; lines: CheckoutLine[]; }
+export interface ReturnResult { loan: Loan; overdueDays: number; }
+/** state: open | overdue | returned; from/to: yyyy-MM-dd (ngày mượn). */
+export interface LoanSearch extends CrudSearch {
+  cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; from?: string | null; to?: string | null;
+}
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -347,6 +367,13 @@ export class Api {
   registerItems(body: RegisterItems) { return this.post<Item[]>('/api/admin/holdings/items/Register', body); }
   nextBarcode(prefix: string, digits: number) { return this.get<NextBarcode>('/api/admin/holdings/items/NextBarcode', { prefix, digits }); }
   shelveItems(body: { ids?: string[]; barcodes?: string[]; storeId?: number | null }) { return this.post<ShelveResult>('/api/admin/holdings/items/Shelve', body); }
+  // Lưu thông (circulation): quầy mượn trả + lịch sử; điểm lưu thông/chính sách qua crud('circ-places' | 'loan-policies', 'circulation')
+  loanReader(cardNo: string, circPlaceId: number | null) { return this.post<ReaderPanel>('/api/admin/circulation/loans/Reader', { cardNo, circPlaceId }); }
+  checkout(cardNo: string, barcodes: string[], circPlaceId: number) { return this.post<CheckoutResult>('/api/admin/circulation/loans/Checkout', { cardNo, barcodes, circPlaceId }); }
+  returnLoan(body: { barcode?: string; loanId?: string; circPlaceId?: number | null }) { return this.post<ReturnResult>('/api/admin/circulation/loans/Return', body); }
+  renewLoan(loanId: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Renew', { loanId, reason }); }
+  noteLoan(loanId: string, note: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Note', { loanId, note, reason }); }
+  searchLoans(search: LoanSearch) { return this.post<CrudPage<Loan>>('/api/admin/circulation/loans/Search', search); }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */

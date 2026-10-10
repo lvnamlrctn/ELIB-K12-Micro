@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\Services\Patron\Elib.Patron.Infrastructure\Elib.Patron.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Catalog\Elib.Catalog.Infrastructure\Elib.Catalog.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Holdings\Elib.Holdings.Infrastructure\Elib.Holdings.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Circulation\Elib.Circulation.Infrastructure\Elib.Circulation.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

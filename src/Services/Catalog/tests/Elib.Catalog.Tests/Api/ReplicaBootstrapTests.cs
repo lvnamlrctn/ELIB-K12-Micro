@@ -56,7 +56,7 @@ public sealed class ReplicaBootstrapTests
             Assert.Equal(["CATALOG", "HOLDINGS"], replicas[0].Modules.Select(m => m.ModuleCode).Order());
 
             // Giấy phép đọc từ bản sao vừa dựng (nguồn license thật của service, không phải bản giả của test).
-            var licenses = new ReplicaModuleLicenseSource<CatalogDbContext>(db, scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>(), TimeProvider.System);
+            var licenses = new ReplicaModuleLicenseSource<CatalogDbContext>(scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(), scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>(), TimeProvider.System);
             Assert.True(await licenses.IsLicensedAsync(9001, "CATALOG", CancellationToken.None));
             Assert.False(await licenses.IsLicensedAsync(9002, "CATALOG", CancellationToken.None)); // đơn vị tạm ngưng → không module nào
         }

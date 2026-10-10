@@ -199,6 +199,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
     {
         var reader = await LoadAsync(publicId, ct);
         reader.SetPhoto(fileId);
+        await PublishAsync(reader, deleted: false, ct);
         await AuditAsync(reader, CrudChange.Updated, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(reader);
@@ -220,7 +221,11 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
 
         var cards = byCard.Keys.ToList();
         var readers = await Set.Where(x => cards.Contains(x.CardNo)).ToListAsync(ct);
-        foreach (var reader in readers) reader.SetPhoto(byCard[reader.CardNo]);
+        foreach (var reader in readers)
+        {
+            reader.SetPhoto(byCard[reader.CardNo]);
+            await PublishAsync(reader, deleted: false, ct);
+        }
         notFound.AddRange(cards.Except(readers.Select(r => r.CardNo)));
         if (AuditSink is not null && readers.Count > 0)
             await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Reader), EntityName, Guid.Empty, CrudChange.Updated,
@@ -265,7 +270,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         var classes = await NamesAsync<SchoolClass>(ct);
         var courses = await NamesAsync<Course>(ct);
         return CrudExcel.Export("Bạn đọc", columns, readers.Select(r => new ReaderExportRow(r,
-            Name(types, r.ReaderTypeId), Name(classes, r.ClassId), Name(courses, r.CourseId))));
+            CatalogName(types, r.ReaderTypeId), CatalogName(classes, r.ClassId), CatalogName(courses, r.CourseId))));
     }
 
     private sealed record ReaderExportRow(Reader Reader, string? ReaderType, string? Class, string? Course);
@@ -273,7 +278,7 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
     private async Task<Dictionary<long, string>> NamesAsync<T>(CancellationToken ct) where T : NamedCatalogItem =>
         await Db.Set<T>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
 
-    private static string? Name(Dictionary<long, string> names, long? id) => id is { } v ? names.GetValueOrDefault(v) : null;
+    private static string? CatalogName(Dictionary<long, string> names, long? id) => id is { } v ? names.GetValueOrDefault(v) : null;
 
     // ── Nhập Excel (monolith: Reader/Import — bố cục cột cố định; ghép cột tuỳ chọn để sau) ──
 
@@ -333,10 +338,33 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         return ToDto(reader);
     }
 
-    private Task PublishAsync(Reader reader, bool deleted, CancellationToken ct)
+    /// <summary>
+    /// Trạng thái hiện tại theo số thẻ, đúng dạng event <see cref="ReaderChanged"/> — circulation… gọi qua /internal khi bản sao
+    /// chưa có bạn đọc (service mới triển khai, event chưa tới). Không có → null.
+    /// </summary>
+    public async Task<ReaderChanged?> CurrentStateAsync(string cardNo, CancellationToken ct)
+    {
+        var normalized = Reader.NormalizeCardNo(cardNo);
+        return await Set.AsNoTracking().FirstOrDefaultAsync(x => x.CardNo == normalized, ct) is { } reader
+            ? await ToEventAsync(reader, deleted: false, ct)
+            : null;
+    }
+
+    private async Task PublishAsync(Reader reader, bool deleted, CancellationToken ct)
     {
         if (reader.PublicId == Guid.Empty) reader.PublicId = Guid.CreateVersion7(); // bạn đọc mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(new ReaderChanged
+        await publisher.Publish(await ToEventAsync(reader, deleted, ct), ct);
+    }
+
+    private Dictionary<long, string>? _typeNames, _classNames, _courseNames;
+
+    /// <summary>Tên danh mục đọc một lần cho cả lượt (sửa hàng loạt/nhập Excel phát nhiều event).</summary>
+    private async Task<ReaderChanged> ToEventAsync(Reader reader, bool deleted, CancellationToken ct)
+    {
+        _typeNames ??= await Db.Set<ReaderType>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        _classNames ??= await Db.Set<SchoolClass>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        _courseNames ??= await Db.Set<Course>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        return new ReaderChanged
         {
             TenantId = tenant.RequireTenantId(),
             Actor = new EventActor(actor.Id, actor.Kind),
@@ -348,10 +376,15 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             CourseId = reader.CourseId,
             Status = reader.Status,
             ExpireDate = reader.ExpireDate,
+            ReaderTypeName = CatalogName(_typeNames, reader.ReaderTypeId),
+            ClassName = CatalogName(_classNames, reader.ClassId),
+            CourseName = CatalogName(_courseNames, reader.CourseId),
+            PhotoId = reader.PhotoId,
             Deleted = deleted,
             Version = reader.Version + (deleted ? 1 : 0),
-        }, ct);
+        };
     }
+
 
     private async Task EnsureExistsAsync<T>(long? id, string label, CancellationToken ct) where T : NamedCatalogItem
     {

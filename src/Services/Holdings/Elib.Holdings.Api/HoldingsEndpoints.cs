@@ -1,5 +1,6 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Holdings.Application;
 using Elib.Holdings.Domain;
 
@@ -31,6 +32,12 @@ public static class HoldingsEndpoints
             => r.NextAsync(prefix, digits ?? 6, ct));
         items.MapPost("/Shelve", [Permission("MAP_SHELVING", "edit")] (ShelveRequest request, ItemResource r, CancellationToken ct)
             => r.ShelveAsync(request, ct));
+        // Nội bộ: circulation lấy trạng thái bản sách khi bản sao chưa có (không qua gateway, chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/items/by-barcode/{barcode}", async (long tenantId, string barcode, ITenantContext tenant, ItemResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.CurrentStateAsync(barcode, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
         return app;
     }
