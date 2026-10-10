@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Api, CrudClient, CrudPage as Page, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
@@ -11,7 +11,7 @@ export interface CrudColumn {
   key: string;
   label: string;
   /** 'lookup': hiện nhãn lựa chọn của ô nhập cùng key (vd tên loại kho thay vì id). */
-  type?: 'text' | 'number' | 'status' | 'bool' | 'mono' | 'lookup';
+  type?: 'text' | 'number' | 'status' | 'bool' | 'mono' | 'lookup' | 'date';
   width?: string;
 }
 
@@ -77,7 +77,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, DecimalPipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
+  imports: [FormsModule, DatePipe, DecimalPipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -167,6 +167,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                       }
                       @case ('mono') { <span class="font-mono text-[13px]">{{ row[col.key] }}</span> }
                       @case ('lookup') { {{ optionLabel(col.key, row[col.key]) }} }
+                      @case ('date') { <span class="whitespace-nowrap">{{ $any(row[col.key]) | date: 'dd/MM/yyyy' }}</span> }
                       @default { <span class="line-clamp-2 break-all">{{ row[col.key] ?? '—' }}</span> }
                     }
                     @if (first && c.badge?.(row); as b) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">{{ b }}</span> }

@@ -19,7 +19,10 @@ public sealed record PhotocopyRequest(
 
 public sealed record PhotocopyDto(
     long Id, Guid PublicId, Guid ReaderPublicId, string CardNo, string? ReaderName, string? ClassName, string Barcode, long Mfn, string? Title,
-    int FromPage, int ToPage, int Copies, decimal UnitPrice, decimal Total, bool Paid, DateOnly PhotoDate, string? Note, DateTimeOffset CreatedAt);
+    int FromPage, int ToPage, int Copies, decimal UnitPrice, decimal Total, bool Paid, DateOnly PhotoDate, string? Note, DateTimeOffset CreatedAt)
+{
+    public string Pages => FromPage == ToPage ? $"{FromPage}" : $"{FromPage}–{ToPage}";
+}
 
 public sealed record PhotocopyTotals(int Count, decimal Total, decimal Paid, decimal Unpaid);
 
