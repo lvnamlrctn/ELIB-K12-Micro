@@ -111,11 +111,26 @@ export interface ReaderPanel {
   readerPublicId: string; cardNo: string; fullName: string; readerTypeName: string | null; className: string | null; courseName: string | null;
   photoId: string | null; expireDate: string | null; isLocked: boolean; isExpired: boolean; hasOverdue: boolean; canBorrow: boolean;
   blockReason: string | null; loanDays: number; maxLoans: number | null; maxRenewals: number | null; currentLoans: Loan[];
-  unpaidFines: number;
+  unpaidFines: number; holds: Hold[] | null;
 }
 export interface CheckoutLine { barcode: string; success: boolean; message: string; loan: Loan | null; }
 export interface CheckoutResult { succeeded: number; failed: number; lines: CheckoutLine[]; }
-export interface ReturnResult { loan: Loan; overdueDays: number; }
+/** holdFor: bản vừa trả được giữ cho người đặt mượn kế tiếp — để riêng, không xếp lên giá. */
+export interface ReturnResult { loan: Loan; overdueDays: number; holdFor: Hold | null; }
+/** status: 1 chờ sách, 2 đang giữ sách, 3 đã mượn, 4 đã huỷ, 5 hết hạn giữ. */
+export interface Hold {
+  id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; mfn: number; title: string | null;
+  author: string | null; circPlaceId: number | null; status: number; requestedAt: string; itemPublicId: string | null; barcode: string | null;
+  readyAt: string | null; expiresAt: string | null; closedAt: string | null; note: string | null; queuePosition: number | null;
+}
+export interface HoldSearch extends CrudSearch { cardNo?: string | null; holdStatus?: number | null; mfn?: number | null; }
+export const HOLD_STATUSES: { code: number; name: string; badge: string }[] = [
+  { code: 1, name: 'Chờ sách', badge: 'badge-warn' },
+  { code: 2, name: 'Đang giữ sách', badge: 'badge-info' },
+  { code: 3, name: 'Đã mượn', badge: 'badge-on' },
+  { code: 4, name: 'Đã huỷ', badge: 'badge-off' },
+  { code: 5, name: 'Hết hạn giữ', badge: 'badge-off' },
+];
 /** state: open | overdue | returned; from/to: yyyy-MM-dd (ngày mượn). */
 export interface LoanSearch extends CrudSearch {
   cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; from?: string | null; to?: string | null;
@@ -397,6 +412,10 @@ export class Api {
   renewLoan(loanId: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Renew', { loanId, reason }); }
   noteLoan(loanId: string, note: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Note', { loanId, note, reason }); }
   searchLoans(search: LoanSearch) { return this.post<CrudPage<Loan>>('/api/admin/circulation/loans/Search', search); }
+  // Đặt mượn (circulation, quyền REQUEST_BOOKS)
+  searchHolds(search: HoldSearch) { return this.post<CrudPage<Hold>>('/api/admin/circulation/holds/Search', search); }
+  placeHold(body: { cardNo: string; mfn?: number | null; barcode?: string | null; note?: string | null }) { return this.post<Hold>('/api/admin/circulation/holds/Place', body); }
+  cancelHold(holdId: string, reason: string | null) { return this.post<Hold>('/api/admin/circulation/holds/Cancel', { holdId, reason }); }
   // Phiếu phạt (circulation, quyền FINES); lý do phạt qua crud('fine-reasons', 'circulation')
   searchFineTickets(search: FineTicketSearch) { return this.post<CrudPage<FineTicket>>('/api/admin/circulation/fine-tickets/Search', search); }
   fineTicketTotals(search: FineTicketSearch) { return this.post<FineTicketTotals>('/api/admin/circulation/fine-tickets/Totals', search); }

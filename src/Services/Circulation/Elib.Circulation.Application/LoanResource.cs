@@ -31,7 +31,7 @@ public sealed record LoanDto(
 public sealed record ReaderPanel(
     Guid ReaderPublicId, string CardNo, string FullName, string? ReaderTypeName, string? ClassName, string? CourseName, Guid? PhotoId,
     DateOnly? ExpireDate, bool IsLocked, bool IsExpired, bool HasOverdue, bool CanBorrow, string? BlockReason,
-    int LoanDays, int? MaxLoans, int? MaxRenewals, IReadOnlyList<LoanDto> CurrentLoans, decimal UnpaidFines = 0);
+    int LoanDays, int? MaxLoans, int? MaxRenewals, IReadOnlyList<LoanDto> CurrentLoans, decimal UnpaidFines = 0, IReadOnlyList<HoldDto>? Holds = null);
 
 public sealed record ReaderPanelRequest(string CardNo, long? CircPlaceId = null);
 
@@ -45,7 +45,8 @@ public sealed record CheckoutResult(int Succeeded, int Failed, IReadOnlyList<Che
 /// <summary>Trả theo số ĐKCB quét được hoặc theo lượt mượn (monolith: Return).</summary>
 public sealed record ReturnRequest(string? Barcode = null, Guid? LoanId = null, long? CircPlaceId = null);
 
-public sealed record ReturnResult(LoanDto Loan, int OverdueDays);
+/// <summary><see cref="HoldFor"/>: bản vừa trả được giữ cho người đặt mượn kế tiếp — cán bộ để riêng, không xếp lên giá.</summary>
+public sealed record ReturnResult(LoanDto Loan, int OverdueDays, HoldDto? HoldFor = null);
 
 /// <summary>Gia hạn (monolith: Renew) — bắt buộc lý do như monolith.</summary>
 public sealed record RenewRequest(Guid LoanId, string Reason);
@@ -58,7 +59,7 @@ public sealed record LoanNoteRequest(Guid LoanId, string? Note, string Reason);
 /// <see cref="LoanChanged"/> (outbox, cùng transaction).
 /// </summary>
 public sealed class LoanResource(
-    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, ICurrentActor actor, TimeProvider clock)
+    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ICurrentActor actor, TimeProvider clock)
     : CrudResource<LoanResource, Loan, LoanSearch, LoanNoteRequest, LoanDto>(db)
 {
     public const int MaxCheckout = 200;
@@ -142,7 +143,8 @@ public sealed class LoanResource(
             .Select(t => t.Remaining).ToListAsync(ct)).Where(r => r > 0).Sum();
         return new ReaderPanel(reader.ReaderPublicId, reader.CardNo, reader.FullName, reader.ReaderTypeName, reader.ClassName, reader.CourseName,
             reader.PhotoId, reader.ExpireDate, reader.Status != IHasStatus.Active, IsExpired(reader), loans.Any(l => l.DueAt < now),
-            block is null, block, policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans, unpaid);
+            block is null, block, policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans, unpaid,
+            await holdList.ActiveForAsync(reader.ReaderPublicId, ct));
     }
 
     /// <summary>
@@ -208,9 +210,13 @@ public sealed class LoanResource(
         var now = clock.GetUtcNow();
         loan.Return(now, request.CircPlaceId, actor.Id);
         await PublishAsync(loan, ct);
-        await Record(loan, CrudChange.Updated, $"Trả ĐKCB {loan.Barcode} — thẻ {loan.CardNo}" + (loan.OverdueDays(now) is > 0 and var d ? $", quá hạn {d} ngày" : ""), ct);
+        await Db.SaveChangesAsync(ct); // lượt đã đóng trước khi xét giữ bản cho đặt mượn
+        var item = await Db.Set<ItemReplica>().FirstOrDefaultAsync(i => i.ItemPublicId == loan.ItemPublicId, ct);
+        var next = item is null ? null : await holds.AssignNextAsync(item, ct);
+        await Record(loan, CrudChange.Updated, $"Trả ĐKCB {loan.Barcode} — thẻ {loan.CardNo}" + (loan.OverdueDays(now) is > 0 and var d ? $", quá hạn {d} ngày" : "")
+            + (next is null ? "" : $"; giữ cho đặt mượn thẻ {next.CardNo}"), ct);
         await Db.SaveChangesAsync(ct);
-        return new ReturnResult((await ToDtosAsync([loan], ct))[0], loan.OverdueDays(now));
+        return new ReturnResult((await ToDtosAsync([loan], ct))[0], loan.OverdueDays(now), next is null ? null : await holdList.GetAsync(next.Id, ct));
     }
 
     /// <summary>Gia hạn (monolith: Renew): theo chính sách của bạn đọc tại điểm mượn; lý do bắt buộc, ghi vào nhật ký.</summary>
@@ -264,9 +270,12 @@ public sealed class LoanResource(
             return (null, $"Tài liệu thuộc kho {item.StoreName ?? "khác"}, không mượn tại {place.Name}.");
         if (policy.MaxLoans is { } max && openCount >= max)
             return (null, $"Bạn đọc đã mượn đủ {max} tài liệu theo chính sách.");
+        if (await holds.HeldAsync(item.ItemPublicId, ct) is { } held && held.ReaderPublicId != reader.ReaderPublicId)
+            return (null, $"Tài liệu đang giữ cho bạn đọc đặt mượn (thẻ {held.CardNo}) đến {ReaderNotifier.Date(held.ExpiresAt!.Value)}.");
 
         var loan = Loan.Open(reader, item, place.Id, now, policy.LoanDays, actor.Id);
         Set.Add(loan);
+        await holds.FulfilAsync(reader, item, ct);
         await PublishAsync(loan, ct);
         return (loan, $"Mượn thành công, hạn trả {Loan.LocalDate(loan.DueAt):dd/MM/yyyy}.");
     }

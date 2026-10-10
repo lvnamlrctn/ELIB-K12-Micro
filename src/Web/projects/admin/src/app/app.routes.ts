@@ -68,6 +68,7 @@ export const routes: Routes = [
       catalog('circ-places', CIRC_PLACES),
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),
+      { path: 'request-books', loadComponent: () => import('./pages/circulation/holds').then((m) => m.Holds), canActivate: [tenantGuard, permissionGuard('REQUEST_BOOKS')], title: 'Yêu cầu mượn' },
       { path: 'fines', loadComponent: () => import('./pages/circulation/fines').then((m) => m.Fines), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Quản lý phạt' },
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Phiếu phạt' },
       { path: 'borrow', loadComponent: () => import('./pages/circulation/borrow').then((m) => m.Borrow), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'Mượn / Trả' },

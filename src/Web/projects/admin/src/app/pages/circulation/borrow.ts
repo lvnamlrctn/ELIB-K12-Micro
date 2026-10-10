@@ -90,6 +90,22 @@ const PLACE_KEY = 'elib.circulation.place';
           }
         </div>
 
+        @if (reader()?.holds?.length) {
+          <div class="panel !mb-0">
+            <div class="font-semibold text-gray-800 mb-2">Đặt mượn ({{ reader()!.holds!.length }})</div>
+            <ul class="space-y-1.5 text-sm">
+              @for (h of reader()!.holds!; track h.publicId) {
+                <li class="flex items-center gap-2 flex-wrap">
+                  <span [class]="h.status === 2 ? 'badge-info' : 'badge-warn'">{{ h.status === 2 ? 'Đang giữ' : 'Chờ sách' }}</span>
+                  <span>{{ h.title ?? 'MFN ' + h.mfn }}</span>
+                  @if (h.status === 2) { <span class="text-gray-600">— bản <b class="font-mono">{{ h.barcode }}</b>, lấy trước hết {{ h.expiresAt | date: 'dd/MM/yyyy' }}</span> }
+                  @else if (h.queuePosition) { <span class="text-gray-500">— thứ tự chờ {{ h.queuePosition }}</span> }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         @if (reader(); as r) {
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">Đang mượn ({{ r.currentLoans.length }})</div>
@@ -142,6 +158,9 @@ const PLACE_KEY = 'elib.circulation.place';
               <div><span class="font-mono font-medium">{{ r.loan.barcode }}</span> — {{ r.loan.title ?? '' }}</div>
               <div class="text-xs text-gray-600">{{ r.loan.readerName ?? '' }} (thẻ {{ r.loan.cardNo }}) · mượn {{ r.loan.loanedAt | date: 'dd/MM/yyyy' }}</div>
               @if (r.overdueDays > 0) { <div class="text-xs font-semibold text-red-600">Quá hạn {{ r.overdueDays }} ngày</div> }
+              @if (r.holdFor; as h) {
+                <div class="text-xs font-semibold text-blue-700 mt-1">Để riêng — giữ cho đặt mượn của {{ h.readerName ?? '' }} (thẻ {{ h.cardNo }}) đến {{ h.expiresAt | date: 'dd/MM/yyyy' }}</div>
+              }
             </li>
           }
         </ul>

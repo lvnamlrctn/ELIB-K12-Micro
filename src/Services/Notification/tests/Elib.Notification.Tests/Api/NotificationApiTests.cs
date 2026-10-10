@@ -86,7 +86,8 @@ public sealed class NotificationApiTests : IClassFixture<NotificationApiFactory>
 
         var templates = await Read<IReadOnlyList<EmailTemplateDto>>(
             await Staff(tenantId).PostAsJsonAsync("/api/email-templates/SearchAll", new CrudSearch(), Json));
-        Assert.Equal([DefaultTemplates.LoginOtp, DefaultTemplates.TestEmail], templates.Select(t => t.Code));
+        Assert.Equal([DefaultTemplates.LoginOtp, DefaultTemplates.PrintDueSoon, DefaultTemplates.PrintHoldExpired, DefaultTemplates.PrintHoldReady,
+            DefaultTemplates.PrintOverdue, DefaultTemplates.TestEmail], templates.Select(t => t.Code));
         Assert.All(templates, t => Assert.True(t.IsBuiltIn));
 
         var restore = await Staff(tenantId).PostAsync(new Uri("/api/email-templates/RestoreDefaults", UriKind.Relative), null);

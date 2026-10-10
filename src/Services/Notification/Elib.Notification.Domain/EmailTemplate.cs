@@ -63,6 +63,12 @@ public static class DefaultTemplates
     public const string TestEmail = "TEST_EMAIL";
     public const string LoginOtp = "LOGIN_OTP";
 
+    // Lưu thông (circulation gửi theo mã — giữ tên monolith EMAIL_PRINT_*).
+    public const string PrintDueSoon = "PRINT_DUE_SOON";
+    public const string PrintOverdue = "PRINT_OVERDUE";
+    public const string PrintHoldReady = "PRINT_HOLD_READY";
+    public const string PrintHoldExpired = "PRINT_HOLD_EXPIRED";
+
     public sealed record Definition(string Code, string Name, string Subject, string Body);
 
     public static readonly IReadOnlyList<Definition> All =
@@ -80,6 +86,30 @@ public static class DefaultTemplates
             <p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ otp }}</p>
             <p>Mã có hiệu lực trong {{ minutes }} phút. Không chia sẻ mã này cho bất kỳ ai.</p>
             <p>Nếu bạn không đăng nhập, hãy đổi mật khẩu ngay.</p>
+            """),
+        new(PrintDueSoon, "Nhắc sách sắp đến hạn trả", "Sách sắp đến hạn trả — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> (ĐKCB {{ barcode }}) bạn mượn sẽ đến hạn trả vào ngày <strong>{{ due_date }}</strong>.</p>
+            <p>Vui lòng trả hoặc gia hạn tại thư viện trước ngày này để tránh bị phạt.</p>
+            """),
+        new(PrintOverdue, "Thông báo sách quá hạn trả", "Sách đã quá hạn trả — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> (ĐKCB {{ barcode }}) đã quá hạn trả từ ngày <strong>{{ due_date }}</strong>.</p>
+            <p>Vui lòng mang trả thư viện sớm. Bạn đọc có tài liệu quá hạn sẽ không mượn thêm được và có thể bị phạt.</p>
+            """),
+        new(PrintHoldReady, "Sách đặt mượn đã sẵn sàng", "Sách bạn đặt mượn đã sẵn sàng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> bạn đặt mượn đã được giữ tại quầy (ĐKCB {{ barcode }}).</p>
+            <p>Vui lòng đến mượn trước hết ngày <strong>{{ expires_at }}</strong>; sau thời hạn này sách sẽ chuyển cho bạn đọc khác.</p>
+            """),
+        new(PrintHoldExpired, "Huỷ giữ sách đặt mượn quá hạn", "Đặt mượn đã hết hạn giữ — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> giữ cho bạn đến hết ngày {{ expires_at }} nhưng bạn chưa đến mượn, nên đặt mượn đã bị huỷ.</p>
+            <p>Bạn có thể đặt mượn lại nếu vẫn cần tài liệu này.</p>
             """),
     ];
 

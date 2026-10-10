@@ -41,6 +41,7 @@ public sealed class LoanPolicy : TenantEntity
 {
     public const int DefaultLoanDays = 14;
     public const int DefaultRenewDays = 7;
+    public const int DefaultHoldDays = 2;
 
     private LoanPolicy() { }
 
@@ -65,16 +66,22 @@ public sealed class LoanPolicy : TenantEntity
     /// <summary>Gia hạn tính từ hôm nay thay vì từ hạn cũ (monolith: tham số C_RENEW_DATE = 1).</summary>
     public bool RenewFromToday { get; private set; }
 
+    /// <summary>Số đặt mượn còn hiệu lực cùng lúc (monolith: NumberOfRequest); null = không giới hạn, 0 = không cho đặt mượn.</summary>
+    public int? MaxHolds { get; private set; }
+
+    /// <summary>Số ngày giữ sách cho người đặt (monolith: 48 giờ cố định).</summary>
+    public int HoldDays { get; private set; } = DefaultHoldDays;
+
     public static LoanPolicy Create(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays,
-        decimal finePerDay = 0, bool renewFromToday = false)
+        decimal finePerDay = 0, bool renewFromToday = false, int? maxHolds = null, int holdDays = DefaultHoldDays)
     {
         var policy = new LoanPolicy();
-        policy.Update(readerTypeId, circPlaceId, loanDays, maxLoans, maxRenewals, renewDays, finePerDay, renewFromToday);
+        policy.Update(readerTypeId, circPlaceId, loanDays, maxLoans, maxRenewals, renewDays, finePerDay, renewFromToday, maxHolds, holdDays);
         return policy;
     }
 
     public void Update(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays,
-        decimal finePerDay = 0, bool renewFromToday = false)
+        decimal finePerDay = 0, bool renewFromToday = false, int? maxHolds = null, int holdDays = DefaultHoldDays)
     {
         ReaderTypeId = readerTypeId;
         CircPlaceId = circPlaceId;
@@ -84,6 +91,8 @@ public sealed class LoanPolicy : TenantEntity
         RenewDays = renewDays is >= 1 and <= 3650 ? renewDays : throw new BusinessRuleException("RENEW_DAYS_INVALID", "Số ngày gia hạn từ 1 đến 3650.");
         FinePerDay = FineMoney.Validate(finePerDay, "Tiền phạt mỗi ngày quá hạn");
         RenewFromToday = renewFromToday;
+        MaxHolds = maxHolds is null or >= 0 ? maxHolds : throw new BusinessRuleException("MAX_HOLDS_INVALID", "Số đặt mượn không được âm.");
+        HoldDays = holdDays is >= 1 and <= 30 ? holdDays : throw new BusinessRuleException("HOLD_DAYS_INVALID", "Số ngày giữ sách từ 1 đến 30.");
     }
 
     /// <summary>Độ cụ thể khi chọn chính sách — càng lớn càng ưu tiên.</summary>

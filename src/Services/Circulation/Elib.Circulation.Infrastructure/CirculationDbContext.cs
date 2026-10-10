@@ -123,6 +123,20 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.LoanPublicId });
         });
 
+        modelBuilder.Entity<Hold>(e =>
+        {
+            e.ToTable("holds");
+            e.Ignore(x => x.IsActive);
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.Barcode).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(Hold.MaxNoteLength);
+            // Một bản sách chỉ giữ cho một đặt mượn.
+            e.HasIndex(x => new { x.TenantId, x.ItemPublicId }).IsUnique().HasFilter("status = 2 AND is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.Mfn, x.Status, x.RequestedAt });
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAt });
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

@@ -6,7 +6,8 @@ namespace Elib.Circulation.Api;
 
 /// <summary>
 /// Lưu thông (gateway: /api/admin/circulation/** → /api/**, cần license CIRCULATION). Mã quyền giữ như monolith:
-/// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt).
+/// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt),
+/// REQUEST_BOOKS (đặt mượn).
 /// </summary>
 public static class CirculationEndpoints
 {
@@ -21,6 +22,17 @@ public static class CirculationEndpoints
         api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")
             .MapPost("/AddDefaults", [Permission("FINE_REASONS", "add")] async (FineReasonResource r, CancellationToken ct)
                 => new { Added = await r.AddDefaultsAsync(ct) });
+
+        // Đặt mượn: cán bộ đặt hộ / huỷ; không sửa (huỷ rồi đặt lại).
+        var holds = api.MapGroup("/holds").WithTags("Holds");
+        holds.MapPost("/Search", [PermissionAny("REQUEST_BOOKS:view", "BORROW:view")] (HoldSearch search, HoldResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        holds.MapGet("/GetById/{publicId:guid}", [PermissionAny("REQUEST_BOOKS:view", "BORROW:view")] (Guid publicId, HoldResource r, CancellationToken ct)
+            => r.GetAsync(publicId, ct));
+        holds.MapPost("/Place", [Permission("REQUEST_BOOKS", "add")] async (PlaceHoldRequest request, HoldResource r, CancellationToken ct)
+            => Results.Created((string?)null, await r.PlaceAsync(request, ct)));
+        holds.MapPost("/Cancel", [Permission("REQUEST_BOOKS", "edit")] (CancelHoldRequest request, HoldResource r, CancellationToken ct)
+            => r.CancelAsync(request, ct));
 
         // Phiếu phạt: Add = phiếu thủ công; sửa qua Save (dòng phạt, giảm trừ, đã nộp, trạng thái).
         var fines = api.MapGroup("/fine-tickets").WithTags("FineTickets");

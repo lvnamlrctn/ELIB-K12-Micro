@@ -41,6 +41,8 @@ public static class InfrastructureServiceCollectionExtensions
             x.AddConsumer<BibChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
+        services.AddSingleton<CirculationJobScheduler>();
+        services.AddHostedService(sp => sp.GetRequiredService<CirculationJobScheduler>());
         services.AddHealthChecks().AddDbContextCheck<CirculationDbContext>("db", tags: [ElibHealthTags.Ready]);
         return services;
     }

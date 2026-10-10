@@ -95,6 +95,7 @@ export class Menu {
         module: 'CIRCULATION',
         children: [
           { title: 'Mượn / Trả', icon: 'swap_vert', link: '/borrow', perm: 'BORROW' },
+          { title: 'Yêu cầu mượn', icon: 'bookmark_add', link: '/request-books', perm: 'REQUEST_BOOKS' },
           { title: 'Lịch sử lưu thông', icon: 'history', link: '/loan-history', perm: 'LOAN_HISTORY' },
           { title: 'Quản lý phạt', icon: 'gavel', link: '/fines', perm: 'FINES' },
           { title: 'Lý do phạt', icon: 'rule_folder', link: '/cfine-types', perm: 'FINE_REASONS' },

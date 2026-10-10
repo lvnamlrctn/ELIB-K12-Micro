@@ -59,9 +59,14 @@ export const LOAN_POLICIES: CrudConfig = {
     { key: 'maxRenewals', label: 'Số lần gia hạn tối đa', type: 'number', half: true, hint: 'Để trống = không giới hạn; 0 = không cho gia hạn.' },
     { key: 'renewDays', label: 'Số ngày mỗi lần gia hạn', type: 'number', required: true, half: true },
     { key: 'finePerDay', label: 'Tiền phạt mỗi ngày quá hạn (đ)', type: 'number', half: true, hint: 'Dùng khi lập phiếu phạt quá hạn.' },
+    { key: 'maxHolds', label: 'Số đặt mượn cùng lúc', type: 'number', half: true, hint: 'Để trống = không giới hạn; 0 = không cho đặt mượn.' },
+    { key: 'holdDays', label: 'Số ngày giữ sách đặt mượn', type: 'number', required: true, half: true },
     { key: 'renewFromToday', label: 'Gia hạn tính từ ngày gia hạn (không cộng vào hạn cũ)', type: 'checkbox' },
   ],
-  defaults: { readerTypeId: null, circPlaceId: null, loanDays: 14, maxLoans: null, maxRenewals: null, renewDays: 7, finePerDay: 0, renewFromToday: false },
+  defaults: {
+    readerTypeId: null, circPlaceId: null, loanDays: 14, maxLoans: null, maxRenewals: null, renewDays: 7, finePerDay: 0, renewFromToday: false,
+    maxHolds: null, holdDays: 2,
+  },
   modalWidth: 'max-w-lg',
 };
 
