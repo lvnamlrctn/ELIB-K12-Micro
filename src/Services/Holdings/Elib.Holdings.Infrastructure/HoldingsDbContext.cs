@@ -36,6 +36,7 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.Property(x => x.Prefix).HasMaxLength(Item.MaxBarcodeLength);
             e.Property(x => x.Status).HasMaxLength(1);
             e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.LoanCardNo).HasMaxLength(50);
             e.Property(x => x.Version).IsConcurrencyToken();
             e.HasIndex(x => new { x.TenantId, x.BarcodeKey }).IsUnique().HasFilter("is_deleted = false");
             e.HasIndex(x => new { x.TenantId, x.Prefix, x.Number });

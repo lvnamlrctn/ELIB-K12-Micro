@@ -1,6 +1,7 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Api, CheckoutLine, CircPlace, Loan, ReaderPanel, ReturnResult, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
@@ -14,7 +15,7 @@ const PLACE_KEY = 'elib.circulation.place';
  */
 @Component({
   selector: 'app-borrow',
-  imports: [FormsModule, DatePipe, Modal],
+  imports: [FormsModule, DatePipe, DecimalPipe, Modal],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">Mượn / Trả</h4>
@@ -57,6 +58,15 @@ const PLACE_KEY = 'elib.circulation.place';
                   Chính sách: mượn {{ r.loanDays }} ngày{{ r.maxLoans != null ? ', tối đa ' + r.maxLoans + ' tài liệu' : '' }}{{ r.maxRenewals != null ? ', gia hạn tối đa ' + r.maxRenewals + ' lần' : '' }}.
                 </div>
                 @if (r.blockReason) { <div class="alert-error !block mt-2">{{ r.blockReason }}</div> }
+                @if (r.unpaidFines > 0 || (r.hasOverdue && canFine())) {
+                  <div class="mt-2 flex items-center gap-3 flex-wrap text-sm">
+                    @if (r.unpaidFines > 0) { <span class="badge-danger">Còn nợ tiền phạt {{ r.unpaidFines | number: '1.0-0' }} đ</span> }
+                    @if (canFine()) {
+                      <button type="button" class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="fine([])">
+                        <span class="material-icons text-[16px]">gavel</span> Lập phiếu phạt</button>
+                    }
+                  </div>
+                }
               </div>
             </div>
 
@@ -103,6 +113,9 @@ const PLACE_KEY = 'elib.circulation.place';
                             <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="returnLoan(l)">Trả</button>
                             <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="openAction(l, 'renew')">Gia hạn</button>
                             <button class="icon-btn text-gray-500 hover:bg-gray-100" title="Ghi chú" (click)="openAction(l, 'note')"><span class="material-icons text-[18px]">edit_note</span></button>
+                            @if (canFine()) {
+                              <button class="icon-btn text-red-600 hover:bg-red-50" title="Báo mất — lập phiếu phạt" (click)="fine([l.publicId])"><span class="material-icons text-[18px]">report</span></button>
+                            }
                           </div>
                         }
                       </td>
@@ -163,6 +176,7 @@ export class Borrow implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
   private readonly itemInput = viewChild<ElementRef<HTMLInputElement>>('itemInput');
 
   protected readonly places = signal<CircPlace[]>([]);
@@ -192,6 +206,20 @@ export class Borrow implements OnInit {
 
   protected can(action: string): boolean {
     return this.session.can(`BORROW:${action}`);
+  }
+
+  protected canFine(): boolean {
+    return this.session.can('FINES:add');
+  }
+
+  /** Gom tài liệu quá hạn (+ lượt chọn — báo mất) vào phiếu phạt đang mở của bạn đọc, mở phiếu để thu tiền. */
+  protected async fine(loanIds: string[]): Promise<void> {
+    const r = this.reader();
+    if (!r) return;
+    await this.run(async () => {
+      const detail = await this.api.buildFineTicket(r.cardNo, loanIds);
+      await this.router.navigate(['/fine-ticket', detail.ticket.publicId]);
+    });
   }
 
   protected overdue(l: Loan): boolean {

@@ -65,7 +65,7 @@ const PREFIX_KEY = 'elib.items.prefix';
             <span class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg pl-2.5 pr-1 py-1 text-sm bg-white">
               <span class="font-mono">{{ it.barcode }}</span>
               <span class="text-[11px] text-gray-400">{{ it.storeCode ?? '' }}</span>
-              <span [class]="status(it.status).badge + ' !text-[10px]'">{{ status(it.status).name }}</span>
+              <span [class]="status(it.status, it.onLoan).badge + ' !text-[10px]'">{{ status(it.status, it.onLoan).name }}</span>
               @if (session.can('CATALOG_BIBS:delete')) {
                 <button type="button" class="icon-btn !w-6 !h-6 text-gray-400 hover:text-red-600" [title]="'Xoá ' + it.barcode" (click)="deleting.set(it)">
                   <span class="material-icons text-[16px]">close</span></button>
@@ -117,8 +117,8 @@ export class BibItems implements OnInit {
     return this.session.can('CATALOG_BIBS:edit');
   }
 
-  protected status(code: string) {
-    return itemStatus(code);
+  protected status(code: string, onLoan = false) {
+    return itemStatus(code, onLoan);
   }
 
   protected format(n: number): string {

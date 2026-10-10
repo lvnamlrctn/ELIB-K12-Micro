@@ -91,6 +91,7 @@ export interface Item {
   id: number; publicId: string; barcode: string; mfn: number; bibPublicId: string; title: string | null; author: string | null;
   publishYear: string | null; ddc: string | null; storeId: number | null; storeCode: string | null; storeName: string | null;
   status: string; note: string | null; version: number; createdAt: string; updatedAt: string | null;
+  onLoan: boolean; loanCardNo: string | null; loanDueAt: string | null;
 }
 export interface ItemSearch extends CrudSearch {
   mfn?: number | null; storeId?: number | null; itemStatus?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null;
@@ -110,6 +111,7 @@ export interface ReaderPanel {
   readerPublicId: string; cardNo: string; fullName: string; readerTypeName: string | null; className: string | null; courseName: string | null;
   photoId: string | null; expireDate: string | null; isLocked: boolean; isExpired: boolean; hasOverdue: boolean; canBorrow: boolean;
   blockReason: string | null; loanDays: number; maxLoans: number | null; maxRenewals: number | null; currentLoans: Loan[];
+  unpaidFines: number;
 }
 export interface CheckoutLine { barcode: string; success: boolean; message: string; loan: Loan | null; }
 export interface CheckoutResult { succeeded: number; failed: number; lines: CheckoutLine[]; }
@@ -117,6 +119,27 @@ export interface ReturnResult { loan: Loan; overdueDays: number; }
 /** state: open | overdue | returned; from/to: yyyy-MM-dd (ngày mượn). */
 export interface LoanSearch extends CrudSearch {
   cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; from?: string | null; to?: string | null;
+}
+export interface FineReason { id: number; publicId: string; code: string; name: string; amount: number; itemStatus: string | null; isBuiltIn: boolean; }
+/** status: 1 đang xử lý, 2 đã hoàn thành (như monolith). */
+export interface FineTicket {
+  id: number; publicId: string; number: number; code: string; readerPublicId: string; cardNo: string; readerName: string | null; fineDate: string;
+  status: number; round: number; manualAmount: number | null; total: number; discount: number; paid: number; remaining: number;
+  note: string | null; lineCount: number; createdAt: string; updatedAt: string | null;
+}
+export interface FineLine {
+  id: number; reasonId: number; reasonCode: string; reasonName: string | null; amount: number; loanPublicId: string | null;
+  barcode: string | null; mfn: number | null; title: string | null; overdueDays: number; dueAt: string | null; loanOpen: boolean;
+}
+export interface FineTicketDetail { ticket: FineTicket; lines: FineLine[]; finePerDay: number; }
+export interface FineTicketTotals { receivable: number; received: number; remaining: number; }
+export interface FineTicketSearch extends CrudSearch {
+  cardNo?: string | null; ticketStatus?: number | null; unpaid?: boolean | null; from?: string | null; to?: string | null;
+}
+export interface FineLineChange { id: number | null; reasonCode: string; amount: number; barcode?: string | null; }
+export interface SaveFineTicket {
+  status: number; discount: number; paid: number; note: string | null; manualAmount?: number | null; fineDate?: string | null;
+  lines: FineLineChange[]; deletedLineIds: number[];
 }
 
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
@@ -374,6 +397,15 @@ export class Api {
   renewLoan(loanId: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Renew', { loanId, reason }); }
   noteLoan(loanId: string, note: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Note', { loanId, note, reason }); }
   searchLoans(search: LoanSearch) { return this.post<CrudPage<Loan>>('/api/admin/circulation/loans/Search', search); }
+  // Phiếu phạt (circulation, quyền FINES); lý do phạt qua crud('fine-reasons', 'circulation')
+  searchFineTickets(search: FineTicketSearch) { return this.post<CrudPage<FineTicket>>('/api/admin/circulation/fine-tickets/Search', search); }
+  fineTicketTotals(search: FineTicketSearch) { return this.post<FineTicketTotals>('/api/admin/circulation/fine-tickets/Totals', search); }
+  fineTicket(publicId: string) { return this.get<FineTicketDetail>(`/api/admin/circulation/fine-tickets/Detail/${publicId}`); }
+  addFineTicket(body: { cardNo: string; amount: number; note: string | null }) { return this.post<FineTicket>('/api/admin/circulation/fine-tickets/Add', body); }
+  buildFineTicket(cardNo: string, loanIds: string[] = []) { return this.post<FineTicketDetail>('/api/admin/circulation/fine-tickets/BuildForReader', { cardNo, loanIds }); }
+  saveFineTicket(publicId: string, body: SaveFineTicket) { return this.put<FineTicketDetail>(`/api/admin/circulation/fine-tickets/Save/${publicId}`, body); }
+  deleteFineTicket(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/fine-tickets/Delete/${publicId}`)); }
+  addDefaultFineReasons() { return this.post<{ added: number }>('/api/admin/circulation/fine-reasons/AddDefaults'); }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */

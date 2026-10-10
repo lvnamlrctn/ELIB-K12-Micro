@@ -3,6 +3,7 @@ using System;
 using Elib.Holdings.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Elib.Holdings.Infrastructure.Migrations
 {
     [DbContext(typeof(HoldingsDbContext))]
-    partial class HoldingsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010140059_LoanState")]
+    partial class LoanState
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

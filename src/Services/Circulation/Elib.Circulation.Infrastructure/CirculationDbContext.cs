@@ -28,6 +28,7 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
         {
             e.ToTable("loan_policies");
             e.Ignore(x => x.Specificity);
+            e.Property(x => x.FinePerDay).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.ReaderTypeId, x.CircPlaceId });
             e.HasOne<CircPlace>().WithMany().HasForeignKey(x => x.CircPlaceId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -39,6 +40,7 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.Property(x => x.CardNo).HasMaxLength(50);
             e.Property(x => x.Barcode).HasMaxLength(50);
             e.Property(x => x.Note).HasMaxLength(Loan.MaxNoteLength);
+            e.Property(x => x.ClosedItemStatus).HasMaxLength(1);
             e.Property(x => x.Version).IsConcurrencyToken();
             // Một bản sách chỉ có một lượt mượn đang mở — chặn cả hai quầy cùng mượn một ĐKCB.
             e.HasIndex(x => new { x.TenantId, x.ItemPublicId }).IsUnique().HasFilter("returned_at IS NULL AND is_deleted = false");
@@ -57,6 +59,8 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.Property(x => x.ReaderTypeName).HasMaxLength(250);
             e.Property(x => x.ClassName).HasMaxLength(250);
             e.Property(x => x.CourseName).HasMaxLength(250);
+            e.Property(x => x.Email).HasMaxLength(250);
+            e.Property(x => x.Phone).HasMaxLength(30);
             e.HasIndex(x => new { x.TenantId, x.ReaderPublicId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.CardNo });
         });
@@ -82,19 +86,57 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.Mfn });
         });
 
+        modelBuilder.Entity<FineReason>(e =>
+        {
+            e.ToTable("fine_reasons");
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.ItemStatus).HasMaxLength(1);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        modelBuilder.Entity<FineTicket>(e =>
+        {
+            e.ToTable("fine_tickets");
+            e.Ignore(x => x.Code);
+            e.Ignore(x => x.IsOpen);
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.ManualAmount).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.Property(x => x.Discount).HasPrecision(18, 2);
+            e.Property(x => x.Paid).HasPrecision(18, 2);
+            e.Property(x => x.Remaining).HasPrecision(18, 2);
+            e.Property(x => x.Note).HasMaxLength(FineTicket.MaxNoteLength);
+            e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.FineDate });
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.FineTicketId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FineLine>(e =>
+        {
+            e.ToTable("fine_lines");
+            e.Property(x => x.ReasonCode).HasMaxLength(20);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Barcode).HasMaxLength(50);
+            e.HasIndex(x => new { x.TenantId, x.LoanPublicId });
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
     }
 }
 
-/// <summary>Đơn vị mới có phân hệ Lưu thông: một quầy mượn trả và chính sách chung (14 ngày, gia hạn 7 ngày như monolith).</summary>
-public sealed class CirculationTenantSeeder(CircPlaceResource places, LoanPolicyResource policies) : ITenantSeeder
+/// <summary>Đơn vị mới có phân hệ Lưu thông: một quầy mượn trả, chính sách chung (14 ngày, gia hạn 7 ngày như monolith), lý do phạt mặc định.</summary>
+public sealed class CirculationTenantSeeder(CircPlaceResource places, LoanPolicyResource policies, FineReasonResource fineReasons) : ITenantSeeder
 {
     public async Task SeedAsync(TenantProvisioned tenant, CancellationToken cancellationToken)
     {
         await places.AddDefaultAsync(cancellationToken);
         await policies.AddDefaultAsync(cancellationToken);
+        await fineReasons.AddDefaultsAsync(cancellationToken);
     }
 }
 

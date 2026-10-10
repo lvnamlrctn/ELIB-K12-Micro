@@ -10,7 +10,10 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<CircPlaceResource>();
         services.AddCrudResource<LoanPolicyResource>();
         services.AddCrudResource<LoanResource>();
+        services.AddCrudResource<FineReasonResource>();
+        services.AddCrudResource<FineTicketResource>();
         services.AddScoped<Replicas>();
+        services.AddScoped<LoanPublisher>();
         return services;
     }
 }

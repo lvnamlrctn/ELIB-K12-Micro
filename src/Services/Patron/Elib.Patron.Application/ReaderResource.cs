@@ -380,6 +380,8 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             ClassName = CatalogName(_classNames, reader.ClassId),
             CourseName = CatalogName(_courseNames, reader.CourseId),
             PhotoId = reader.PhotoId,
+            Email = reader.Email,
+            Phone = reader.Phone,
             Deleted = deleted,
             Version = reader.Version + (deleted ? 1 : 0),
         };

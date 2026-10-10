@@ -59,6 +59,8 @@ public static class PermissionCatalog
         new("LOAN_HISTORY", "Lịch sử lưu thông", CirculationGroup, [View], CirculationLicense),
         new("CIRC_POLICIES", "Chính sách lưu thông", CirculationGroup, Crud, CirculationLicense),
         new("CIRC_PLACES", "Điểm lưu thông", CirculationGroup, Crud, CirculationLicense),
+        new("FINES", "Quản lý phạt", CirculationGroup, Crud, CirculationLicense),
+        new("FINE_REASONS", "Lý do phạt", CirculationGroup, Crud, CirculationLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

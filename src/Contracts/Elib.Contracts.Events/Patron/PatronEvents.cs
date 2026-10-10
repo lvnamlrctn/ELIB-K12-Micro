@@ -23,6 +23,11 @@ public sealed record ReaderChanged : IntegrationEvent
     /// <summary>Ảnh thẻ (file ở media, riêng tư).</summary>
     public Guid? PhotoId { get; init; }
 
+    /// <summary>Liên hệ để circulation gửi nhắc hạn/thông báo đặt mượn qua notification.</summary>
+    public string? Email { get; init; }
+
+    public string? Phone { get; init; }
+
     /// <summary>2 = hoạt động, 1 = bị khoá (quy ước Status của monolith).</summary>
     public int Status { get; init; }
 

@@ -37,6 +37,8 @@ public sealed class Replicas(ICrudDbContext db, IReplicaSources sources, ITenant
         r.ClassName = Cut(e.ClassName, 250);
         r.CourseName = Cut(e.CourseName, 250);
         r.PhotoId = e.PhotoId;
+        r.Email = Cut(e.Email, 250);
+        r.Phone = Cut(e.Phone, 30);
         r.Status = e.Status;
         r.ExpireDate = e.ExpireDate;
         r.Deleted = e.Deleted;

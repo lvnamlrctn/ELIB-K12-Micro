@@ -6,7 +6,7 @@ namespace Elib.Circulation.Api;
 
 /// <summary>
 /// Lưu thông (gateway: /api/admin/circulation/** → /api/**, cần license CIRCULATION). Mã quyền giữ như monolith:
-/// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES.
+/// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt).
 /// </summary>
 public static class CirculationEndpoints
 {
@@ -18,6 +18,29 @@ public static class CirculationEndpoints
 
         api.MapCrud<CircPlaceResource>("/circ-places", "CIRC_PLACES").WithTags("CircPlaces");
         api.MapCrud<LoanPolicyResource>("/loan-policies", "CIRC_POLICIES").WithTags("LoanPolicies");
+        api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")
+            .MapPost("/AddDefaults", [Permission("FINE_REASONS", "add")] async (FineReasonResource r, CancellationToken ct)
+                => new { Added = await r.AddDefaultsAsync(ct) });
+
+        // Phiếu phạt: Add = phiếu thủ công; sửa qua Save (dòng phạt, giảm trừ, đã nộp, trạng thái).
+        var fines = api.MapGroup("/fine-tickets").WithTags("FineTickets");
+        fines.MapPost("/Search", [Permission("FINES", "view")] (FineTicketSearch search, FineTicketResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        fines.MapPost("/Totals", [Permission("FINES", "view")] (FineTicketSearch search, FineTicketResource r, CancellationToken ct)
+            => r.TotalsAsync(search, ct));
+        fines.MapGet("/Detail/{publicId:guid}", [Permission("FINES", "view")] (Guid publicId, FineTicketResource r, CancellationToken ct)
+            => r.DetailAsync(publicId, ct));
+        fines.MapPost("/Add", [Permission("FINES", "add")] async (FineTicketCreateRequest request, FineTicketResource r, CancellationToken ct)
+            => Results.Created((string?)null, await r.AddAsync(request, ct)));
+        fines.MapPost("/BuildForReader", [Permission("FINES", "add")] (BuildFineTicketRequest request, FineTicketResource r, CancellationToken ct)
+            => r.BuildForReaderAsync(request, ct));
+        fines.MapPut("/Save/{publicId:guid}", [Permission("FINES", "edit")] (Guid publicId, SaveFineTicketRequest request, FineTicketResource r, CancellationToken ct)
+            => r.SaveAsync(publicId, request, ct));
+        fines.MapDelete("/Delete/{publicId:guid}", [Permission("FINES", "delete")] async (Guid publicId, FineTicketResource r, CancellationToken ct) =>
+        {
+            await r.DeleteAsync(publicId, ct);
+            return Results.NoContent();
+        });
 
         // Lượt mượn không có Add/Update/Delete chung — chỉ các thao tác nghiệp vụ ở quầy.
         var loans = api.MapGroup("/loans").WithTags("Loans");

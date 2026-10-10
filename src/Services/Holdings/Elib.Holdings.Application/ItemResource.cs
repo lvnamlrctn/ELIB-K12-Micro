@@ -3,6 +3,7 @@ using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Contracts.Events;
+using Elib.Contracts.Events.Circulation;
 using Elib.Contracts.Events.Holdings;
 using Elib.Holdings.Domain;
 using MassTransit;
@@ -12,7 +13,7 @@ namespace Elib.Holdings.Application;
 
 /// <summary>
 /// Tìm bản sách (monolith: màn "Tìm kiếm tài liệu" /admin/books và danh sách ĐKCB của biểu ghi). Keyword: đầu số ĐKCB hoặc
-/// một phần nhan đề. <see cref="ItemStatus"/>: mã trạng thái (I/R/L/S/X). BarcodeFrom/To: khoảng ĐKCB (so theo chữ hoa).
+/// một phần nhan đề. <see cref="ItemStatus"/>: mã trạng thái (I/R/L/S/X) hoặc B = đang mượn. BarcodeFrom/To: khoảng ĐKCB (so theo chữ hoa).
 /// </summary>
 public sealed class ItemSearch : CrudSearch
 {
@@ -28,7 +29,8 @@ public sealed record ItemRequest(long? Mfn = null, string? Barcode = null, long?
 
 public sealed record ItemDto(
     long Id, Guid PublicId, string Barcode, long Mfn, Guid BibPublicId, string? Title, string? Author, string? PublishYear, string? Ddc,
-    long? StoreId, string? StoreCode, string? StoreName, string Status, string? Note, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    long? StoreId, string? StoreCode, string? StoreName, string Status, string? Note, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
+    bool OnLoan = false, string? LoanCardNo = null, DateTimeOffset? LoanDueAt = null);
 
 /// <summary>
 /// Đăng ký ĐKCB theo lô cho một biểu ghi (monolith: RegisterBarcodes / BarcodeNumbering): <see cref="Quantity"/> mã liên tiếp
@@ -67,7 +69,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         x.StoreId,
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Code).FirstOrDefault(),
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Name).FirstOrDefault(),
-        x.Status, x.Note, x.Version, x.CreatedAt, x.UpdatedAt);
+        x.Status, x.Note, x.Version, x.CreatedAt, x.UpdatedAt, x.OnLoan, x.OnLoan ? x.LoanCardNo : null, x.OnLoan ? x.LoanDueAt : null);
 
     protected override Item Create(ItemRequest request) => throw new NotSupportedException("Bản sách tạo qua CreateAsync (cần tra biểu ghi).");
 
@@ -88,7 +90,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         if (!string.IsNullOrWhiteSpace(s.ItemStatus))
         {
             var status = s.ItemStatus.Trim().ToUpperInvariant();
-            query = query.Where(x => x.Status == status);
+            query = status == Domain.ItemStatus.OnLoan ? query.Where(x => x.OnLoan) : query.Where(x => x.Status == status);
         }
 #pragma warning disable CA1309 // EF chỉ dịch string.Compare(a, b) — so sánh theo collation của cột
         if (!string.IsNullOrWhiteSpace(s.BarcodeFrom))
@@ -215,6 +217,22 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         var key = Item.Key(barcode);
         var item = await Set.AsNoTracking().FirstOrDefaultAsync(x => x.BarcodeKey == key, ct);
         return item is null ? null : ToEvent(item, deleted: false, await StoreNamesAsync(ct));
+    }
+
+    /// <summary>
+    /// Lượt mượn từ circulation (LoanChanged): ghi "đang mượn" để hiển thị; lượt đóng vì mất tài liệu thì bản sách sang "Mất" và phát
+    /// ItemChanged. Bản sách không có (đã xoá, khác đơn vị) → bỏ qua. Chưa lưu — nơi gọi SaveChanges.
+    /// </summary>
+    public async Task ApplyLoanAsync(LoanChanged e, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        var item = await Set.FirstOrDefaultAsync(x => x.PublicId == e.ItemPublicId, ct);
+        if (item is null) return;
+        if (!item.ApplyLoan(e.LoanPublicId, e.Version, e.CardNo, e.LoanedAt, e.DueAt, e.ReturnedAt is not null, e.ClosedItemStatus)) return;
+        await PublishAsync(item, deleted: false, await StoreNamesAsync(ct), ct);
+        if (AuditSink is not null)
+            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, item.PublicId, CrudChange.Updated,
+                $"ĐKCB {item.Barcode} chuyển trạng thái \"{ItemStatus.Names.GetValueOrDefault(item.Status)}\" (lưu thông báo mất, thẻ {e.CardNo})"), ct);
     }
 
     private static string NormalizePrefix(string? prefix)

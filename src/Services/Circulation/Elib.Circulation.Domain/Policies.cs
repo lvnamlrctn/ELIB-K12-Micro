@@ -59,14 +59,22 @@ public sealed class LoanPolicy : TenantEntity
     /// <summary>Số ngày mỗi lần gia hạn (monolith: NumberOfRenewDays).</summary>
     public int RenewDays { get; private set; } = DefaultRenewDays;
 
-    public static LoanPolicy Create(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays)
+    /// <summary>Tiền phạt mỗi ngày quá hạn (monolith: PolicyCircFine lý do QUAHAN).</summary>
+    public decimal FinePerDay { get; private set; }
+
+    /// <summary>Gia hạn tính từ hôm nay thay vì từ hạn cũ (monolith: tham số C_RENEW_DATE = 1).</summary>
+    public bool RenewFromToday { get; private set; }
+
+    public static LoanPolicy Create(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays,
+        decimal finePerDay = 0, bool renewFromToday = false)
     {
         var policy = new LoanPolicy();
-        policy.Update(readerTypeId, circPlaceId, loanDays, maxLoans, maxRenewals, renewDays);
+        policy.Update(readerTypeId, circPlaceId, loanDays, maxLoans, maxRenewals, renewDays, finePerDay, renewFromToday);
         return policy;
     }
 
-    public void Update(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays)
+    public void Update(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays,
+        decimal finePerDay = 0, bool renewFromToday = false)
     {
         ReaderTypeId = readerTypeId;
         CircPlaceId = circPlaceId;
@@ -74,6 +82,8 @@ public sealed class LoanPolicy : TenantEntity
         MaxLoans = maxLoans is null or >= 0 ? maxLoans : throw new BusinessRuleException("MAX_LOANS_INVALID", "Số tài liệu được mượn không được âm.");
         MaxRenewals = maxRenewals is null or >= 0 ? maxRenewals : throw new BusinessRuleException("MAX_RENEWALS_INVALID", "Số lần gia hạn không được âm.");
         RenewDays = renewDays is >= 1 and <= 3650 ? renewDays : throw new BusinessRuleException("RENEW_DAYS_INVALID", "Số ngày gia hạn từ 1 đến 3650.");
+        FinePerDay = FineMoney.Validate(finePerDay, "Tiền phạt mỗi ngày quá hạn");
+        RenewFromToday = renewFromToday;
     }
 
     /// <summary>Độ cụ thể khi chọn chính sách — càng lớn càng ưu tiên.</summary>

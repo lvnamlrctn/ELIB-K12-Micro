@@ -17,6 +17,7 @@ type Elib.Contracts.Events.Circulation.LoanChanged class : Elib.Contracts.Events
   Barcode : System.String required
   CardNo : System.String required
   CircPlaceId : Nullable<System.Int64>
+  ClosedItemStatus : System.String?
   DueAt : System.DateTimeOffset required
   ItemPublicId : System.Guid required
   LoanPublicId : System.Guid required
@@ -51,8 +52,10 @@ type Elib.Contracts.Events.Patron.ReaderChanged class : Elib.Contracts.Events.In
   CourseId : Nullable<System.Int64>
   CourseName : System.String?
   Deleted : System.Boolean
+  Email : System.String?
   ExpireDate : Nullable<System.DateOnly>
   FullName : System.String required
+  Phone : System.String?
   PhotoId : Nullable<System.Guid>
   ReaderPublicId : System.Guid required
   ReaderTypeId : Nullable<System.Int64>

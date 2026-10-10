@@ -3,9 +3,7 @@ using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Circulation.Domain;
-using Elib.Contracts.Events;
 using Elib.Contracts.Events.Circulation;
-using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Circulation.Application;
@@ -33,7 +31,7 @@ public sealed record LoanDto(
 public sealed record ReaderPanel(
     Guid ReaderPublicId, string CardNo, string FullName, string? ReaderTypeName, string? ClassName, string? CourseName, Guid? PhotoId,
     DateOnly? ExpireDate, bool IsLocked, bool IsExpired, bool HasOverdue, bool CanBorrow, string? BlockReason,
-    int LoanDays, int? MaxLoans, int? MaxRenewals, IReadOnlyList<LoanDto> CurrentLoans);
+    int LoanDays, int? MaxLoans, int? MaxRenewals, IReadOnlyList<LoanDto> CurrentLoans, decimal UnpaidFines = 0);
 
 public sealed record ReaderPanelRequest(string CardNo, long? CircPlaceId = null);
 
@@ -60,7 +58,7 @@ public sealed record LoanNoteRequest(Guid LoanId, string? Note, string Reason);
 /// <see cref="LoanChanged"/> (outbox, cùng transaction).
 /// </summary>
 public sealed class LoanResource(
-    ICrudDbContext db, Replicas replicas, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock)
+    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, ICurrentActor actor, TimeProvider clock)
     : CrudResource<LoanResource, Loan, LoanSearch, LoanNoteRequest, LoanDto>(db)
 {
     public const int MaxCheckout = 200;
@@ -140,9 +138,11 @@ public sealed class LoanResource(
         var loans = await OpenLoansAsync(reader, ct);
         var now = clock.GetUtcNow();
         var block = BlockReason(reader, loans.Any(l => l.DueAt < now));
+        var unpaid = (await Db.Set<FineTicket>().AsNoTracking().Where(t => t.ReaderPublicId == reader.ReaderPublicId)
+            .Select(t => t.Remaining).ToListAsync(ct)).Where(r => r > 0).Sum();
         return new ReaderPanel(reader.ReaderPublicId, reader.CardNo, reader.FullName, reader.ReaderTypeName, reader.ClassName, reader.CourseName,
             reader.PhotoId, reader.ExpireDate, reader.Status != IHasStatus.Active, IsExpired(reader), loans.Any(l => l.DueAt < now),
-            block is null, block, policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans);
+            block is null, block, policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans, unpaid);
     }
 
     /// <summary>
@@ -326,25 +326,5 @@ public sealed class LoanResource(
 
     private static DateTimeOffset VietnamStart(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7));
 
-    private Task PublishAsync(Loan loan, CancellationToken ct)
-    {
-        if (loan.PublicId == Guid.Empty) loan.PublicId = Guid.CreateVersion7(); // lượt mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(new LoanChanged
-        {
-            TenantId = tenant.RequireTenantId(),
-            Actor = new EventActor(actor.Id, actor.Kind),
-            LoanPublicId = loan.PublicId,
-            ReaderPublicId = loan.ReaderPublicId,
-            CardNo = loan.CardNo,
-            ItemPublicId = loan.ItemPublicId,
-            Barcode = loan.Barcode,
-            Mfn = loan.Mfn,
-            CircPlaceId = loan.CircPlaceId,
-            LoanedAt = loan.LoanedAt,
-            DueAt = loan.DueAt,
-            ReturnedAt = loan.ReturnedAt,
-            RenewCount = loan.RenewCount,
-            Version = loan.Version,
-        }, ct);
-    }
+    private Task PublishAsync(Loan loan, CancellationToken ct) => publisher.PublishAsync(loan, ct);
 }

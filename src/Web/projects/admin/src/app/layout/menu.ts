@@ -96,6 +96,8 @@ export class Menu {
         children: [
           { title: 'Mượn / Trả', icon: 'swap_vert', link: '/borrow', perm: 'BORROW' },
           { title: 'Lịch sử lưu thông', icon: 'history', link: '/loan-history', perm: 'LOAN_HISTORY' },
+          { title: 'Quản lý phạt', icon: 'gavel', link: '/fines', perm: 'FINES' },
+          { title: 'Lý do phạt', icon: 'rule_folder', link: '/cfine-types', perm: 'FINE_REASONS' },
           { title: 'Chính sách lưu thông', icon: 'rule', link: '/circ-policies', perm: 'CIRC_POLICIES' },
           { title: 'Điểm lưu thông', icon: 'place', link: '/circ-places', perm: 'CIRC_PLACES' },
         ],

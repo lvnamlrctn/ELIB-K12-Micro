@@ -5,6 +5,7 @@ using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Messaging;
 using Elib.Contracts.Events.Catalog;
+using Elib.Contracts.Events.Circulation;
 using Elib.Holdings.Application;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,19 @@ public sealed class BibChangedConsumer(BibSnapshots snapshots, ICrudDbContext db
     protected override async Task HandleAsync(BibChanged message, ConsumeContext<BibChanged> context)
     {
         await snapshots.ApplyAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Lượt mượn từ circulation: hiển thị "đang mượn", lượt đóng vì mất tài liệu → bản sách sang "Mất" (chỉ đơn vị có license HOLDINGS).</summary>
+public sealed class LoanChangedConsumer(ItemResource items, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<LoanChangedConsumer> logger)
+    : ElibConsumer<LoanChanged>(licenses, logger)
+{
+    protected override string? RequiredModule => "HOLDINGS";
+
+    protected override async Task HandleAsync(LoanChanged message, ConsumeContext<LoanChanged> context)
+    {
+        await items.ApplyLoanAsync(message, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }

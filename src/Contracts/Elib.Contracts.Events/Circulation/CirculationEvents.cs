@@ -21,5 +21,9 @@ public sealed record LoanChanged : IntegrationEvent
     public DateTimeOffset? ReturnedAt { get; init; }
 
     public int RenewCount { get; init; }
+
+    /// <summary>Lượt đóng không phải do trả sách: trạng thái holdings phải đặt cho bản sách ("L" = mất). Null = trả bình thường.</summary>
+    public string? ClosedItemStatus { get; init; }
+
     public long Version { get; init; }
 }

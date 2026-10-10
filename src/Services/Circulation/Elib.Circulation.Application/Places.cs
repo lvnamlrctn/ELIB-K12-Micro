@@ -59,11 +59,11 @@ public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlac
 }
 
 public sealed record LoanPolicyRequest(long? ReaderTypeId, long? CircPlaceId, int LoanDays = LoanPolicy.DefaultLoanDays, int? MaxLoans = null,
-    int? MaxRenewals = null, int RenewDays = LoanPolicy.DefaultRenewDays);
+    int? MaxRenewals = null, int RenewDays = LoanPolicy.DefaultRenewDays, decimal FinePerDay = 0, bool RenewFromToday = false);
 
 public sealed record LoanPolicyDto(
     long Id, Guid PublicId, long? ReaderTypeId, long? CircPlaceId, int LoanDays, int? MaxLoans, int? MaxRenewals, int RenewDays,
-    DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    decimal FinePerDay, bool RenewFromToday, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>
 /// Chính sách lưu thông (monolith: CirculationCircPolicyController, quyền CIRC_POLICIES). Mỗi cặp loại bạn đọc × điểm lưu thông
@@ -78,13 +78,14 @@ public sealed class LoanPolicyResource(ICrudDbContext db) : CrudResource<LoanPol
         $"điểm {entity.CircPlaceId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "mọi điểm"}: {entity.LoanDays} ngày";
 
     protected override Expression<Func<LoanPolicy, LoanPolicyDto>> Projection => x => new LoanPolicyDto(
-        x.Id, x.PublicId, x.ReaderTypeId, x.CircPlaceId, x.LoanDays, x.MaxLoans, x.MaxRenewals, x.RenewDays, x.CreatedAt, x.UpdatedAt);
+        x.Id, x.PublicId, x.ReaderTypeId, x.CircPlaceId, x.LoanDays, x.MaxLoans, x.MaxRenewals, x.RenewDays, x.FinePerDay, x.RenewFromToday,
+        x.CreatedAt, x.UpdatedAt);
 
     protected override LoanPolicy Create(LoanPolicyRequest r) =>
-        LoanPolicy.Create(r.ReaderTypeId, r.CircPlaceId, r.LoanDays, r.MaxLoans, r.MaxRenewals, r.RenewDays);
+        LoanPolicy.Create(r.ReaderTypeId, r.CircPlaceId, r.LoanDays, r.MaxLoans, r.MaxRenewals, r.RenewDays, r.FinePerDay, r.RenewFromToday);
 
     protected override void Update(LoanPolicy entity, LoanPolicyRequest r) =>
-        entity.Update(r.ReaderTypeId, r.CircPlaceId, r.LoanDays, r.MaxLoans, r.MaxRenewals, r.RenewDays);
+        entity.Update(r.ReaderTypeId, r.CircPlaceId, r.LoanDays, r.MaxLoans, r.MaxRenewals, r.RenewDays, r.FinePerDay, r.RenewFromToday);
 
     protected override IOrderedQueryable<LoanPolicy> Order(IQueryable<LoanPolicy> query) =>
         query.OrderBy(x => x.CircPlaceId).ThenBy(x => x.ReaderTypeId).ThenBy(x => x.Id);

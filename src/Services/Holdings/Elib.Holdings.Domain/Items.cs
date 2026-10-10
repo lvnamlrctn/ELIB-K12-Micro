@@ -16,6 +16,9 @@ public static class ItemStatus
     public const string Liquidated = "S";
     public const string OutOfStore = "X";
 
+    /// <summary>Mã lọc "đang mượn" (monolith: Barcode.Status = "B") — không phải trạng thái lưu, suy từ lượt mượn của circulation.</summary>
+    public const string OnLoan = "B";
+
     public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [Unshelved] = "Chưa xếp giá",
@@ -58,6 +61,15 @@ public sealed class Item : TenantEntity
     public string? Note { get; private set; }
     public long Version { get; private set; }
 
+    /// <summary>Lượt mượn gần nhất (circulation sở hữu, nhận qua LoanChanged) — chỉ để hiển thị "đang mượn", không tăng Version.</summary>
+    public Guid? LoanPublicId { get; private set; }
+
+    public long LoanVersion { get; private set; }
+    public DateTimeOffset? LoanedAt { get; private set; }
+    public DateTimeOffset? LoanDueAt { get; private set; }
+    public string? LoanCardNo { get; private set; }
+    public bool OnLoan { get; private set; }
+
     public static Item Register(BibSnapshot bib, string barcode, long? storeId)
     {
         ArgumentNullException.ThrowIfNull(bib);
@@ -86,6 +98,27 @@ public sealed class Item : TenantEntity
         Status = ItemStatus.Available;
         if (storeId is not null) StoreId = storeId;
         Version++;
+    }
+
+    /// <summary>
+    /// Áp trạng thái lượt mượn từ circulation. Cùng lượt: chỉ nhận version lớn hơn; lượt khác: chỉ nhận lượt mượn sau lượt đang giữ
+    /// (event tới lệch thứ tự không ghi đè). Lượt đóng vì mất tài liệu (<paramref name="closedItemStatus"/> = L) → bản sách sang "Mất".
+    /// Trả về true khi trạng thái bản sách đổi (cần phát ItemChanged).
+    /// </summary>
+    public bool ApplyLoan(Guid loanPublicId, long version, string cardNo, DateTimeOffset loanedAt, DateTimeOffset dueAt, bool returned,
+        string? closedItemStatus)
+    {
+        if (LoanPublicId == loanPublicId ? version <= LoanVersion : LoanedAt is { } current && loanedAt <= current) return false;
+        LoanPublicId = loanPublicId;
+        LoanVersion = version;
+        LoanCardNo = cardNo;
+        LoanedAt = loanedAt;
+        LoanDueAt = dueAt;
+        OnLoan = !returned;
+        if (!returned || closedItemStatus is null || closedItemStatus == Status || !ItemStatus.Names.ContainsKey(closedItemStatus)) return false;
+        Status = closedItemStatus;
+        Version++;
+        return true;
     }
 
     /// <summary>Đánh dấu xoá — tăng version để event xoá thắng mọi event trước đó.</summary>

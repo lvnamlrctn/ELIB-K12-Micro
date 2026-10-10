@@ -11,6 +11,9 @@ public sealed class Loan : TenantEntity
 {
     public const int MaxNoteLength = 1000;
 
+    /// <summary>Trạng thái holdings "Mất" — lượt mượn đóng vì mất tài liệu.</summary>
+    public const string LostStatus = "L";
+
     private Loan() { }
 
     public Guid ReaderPublicId { get; private set; }
@@ -28,6 +31,14 @@ public sealed class Loan : TenantEntity
     public long? ReturnCircPlaceId { get; private set; }
     public int RenewCount { get; private set; }
     public string? Note { get; private set; }
+
+    /// <summary>Lượt đóng không phải do trả sách: trạng thái bản sách holdings phải chuyển sang (L = mất). Null = trả bình thường.</summary>
+    public string? ClosedItemStatus { get; private set; }
+
+    /// <summary>Ngày (giờ Việt Nam) đã phát nhắc sắp đến hạn / quá hạn — job nhắc hạn không phát lại.</summary>
+    public DateOnly? DueSoonNotifiedOn { get; private set; }
+
+    public DateOnly? OverdueNotifiedOn { get; private set; }
     public long Version { get; private set; }
 
     public bool IsOpen => ReturnedAt is null;
@@ -54,8 +65,23 @@ public sealed class Loan : TenantEntity
     }
 
     /// <summary>
-    /// Gia hạn (monolith: Renew, C_RENEW_DATE = 0): hạn mới = hạn cũ + số ngày gia hạn. Lượt đã quá hạn thì tính từ hôm nay
-    /// để không gia hạn xong vẫn quá hạn.
+    /// Đóng lượt vì mất tài liệu (monolith: lý do phạt có Status_Reg_Id — BookOut "R" + BookIn, ĐKCB sang "Mất"). Holdings nhận
+    /// LoanChanged có <see cref="ClosedItemStatus"/> để đổi trạng thái bản sách.
+    /// </summary>
+    public void CloseAsLost(DateTimeOffset now, long? staffId)
+    {
+        if (!IsOpen) return;
+        ClosedItemStatus = LostStatus;
+        Return(now, null, staffId);
+    }
+
+    public void MarkDueSoonNotified(DateOnly day) => DueSoonNotifiedOn = day;
+
+    public void MarkOverdueNotified(DateOnly day) => OverdueNotifiedOn = day;
+
+    /// <summary>
+    /// Gia hạn (monolith: Renew). Mặc định (C_RENEW_DATE = 0): hạn mới = hạn cũ + số ngày gia hạn; lượt đã quá hạn thì tính từ hôm
+    /// nay để không gia hạn xong vẫn quá hạn. Chính sách "gia hạn tính từ hôm nay" (C_RENEW_DATE = 1): hạn mới = hôm nay + số ngày.
     /// </summary>
     public void Renew(DateTimeOffset now, LoanPolicy policy)
     {
@@ -65,7 +91,7 @@ public sealed class Loan : TenantEntity
             throw new BusinessRuleException("RENEW_LIMIT", max == 0
                 ? "Chính sách lưu thông không cho gia hạn."
                 : $"Bạn đọc đã gia hạn đủ số lần cho phép ({max} lần).");
-        DueAt = (DueAt > now ? DueAt : now).AddDays(policy.RenewDays);
+        DueAt = (DueAt > now && !policy.RenewFromToday ? DueAt : now).AddDays(policy.RenewDays);
         RenewCount++;
         Version++;
     }
@@ -97,6 +123,11 @@ public sealed class PatronReplica : Entity, ITenantOwned
     public string? ClassName { get; set; }
     public string? CourseName { get; set; }
     public Guid? PhotoId { get; set; }
+
+    /// <summary>Để gửi nhắc hạn/thông báo đặt mượn qua notification.</summary>
+    public string? Email { get; set; }
+
+    public string? Phone { get; set; }
 
     /// <summary>2 = hoạt động, 1 = bị khoá.</summary>
     public int Status { get; set; }

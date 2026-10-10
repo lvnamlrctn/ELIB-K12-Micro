@@ -1,101 +1,23 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Elib.BuildingBlocks.Crud;
-using Elib.BuildingBlocks.Testing;
 using Elib.Circulation.Application;
-using Elib.Contracts.Events;
-using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Circulation;
-using Elib.Contracts.Events.Holdings;
-using Elib.Contracts.Events.Patron;
 using Elib.Contracts.Events.Platform;
 
 namespace Elib.Circulation.Tests.Api;
 
-public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, IAsyncLifetime
+public sealed class CirculationApiTests(CirculationApiFactory factory) : CirculationTestBase(factory)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
-    private static long _nextTenantId = 9000;
-    private static long _nextUserId = 19000;
-    private static long _nextMfn = 900;
-
-    private readonly CirculationApiFactory _factory;
-
-    public CirculationApiTests(CirculationApiFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => _factory.InitializeAsync();
-
-    public Task DisposeAsync() => Task.CompletedTask;
-
-    private static Uri U(string path) => new(path, UriKind.Relative);
-
-    private long NewTenant(bool licensed = true)
-    {
-        var tenantId = Interlocked.Increment(ref _nextTenantId);
-        if (licensed) _factory.Licenses.Licensed.Add((tenantId, "CIRCULATION"));
-        return tenantId;
-    }
-
-    private HttpClient Staff(long tenantId, params string[] grants)
-    {
-        var userId = Interlocked.Increment(ref _nextUserId);
-        _factory.Permissions.Grants[userId] = grants.Length == 0 ? ["*"] : grants;
-        return _factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, userId));
-    }
-
-    private static async Task<T> Read<T>(HttpResponseMessage response)
-    {
-        Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-        return (await response.Content.ReadFromJsonAsync<T>(Json))!;
-    }
-
-    private static async Task<(int Status, string? Code, string? Detail)> Error(HttpResponseMessage response)
-    {
-        var root = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        return ((int)response.StatusCode, root.GetProperty("code").GetString(), root.GetProperty("detail").GetString());
-    }
-
-    private static ReaderChanged Reader(long tenantId, string card, long? typeId = null, int status = 2, DateOnly? expire = null, long version = 0) => new()
-    {
-        TenantId = tenantId, ReaderPublicId = Guid.CreateVersion7(), CardNo = card, FullName = "Bạn đọc " + card, ReaderTypeId = typeId,
-        ReaderTypeName = "Học sinh", ClassName = "6A1", Status = status, ExpireDate = expire, Version = version,
-    };
-
-    private static ItemChanged Item(long tenantId, string barcode, long mfn, string status = "R", long? storeId = 1, long version = 0) => new()
-    {
-        TenantId = tenantId, ItemPublicId = Guid.CreateVersion7(), Barcode = barcode, BibPublicId = Guid.CreateVersion7(), Mfn = mfn,
-        StoreId = storeId, StoreName = "Kho " + storeId, Status = status, Version = version,
-    };
-
-    private static BibChanged Bib(long tenantId, long mfn, string title) => new()
-    {
-        TenantId = tenantId, BibPublicId = Guid.CreateVersion7(), Mfn = mfn, Title = title, Author = "Tô Hoài", Status = 2,
-    };
-
-    /// <summary>Đưa vào bản sao qua event (như patron/holdings/catalog phát) và chờ consumer xử lý xong.</summary>
-    private async Task Publish(params IntegrationEvent[] events)
-    {
-        foreach (var e in events) await _factory.PublishAsAsync(e);
-        foreach (var e in events) await _factory.WaitConsumedAsync(e);
-    }
-
-    private static async Task<CircPlaceDto> AddPlace(HttpClient staff, string code, params long[] stores) =>
-        await Read<CircPlaceDto>(await staff.PostAsJsonAsync(U("/api/circ-places/Add"), new CircPlaceRequest(code, "Quầy " + code, stores), Json));
-
-    private static Task<HttpResponseMessage> Checkout(HttpClient staff, string card, long place, params string[] barcodes) =>
-        staff.PostAsJsonAsync(U("/api/loans/Checkout"), new CheckoutRequest(card, barcodes, place), Json);
-
     [Fact]
     public async Task New_tenant_gets_a_desk_and_a_default_policy()
     {
         var tenantId = NewTenant();
-        await _factory.PublishAsync(new TenantProvisioned
+        await Factory.PublishAsync(new TenantProvisioned
         {
             TenantId = tenantId, Code = "L" + tenantId, Name = "Trường " + tenantId, Subdomain = "l" + tenantId, TimeZone = "Asia/Ho_Chi_Minh", Modules = [],
         });
-        await CirculationApiFactory.WaitForAsync(() => Task.FromResult(_factory.PublishedOf<TenantSeeded>().FirstOrDefault(s => s.TenantId == tenantId)), "TenantSeeded");
+        await CirculationApiFactory.WaitForAsync(() => Task.FromResult(Factory.PublishedOf<TenantSeeded>().FirstOrDefault(s => s.TenantId == tenantId)), "TenantSeeded");
 
         var staff = Staff(tenantId);
         var place = Assert.Single(await Read<List<CircPlaceDto>>(await staff.PostAsJsonAsync(U("/api/circ-places/SearchAll"), new CrudSearch(), Json)));
@@ -110,7 +32,7 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         var tenantId = NewTenant();
         var staff = Staff(tenantId);
         var place = await AddPlace(staff, "Q1");
-        var mfn = Interlocked.Increment(ref _nextMfn);
+        var mfn = NextMfn();
         var reader = Reader(tenantId, "hs-01");
         await Publish(reader, Reader(tenantId, "HS-02"), Bib(tenantId, mfn, "Dế mèn phiêu lưu ký"),
             Item(tenantId, "VV0001", mfn), Item(tenantId, "VV0002", mfn, status: "I"), Item(tenantId, "VV0003", mfn, status: "L"));
@@ -127,7 +49,7 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         Assert.Equal(("VV0001", "Dế mèn phiêu lưu ký", "HS-01", "Bạn đọc hs-01"), (loan.Barcode, loan.Title, loan.CardNo, loan.ReaderName));
         Assert.Equal(14, (loan.DueAt - loan.LoanedAt).TotalDays);
 
-        var created = _factory.PublishedOf<LoanChanged>().Single(e => e.LoanPublicId == loan.PublicId);
+        var created = Factory.PublishedOf<LoanChanged>().Single(e => e.LoanPublicId == loan.PublicId);
         Assert.Equal((reader.ReaderPublicId, mfn, (DateTimeOffset?)null), (created.ReaderPublicId, created.Mfn, created.ReturnedAt));
 
         // Bạn đọc khác không mượn được bản đang có người mượn.
@@ -140,7 +62,7 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         var returned = await Read<ReturnResult>(await staff.PostAsJsonAsync(U("/api/loans/Return"), new ReturnRequest(" vv0001 ", CircPlaceId: place.Id), Json));
         Assert.Equal((loan.PublicId, 0), (returned.Loan.PublicId, returned.OverdueDays));
         Assert.NotNull(returned.Loan.ReturnedAt);
-        Assert.NotNull(_factory.PublishedOf<LoanChanged>().Single(e => e.LoanPublicId == loan.PublicId && e.Version == 1).ReturnedAt);
+        Assert.NotNull(Factory.PublishedOf<LoanChanged>().Single(e => e.LoanPublicId == loan.PublicId && e.Version == 1).ReturnedAt);
 
         var again = await staff.PostAsJsonAsync(U("/api/loans/Return"), new ReturnRequest("VV0001"), Json);
         Assert.Equal((404, "LOAN_NOT_FOUND"), ((await Error(again)).Status, (await Error(again)).Code));
@@ -153,8 +75,8 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         var tenantId = NewTenant();
         var staff = Staff(tenantId);
         var place = await AddPlace(staff, "Q2");
-        var mfn = Interlocked.Increment(ref _nextMfn);
-        var today = DateOnly.FromDateTime(_factory.Clock.GetUtcNow().UtcDateTime.AddHours(7));
+        var mfn = NextMfn();
+        var today = DateOnly.FromDateTime(Factory.Clock.GetUtcNow().UtcDateTime.AddHours(7));
         await Publish(Reader(tenantId, "KHOA", status: 1), Reader(tenantId, "HETHAN", expire: today.AddDays(-1)), Reader(tenantId, "QH"),
             Item(tenantId, "QH01", mfn), Item(tenantId, "QH02", mfn));
 
@@ -163,7 +85,7 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         Assert.Equal(404, (await Error(await Checkout(staff, "KHONGCO", place.Id, "QH01"))).Status);
 
         Assert.Equal(1, (await Read<CheckoutResult>(await Checkout(staff, "QH", place.Id, "QH01"))).Succeeded);
-        _factory.Clock.Advance(TimeSpan.FromDays(20)); // hạn 14 ngày → quá hạn 6 ngày
+        Factory.Clock.Advance(TimeSpan.FromDays(20)); // hạn 14 ngày → quá hạn 6 ngày
         var panel = await Read<ReaderPanel>(await staff.PostAsJsonAsync(U("/api/loans/Reader"), new ReaderPanelRequest("QH"), Json));
         Assert.Equal((true, false), (panel.HasOverdue, panel.CanBorrow));
         Assert.Contains("quá hạn", (await Error(await Checkout(staff, "QH", place.Id, "QH02"))).Detail, StringComparison.Ordinal);
@@ -187,7 +109,7 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         var dupe = await staff.PostAsJsonAsync(U("/api/loan-policies/Add"), new LoanPolicyRequest(5, place.Id, 7), Json);
         Assert.Equal((409, "POLICY_EXISTS"), ((await Error(dupe)).Status, (await Error(dupe)).Code));
 
-        var mfn = Interlocked.Increment(ref _nextMfn);
+        var mfn = NextMfn();
         await Publish(Reader(tenantId, "GV1", typeId: 5), Reader(tenantId, "GV2", typeId: 6), Item(tenantId, "CS01", mfn), Item(tenantId, "CS02", mfn), Item(tenantId, "CS03", mfn));
 
         var first = await Read<CheckoutResult>(await Checkout(staff, "GV1", place.Id, "CS01", "CS02"));
@@ -213,13 +135,13 @@ public sealed class CirculationApiTests : IClassFixture<CirculationApiFactory>, 
         var tenantId = NewTenant();
         var staff = Staff(tenantId);
         var desk = await AddPlace(staff, "Q4", 7);
-        var mfn = Interlocked.Increment(ref _nextMfn);
+        var mfn = NextMfn();
 
         // Có ở patron/holdings/catalog nhưng circulation chưa nhận event (service mới triển khai).
-        _factory.Sources.Readers[(tenantId, "CU-01")] = Reader(tenantId, "CU-01");
-        _factory.Sources.Items[(tenantId, "CU0001")] = Item(tenantId, "CU0001", mfn, storeId: 7);
-        _factory.Sources.Items[(tenantId, "CU0002")] = Item(tenantId, "CU0002", mfn, storeId: 8);
-        _factory.Sources.Bibs[(tenantId, mfn)] = Bib(tenantId, mfn, "Tắt đèn");
+        Factory.Sources.Readers[(tenantId, "CU-01")] = Reader(tenantId, "CU-01");
+        Factory.Sources.Items[(tenantId, "CU0001")] = Item(tenantId, "CU0001", mfn, storeId: 7);
+        Factory.Sources.Items[(tenantId, "CU0002")] = Item(tenantId, "CU0002", mfn, storeId: 8);
+        Factory.Sources.Bibs[(tenantId, mfn)] = Bib(tenantId, mfn, "Tắt đèn");
 
         var result = await Read<CheckoutResult>(await Checkout(staff, "cu-01", desk.Id, "cu0001", "CU0002"));
         Assert.Equal(1, result.Succeeded);

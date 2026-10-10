@@ -43,6 +43,7 @@ export const LOAN_POLICIES: CrudConfig = {
     { key: 'maxLoans', label: 'Mượn tối đa', type: 'number', width: '120px' },
     { key: 'maxRenewals', label: 'Số lần gia hạn', type: 'number', width: '130px' },
     { key: 'renewDays', label: 'Ngày mỗi lần gia hạn', type: 'number', width: '160px' },
+    { key: 'finePerDay', label: 'Phạt / ngày quá hạn', type: 'number', width: '150px' },
   ],
   fields: [
     {
@@ -57,7 +58,44 @@ export const LOAN_POLICIES: CrudConfig = {
     { key: 'maxLoans', label: 'Số tài liệu mượn cùng lúc', type: 'number', half: true, hint: 'Để trống = không giới hạn.' },
     { key: 'maxRenewals', label: 'Số lần gia hạn tối đa', type: 'number', half: true, hint: 'Để trống = không giới hạn; 0 = không cho gia hạn.' },
     { key: 'renewDays', label: 'Số ngày mỗi lần gia hạn', type: 'number', required: true, half: true },
+    { key: 'finePerDay', label: 'Tiền phạt mỗi ngày quá hạn (đ)', type: 'number', half: true, hint: 'Dùng khi lập phiếu phạt quá hạn.' },
+    { key: 'renewFromToday', label: 'Gia hạn tính từ ngày gia hạn (không cộng vào hạn cũ)', type: 'checkbox' },
   ],
-  defaults: { readerTypeId: null, circPlaceId: null, loanDays: 14, maxLoans: null, maxRenewals: null, renewDays: 7 },
+  defaults: { readerTypeId: null, circPlaceId: null, loanDays: 14, maxLoans: null, maxRenewals: null, renewDays: 7, finePerDay: 0, renewFromToday: false },
+  modalWidth: 'max-w-lg',
+};
+
+/** Lý do phạt (monolith: /admin/cfine-types, quyền FINE_REASONS). Lý do có trạng thái "Mất" đóng lượt mượn và báo kho mất sách. */
+export const FINE_REASONS: CrudConfig = {
+  title: 'Lý do phạt',
+  resource: 'fine-reasons',
+  service: 'circulation',
+  perm: 'FINE_REASONS',
+  searchLabel: 'Tên / mã lý do',
+  searchPlaceholder: 'VD: QUAHAN, Mất tài liệu...',
+  columns: [
+    { key: 'code', label: 'Mã', type: 'mono', width: '140px' },
+    { key: 'name', label: 'Tên lý do phạt' },
+    { key: 'amount', label: 'Số tiền gợi ý (đ)', type: 'number', width: '160px' },
+    { key: 'itemStatus', label: 'Trạng thái tài liệu', type: 'lookup', width: '180px' },
+  ],
+  fields: [
+    { key: 'code', label: 'Mã', type: 'text', required: true, placeholder: 'VD: HUHONG', half: true, lockWhen: (x) => x['isBuiltIn'] === true },
+    { key: 'name', label: 'Tên lý do phạt', type: 'text', required: true, placeholder: 'VD: Hư hỏng tài liệu', half: true },
+    { key: 'amount', label: 'Số tiền gợi ý (đ)', type: 'number', half: true, hint: 'Điền sẵn khi thêm dòng phạt; lý do "Quá hạn" tính theo chính sách.' },
+    {
+      key: 'itemStatus', label: 'Trạng thái tài liệu khi phạt', type: 'select', emptyLabel: 'Không đổi', half: true,
+      options: [{ value: 'L', label: 'Mất tài liệu' }],
+      hint: 'Chọn "Mất tài liệu": lưu phiếu phạt sẽ đóng lượt mượn và chuyển bản sách sang trạng thái Mất.',
+    },
+  ],
+  defaults: { amount: 0, itemStatus: null },
+  badge: (x) => (x['isBuiltIn'] ? 'Hệ thống' : null),
+  toolbar: [
+    {
+      label: 'Thêm lý do mặc định', icon: 'playlist_add', action: 'add',
+      run: async (api) => { const r = await api.addDefaultFineReasons(); return r.added ? `Đã thêm ${r.added} lý do phạt mặc định` : 'Đã có đủ lý do mặc định'; },
+    },
+  ],
   modalWidth: 'max-w-lg',
 };

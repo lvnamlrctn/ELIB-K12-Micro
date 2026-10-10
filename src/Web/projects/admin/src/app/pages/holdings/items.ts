@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -6,15 +7,16 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 
-/** Nhãn + kiểu badge của mã trạng thái bản sách. */
-export function itemStatus(code: string): { name: string; badge: string } {
+/** Nhãn + kiểu badge của mã trạng thái bản sách; bản đang có người mượn (theo lưu thông) hiện "Đang mượn". */
+export function itemStatus(code: string, onLoan = false): { name: string; badge: string } {
+  if (onLoan) return { name: 'Đang mượn', badge: 'badge-info' };
   return ITEM_STATUSES.find((s) => s.code === code) ?? { name: code, badge: 'badge-off' };
 }
 
 /** Tìm kiếm tài liệu theo ĐKCB (monolith: /admin/books, quyền DOC_SEARCH) — sửa kho/ghi chú, xoá theo quyền CATALOG_BIBS. */
 @Component({
   selector: 'app-items',
-  imports: [FormsModule, RouterLink, Loading, Paginator, Modal, ConfirmDelete],
+  imports: [FormsModule, DatePipe, RouterLink, Loading, Paginator, Modal, ConfirmDelete],
   template: `
     <div class="mb-5"><h4 class="page-title">Tìm kiếm tài liệu</h4></div>
 
@@ -74,7 +76,8 @@ export function itemStatus(code: string): { name: string; badge: string } {
                 </td>
                 <td class="td">{{ it.author ?? '—' }}</td>
                 <td class="td">{{ it.storeCode ? it.storeCode + ' — ' + it.storeName : '—' }}</td>
-                <td class="td text-center"><span [class]="statusOf(it.status).badge">{{ statusOf(it.status).name }}</span></td>
+                <td class="td text-center"><span [class]="statusOf(it.status, it.onLoan).badge">{{ statusOf(it.status, it.onLoan).name }}</span>
+                  @if (it.onLoan) { <div class="text-[11px] text-gray-500">thẻ {{ it.loanCardNo }} · hạn {{ it.loanDueAt | date: 'dd/MM/yyyy' }}</div> }</td>
                 <td class="td text-[13px] text-gray-600">{{ it.note ?? '' }}</td>
                 <td class="td">
                   <div class="flex items-center justify-center gap-1.5">
@@ -130,7 +133,7 @@ export class Items implements OnInit {
   private readonly client: CrudClient<Item> = this.api.crud<Item>('items', 'holdings');
   protected readonly session = inject(Session);
 
-  protected readonly statuses = ITEM_STATUSES;
+  protected readonly statuses = [...ITEM_STATUSES, { code: 'B', name: 'Đang mượn', badge: 'badge-info' }];
   protected search: ItemSearch = { keyword: '', storeId: null, itemStatus: null, barcodeFrom: '', barcodeTo: '', pageIndex: 1, pageSize: 10 };
   protected readonly page = signal<CrudPage<Item> | null>(null);
   protected readonly stores = signal<Store[]>([]);
@@ -149,8 +152,8 @@ export class Items implements OnInit {
     }
   }
 
-  protected statusOf(code: string) {
-    return itemStatus(code);
+  protected statusOf(code: string, onLoan = false) {
+    return itemStatus(code, onLoan);
   }
 
   protected find(): void {

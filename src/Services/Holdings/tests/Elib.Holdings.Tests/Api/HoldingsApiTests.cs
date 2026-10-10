@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events.Catalog;
+using Elib.Contracts.Events.Circulation;
 using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Platform;
 using Elib.Holdings.Application;
@@ -193,6 +194,47 @@ public sealed class HoldingsApiTests : IClassFixture<HoldingsApiFactory>, IAsync
         Assert.Equal([shelf.Id, shelf.Id, null], all.Select(i => i.StoreId));
         var last = _factory.PublishedOf<ItemChanged>().Where(e => e.Barcode == "SD000001").MaxBy(e => e.Version)!;
         Assert.Equal(("R", 1L, "Kho KD"), (last.Status, last.Version, last.StoreName));
+    }
+
+    [Fact]
+    public async Task Loan_events_show_on_loan_and_a_lost_closure_marks_the_item_lost()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var bib = await PublishBib(tenantId, "Nhật ký trong tù");
+        var items = await Read<List<ItemDto>>(await Register(staff, bib.Mfn, 2, "NK"));
+        await Read<ShelveResult>(await staff.PostAsJsonAsync(U("/api/items/Shelve"), new ShelveRequest(Ids: [.. items.Select(i => i.PublicId)]), Json));
+        var now = DateTimeOffset.UtcNow;
+        LoanChanged Loan(ItemDto item, Guid id, long version, DateTimeOffset loanedAt, DateTimeOffset? returned = null, string? closed = null) => new()
+        {
+            TenantId = tenantId, LoanPublicId = id, ReaderPublicId = Guid.CreateVersion7(), CardNo = "HS01", ItemPublicId = item.PublicId,
+            Barcode = item.Barcode, Mfn = bib.Mfn, LoanedAt = loanedAt, DueAt = loanedAt.AddDays(14), ReturnedAt = returned,
+            ClosedItemStatus = closed, Version = version,
+        };
+
+        // Bản 1: mượn → đang mượn; event trả tới trước event gia hạn cũ hơn → giữ trạng thái đã trả.
+        var first = Guid.CreateVersion7();
+        foreach (var e in new[] { Loan(items[0], first, 0, now), Loan(items[0], first, 2, now, returned: now.AddDays(3)), Loan(items[0], first, 1, now) })
+        {
+            await _factory.PublishAsync(e);
+            await _factory.WaitConsumedAsync(e);
+        }
+        // Bản 2: mượn rồi đóng vì mất tài liệu → trạng thái "Mất", phát ItemChanged.
+        var second = Guid.CreateVersion7();
+        var open = Loan(items[1], second, 0, now);
+        await _factory.PublishAsync(open);
+        await _factory.WaitConsumedAsync(open);
+        var onLoan = await Read<CrudPage<ItemDto>>(await staff.PostAsJsonAsync(U("/api/items/Search"), new ItemSearch { Mfn = bib.Mfn, ItemStatus = "b" }, Json));
+        Assert.Equal(("NK000002", "HS01"), (Assert.Single(onLoan.Items).Barcode, onLoan.Items[0].LoanCardNo));
+
+        var lost = Loan(items[1], second, 1, now, returned: now.AddDays(1), closed: "L");
+        await _factory.PublishAsync(lost);
+        await _factory.WaitConsumedAsync(lost);
+
+        var all = await Read<List<ItemDto>>(await staff.PostAsJsonAsync(U("/api/items/SearchAll"), new ItemSearch { Mfn = bib.Mfn }, Json));
+        Assert.Equal([("R", false), ("L", false)], all.Select(i => (i.Status, i.OnLoan)));
+        var changed = _factory.PublishedOf<ItemChanged>().Where(e => e.ItemPublicId == items[1].PublicId).MaxBy(e => e.Version)!;
+        Assert.Equal("L", changed.Status);
     }
 
     [Fact]
