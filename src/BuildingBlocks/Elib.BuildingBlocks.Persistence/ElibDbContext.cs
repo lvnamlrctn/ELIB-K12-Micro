@@ -31,13 +31,15 @@ public abstract class ElibDbContext(DbContextOptions options, ITenantContext ten
     {
         base.OnModelCreating(modelBuilder);
 
-        // Test chạy SQLite: SQLite không so sánh/sắp xếp được DateTimeOffset → lưu dạng số (giữ thứ tự với giá trị UTC).
-        // PostgreSQL (production) dùng timestamptz như bình thường.
+        // Test chạy SQLite: SQLite không so sánh/sắp xếp được DateTimeOffset → lưu số tick UTC (giữ thứ tự). Giá trị khác offset 0
+        // bị từ chối như Npgsql làm với timestamptz ở production — lỗi lộ ra ngay trong test thay vì trên máy thật.
         if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
         {
+            var utcTicks = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
+                v => RequireUtc(v).UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
             foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(t => t.GetProperties())
                          .Where(p => p.ClrType == typeof(DateTimeOffset) || p.ClrType == typeof(DateTimeOffset?)))
-                property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.DateTimeOffsetToBinaryConverter());
+                property.SetValueConverter(utcTicks);
         }
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -47,6 +49,11 @@ public abstract class ElibDbContext(DbContextOptions options, ITenantContext ten
             ConfigureFiltersMethod.MakeGenericMethod(entityType.ClrType).Invoke(this, [modelBuilder]);
         }
     }
+
+    /// <summary>Như Npgsql: timestamptz chỉ nhận DateTimeOffset offset 0 — đổi về UTC trước khi ghi/so sánh.</summary>
+    public static DateTimeOffset RequireUtc(DateTimeOffset value) => value.Offset == TimeSpan.Zero
+        ? value
+        : throw new ArgumentException($"DateTimeOffset {value:O} có offset khác 0 — PostgreSQL timestamptz chỉ nhận UTC (gọi ToUniversalTime()).", nameof(value));
 
     private void ConfigureFilters<TEntity>(ModelBuilder modelBuilder) where TEntity : class
     {

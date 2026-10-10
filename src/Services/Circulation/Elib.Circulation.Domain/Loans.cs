@@ -109,6 +109,10 @@ public sealed class Loan : TenantEntity
     public int OverdueDays(DateTimeOffset now) => Math.Max(0, LocalDate(ReturnedAt ?? now).DayNumber - LocalDate(DueAt).DayNumber);
 
     public static DateOnly LocalDate(DateTimeOffset at) => DateOnly.FromDateTime(at.UtcDateTime.AddHours(7));
+
+    /// <summary>0 giờ ngày <paramref name="date"/> giờ Việt Nam, biểu diễn ở UTC (Npgsql chỉ ghi/so sánh timestamptz offset 0).</summary>
+    public static DateTimeOffset VietnamStart(DateOnly date) =>
+        new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
 }
 
 /// <summary>Bản sao bạn đọc từ patron (ReaderChanged) — docs 04: PatronReplica.</summary>

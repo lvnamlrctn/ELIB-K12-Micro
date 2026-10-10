@@ -321,5 +321,5 @@ public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, 
         return expired.Count;
     }
 
-    private static DateTimeOffset VietnamStart(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7));
+    private static DateTimeOffset VietnamStart(DateOnly date) => Loan.VietnamStart(date);
 }

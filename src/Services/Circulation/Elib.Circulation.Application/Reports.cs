@@ -336,7 +336,7 @@ public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant,
 
     private DateOnly Today => Loan.LocalDate(clock.GetUtcNow());
 
-    private static DateTimeOffset Start(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7));
+    private static DateTimeOffset Start(DateOnly date) => Loan.VietnamStart(date);
 
     private static string Day(DateTimeOffset at) => Loan.LocalDate(at).ToString(D, CultureInfo.InvariantCulture);
 

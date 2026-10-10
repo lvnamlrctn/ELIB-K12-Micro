@@ -69,7 +69,7 @@ public sealed class Hold : TenantEntity
         Barcode = item.Barcode;
         ReadyAt = now;
         var lastDay = Loan.LocalDate(now).AddDays(Math.Max(1, holdDays));
-        ExpiresAt = new DateTimeOffset(lastDay.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).AddTicks(-1);
+        ExpiresAt = Loan.VietnamStart(lastDay.AddDays(1)).AddTicks(-1);
     }
 
     public void Fulfil(DateTimeOffset now, ItemReplica item)

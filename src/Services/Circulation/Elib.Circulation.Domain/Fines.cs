@@ -134,7 +134,7 @@ public sealed class FineTicket : TenantEntity
     /// <summary>Giảm trừ, đã nộp, ghi chú, ngày phạt, số tiền phiếu thủ công; trạng thái cuối cùng.</summary>
     public void Settle(DateTimeOffset? fineDate, decimal? manualAmount, decimal discount, decimal paid, string? note, int status)
     {
-        if (fineDate is { } d) FineDate = d;
+        if (fineDate is { } d) FineDate = d.ToUniversalTime();
         ManualAmount = manualAmount is { } m ? FineMoney.Validate(m, "Số tiền phạt") : null;
         Discount = FineMoney.Validate(discount, "Giảm trừ");
         Paid = FineMoney.Validate(paid, "Tiền đã nộp");

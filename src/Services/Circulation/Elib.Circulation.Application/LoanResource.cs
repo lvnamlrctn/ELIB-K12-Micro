@@ -364,7 +364,7 @@ public sealed class LoanResource(
         return r is { Length: > 0 and <= 500 } ? r : throw new BusinessRuleException("REASON_REQUIRED", $"Nhập lý do {what} (tối đa 500 ký tự).");
     }
 
-    private static DateTimeOffset VietnamStart(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7));
+    private static DateTimeOffset VietnamStart(DateOnly date) => Loan.VietnamStart(date);
 
     private Task PublishAsync(Loan loan, CancellationToken ct) => publisher.PublishAsync(loan, ct);
 }

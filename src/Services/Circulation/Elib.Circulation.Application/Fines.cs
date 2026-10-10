@@ -411,5 +411,5 @@ public sealed class FineTicketResource(
 
     private static string Money(decimal amount) => amount.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) + "đ";
 
-    private static DateTimeOffset VietnamStart(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7));
+    private static DateTimeOffset VietnamStart(DateOnly date) => Loan.VietnamStart(date);
 }
