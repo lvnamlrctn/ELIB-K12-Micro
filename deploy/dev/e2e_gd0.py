@@ -30,6 +30,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
  19. lưu thông (tiếp): đặt mượn — hết bản thì xếp hàng, trả sách thì giữ cho người đặt + email "đã sẵn sàng" (Mailpit),
      người khác không mượn được bản đang giữ; phiếu phạt báo mất → lượt mượn đóng, holdings chuyển bản sách sang "Mất";
      sao chụp; báo cáo hoạt động + tài liệu mất; xuất Excel lịch sử.
+ 20. tra cứu OPAC (search): chỉ mục tự dựng khi service mới triển khai, tìm không dấu ẩn danh theo host, tìm nâng cao theo tác giả,
+     số bản / bản sẵn sàng, chi tiết + tình trạng từng bản, gợi ý nhan đề, ẩn biểu ghi khỏi OPAC, quản trị chỉ mục (trạng thái, dựng lại).
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -847,6 +849,63 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     tb.request("DELETE", f"{C}/bibs/Delete/{lbib['publicId']}", token=token)
     s, _, _ = tb.request("DELETE", f"{P}/readers/Delete/{lreader['publicId']}", token=token)
     expect(s == 204, "dọn bạn đọc, ĐKCB, biểu ghi thử (lượt mượn giữ làm lịch sử)")
+
+    print("20. Tra cứu OPAC (service search)")
+    S = "/api/admin/search"
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
+        {"tag": "100", "ind1": "0", "ind2": " ", "subfields": [{"code": "a", "value": "Nguyễn Du"}]},
+        {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": f"Truyện Kiều {tag} /"}]},
+        {"tag": "520", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "Kiệt tác thơ lục bát của văn học Việt Nam."}]}]})
+    sbib = json.loads(body) if s == 201 else {}
+    sprefix = f"S{tag.upper()}-"
+    s, _, body = tb.request("POST", f"{H}/items/Register", token=token, json_body={"mfn": sbib.get("mfn"), "quantity": 2, "prefix": sprefix, "digits": 3})
+    sitems = json.loads(body) if s == 200 else []
+    tb.request("POST", f"{H}/items/Shelve", token=token, json_body={"barcodes": [f"{sprefix}001"]})
+    expect(sbib and len(sitems) == 2, f"chuẩn bị biểu ghi MFN {sbib.get('mfn')} (Nguyễn Du) + 2 ĐKCB, 1 bản đã xếp giá", body[:200])
+
+    hit = {}
+    for _ in range(30):  # BibChanged/ItemChanged → search (bất đồng bộ)
+        s, _, body = opac.request("POST", "/api/opac/search/bibs/Search", json_body={"q": f"truyen kieu {tag}"})
+        items = json.loads(body).get("items", []) if s == 200 else []
+        hit = items[0] if items else {}
+        if hit.get("copies") == 2 and hit.get("available") == 1: break
+        time.sleep(1)
+    expect(hit.get("title") == f"Truyện Kiều {tag}" and hit.get("available") == 1, "OPAC ẩn danh: tìm không dấu, 2 bản / 1 bản sẵn sàng", body[:300])
+    s, _, body = opac.request("POST", "/api/opac/search/bibs/Search", json_body={"author": "nguyen du", "q": tag})
+    expect(s == 200 and json.loads(body)["total"] == 1 and json.loads(body)["facets"]["authors"][0]["key"] == "Nguyễn Du",
+           "tìm nâng cao theo tác giả + facet tác giả", body[:300])
+    s, _, body = opac.request("GET", f"/api/opac/search/bibs/{sbib['publicId']}")
+    detail = json.loads(body) if s == 200 else {}
+    statuses = sorted(c["statusName"] for c in detail.get("holdings", []))
+    expect(statuses == ["Sẵn sàng", "Đang xử lý"] and "lục bát" in (detail.get("summary") or ""), f"chi tiết: tóm tắt + tình trạng từng bản {statuses}", body[:300])
+    s, _, body = opac.request("GET", "/api/opac/search/suggest?q=" + urllib.parse.quote(f"truyen kieu {tag}"))
+    expect(s == 200 and json.loads(body) == [f"Truyện Kiều {tag}"], "gợi ý nhan đề khi gõ", body[:200])
+
+    tb.request("PUT", f"{C}/bibs/ChangeStatus", token=token, json_body={"publicId": sbib["publicId"], "status": 1})
+    total = None
+    for _ in range(20):
+        s, _, body = opac.request("POST", "/api/opac/search/bibs/Search", json_body={"q": f"truyen kieu {tag}"})
+        total = json.loads(body)["total"] if s == 200 else None
+        if total == 0: break
+        time.sleep(1)
+    expect(total == 0, "ẩn biểu ghi ở biên mục → biến mất khỏi OPAC", str(total))
+
+    s, _, body = tb.request("GET", f"{S}/index/Status", token=token)
+    st = json.loads(body) if s == 200 else {}
+    expect(st.get("indexedBibs", 0) >= 1, f"quản trị chỉ mục: {st.get('indexedBibs')} biểu ghi, {st.get('indexedItems')} bản sách", body[:300])
+    s, _, body = tb.request("POST", f"{S}/index/Rebuild", token=token)
+    for _ in range(60):
+        s2, _, body2 = tb.request("GET", f"{S}/index/Status", token=token)
+        st = json.loads(body2) if s2 == 200 else {}
+        if st.get("status") in ("Done", "Failed"): break
+        time.sleep(1)
+    expect(s == 202 and st.get("status") == "Done", f"dựng lại chỉ mục: {st.get('bibs')} biểu ghi, {st.get('items')} bản sách, {st.get('loans')} lượt đang mượn",
+           body2[:300])
+
+    for i in sitems:
+        tb.request("DELETE", f"{H}/items/Delete/{i['publicId']}", token=token)
+    s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{sbib['publicId']}", token=token)
+    expect(s == 204, "dọn ĐKCB, biểu ghi thử")
 
 
 if __name__ == "__main__":

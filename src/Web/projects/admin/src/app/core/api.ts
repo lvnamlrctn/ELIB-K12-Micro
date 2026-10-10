@@ -143,6 +143,10 @@ export interface CirculationReport {
   reportType: number; title: string; headers: string[]; rows: string[][]; totalCount: number; totalRow: string[] | null;
   libraryName: string | null; truncated: boolean;
 }
+export interface SearchIndexStatus {
+  status: string; startedAt: string | null; finishedAt: string | null; bibs: number; items: number; loans: number; error: string | null;
+  indexedBibs: number; visibleBibs: number; indexedItems: number;
+}
 export interface FineReason { id: number; publicId: string; code: string; name: string; amount: number; itemStatus: string | null; isBuiltIn: boolean; }
 /** status: 1 đang xử lý, 2 đã hoàn thành (như monolith). */
 export interface FineTicket {
@@ -428,6 +432,9 @@ export class Api {
   exportCirculationReport(body: CirculationReportRequest) {
     return blobRequest(firstValueFrom(this.http.post('/api/admin/circulation/reports/Export', body, { responseType: 'blob' })));
   }
+  // Chỉ mục tra cứu (search, quyền SEARCH_INDEX)
+  searchIndexStatus() { return this.get<SearchIndexStatus>('/api/admin/search/index/Status'); }
+  rebuildSearchIndex() { return this.post<{ status: string }>('/api/admin/search/index/Rebuild'); }
   // Đặt mượn (circulation, quyền REQUEST_BOOKS)
   searchHolds(search: HoldSearch) { return this.post<CrudPage<Hold>>('/api/admin/circulation/holds/Search', search); }
   placeHold(body: { cardNo: string; mfn?: number | null; barcode?: string | null; note?: string | null }) { return this.post<Hold>('/api/admin/circulation/holds/Place', body); }

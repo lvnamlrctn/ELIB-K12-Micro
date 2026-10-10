@@ -106,6 +106,14 @@ export class Menu {
         ],
       },
       {
+        title: 'Tra cứu',
+        icon: 'travel_explore',
+        module: 'SEARCH',
+        children: [
+          { title: 'Chỉ mục tra cứu (OPAC)', icon: 'manage_search', link: '/search-index', perm: 'SEARCH_INDEX' },
+        ],
+      },
+      {
         title: 'Quản lý Kho',
         icon: 'store',
         module: 'HOLDINGS',

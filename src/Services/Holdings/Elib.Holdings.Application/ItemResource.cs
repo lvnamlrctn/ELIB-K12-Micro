@@ -235,6 +235,17 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
                 $"ĐKCB {item.Barcode} chuyển trạng thái \"{ItemStatus.Names.GetValueOrDefault(item.Status)}\" (lưu thông báo mất, thẻ {e.CardNo})"), ct);
     }
 
+    public const int MaxStatePage = 2000;
+
+    /// <summary>Trạng thái mọi bản sách theo id tăng dần sau <paramref name="afterId"/> — search dựng chỉ mục lần đầu / dựng lại.</summary>
+    public async Task<(IReadOnlyList<ItemChanged> Items, long? Next)> StatesAsync(long afterId, int take, CancellationToken ct)
+    {
+        var size = Math.Clamp(take, 1, MaxStatePage);
+        var items = await Set.AsNoTracking().Where(x => x.Id > afterId).OrderBy(x => x.Id).Take(size).ToListAsync(ct);
+        var stores = await StoreNamesAsync(ct);
+        return (items.Select(i => ToEvent(i, deleted: false, stores)).ToList(), items.Count == size ? items[^1].Id : null);
+    }
+
     private static string NormalizePrefix(string? prefix)
     {
         var p = (prefix ?? "").Trim().ToUpperInvariant();

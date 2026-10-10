@@ -255,6 +255,16 @@ public sealed class LoanResource(
         return (await ToDtosAsync([loan], ct))[0];
     }
 
+    public const int MaxStatePage = 2000;
+
+    /// <summary>Lượt đang mượn theo id tăng dần sau <paramref name="afterId"/> — search dựng chỉ mục lần đầu / dựng lại.</summary>
+    public async Task<(IReadOnlyList<LoanChanged> Items, long? Next)> OpenStatesAsync(long afterId, int take, CancellationToken ct)
+    {
+        var size = Math.Clamp(take, 1, MaxStatePage);
+        var loans = await Set.AsNoTracking().Where(x => x.ReturnedAt == null && x.Id > afterId).OrderBy(x => x.Id).Take(size).ToListAsync(ct);
+        return (loans.Select(publisher.ToEvent).ToList(), loans.Count == size ? loans[^1].Id : null);
+    }
+
     /// <summary>Xuất Excel lịch sử lưu thông theo bộ lọc đang xem (monolith: CirculationHistory/Export), tối đa <see cref="CrudExcel.MaxExportRows"/> dòng.</summary>
     public async Task<byte[]> ExportAsync(LoanSearch search, CancellationToken ct)
     {

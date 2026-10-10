@@ -18,7 +18,11 @@ public sealed class LoanPublisher(IPublishEndpoint publisher, ITenantContext ten
     {
         ArgumentNullException.ThrowIfNull(loan);
         if (loan.PublicId == Guid.Empty) loan.PublicId = Guid.CreateVersion7(); // lượt mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(new LoanChanged
+        return publisher.Publish(ToEvent(loan), ct);
+    }
+
+    public LoanChanged ToEvent(Loan loan) =>
+        new()
         {
             TenantId = tenant.RequireTenantId(),
             Actor = new EventActor(actor.Id, actor.Kind),
@@ -35,8 +39,7 @@ public sealed class LoanPublisher(IPublishEndpoint publisher, ITenantContext ten
             RenewCount = loan.RenewCount,
             ClosedItemStatus = loan.ClosedItemStatus,
             Version = loan.Version,
-        }, ct);
-    }
+        };
 }
 
 public sealed record FineReasonRequest(string Code, string Name, decimal Amount = 0, string? ItemStatus = null);

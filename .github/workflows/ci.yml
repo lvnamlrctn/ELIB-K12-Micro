@@ -55,7 +55,7 @@ jobs:
       - name: Kiểm tra migration khớp model (không quên sinh migration)
         run: |
           dotnet tool install --global dotnet-ef --version 10.0.*
-          for p in Identity Tenant Notification Audit Media Patron Catalog Holdings Circulation; do
+          for p in Identity Tenant Notification Audit Media Patron Catalog Holdings Circulation Search; do
             dotnet ef migrations has-pending-model-changes --no-build --configuration Release \
               -p src/Services/$p/Elib.$p.Infrastructure -s src/Services/$p/Elib.$p.Infrastructure
           done
@@ -120,6 +120,7 @@ jobs:
           - { name: catalog, dockerfile: service, project: Services/Catalog/Elib.Catalog.Api/Elib.Catalog.Api.csproj, assembly: Elib.Catalog.Api }
           - { name: holdings, dockerfile: service, project: Services/Holdings/Elib.Holdings.Api/Elib.Holdings.Api.csproj, assembly: Elib.Holdings.Api }
           - { name: circulation, dockerfile: service, project: Services/Circulation/Elib.Circulation.Api/Elib.Circulation.Api.csproj, assembly: Elib.Circulation.Api }
+          - { name: search, dockerfile: service, project: Services/Search/Elib.Search.Api/Elib.Search.Api.csproj, assembly: Elib.Search.Api }
           - { name: admin-web, dockerfile: web, app: admin }
           - { name: opac-web, dockerfile: web, app: opac, nginx: web.opac.nginx.conf }
     steps:

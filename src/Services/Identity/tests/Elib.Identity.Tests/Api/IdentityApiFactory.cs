@@ -63,6 +63,7 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
             ["Identity:Clients:svc-catalog:ClientSecret"] = "catalog-secret-for-tests",
             ["Identity:Clients:svc-holdings:ClientSecret"] = "holdings-secret-for-tests",
             ["Identity:Clients:svc-circulation:ClientSecret"] = "circulation-secret-for-tests",
+            ["Identity:Clients:svc-search:ClientSecret"] = "search-secret-for-tests",
             ["Tenancy:GatewaySigningKey"] = GatewayKey,
             ["Identity:BootstrapAdmin:UserName"] = "sysadmin",
             ["Identity:BootstrapAdmin:Password"] = "Sysadmin123",

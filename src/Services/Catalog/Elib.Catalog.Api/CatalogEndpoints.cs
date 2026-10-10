@@ -4,6 +4,8 @@ using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Catalog.Application;
 using Elib.Catalog.Domain;
+using Elib.Contracts.Events.Catalog;
+using Elib.Contracts.Events.Platform;
 
 namespace Elib.Catalog.Api;
 
@@ -57,6 +59,15 @@ public static class CatalogEndpoints
         {
             using (tenant.Use(tenantId))
                 return await r.CurrentStateAsync(mfn, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapGet("/internal/tenants/{tenantId:long}/bibs", async (long tenantId, long? after, int? take, ITenantContext tenant, BibResource r, CancellationToken ct) =>
+        {
+            var size = Math.Clamp(take ?? 500, 1, BibResource.MaxStatePage);
+            using (tenant.Use(tenantId))
+            {
+                var items = await r.StatesAsync(after ?? 0, size, ct);
+                return new StatePage<BibChanged>(items, items.Count == size ? items[^1].Mfn : null);
+            }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }

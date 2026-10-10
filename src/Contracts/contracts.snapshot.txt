@@ -4,13 +4,23 @@ type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.Inte
   Author : System.String?
   BibPublicId : System.Guid required
   BibTypeId : Nullable<System.Int64>
+  BibTypeName : System.String?
+  Cutter : System.String?
   Ddc : System.String?
   Deleted : System.Boolean
+  Edition : System.String?
   Isbns : IReadOnlyList<System.String>
+  Keywords : System.String?
+  Language : System.String?
   Mfn : System.Int64 required
+  OtherAuthors : IReadOnlyList<System.String>
+  PhysicalDescription : System.String?
+  PublishPlace : System.String?
   PublishYear : System.String?
   Publisher : System.String?
+  Series : System.String?
   Status : System.Int32
+  Summary : System.String?
   Title : System.String required
   Version : System.Int64
 type Elib.Contracts.Events.Circulation.LoanChanged class : Elib.Contracts.Events.IntegrationEvent
@@ -95,6 +105,9 @@ type Elib.Contracts.Events.Platform.NotificationRequested class : Elib.Contracts
 type Elib.Contracts.Events.Platform.PermissionChanged class : Elib.Contracts.Events.IntegrationEvent
   AllUsersOfTenant : System.Boolean
   UserIds : IReadOnlyList<System.Int64>
+type Elib.Contracts.Events.Platform.StatePage`1 class
+  Items : IReadOnlyList<T>
+  Next : Nullable<System.Int64>
 type Elib.Contracts.Events.Platform.SystemAuditRecorded class : Elib.Contracts.Events.SystemEvent
   Action : System.String required
   ActorName : System.String?

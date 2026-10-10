@@ -157,32 +157,62 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
     /// /internal khi bản sao chưa có (service mới triển khai sau khi đã có biểu ghi, hoặc event chưa tới). Không có → null.
     /// </summary>
     public async Task<BibChanged?> CurrentStateAsync(long mfn, CancellationToken ct) =>
-        await Set.AsNoTracking().FirstOrDefaultAsync(x => x.Id == mfn, ct) is { } bib ? ToEvent(bib, deleted: false) : null;
+        await Set.AsNoTracking().FirstOrDefaultAsync(x => x.Id == mfn, ct) is { } bib ? await ToEventAsync(bib, deleted: false, ct) : null;
 
-    private Task PublishAsync(Bib bib, bool deleted, CancellationToken ct)
+    public const int MaxStatePage = 1000;
+
+    /// <summary>
+    /// Trạng thái mọi biểu ghi (kể cả đang ẩn) theo MFN tăng dần, sau <paramref name="afterMfn"/> — search dựng chỉ mục lần đầu
+    /// (service mới triển khai) hoặc khi quản trị bấm "Dựng lại chỉ mục".
+    /// </summary>
+    public async Task<IReadOnlyList<BibChanged>> StatesAsync(long afterMfn, int take, CancellationToken ct)
     {
-        if (bib.PublicId == Guid.Empty) bib.PublicId = Guid.CreateVersion7(); // biểu ghi mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(ToEvent(bib, deleted), ct);
+        var bibs = await Set.AsNoTracking().Where(x => x.Id > afterMfn).OrderBy(x => x.Id).Take(Math.Clamp(take, 1, MaxStatePage)).ToListAsync(ct);
+        var events = new List<BibChanged>(bibs.Count);
+        foreach (var bib in bibs) events.Add(await ToEventAsync(bib, deleted: false, ct));
+        return events;
     }
 
-    private BibChanged ToEvent(Bib bib, bool deleted) =>
-        new()
+    private async Task PublishAsync(Bib bib, bool deleted, CancellationToken ct)
+    {
+        if (bib.PublicId == Guid.Empty) bib.PublicId = Guid.CreateVersion7(); // biểu ghi mới: interceptor chỉ gán khi còn trống
+        await publisher.Publish(await ToEventAsync(bib, deleted, ct), ct);
+    }
+
+    private Dictionary<long, string>? _typeNames;
+
+    private async Task<BibChanged> ToEventAsync(Bib bib, bool deleted, CancellationToken ct)
+    {
+        _typeNames ??= await Db.Set<BibType>().AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+        var d = MarcRecord.Describe(bib.Fields);
+        return new()
         {
             TenantId = tenant.RequireTenantId(),
             Actor = new EventActor(actor.Id, actor.Kind),
             BibPublicId = bib.PublicId,
             Mfn = bib.Id,
             BibTypeId = bib.BibTypeId,
+            BibTypeName = bib.BibTypeId is { } type ? _typeNames.GetValueOrDefault(type) : null,
             Title = bib.Title,
             Author = bib.Author,
             Publisher = bib.Publisher,
             PublishYear = bib.PublishYear,
             Isbns = bib.IsbnList,
             Ddc = bib.Ddc,
+            Cutter = d.Cutter,
+            Keywords = bib.Keywords,
+            Language = bib.Language,
+            Summary = d.Summary,
+            Edition = d.Edition,
+            PublishPlace = d.PublishPlace,
+            PhysicalDescription = d.PhysicalDescription,
+            Series = d.Series,
+            OtherAuthors = d.OtherAuthors,
             Status = bib.Status,
             Deleted = deleted,
             Version = bib.Version + (deleted ? 1 : 0),
         };
+    }
 
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime.AddHours(7)); // giờ Việt Nam
 }

@@ -31,6 +31,8 @@ public static class PermissionCatalog
     private const string HoldingsLicense = "HOLDINGS";
     private const string CirculationGroup = "Lưu thông";
     private const string CirculationLicense = "CIRCULATION";
+    private const string SearchGroup = "Tra cứu";
+    private const string SearchLicense = "SEARCH";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -64,6 +66,8 @@ public static class PermissionCatalog
         new("CIRC_PLACES", "Điểm lưu thông", CirculationGroup, Crud, CirculationLicense),
         new("FINES", "Quản lý phạt", CirculationGroup, Crud, CirculationLicense),
         new("FINE_REASONS", "Lý do phạt", CirculationGroup, Crud, CirculationLicense),
+
+        new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

@@ -13,6 +13,10 @@ public sealed record BibChanged : IntegrationEvent
     public required long Mfn { get; init; }
 
     public long? BibTypeId { get; init; }
+
+    /// <summary>Tên loại biểu ghi lúc phát event (OPAC hiện "loại tài liệu", lọc theo loại).</summary>
+    public string? BibTypeName { get; init; }
+
     public required string Title { get; init; }
     public string? Author { get; init; }
     public string? Publisher { get; init; }
@@ -21,6 +25,17 @@ public sealed record BibChanged : IntegrationEvent
 
     /// <summary>Ký hiệu phân loại DDC (082$a).</summary>
     public string? Ddc { get; init; }
+
+    // Thông tin mô tả cho OPAC/tìm kiếm (search) — rút từ MARC lúc phát event.
+    public string? Cutter { get; init; }
+    public string? Keywords { get; init; }
+    public string? Language { get; init; }
+    public string? Summary { get; init; }
+    public string? Edition { get; init; }
+    public string? PublishPlace { get; init; }
+    public string? PhysicalDescription { get; init; }
+    public string? Series { get; init; }
+    public IReadOnlyList<string> OtherAuthors { get; init; } = [];
 
     /// <summary>2 = hiện trên OPAC, 1 = ẩn.</summary>
     public int Status { get; init; }

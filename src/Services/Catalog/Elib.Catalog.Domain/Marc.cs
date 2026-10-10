@@ -22,6 +22,10 @@ public sealed record MarcField(string Tag, string? Ind1 = null, string? Ind2 = n
         (Subfields ?? []).Where(s => s.Code.Length == 1 && s.Code[0] == code).Select(s => s.Value);
 }
 
+/// <summary>Thông tin mô tả thêm của biểu ghi cho OPAC (xem <see cref="MarcRecord.Describe"/>).</summary>
+public sealed record BibDescription(
+    string? Summary, string? Cutter, string? Edition, string? PublishPlace, string? PhysicalDescription, string? Series, IReadOnlyList<string> OtherAuthors);
+
 /// <summary>Thông tin tóm tắt rút từ MARC — lưu thành cột để tìm/lọc và gửi trong <c>BibChanged</c>.</summary>
 public sealed record BibSummary(
     string Title, string? Author, string? Publisher, string? PublishYear, IReadOnlyList<string> Isbns, string? Ddc, string? Keywords, string? Language);
@@ -91,6 +95,26 @@ public static partial class MarcRecord
             ?? (fields.FirstOrDefault(f => f.Tag == "008")?.Value is { Length: >= 38 } f008 ? f008.Substring(35, 3).Trim() : null);
         return new BibSummary(Cut(title, 1000)!, Cut(author, 500), Cut(publisher, 500), Year(date), isbns,
             Cut(FirstValue(fields, "082", 'a'), 50), keywords.Length > 0 ? Cut(keywords, 2000) : null, string.IsNullOrWhiteSpace(language) ? null : language);
+    }
+
+    /// <summary>
+    /// Thông tin mô tả cho OPAC/tìm kiếm (không lưu cột riêng ở catalog — đi theo BibChanged): tóm tắt 520$a, Cutter 082$b,
+    /// lần xuất bản 250$a, nơi xuất bản 264/260$a, mô tả vật lý 300$a, tùng thư 490/440$a, tác giả bổ sung 700/710$a.
+    /// </summary>
+    public static BibDescription Describe(IReadOnlyList<MarcField> fields)
+    {
+        var mainAuthor = FirstValue(fields, "100", 'a') ?? FirstValue(fields, "110", 'a');
+        var others = fields.Where(f => f.Tag is "700" or "710").SelectMany(f => f.Values('a')).Select(v => Trim(v))
+            .Where(v => v.Length > 0 && v != mainAuthor).Distinct().Take(20).Select(v => Cut(v, 250)!).ToList();
+        var summary = string.Join(" ", fields.Where(f => f.Tag == "520").SelectMany(f => f.Values('a')).Select(v => v.Trim()).Where(v => v.Length > 0));
+        return new BibDescription(
+            summary.Length > 0 ? Cut(summary, 4000) : null,
+            Cut(FirstValue(fields, "082", 'b'), 50),
+            Cut(FirstValue(fields, "250", 'a'), 250),
+            Cut(FirstValue(fields, "264", 'a') ?? FirstValue(fields, "260", 'a'), 250),
+            Cut(Join(First(fields, "300"), 'a', 'b', 'c'), 250),
+            Cut(FirstValue(fields, "490", 'a') ?? FirstValue(fields, "440", 'a'), 500),
+            others);
     }
 
     /// <summary>ISBN 10/13: bỏ gạch, khoảng trắng và phần chú thích "(bìa mềm)"; null nếu không giống ISBN.</summary>

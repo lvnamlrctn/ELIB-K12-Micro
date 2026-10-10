@@ -1,6 +1,9 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Circulation.Application;
+using Elib.Contracts.Events.Circulation;
+using Elib.Contracts.Events.Platform;
 
 namespace Elib.Circulation.Api;
 
@@ -22,6 +25,16 @@ public static class CirculationEndpoints
         api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")
             .MapPost("/AddDefaults", [Permission("FINE_REASONS", "add")] async (FineReasonResource r, CancellationToken ct)
                 => new { Added = await r.AddDefaultsAsync(ct) });
+
+        // Nội bộ: search dựng chỉ mục lần đầu lấy các lượt đang mượn (không qua gateway, chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/loans/open", async (long tenantId, long? after, int? take, ITenantContext tenant, LoanResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+            {
+                var (list, next) = await r.OpenStatesAsync(after ?? 0, take ?? 1000, ct);
+                return new StatePage<LoanChanged>(list, next);
+            }
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
         // Sao chụp: 8 endpoint chuẩn + tổng tiền, đánh dấu đã thu.
         var photos = api.MapCrud<PhotocopyResource>("/photocopies", "C_PHOTO").WithTags("Photocopies");

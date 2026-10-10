@@ -1,6 +1,8 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Tenancy;
+using Elib.Contracts.Events.Holdings;
+using Elib.Contracts.Events.Platform;
 using Elib.Holdings.Application;
 using Elib.Holdings.Domain;
 
@@ -37,6 +39,14 @@ public static class HoldingsEndpoints
         {
             using (tenant.Use(tenantId))
                 return await r.CurrentStateAsync(barcode, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapGet("/internal/tenants/{tenantId:long}/items", async (long tenantId, long? after, int? take, ITenantContext tenant, ItemResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+            {
+                var (list, next) = await r.StatesAsync(after ?? 0, take ?? 1000, ct);
+                return new StatePage<ItemChanged>(list, next);
+            }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
         return app;
