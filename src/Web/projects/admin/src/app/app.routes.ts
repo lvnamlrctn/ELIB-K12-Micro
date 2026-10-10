@@ -8,7 +8,7 @@ import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import { BIB_TYPES } from './pages/catalog/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
-import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES } from './pages/circulation/catalogs';
+import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -68,6 +68,8 @@ export const routes: Routes = [
       catalog('circ-places', CIRC_PLACES),
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),
+      catalog('photocopy', PHOTOCOPIES),
+      { path: 'circulation-report', loadComponent: () => import('./pages/circulation/reports').then((m) => m.CirculationReports), canActivate: [tenantGuard, permissionGuard('CIRC_REPORT')], title: 'Báo cáo lưu thông' },
       { path: 'request-books', loadComponent: () => import('./pages/circulation/holds').then((m) => m.Holds), canActivate: [tenantGuard, permissionGuard('REQUEST_BOOKS')], title: 'Yêu cầu mượn' },
       { path: 'fines', loadComponent: () => import('./pages/circulation/fines').then((m) => m.Fines), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Quản lý phạt' },
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Phiếu phạt' },

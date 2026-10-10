@@ -172,3 +172,17 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public bool Deleted { get; set; }
     public long Version { get; set; }
 }
+
+/// <summary>Một lần gia hạn (monolith: C_Renew) — báo cáo hoạt động phục vụ đếm lượt gia hạn theo ngày.</summary>
+public sealed class LoanRenewal : Entity, ITenantOwned
+{
+    public long TenantId { get; set; }
+    public Guid LoanPublicId { get; set; }
+    public Guid ReaderPublicId { get; set; }
+    public long? CircPlaceId { get; set; }
+    public DateTimeOffset RenewedAt { get; set; }
+    public DateTimeOffset OldDueAt { get; set; }
+    public DateTimeOffset NewDueAt { get; set; }
+    public string Reason { get; set; } = "";
+    public long? RenewedBy { get; set; }
+}

@@ -7,7 +7,7 @@ namespace Elib.Circulation.Api;
 /// <summary>
 /// Lưu thông (gateway: /api/admin/circulation/** → /api/**, cần license CIRCULATION). Mã quyền giữ như monolith:
 /// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt),
-/// REQUEST_BOOKS (đặt mượn).
+/// REQUEST_BOOKS (đặt mượn), C_PHOTO (sao chụp), CIRC_REPORT (báo cáo lưu thông).
 /// </summary>
 public static class CirculationEndpoints
 {
@@ -22,6 +22,21 @@ public static class CirculationEndpoints
         api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")
             .MapPost("/AddDefaults", [Permission("FINE_REASONS", "add")] async (FineReasonResource r, CancellationToken ct)
                 => new { Added = await r.AddDefaultsAsync(ct) });
+
+        // Sao chụp: 8 endpoint chuẩn + tổng tiền, đánh dấu đã thu.
+        var photos = api.MapCrud<PhotocopyResource>("/photocopies", "C_PHOTO").WithTags("Photocopies");
+        photos.MapPost("/Totals", [Permission("C_PHOTO", "view")] (PhotocopySearch search, PhotocopyResource r, CancellationToken ct) => r.TotalsAsync(search, ct));
+        photos.MapPost("/SetPaid", [Permission("C_PHOTO", "edit")] (PhotocopyPaidRequest request, PhotocopyResource r, CancellationToken ct) => r.SetPaidAsync(request, ct));
+
+        // Báo cáo lưu thông: 11 loại như monolith, xem theo trang hoặc xuất Excel.
+        var reports = api.MapGroup("/reports").WithTags("Reports");
+        reports.MapPost("/Search", [Permission("CIRC_REPORT", "view")] (CirculationReportRequest request, CirculationReports r, CancellationToken ct)
+            => r.BuildAsync(request, ct));
+        reports.MapPost("/Export", [Permission("CIRC_REPORT", "view")] async (CirculationReportRequest request, CirculationReports r, CancellationToken ct) =>
+        {
+            var file = await r.ExportAsync(request, ct);
+            return Results.File(file.Content, CrudExcel.ContentType, file.FileName);
+        });
 
         // Đặt mượn: cán bộ đặt hộ / huỷ; không sửa (huỷ rồi đặt lại).
         var holds = api.MapGroup("/holds").WithTags("Holds");
@@ -68,6 +83,8 @@ public static class CirculationEndpoints
             => r.NoteAsync(request, ct));
         loans.MapPost("/Search", [PermissionAny("LOAN_HISTORY:view", "BORROW:view")] (LoanSearch search, LoanResource r, CancellationToken ct)
             => r.SearchAsync(search, ct));
+        loans.MapPost("/Export", [PermissionAny("LOAN_HISTORY:view", "BORROW:view")] async (LoanSearch search, LoanResource r, CancellationToken ct)
+            => Results.File(await r.ExportAsync(search, ct), CrudExcel.ContentType, "lich-su-luu-thong.xlsx"));
         loans.MapGet("/GetById/{publicId:guid}", [PermissionAny("LOAN_HISTORY:view", "BORROW:view")] (Guid publicId, LoanResource r, CancellationToken ct)
             => r.GetAsync(publicId, ct));
         return app;

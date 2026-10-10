@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, CircPlace, CrudPage, Loan, LoanSearch, errorMessage } from '../../core/api';
+import { Api, CircPlace, CrudPage, Loan, LoanSearch, errorMessage, saveFile } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 
@@ -43,7 +43,8 @@ import { Loading, Paginator } from '../../shared/ui';
           <input id="lh-to" type="date" class="input" [(ngModel)]="search.to" (change)="find()" />
         </div>
       </div>
-      <div class="flex justify-end mt-4">
+      <div class="flex justify-end gap-2 mt-4">
+        <button (click)="export()" class="btn-secondary" [disabled]="exporting()"><span class="material-icons text-[18px]">download</span> Xuất Excel</button>
         <button (click)="find()" class="btn-primary"><span class="material-icons text-[18px]">search</span> Tìm kiếm</button>
       </div>
     </div>
@@ -92,6 +93,7 @@ export class LoanHistory implements OnInit {
   protected readonly page = signal<CrudPage<Loan> | null>(null);
   protected readonly places = signal<CircPlace[]>([]);
   protected readonly loading = signal(false);
+  protected readonly exporting = signal(false);
 
   async ngOnInit(): Promise<void> {
     void this.load();
@@ -115,6 +117,18 @@ export class LoanHistory implements OnInit {
     this.search.pageIndex = e.pageIndex;
     this.search.pageSize = e.pageSize;
     void this.load();
+  }
+
+  protected async export(): Promise<void> {
+    this.exporting.set(true);
+    try {
+      const s = this.search;
+      saveFile(await this.api.exportLoans({ ...s, keyword: s.keyword?.trim() || undefined, from: s.from || null, to: s.to || null }), 'lich-su-luu-thong.xlsx');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   private async load(): Promise<void> {

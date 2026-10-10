@@ -123,6 +123,26 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.LoanPublicId });
         });
 
+        modelBuilder.Entity<LoanRenewal>(e =>
+        {
+            e.ToTable("loan_renewals");
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.RenewedAt });
+            e.HasIndex(x => new { x.TenantId, x.LoanPublicId });
+        });
+
+        modelBuilder.Entity<Photocopy>(e =>
+        {
+            e.ToTable("photocopies");
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.Barcode).HasMaxLength(50);
+            e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.PhotoDate });
+            e.HasIndex(x => new { x.TenantId, x.CardNo });
+        });
+
         modelBuilder.Entity<Hold>(e =>
         {
             e.ToTable("holds");

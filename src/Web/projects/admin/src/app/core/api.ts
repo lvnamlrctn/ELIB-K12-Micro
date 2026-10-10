@@ -135,6 +135,14 @@ export const HOLD_STATUSES: { code: number; name: string; badge: string }[] = [
 export interface LoanSearch extends CrudSearch {
   cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; from?: string | null; to?: string | null;
 }
+export interface CirculationReportRequest {
+  reportType: number; from: string | null; to: string | null; circPlaceId: number | null; readerTypeId: number | null; className: string | null;
+  pageIndex: number; pageSize: number;
+}
+export interface CirculationReport {
+  reportType: number; title: string; headers: string[]; rows: string[][]; totalCount: number; totalRow: string[] | null;
+  libraryName: string | null; truncated: boolean;
+}
 export interface FineReason { id: number; publicId: string; code: string; name: string; amount: number; itemStatus: string | null; isBuiltIn: boolean; }
 /** status: 1 đang xử lý, 2 đã hoàn thành (như monolith). */
 export interface FineTicket {
@@ -412,6 +420,14 @@ export class Api {
   renewLoan(loanId: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Renew', { loanId, reason }); }
   noteLoan(loanId: string, note: string, reason: string) { return this.post<Loan>('/api/admin/circulation/loans/Note', { loanId, note, reason }); }
   searchLoans(search: LoanSearch) { return this.post<CrudPage<Loan>>('/api/admin/circulation/loans/Search', search); }
+  exportLoans(search: LoanSearch) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/circulation/loans/Export', search, { responseType: 'blob' })));
+  }
+  // Báo cáo lưu thông (quyền CIRC_REPORT)
+  circulationReport(body: CirculationReportRequest) { return this.post<CirculationReport>('/api/admin/circulation/reports/Search', body); }
+  exportCirculationReport(body: CirculationReportRequest) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/circulation/reports/Export', body, { responseType: 'blob' })));
+  }
   // Đặt mượn (circulation, quyền REQUEST_BOOKS)
   searchHolds(search: HoldSearch) { return this.post<CrudPage<Hold>>('/api/admin/circulation/holds/Search', search); }
   placeHold(body: { cardNo: string; mfn?: number | null; barcode?: string | null; note?: string | null }) { return this.post<Hold>('/api/admin/circulation/holds/Place', body); }

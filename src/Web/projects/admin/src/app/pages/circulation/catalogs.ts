@@ -104,3 +104,37 @@ export const FINE_REASONS: CrudConfig = {
   ],
   modalWidth: 'max-w-lg',
 };
+
+/** Photo copy tài liệu (monolith: /admin/photocopy, quyền C_PHOTO). Thành tiền = số trang × số bản × đơn giá, tính ở server. */
+export const PHOTOCOPIES: CrudConfig = {
+  title: 'Photo copy tài liệu',
+  resource: 'photocopies',
+  service: 'circulation',
+  perm: 'C_PHOTO',
+  searchLabel: 'Số thẻ / ĐKCB / họ tên / nhan đề',
+  searchPlaceholder: 'VD: HS001, VV000123...',
+  columns: [
+    { key: 'cardNo', label: 'Số thẻ', type: 'mono', width: '120px' },
+    { key: 'readerName', label: 'Bạn đọc' },
+    { key: 'barcode', label: 'ĐKCB', type: 'mono', width: '120px' },
+    { key: 'title', label: 'Nhan đề' },
+    { key: 'fromPage', label: 'Từ trang', type: 'number', width: '90px' },
+    { key: 'toPage', label: 'Đến trang', type: 'number', width: '90px' },
+    { key: 'copies', label: 'Số bản', type: 'number', width: '80px' },
+    { key: 'total', label: 'Thành tiền (đ)', type: 'number', width: '130px' },
+    { key: 'paid', label: 'Đã thu', type: 'bool', width: '90px' },
+    { key: 'photoDate', label: 'Ngày', width: '110px' },
+  ],
+  fields: [
+    { key: 'cardNo', label: 'Số thẻ bạn đọc', type: 'text', required: true, half: true },
+    { key: 'barcode', label: 'Số ĐKCB', type: 'text', required: true, half: true },
+    { key: 'fromPage', label: 'Từ trang', type: 'number', required: true, half: true },
+    { key: 'toPage', label: 'Đến trang', type: 'number', required: true, half: true },
+    { key: 'copies', label: 'Số bản', type: 'number', required: true, half: true },
+    { key: 'unitPrice', label: 'Đơn giá / trang (đ)', type: 'number', required: true, half: true },
+    { key: 'note', label: 'Ghi chú', type: 'text' },
+    { key: 'paid', label: 'Đã thu tiền', type: 'checkbox' },
+  ],
+  defaults: { fromPage: 1, toPage: 1, copies: 1, unitPrice: 500, paid: false },
+  modalWidth: 'max-w-lg',
+};

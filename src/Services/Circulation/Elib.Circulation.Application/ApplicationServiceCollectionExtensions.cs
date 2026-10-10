@@ -13,6 +13,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<FineReasonResource>();
         services.AddCrudResource<FineTicketResource>();
         services.AddCrudResource<HoldResource>();
+        services.AddCrudResource<PhotocopyResource>();
+        services.AddScoped<CirculationReports>();
         services.AddScoped<Replicas>();
         services.AddScoped<LoanPublisher>();
         services.AddScoped<ReaderNotifier>();

@@ -228,7 +228,13 @@ public sealed class LoanResource(
         var reader = await Db.Set<PatronReplica>().AsNoTracking().FirstOrDefaultAsync(r => r.ReaderPublicId == loan.ReaderPublicId, ct);
         var policy = await PolicyAsync(reader, loan.CircPlaceId, ct);
         var oldDue = loan.DueAt;
-        loan.Renew(clock.GetUtcNow(), policy);
+        var now = clock.GetUtcNow();
+        loan.Renew(now, policy);
+        Db.Set<LoanRenewal>().Add(new LoanRenewal
+        {
+            LoanPublicId = loan.PublicId, ReaderPublicId = loan.ReaderPublicId, CircPlaceId = loan.CircPlaceId, RenewedAt = now,
+            OldDueAt = oldDue, NewDueAt = loan.DueAt, Reason = reason, RenewedBy = actor.Id,
+        });
         await PublishAsync(loan, ct);
         await Record(loan, CrudChange.Updated,
             $"Gia hạn ĐKCB {loan.Barcode} — thẻ {loan.CardNo}: hạn {Loan.LocalDate(oldDue):dd/MM/yyyy} → {Loan.LocalDate(loan.DueAt):dd/MM/yyyy}. Lý do: {reason}", ct);
@@ -248,6 +254,31 @@ public sealed class LoanResource(
         await Record(loan, CrudChange.Updated, $"Sửa ghi chú ĐKCB {loan.Barcode}: \"{old}\" → \"{loan.Note}\". Lý do: {reason}", ct);
         await Db.SaveChangesAsync(ct);
         return (await ToDtosAsync([loan], ct))[0];
+    }
+
+    /// <summary>Xuất Excel lịch sử lưu thông theo bộ lọc đang xem (monolith: CirculationHistory/Export), tối đa <see cref="CrudExcel.MaxExportRows"/> dòng.</summary>
+    public async Task<byte[]> ExportAsync(LoanSearch search, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(search);
+        var rows = await Query(search).Take(CrudExcel.MaxExportRows + 1).Select(Projection).ToListAsync(ct);
+        if (rows.Count > CrudExcel.MaxExportRows)
+            throw new BusinessRuleException("EXPORT_TOO_LARGE", $"Kết quả quá {CrudExcel.MaxExportRows:N0} lượt mượn — thu hẹp khoảng ngày hoặc bộ lọc.");
+        var now = clock.GetUtcNow();
+        static string State(LoanDto l, DateTimeOffset now) => l.ReturnedAt is not null ? "Đã trả" : l.DueAt < now ? "Quá hạn" : "Đang mượn";
+        return CrudExcel.Export<LoanDto>("Lịch sử lưu thông",
+        [
+            new("cardNo", "Số thẻ", l => l.CardNo),
+            new("readerName", "Họ tên", l => l.ReaderName),
+            new("barcode", "Số ĐKCB", l => l.Barcode),
+            new("title", "Nhan đề", l => l.Title),
+            new("author", "Tác giả", l => l.Author),
+            new("loanedAt", "Ngày mượn", l => Loan.LocalDate(l.LoanedAt)),
+            new("dueAt", "Hạn trả", l => Loan.LocalDate(l.DueAt)),
+            new("returnedAt", "Ngày trả", l => l.ReturnedAt is { } r ? Loan.LocalDate(r) : null),
+            new("renewCount", "Số lần gia hạn", l => l.RenewCount),
+            new("state", "Tình trạng", l => State(l, now)),
+            new("note", "Ghi chú", l => l.Note),
+        ], rows);
     }
 
     private async Task<(Loan? Loan, string Message)> TryCheckoutAsync(

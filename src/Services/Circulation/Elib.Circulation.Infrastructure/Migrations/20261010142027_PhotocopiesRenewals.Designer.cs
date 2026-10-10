@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Elib.Circulation.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Elib.Circulation.Infrastructure.Migrations
 {
     [DbContext(typeof(CirculationDbContext))]
-    partial class CirculationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261010142027_PhotocopiesRenewals")]
+    partial class PhotocopiesRenewals
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

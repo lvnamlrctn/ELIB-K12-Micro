@@ -27,6 +27,9 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      xếp giá bằng mã quét, tìm theo trạng thái, kho còn sách không xoá được, nhật ký, dọn.
  18. lưu thông (circulation): quầy + chính sách mặc định, thông tin bạn đọc ở quầy, mượn (bản chưa xếp giá bị từ chối),
      không mượn trùng, gia hạn, trả bằng mã quét, lịch sử, nhật ký.
+ 19. lưu thông (tiếp): đặt mượn — hết bản thì xếp hàng, trả sách thì giữ cho người đặt + email "đã sẵn sàng" (Mailpit),
+     người khác không mượn được bản đang giữ; phiếu phạt báo mất → lượt mượn đóng, holdings chuyển bản sách sang "Mất";
+     sao chụp; báo cáo hoạt động + tài liệu mất; xuất Excel lịch sử.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -776,6 +779,69 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(s == 200 and json.loads(body)["totalCount"] == 1, "lịch sử: lượt đã trả", body[:200])
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"thẻ {lcard}")
     step("nhật ký có lượt mượn (circulation → audit)")
+
+    print("19. Lưu thông: đặt mượn, phạt, sao chụp, báo cáo")
+    tb.request("POST", f"{H}/items/Shelve", token=token, json_body={"barcodes": [f"{lprefix}002"]})
+    hcard, hmail = f"DM{tag.upper()}", f"e2e-hold-{tag}@example.com"
+    s, _, body = tb.request("POST", f"{P}/readers/Add", token=token, json_body={"cardNo": hcard, "lastName": "Đỗ", "firstName": "Đặt", "email": hmail})
+    hreader = json.loads(body) if s == 201 else {}
+    for _ in range(15):  # bản 002 vừa xếp giá — chờ ItemChanged tới circulation
+        s, _, body = tb.request("POST", f"{L}/loans/Checkout", token=token,
+                                json_body={"cardNo": lcard, "barcodes": [f"{lprefix}001", f"{lprefix}002"], "circPlaceId": quay["id"]})
+        r = json.loads(body) if s == 200 else {}
+        if r.get("succeeded") == 2: break
+        time.sleep(1)
+    expect(r.get("succeeded") == 2 and hreader, f"bạn đọc {lcard} mượn cả 2 bản", body[:300])
+    lost_loan = next(l["loan"] for l in r["lines"] if l["barcode"].upper() == f"{lprefix}001")
+    s, _, body = tb.request("POST", f"{L}/holds/Place", token=token, json_body={"cardNo": hcard, "mfn": lbib.get("mfn"), "note": "E2E"})
+    hold = json.loads(body) if s == 201 else {}
+    expect(hold.get("status") == 1 and hold.get("queuePosition") == 1, "đặt mượn khi hết bản → xếp hàng thứ 1", body[:300])
+    before, _ = mailpit_latest(hmail, wait=0)
+    s, _, body = tb.request("POST", f"{L}/loans/Return", token=token, json_body={"barcode": f"{lprefix}002", "circPlaceId": quay["id"]})
+    held = (json.loads(body) if s == 200 else {}).get("holdFor") or {}
+    expect(held.get("cardNo") == hcard and held.get("status") == 2, f"trả {lprefix}002 → giữ cho người đặt {hcard}", body[:300])
+    _, text = mailpit_latest(hmail, after_id=before)
+    expect(text and "đã được giữ" in text and f"{lprefix}002" in text, "email \"sách đặt mượn đã sẵn sàng\" tới bạn đọc (notification)", str(text)[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Checkout", token=token, json_body={"cardNo": lcard, "barcodes": [f"{lprefix}002"], "circPlaceId": quay["id"]})
+    expect(s == 200 and "đang giữ cho bạn đọc đặt mượn" in json.loads(body)["lines"][0]["message"], "người khác không mượn được bản đang giữ", body[:200])
+    s, _, body = tb.request("POST", f"{L}/loans/Checkout", token=token, json_body={"cardNo": hcard, "barcodes": [f"{lprefix}002"], "circPlaceId": quay["id"]})
+    s2, _, body2 = tb.request("POST", f"{L}/holds/Search", token=token, json_body={"cardNo": hcard})
+    expect(s == 200 and json.loads(body)["succeeded"] == 1 and json.loads(body2)["items"][0]["status"] == 3, "người đặt mượn được → đặt mượn hoàn thành", body2[:200])
+
+    s, _, body = tb.request("POST", f"{L}/fine-tickets/BuildForReader", token=token, json_body={"cardNo": lcard, "loanIds": [lost_loan["publicId"]]})
+    ticket = json.loads(body) if s == 200 else {}
+    line = (ticket.get("lines") or [{}])[0]
+    expect(line.get("reasonCode") == "MATTL" and line.get("loanOpen"), f"lập phiếu phạt {ticket.get('ticket', {}).get('code')}: dòng \"Mất tài liệu\"", body[:300])
+    s, _, body = tb.request("PUT", f"{L}/fine-tickets/Save/{ticket['ticket']['publicId']}", token=token, json_body={
+        "status": 2, "discount": 0, "paid": 50000, "note": "E2E đền sách", "lines": [{"id": line["id"], "reasonCode": "MATTL", "amount": 50000}], "deletedLineIds": []})
+    saved = json.loads(body) if s == 200 else {}
+    expect(saved.get("ticket", {}).get("remaining") == 0 and not saved["lines"][0]["loanOpen"], "lưu phiếu: nộp đủ 50.000đ, lượt mượn đóng vì mất", body[:300])
+    status = None
+    for _ in range(20):  # holdings nhận LoanChanged (ClosedItemStatus = L)
+        s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": f"{lprefix}001"})
+        status = (json.loads(body)["items"] or [{}])[0].get("status") if s == 200 else None
+        if status == "L": break
+        time.sleep(1)
+    expect(status == "L", f"holdings: {lprefix}001 chuyển trạng thái \"Mất\"", str(status))
+    s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": f"{lprefix}002", "itemStatus": "B"})
+    expect(s == 200 and json.loads(body)["totalCount"] == 1, f"holdings: {lprefix}002 hiện \"Đang mượn\" (lọc mã B)", body[:200])
+
+    s, _, body = tb.request("POST", f"{L}/photocopies/Add", token=token,
+                            json_body={"cardNo": hcard, "barcode": f"{lprefix}002", "fromPage": 1, "toPage": 10, "copies": 2, "unitPrice": 500})
+    photo = json.loads(body) if s == 201 else {}
+    expect(photo.get("total") == 10000, "sao chụp: 10 trang × 2 bản × 500đ = 10.000đ (tính ở server)", body[:200])
+    today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600))
+    s, _, body = tb.request("POST", f"{L}/reports/Search", token=token, json_body={"reportType": 1, "from": today, "to": today})
+    daily = json.loads(body) if s == 200 else {}
+    expect(daily.get("totalRow") and int(daily["totalRow"][1]) >= 3, f"báo cáo hoạt động phục vụ hôm nay: {daily.get('totalRow')}", body[:300])
+    s, _, body = tb.request("POST", f"{L}/reports/Search", token=token, json_body={"reportType": 11, "from": today, "to": today, "pageSize": 100})
+    expect(s == 200 and any(r[1].upper() == f"{lprefix}001" for r in json.loads(body)["rows"]), "báo cáo tài liệu mất có bản vừa báo mất", body[:300])
+    s, h, body = tb.request("POST", f"{L}/loans/Export", token=token, json_body={"cardNo": lcard}, binary=True)
+    expect(s == 200 and body[:2] == b"PK", "xuất Excel lịch sử lưu thông", str(s))
+
+    tb.request("POST", f"{L}/loans/Return", token=token, json_body={"barcode": f"{lprefix}002"})
+    tb.request("DELETE", f"{L}/photocopies/Delete/{photo.get('publicId')}", token=token)
+    tb.request("DELETE", f"{P}/readers/Delete/{hreader['publicId']}", token=token)
     for i in litems:
         tb.request("DELETE", f"{H}/items/Delete/{i['publicId']}", token=token)
     tb.request("DELETE", f"{C}/bibs/Delete/{lbib['publicId']}", token=token)
