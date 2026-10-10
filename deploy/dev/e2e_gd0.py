@@ -23,6 +23,8 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
  16. biên mục (catalog): loại biểu ghi + biểu mẫu mặc định (tự dựng bản sao đơn vị khi service mới triển khai), từ điển MARC21,
      biên mục biểu ghi theo biểu mẫu (001/003/005/008 tự sinh), tìm không dấu, trùng ISBN, ẩn khỏi OPAC, nhật ký,
      xuất ISO2709 + nhập lại (bỏ qua trùng), nhập MARCXML (biểu ghi lỗi: từ chối cả file / bỏ qua), xoá.
+ 17. kho (holdings): loại kho + kho chung mặc định, đăng ký ĐKCB theo lô (nhan đề lấy từ catalog), số tiếp theo, trùng mã,
+     xếp giá bằng mã quét, tìm theo trạng thái, kho còn sách không xoá được, nhật ký, dọn.
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -676,6 +678,51 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{bib['publicId']}", token=token)
     s2, _, _ = tb.request("GET", f"{C}/bibs/GetByMfn/{bib['mfn']}", token=token)
     expect(s == 204 and s2 == 404, "xoá biểu ghi thử")
+
+    print("17. Kho (service holdings)")
+    H = "/api/admin/holdings"
+    stores = []
+    for _ in range(30):  # holdings vừa triển khai: chờ tự dựng bản sao đơn vị + seed kho chung
+        s, _, body = tb.request("POST", f"{H}/stores/SearchAll", token=token, json_body={})
+        stores = json.loads(body) if s == 200 else []
+        if any(x["code"] == "KC" for x in stores): break
+        time.sleep(2)
+    kc = next((x for x in stores if x["code"] == "KC"), None)
+    s, _, body = tb.request("POST", f"{H}/store-types/SearchAll", token=token, json_body={})
+    expect(kc is not None and s == 200 and len(json.loads(body)) >= 2, f"loại kho + kho chung mặc định ({len(stores)} kho)", f"{s} {body[:200]}")
+
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
+        {"tag": "100", "ind1": "1", "ind2": " ", "subfields": [{"code": "a", "value": "Nguyễn Nhật Ánh"}]},
+        {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": f"Kính vạn hoa {tag}"}]}]})
+    kbib = json.loads(body) if s == 201 else {}
+    expect(s == 201, f"biên mục biểu ghi để đăng ký cá biệt (MFN {kbib.get('mfn')})", body[:200])
+    prefix = f"T{tag.upper()}-"
+    s, _, body = tb.request("POST", f"{H}/items/Register", token=token,
+                            json_body={"mfn": kbib["mfn"], "quantity": 3, "prefix": prefix.lower(), "digits": 4, "storeId": kc["id"]})
+    items = json.loads(body) if s == 200 else []
+    expect([i["barcode"] for i in items] == [f"{prefix}000{n}" for n in (1, 2, 3)]
+           and all(i["status"] == "I" and i["title"] == f"Kính vạn hoa {tag}" and i["storeCode"] == "KC" for i in items),
+           f"đăng ký 3 ĐKCB theo lô {prefix}0001–0003 (nhan đề từ catalog)", body[:300])
+    s, _, body = tb.request("GET", f"{H}/items/NextBarcode?prefix={prefix}&digits=4", token=token)
+    expect(s == 200 and json.loads(body)["barcode"] == f"{prefix}0004", "số ĐKCB tiếp theo", body[:200])
+    s, _, body = tb.request("POST", f"{H}/items/Add", token=token, json_body={"mfn": kbib["mfn"], "barcode": f"{prefix.lower()}0002"})
+    expect(s == 409, "ĐKCB trùng (không phân biệt hoa/thường) bị từ chối", f"{s} {body[:200]}")
+    s, _, body = tb.request("POST", f"{H}/items/Shelve", token=token, json_body={"barcodes": [f"{prefix.lower()}0001", f"{prefix}0002", "KHONG-CO"]})
+    r = json.loads(body) if s == 200 else {}
+    expect(r.get("shelved") == 2 and r.get("notFound") == ["KHONG-CO"], "xếp giá 2 bản bằng mã quét", body[:200])
+    s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": prefix, "itemStatus": "R"})
+    expect(s == 200 and json.loads(body)["totalCount"] == 2, "tìm tài liệu theo trạng thái sẵn sàng", body[:200])
+    s, _, body = tb.request("GET", f"{H}/stores/{kc['id']}", token=token)
+    expect(s == 200 and json.loads(body)["itemCount"] >= 3, f"kho chung có {json.loads(body).get('itemCount')} bản", body[:200])
+    s, _, body = tb.request("DELETE", f"{H}/stores/Delete/{kc['publicId']}", token=token)
+    expect(s == 409 and json.loads(body).get("code") == "STORE_NOT_EMPTY", "kho còn bản sách không xoá được", f"{s} {body[:200]}")
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"cho MFN {kbib['mfn']}")
+    step("nhật ký có đăng ký cá biệt (holdings → audit)")
+    for i in items:
+        tb.request("DELETE", f"{H}/items/Delete/{i['publicId']}", token=token)
+    s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": prefix})
+    tb.request("DELETE", f"{C}/bibs/Delete/{kbib['publicId']}", token=token)
+    expect(s == 200 and json.loads(body)["totalCount"] == 0, "dọn ĐKCB và biểu ghi thử")
 
 
 if __name__ == "__main__":

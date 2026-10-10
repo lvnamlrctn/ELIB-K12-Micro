@@ -6,6 +6,7 @@ import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
+import { BibItems } from '../holdings/bib-items';
 import { MarcPick } from './marc-tools';
 
 /** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
@@ -19,7 +20,7 @@ const BLANK_FIELDS: MarcField[] = [
 /** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick],
+  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" title="Quay lại"><span class="material-icons">arrow_back</span></a>
@@ -71,6 +72,10 @@ const BLANK_FIELDS: MarcField[] = [
           </ul>
           <button type="button" class="btn-secondary !py-1 !px-3 mt-2" (click)="save(true)">Vẫn lưu biểu ghi mới</button>
         </div>
+      }
+
+      @if (bib(); as b) {
+        @if (hasHoldings()) { <app-bib-items [mfn]="b.mfn" /> }
       }
 
       <div class="flex gap-3 px-5 py-4 border-t border-gray-100">
@@ -140,6 +145,11 @@ export class BibEdit implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Đơn vị có phân hệ Quản lý kho → hiện khung đăng ký cá biệt. */
+  protected hasHoldings(): boolean {
+    return (this.session.features()?.modules ?? []).includes('HOLDINGS');
   }
 
   protected canSave(): boolean {

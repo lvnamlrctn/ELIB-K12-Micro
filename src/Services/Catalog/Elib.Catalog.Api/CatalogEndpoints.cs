@@ -1,6 +1,7 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Catalog.Application;
 using Elib.Catalog.Domain;
 
@@ -50,6 +51,13 @@ public static class CatalogEndpoints
 
         // Từ điển MARC21 dùng chung — cán bộ nào dùng phân hệ Biên mục cũng đọc được (màn biên mục, biểu mẫu).
         api.MapGet("/marc21/fields", () => Marc21Definitions.Fields).WithTags("Marc21");
+
+        // Nội bộ: service khác lấy trạng thái biểu ghi khi bản sao của nó chưa có biểu ghi này (không qua gateway, chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/bibs/{mfn:long}", async (long tenantId, long mfn, ITenantContext tenant, BibResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.CurrentStateAsync(mfn, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }
 

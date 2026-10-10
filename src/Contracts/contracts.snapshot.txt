@@ -16,6 +16,16 @@ type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.Inte
 type Elib.Contracts.Events.EventActor class
   Id : Nullable<System.Int64>
   Kind : System.String
+type Elib.Contracts.Events.Holdings.ItemChanged class : Elib.Contracts.Events.IntegrationEvent
+  Barcode : System.String required
+  BibPublicId : System.Guid required
+  Deleted : System.Boolean
+  ItemPublicId : System.Guid required
+  Mfn : System.Int64 required
+  Status : System.String required
+  StoreId : Nullable<System.Int64>
+  StoreName : System.String?
+  Version : System.Int64
 type Elib.Contracts.Events.IntegrationEvent abstract
   Actor : Elib.Contracts.Events.EventActor
   EventId : System.Guid

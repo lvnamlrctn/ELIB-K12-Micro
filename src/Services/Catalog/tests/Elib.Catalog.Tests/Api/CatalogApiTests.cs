@@ -225,4 +225,21 @@ public sealed class CatalogApiTests : IClassFixture<CatalogApiFactory>, IAsyncLi
         Assert.Equal(HttpStatusCode.Forbidden, (await AddBib(viewer, Book("X"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PostAsJsonAsync(U("/api/worksheets/Search"), new WorksheetSearch(), Json)).StatusCode);
     }
+
+    [Fact]
+    public async Task Internal_bib_state_is_for_service_callers_only()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var created = await Read<BibDto>(await AddBib(staff, Book("Nhật ký trong tù", "978-604-0-00009-9")));
+
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        var state = await Read<BibChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/bibs/{created.Mfn}")));
+        Assert.Equal((created.PublicId, created.Mfn, tenantId, "Nhật ký trong tù", false), (state.BibPublicId, state.Mfn, state.TenantId, state.Title, state.Deleted));
+        Assert.Equal(["9786040000099"], state.Isbns);
+
+        // Đơn vị khác không có biểu ghi này; cán bộ không gọi được endpoint nội bộ.
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{NewTenant()}/bibs/{created.Mfn}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenantId}/bibs/{created.Mfn}"))).StatusCode);
+    }
 }

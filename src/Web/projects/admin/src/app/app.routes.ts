@@ -7,6 +7,7 @@ import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSIT
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import { BIB_TYPES } from './pages/catalog/catalogs';
+import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -59,6 +60,10 @@ export const routes: Routes = [
       { path: 'catalog-bibs', loadComponent: () => import('./pages/catalog/bibs').then((m) => m.Bibs), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'Biên mục biểu ghi' },
       // ":mfn" = "new" khi biên mục mới (monolith: /catalog-bibs/new và /catalog-bibs/edit/:mfn).
       { path: 'catalog-bibs/:mfn', loadComponent: () => import('./pages/catalog/bib-edit').then((m) => m.BibEdit), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'Biên mục' },
+      catalog('store-types', STORE_TYPES),
+      catalog('stores', STORES),
+      { path: 'books', loadComponent: () => import('./pages/holdings/items').then((m) => m.Items), canActivate: [tenantGuard, permissionGuard('DOC_SEARCH')], title: 'Tìm kiếm tài liệu' },
+      { path: 'shelving', loadComponent: () => import('./pages/holdings/shelving').then((m) => m.Shelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], title: 'Xếp giá' },
       {
         path: 'system-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
         canActivate: [tenantGuard, permissionGuard('SYSTEM_LOG')], data: { scope: 'tenant' }, title: 'Nhật ký hệ thống',

@@ -53,6 +53,13 @@
     <Project Path="src/Services/Catalog/Elib.Catalog.Infrastructure/Elib.Catalog.Infrastructure.csproj" />
     <Project Path="src/Services/Catalog/tests/Elib.Catalog.Tests/Elib.Catalog.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Holdings/">
+    <Project Path="src/Services/Holdings/Elib.Holdings.Api/Elib.Holdings.Api.csproj" />
+    <Project Path="src/Services/Holdings/Elib.Holdings.Application/Elib.Holdings.Application.csproj" />
+    <Project Path="src/Services/Holdings/Elib.Holdings.Domain/Elib.Holdings.Domain.csproj" />
+    <Project Path="src/Services/Holdings/Elib.Holdings.Infrastructure/Elib.Holdings.Infrastructure.csproj" />
+    <Project Path="src/Services/Holdings/tests/Elib.Holdings.Tests/Elib.Holdings.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />

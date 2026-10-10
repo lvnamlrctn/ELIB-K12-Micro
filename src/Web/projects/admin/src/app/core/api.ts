@@ -75,6 +75,30 @@ export interface MarcPreviewRecord { record: number; leader: string; fields: Mar
 export interface MarcFilePreview { total: number; records: MarcPreviewRecord[]; }
 export type MarcFormat = 'iso2709' | 'marcxml';
 
+// ── Kho (service holdings) ──
+export interface Store {
+  id: number; publicId: string; code: string; name: string; storeTypeId: number | null; position: string | null; capacity: number | null; itemCount: number;
+}
+/** Trạng thái bản sách (mã monolith): I chưa xếp giá, R sẵn sàng, L mất, S thanh lý, X xuất kho. */
+export const ITEM_STATUSES: { code: string; name: string; badge: string }[] = [
+  { code: 'I', name: 'Chưa xếp giá', badge: 'badge-off' },
+  { code: 'R', name: 'Sẵn sàng', badge: 'badge-on' },
+  { code: 'L', name: 'Mất', badge: 'badge-off' },
+  { code: 'S', name: 'Đã thanh lý', badge: 'badge-off' },
+  { code: 'X', name: 'Xuất kho', badge: 'badge-off' },
+];
+export interface Item {
+  id: number; publicId: string; barcode: string; mfn: number; bibPublicId: string; title: string | null; author: string | null;
+  publishYear: string | null; ddc: string | null; storeId: number | null; storeCode: string | null; storeName: string | null;
+  status: string; note: string | null; version: number; createdAt: string; updatedAt: string | null;
+}
+export interface ItemSearch extends CrudSearch {
+  mfn?: number | null; storeId?: number | null; itemStatus?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null;
+}
+export interface RegisterItems { mfn: number; quantity: number; prefix: string; digits: number; startNumber?: number | null; storeId?: number | null; }
+export interface NextBarcode { prefix: string; number: number; barcode: string; }
+export interface ShelveResult { shelved: number; notFound: string[]; skipped: string[]; }
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -318,6 +342,11 @@ export class Api {
   exportMarc(search: BibSearch, format: MarcFormat) {
     return blobRequest(firstValueFrom(this.http.post('/api/admin/catalog/bibs/ExportMarc', { search, format }, { responseType: 'blob' })));
   }
+  // Kho (holdings): crud('stores' | 'store-types' | 'items', 'holdings') + đăng ký theo lô, tìm, xếp giá
+  lookupItems(search: ItemSearch) { return this.post<CrudPage<Item>>('/api/admin/holdings/items/Lookup', search); }
+  registerItems(body: RegisterItems) { return this.post<Item[]>('/api/admin/holdings/items/Register', body); }
+  nextBarcode(prefix: string, digits: number) { return this.get<NextBarcode>('/api/admin/holdings/items/NextBarcode', { prefix, digits }); }
+  shelveItems(body: { ids?: string[]; barcodes?: string[]; storeId?: number | null }) { return this.post<ShelveResult>('/api/admin/holdings/items/Shelve', body); }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */

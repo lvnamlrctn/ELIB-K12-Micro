@@ -10,7 +10,8 @@ import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from './ui';
 export interface CrudColumn {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'status' | 'bool' | 'mono';
+  /** 'lookup': hiện nhãn lựa chọn của ô nhập cùng key (vd tên loại kho thay vì id). */
+  type?: 'text' | 'number' | 'status' | 'bool' | 'mono' | 'lookup';
   width?: string;
 }
 
@@ -20,6 +21,8 @@ export interface CrudField {
   type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select';
   /** Lựa chọn của ô 'select'. */
   options?: { value: string | number; label: string }[];
+  /** Lựa chọn lấy từ API khi mở màn (vd danh sách loại kho); thêm sẵn lựa chọn trống "—". */
+  optionsFrom?: (api: Api) => Promise<{ value: string | number; label: string }[]>;
   required?: boolean;
   placeholder?: string;
   hint?: string;
@@ -160,6 +163,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                         @if (row[col.key]) { <span class="badge-info">Có</span> } @else { <span class="text-gray-300">—</span> }
                       }
                       @case ('mono') { <span class="font-mono text-[13px]">{{ row[col.key] }}</span> }
+                      @case ('lookup') { {{ optionLabel(col.key, row[col.key]) }} }
                       @default { <span class="line-clamp-2 break-all">{{ row[col.key] ?? '—' }}</span> }
                     }
                     @if (first && c.badge?.(row); as b) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">{{ b }}</span> }
@@ -221,7 +225,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                   }
                   @case ('select') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)">
-                      @for (o of f.options ?? []; track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                      @for (o of optionsOf(f); track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
                     </select>
                   }
                   @case ('status') {
@@ -281,6 +285,7 @@ export class CrudPage implements OnInit {
   protected readonly editing = signal<Row | null>(null);
   protected readonly deleting = signal<string[]>([]);
   protected readonly importing = signal(false);
+  private readonly loadedOptions = signal<Record<string, { value: string | number | null; label: string }[]>>({});
 
   protected readonly colspan = computed(() => this.config().columns.length + (this.config().hasStatus ? 4 : 3));
   protected readonly allSelected = computed(() => {
@@ -291,6 +296,28 @@ export class CrudPage implements OnInit {
   ngOnInit(): void {
     this.client = this.api.crud<Row>(this.config().resource, this.config().service);
     void this.load();
+    void this.loadOptions();
+  }
+
+  protected optionsOf(field: CrudField): { value: string | number | null; label: string }[] {
+    return this.loadedOptions()[field.key] ?? field.options ?? [];
+  }
+
+  protected optionLabel(key: string, value: unknown): string {
+    if (value == null || value === '') return '—';
+    const field = this.config().fields.find((f) => f.key === key);
+    return (field ? this.optionsOf(field) : []).find((o) => o.value === value)?.label ?? String(value);
+  }
+
+  private async loadOptions(): Promise<void> {
+    for (const field of this.config().fields.filter((f) => f.optionsFrom)) {
+      try {
+        const options = await field.optionsFrom!(this.api);
+        this.loadedOptions.update((all) => ({ ...all, [field.key]: [{ value: null, label: '—' }, ...options] }));
+      } catch {
+        /* thiếu quyền xem danh mục liên quan — ô chọn để trống */
+      }
+    }
   }
 
   protected can(action: string): boolean {

@@ -152,10 +152,21 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
         return await Db.Set<TenantReplicaRecord>().AsNoTracking().Where(t => t.TenantId == tenantId).Select(t => t.Code).FirstOrDefaultAsync(ct);
     }
 
+    /// <summary>
+    /// Trạng thái hiện tại của biểu ghi theo MFN, đúng dạng event <see cref="BibChanged"/> — service khác (holdings…) gọi qua
+    /// /internal khi bản sao chưa có (service mới triển khai sau khi đã có biểu ghi, hoặc event chưa tới). Không có → null.
+    /// </summary>
+    public async Task<BibChanged?> CurrentStateAsync(long mfn, CancellationToken ct) =>
+        await Set.AsNoTracking().FirstOrDefaultAsync(x => x.Id == mfn, ct) is { } bib ? ToEvent(bib, deleted: false) : null;
+
     private Task PublishAsync(Bib bib, bool deleted, CancellationToken ct)
     {
         if (bib.PublicId == Guid.Empty) bib.PublicId = Guid.CreateVersion7(); // biểu ghi mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(new BibChanged
+        return publisher.Publish(ToEvent(bib, deleted), ct);
+    }
+
+    private BibChanged ToEvent(Bib bib, bool deleted) =>
+        new()
         {
             TenantId = tenant.RequireTenantId(),
             Actor = new EventActor(actor.Id, actor.Kind),
@@ -171,8 +182,7 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
             Status = bib.Status,
             Deleted = deleted,
             Version = bib.Version + (deleted ? 1 : 0),
-        }, ct);
-    }
+        };
 
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime.AddHours(7)); // giờ Việt Nam
 }

@@ -90,6 +90,17 @@ export class Menu {
         ],
       },
       {
+        title: 'Quản lý Kho',
+        icon: 'store',
+        module: 'HOLDINGS',
+        children: [
+          { title: 'Tìm kiếm tài liệu', icon: 'manage_search', link: '/books', perm: 'DOC_SEARCH' },
+          { title: 'Xếp giá', icon: 'shelves', link: '/shelving', perm: 'MAP_SHELVING' },
+          { title: 'Kho', icon: 'warehouse', link: '/stores', perm: 'STORES' },
+          { title: 'Loại kho', icon: 'category', link: '/store-types', perm: 'STORE_TYPES' },
+        ],
+      },
+      {
         title: 'Phân hệ đã mua',
         icon: 'apps',
         children: modules.map((code) => ({ title: MODULE_NAMES[code] ?? code, icon: MODULE_ICONS[code] ?? 'extension', link: `/phan-he/${code}` })),
