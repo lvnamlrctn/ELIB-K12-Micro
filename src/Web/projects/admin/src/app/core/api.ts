@@ -149,6 +149,16 @@ export interface SearchIndexStatus {
   status: string; startedAt: string | null; finishedAt: string | null; bibs: number; items: number; loans: number; error: string | null;
   indexedBibs: number; visibleBibs: number; indexedItems: number;
 }
+export interface Z3950ServerOption { publicId: string; name: string; groupName: string | null; recordSyntax: string; }
+export interface Z3950Record { leader: string; fields: MarcField[]; }
+export interface Z3950Hit { position: number; title: string | null; author: string | null; publisher: string | null; year: string | null; isbn: string | null; record: Z3950Record; }
+export interface Z3950ServerResult {
+  serverId: string; serverName: string; recordSyntax: string; connected: boolean; total: number; page: number; pageSize: number; hits: Z3950Hit[]; error: string | null;
+}
+export interface Z3950SearchRequest {
+  title?: string | null; author?: string | null; publisher?: string | null; isbn?: string | null; keyword?: string | null; subject?: string | null;
+  serverIds?: string[]; page?: number; pageSize?: number;
+}
 export interface DailySearchStat { date: string; searches: number; zeroResults: number; withClicks: number; }
 export interface QueryStat { text: string; searches: number; avgTotal: number; withClicks: number; }
 /** Thống kê chất lượng tìm kiếm OPAC trong khoảng ngày (service search). */
@@ -309,6 +319,7 @@ export function errorMessage(error: unknown): string {
     if (error.status === 403) return 'Bạn không có quyền thực hiện chức năng này.';
     return body?.title ?? `Lỗi ${error.status}`;
   }
+  if (error instanceof Error && error.message) return error.message;
   return 'Đã xảy ra lỗi không xác định.';
 }
 
@@ -446,6 +457,10 @@ export class Api {
   // Chỉ mục tra cứu (search, quyền SEARCH_INDEX)
   searchIndexStatus() { return this.get<SearchIndexStatus>('/api/admin/search/index/Status'); }
   rebuildSearchIndex() { return this.post<{ status: string }>('/api/admin/search/index/Rebuild'); }
+  // Tra cứu liên thư viện (search, Z39.50/SRU)
+  testZ3950Server(publicId: string) { return this.post<{ ok: boolean; error: string | null; elapsedMs: number }>(`/api/admin/search/z3950-servers/${publicId}/Test`); }
+  z3950Servers() { return this.get<Z3950ServerOption[]>('/api/admin/search/z3950/servers'); }
+  z3950Search(body: Z3950SearchRequest) { return this.post<Z3950ServerResult[]>('/api/admin/search/z3950/Search', body); }
   searchStats(from: string | null, to: string | null) {
     const q: Record<string, string> = {};
     if (from) q['from'] = from;

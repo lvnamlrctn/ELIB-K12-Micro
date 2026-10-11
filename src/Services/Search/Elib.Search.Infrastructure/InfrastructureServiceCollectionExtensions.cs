@@ -1,9 +1,11 @@
 using Elib.BuildingBlocks.Authorization;
+using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Hosting;
 using Elib.BuildingBlocks.Messaging;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.TenantReplica;
 using Elib.Search.Application;
+using Elib.Search.Infrastructure.Z3950;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +23,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddElibPostgres<SearchDbContext>(connectionString);
         services.AddScoped<ISearchDb>(sp => sp.GetRequiredService<SearchDbContext>());
+        services.AddCrudDbContext<SearchDbContext>(ServiceName);
         services.AddTenantReplica<SearchDbContext>(ServiceName);
         services.AddTenantReplicaBootstrap<SearchDbContext>(configuration);
         services.AddScoped<ITenantSeeder, SearchTenantSeeder>();
@@ -32,6 +35,21 @@ public static class InfrastructureServiceCollectionExtensions
         AddSource(services, configuration, HttpSearchSources.Holdings, "Holdings:Url");
         AddSource(services, configuration, HttpSearchSources.Circulation, "Circulation:Url");
         services.AddScoped<ISearchSources, HttpSearchSources>();
+
+        // Tra cứu liên thư viện: Z39.50 (TCP) / SRU (HTTP) ra máy chủ ngoài — chỉ địa chỉ công khai (Z3950:AllowPrivateNetworks).
+        services.Configure<Z3950Options>(configuration.GetSection(Z3950Options.SectionName));
+        var allowPrivate = configuration.GetValue<bool>($"{Z3950Options.SectionName}:{nameof(Z3950Options.AllowPrivateNetworks)}");
+        services.AddHttpClient(Z3950Client.SruHttpClient, c =>
+            {
+                c.Timeout = TimeSpan.FromSeconds(30);
+                c.DefaultRequestHeaders.UserAgent.ParseAdd("ELIB-K12-Z3950/1.0");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                ConnectCallback = (context, ct) => Z3950Client.ConnectGuardedAsync(context, allowPrivate, ct),
+                MaxAutomaticRedirections = 3,
+            });
+        services.AddScoped<IZ3950Client, Z3950Client>();
 
         services.AddElibMessaging<SearchDbContext>(ServiceName, configuration, x =>
         {

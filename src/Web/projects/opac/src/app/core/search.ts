@@ -30,6 +30,18 @@ export interface BibDetail {
 }
 export interface MarcSubfield { code: string; value: string; }
 export interface MarcField { tag: string; ind1: string | null; ind2: string | null; value: string | null; subfields: MarcSubfield[] | null; }
+/** Tra cứu liên thư viện (Z39.50/SRU) — máy chủ thư viện bật cho OPAC. */
+export interface Z3950Server { publicId: string; name: string; groupName: string | null; recordSyntax: string; }
+export interface Z3950Hit {
+  position: number; title: string | null; author: string | null; publisher: string | null; year: string | null; isbn: string | null;
+  record: { leader: string; fields: MarcField[] };
+}
+export interface Z3950Result {
+  serverId: string; serverName: string; recordSyntax: string; connected: boolean; total: number; page: number; pageSize: number; hits: Z3950Hit[]; error: string | null;
+}
+export interface Z3950Request {
+  title?: string | null; author?: string | null; isbn?: string | null; keyword?: string | null; serverIds?: string[]; page: number; pageSize: number;
+}
 /** MARC + ISBD của biểu ghi (service catalog, /api/opac/catalog/**). */
 export interface OpacMarc { publicId: string; mfn: number; leader: string; fields: MarcField[]; isbd: string[]; }
 
@@ -60,6 +72,8 @@ export class SearchApi {
   detail(publicId: string) { return firstValueFrom(this.http.get<BibDetail>(`/api/opac/search/bibs/${publicId}`)); }
   similar(publicId: string) { return firstValueFrom(this.http.get<Bib[]>(`/api/opac/search/bibs/${publicId}/similar`)); }
   suggest(q: string) { return firstValueFrom(this.http.get<string[]>('/api/opac/search/suggest', { params: { q } })); }
+  z3950Servers() { return firstValueFrom(this.http.get<Z3950Server[]>('/api/opac/search/z3950/servers')); }
+  z3950Search(body: Z3950Request) { return firstValueFrom(this.http.post<Z3950Result[]>('/api/opac/search/z3950/Search', body)); }
   marc(publicId: string) { return firstValueFrom(this.http.get<OpacMarc>(`/api/opac/catalog/bibs/${publicId}/marc`)); }
   exportUrl(publicId: string, format: 'iso2709' | 'marcxml') { return `/api/opac/catalog/bibs/${publicId}/export?format=${format}`; }
 

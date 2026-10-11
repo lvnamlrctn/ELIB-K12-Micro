@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, permissionGuard, systemGuard, tenantGuard } from './core/guards';
+import { anyPermissionGuard, authGuard, permissionGuard, systemGuard, tenantGuard } from './core/guards';
 import { Shell } from './layout/shell';
 import { Callback } from './pages/callback';
 import { Home } from './pages/home';
@@ -7,6 +7,7 @@ import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSIT
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import { BIB_TYPES } from './pages/catalog/catalogs';
+import { Z3950_SERVERS } from './pages/search/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
@@ -72,6 +73,11 @@ export const routes: Routes = [
       { path: 'circulation-report', loadComponent: () => import('./pages/circulation/reports').then((m) => m.CirculationReports), canActivate: [tenantGuard, permissionGuard('CIRC_REPORT')], title: 'Báo cáo lưu thông' },
       { path: 'request-books', loadComponent: () => import('./pages/circulation/holds').then((m) => m.Holds), canActivate: [tenantGuard, permissionGuard('REQUEST_BOOKS')], title: 'Yêu cầu mượn' },
       { path: 'search-index', loadComponent: () => import('./pages/search/search-index').then((m) => m.SearchIndex), canActivate: [tenantGuard, permissionGuard('SEARCH_INDEX')], title: 'Chỉ mục tra cứu' },
+      catalog('z3950-configs', Z3950_SERVERS),
+      // Tra Z39.50: cán bộ biên mục (thêm biểu ghi) hoặc người quản lý máy chủ Z39.50.
+      { path: 'z3950-search', loadComponent: () => import('./pages/search/z3950-search').then((m) => m.Z3950Search),
+        canActivate: [tenantGuard, anyPermissionGuard('CATALOG_BIBS:add', 'Z3950_CONFIGS:view')],
+        title: 'Tra cứu Z39.50' },
       { path: 'search-stats', loadComponent: () => import('./pages/search/search-stats').then((m) => m.SearchStats), canActivate: [tenantGuard, permissionGuard('SEARCH_STATS')], title: 'Thống kê tra cứu' },
       { path: 'fines', loadComponent: () => import('./pages/circulation/fines').then((m) => m.Fines), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Quản lý phạt' },
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Phiếu phạt' },

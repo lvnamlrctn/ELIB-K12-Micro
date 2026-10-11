@@ -27,3 +27,9 @@ export const tenantGuard: CanActivateFn = () => !inject(Session).isSystem() || i
 /** Có quyền xem module (MODULE:view) — chỉ để không mở màn trống; API vẫn tự kiểm tra quyền. */
 export const permissionGuard = (module: string): CanActivateFn => () =>
   inject(Session).can(`${module}:view`) || inject(Router).parseUrl('/');
+
+/** Có ít nhất một trong các quyền "MODULE:action". */
+export const anyPermissionGuard = (...permissions: string[]): CanActivateFn => () => {
+  const session = inject(Session);
+  return permissions.some((p) => session.can(p)) || inject(Router).parseUrl('/');
+};

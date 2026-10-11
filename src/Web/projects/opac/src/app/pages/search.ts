@@ -62,6 +62,10 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
                 <span class="material-icons text-[18px]">bookmark_border</span> Lưu tìm kiếm</button>
             }
           }
+          @if (hasZ3950()) {
+            <a routerLink="/lien-thu-vien" [queryParams]="{ q: q || null }" class="text-blue-600 hover:underline inline-flex items-center gap-1">
+              <span class="material-icons text-[18px]">hub</span> Tra cứu liên thư viện</a>
+          }
           @if (saved.items().length) {
             <button type="button" class="ml-auto text-slate-600 hover:underline inline-flex items-center gap-1" (click)="toggleSaved()"
                     [attr.aria-expanded]="showSaved()">
@@ -193,6 +197,10 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
               <li class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
                 <span class="material-icons text-5xl text-slate-300">search_off</span>
                 <p class="mt-2">Không tìm thấy tài liệu phù hợp. Thử bỏ dấu, dùng ít từ hơn hoặc bỏ bớt bộ lọc.</p>
+                @if (hasZ3950() && q) {
+                  <a routerLink="/lien-thu-vien" [queryParams]="{ q }" class="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline">
+                    <span class="material-icons text-[18px]">hub</span> Tìm "{{ q }}" ở thư viện khác</a>
+                }
               </li>
             }
           }
@@ -229,6 +237,8 @@ export class Search implements OnInit {
   protected readonly fresh = signal<Record<string, number>>({});
   protected readonly current = signal<SavedSearch | undefined>(undefined);
   protected readonly brokenCovers = signal(new Set<string>());
+  /** Thư viện đã bật máy chủ Z39.50 cho OPAC. */
+  protected readonly hasZ3950 = signal(false);
   private queryId: string | null = null;
   protected q = '';
   protected adv: Record<string, string> = {};
@@ -241,6 +251,7 @@ export class Search implements OnInit {
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
 
   ngOnInit(): void {
+    this.api.z3950Servers().then((s) => this.hasZ3950.set(s.length > 0), () => this.hasZ3950.set(false));
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       this.params = p;
       this.current.set(this.saved.find(paramsOf(p)));

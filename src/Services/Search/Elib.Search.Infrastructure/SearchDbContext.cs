@@ -1,3 +1,4 @@
+using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Messaging;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Tenancy;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Elib.Search.Infrastructure;
 
 public sealed class SearchDbContext(DbContextOptions<SearchDbContext> options, ITenantContext tenant)
-    : ElibDbContext(options, tenant), ISearchDb
+    : ElibDbContext(options, tenant), ISearchDb, ICrudDbContext
 {
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +68,20 @@ public sealed class SearchDbContext(DbContextOptions<SearchDbContext> options, I
             e.Property(x => x.TextFold).HasMaxLength(SearchQuery.MaxTextLength);
             e.HasIndex(x => new { x.TenantId, x.QueryId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.At });
+        });
+
+        modelBuilder.Entity<Z3950Server>(e =>
+        {
+            e.ToTable("z3950_servers");
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Host).HasMaxLength(255);
+            e.Property(x => x.DatabaseName).HasMaxLength(100);
+            e.Property(x => x.RecordSyntax).HasMaxLength(10);
+            e.Property(x => x.UserName).HasMaxLength(100);
+            e.Property(x => x.Password).HasMaxLength(200);
+            e.Property(x => x.SruUrl).HasMaxLength(500);
+            e.Property(x => x.GroupName).HasMaxLength(100);
+            e.HasIndex(x => new { x.TenantId, x.Name });
         });
 
         modelBuilder.Entity<SearchSyncState>(e =>

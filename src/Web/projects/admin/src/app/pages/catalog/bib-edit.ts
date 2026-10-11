@@ -2,6 +2,7 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, Bib, BibType, CrudClient, IsbnMatch, MarcField, MarcFieldDef, MarcPreviewRecord, STATUS_ACTIVE, Worksheet, errorMessage } from '../../core/api';
+import { MarcDrafts } from '../../core/marc-draft';
 import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
@@ -28,7 +29,10 @@ const BLANK_FIELDS: MarcField[] = [
       <h4 class="page-title">{{ bib() ? 'Sửa biểu ghi' : 'Biên mục mới' }}</h4>
       @if (bib(); as b) { <span class="text-sm text-gray-500">MFN <b class="font-mono">{{ b.mfn }}</b> · {{ b.title }}</span> }
       @if (canSave()) {
-        <button type="button" class="btn-secondary ml-auto" (click)="picking.set(true)"><span class="material-icons text-[18px]">upload_file</span> Nạp từ file MARC</button>
+        @if (!bib() && hasSearch()) {
+          <a routerLink="/z3950-search" class="btn-secondary ml-auto"><span class="material-icons text-[18px]">travel_explore</span> Tra Z39.50</a>
+        }
+        <button type="button" class="btn-secondary" [class.ml-auto]="bib() || !hasSearch()" (click)="picking.set(true)"><span class="material-icons text-[18px]">upload_file</span> Nạp từ file MARC</button>
       }
     </div>
 
@@ -101,6 +105,7 @@ export class BibEdit implements OnInit {
   private readonly router = inject(Router);
   protected readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly drafts = inject(MarcDrafts);
   private readonly client: CrudClient<Bib> = this.api.crud<Bib>('bibs', 'catalog');
 
   protected readonly bib = signal<Bib | null>(null);
@@ -138,8 +143,14 @@ export class BibEdit implements OnInit {
         // Biên mục mới: mặc định loại "Sách" và biểu mẫu đầu tiên của loại đó.
         this.bibTypeId = this.types().find((t) => t.code === 'SACH')?.id ?? this.types()[0]?.id ?? null;
         await this.loadWorksheets();
+        const draft = this.drafts.take();
         const first = this.worksheets()[0];
-        if (first) this.useWorksheet(first);
+        if (draft) {
+          // Bản ghi sao từ Z39.50: giữ Leader/06–07 của nguồn để loại biểu ghi khớp, MFN/003/005 hệ thống tự sinh khi lưu.
+          this.leader = draft.leader.trim().length === 24 ? draft.leader : '';
+          this.fields.set(structuredClone(draft.fields));
+          this.toastr.success(`Đã nạp bản ghi từ ${draft.source} — kiểm tra, sửa rồi bấm Lưu biểu ghi.`);
+        } else if (first) this.useWorksheet(first);
         else this.fields.set(structuredClone(BLANK_FIELDS));
       }
     } catch (e) {
@@ -147,6 +158,11 @@ export class BibEdit implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Đơn vị có phân hệ Tra cứu → tra Z39.50 để sao biểu ghi. */
+  protected hasSearch(): boolean {
+    return (this.session.features()?.modules ?? []).includes('SEARCH');
   }
 
   /** Đơn vị có phân hệ Quản lý kho → hiện khung đăng ký cá biệt. */

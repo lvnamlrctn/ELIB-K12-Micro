@@ -47,6 +47,8 @@ public sealed class SearchApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Messaging:UseOutbox", "false");
         builder.UseSetting("Auth:Authority", "https://identity.test");
         builder.UseSetting("Tenancy:GatewaySigningKey", "test-gateway-key-0123456789abcdef");
+        builder.UseSetting("Z3950:AllowPrivateNetworks", "true"); // máy chủ Z39.50 giả chạy trên 127.0.0.1
+        builder.UseSetting("Z3950:TimeoutSeconds", "5");
 
         builder.ConfigureTestServices(services =>
         {

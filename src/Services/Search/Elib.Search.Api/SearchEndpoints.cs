@@ -1,4 +1,5 @@
 using Elib.BuildingBlocks.Authorization;
+using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Search.Application;
@@ -24,6 +25,9 @@ public static class SearchEndpoints
             var result = await s.SearchAsync(request, ct);
             return result with { QueryId = await stats.RecordAsync(request, result.Total, ct) };
         });
+        // Tra cứu liên thư viện trên OPAC: chỉ máy chủ quản trị bật "hiện trên OPAC" (gateway: policy opac-heavy — mỗi lượt mở kết nối ra ngoài).
+        opac.MapGet("/z3950/servers", (Z3950Search z, CancellationToken ct) => z.ServersAsync(opacOnly: true, ct));
+        opac.MapPost("/z3950/Search", (Z3950SearchRequest request, Z3950Search z, CancellationToken ct) => z.SearchAsync(request, opacOnly: true, ct));
         opac.MapPost("/stats/click", async (OpacClickRequest request, SearchStats stats, CancellationToken ct) =>
         {
             await stats.RecordClickAsync(request, ct);
@@ -45,6 +49,16 @@ public static class SearchEndpoints
             _ = runner.Start(tenant.RequireTenantId());
             return Results.Accepted(value: new { Status = SearchSyncState.Running });
         });
+
+        // Tra cứu liên thư viện (Z39.50/SRU): cấu hình máy chủ (Z3950_CONFIGS như monolith) và tra để sao biểu ghi về biên mục.
+        var admin = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
+        var servers = admin.MapCrud<Z3950ServerResource>("/z3950-servers", "Z3950_CONFIGS").WithTags("Z3950");
+        servers.MapPost("/{publicId:guid}/Test", [Permission("Z3950_CONFIGS", "view")] (Guid publicId, Z3950Search z, CancellationToken ct) => z.TestAsync(publicId, ct));
+        var z3950 = admin.MapGroup("/z3950").WithTags("Z3950");
+        z3950.MapGet("/servers", [PermissionAny("Z3950_CONFIGS:view", "CATALOG_BIBS:add", "CATALOG_BIBS:edit")] (Z3950Search z, CancellationToken ct)
+            => z.ServersAsync(opacOnly: false, ct));
+        z3950.MapPost("/Search", [PermissionAny("Z3950_CONFIGS:view", "CATALOG_BIBS:add", "CATALOG_BIBS:edit")] (Z3950SearchRequest request, Z3950Search z,
+            CancellationToken ct) => z.SearchAsync(request, opacOnly: false, ct));
 
         // Thống kê chất lượng tìm kiếm OPAC.
         app.MapGet("/api/stats/Summary", [Permission("SEARCH_STATS", "view")] (DateOnly? from, DateOnly? to, SearchStats stats, CancellationToken ct)

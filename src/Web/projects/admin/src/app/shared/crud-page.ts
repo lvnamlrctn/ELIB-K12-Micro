@@ -18,8 +18,11 @@ export interface CrudColumn {
 export interface CrudField {
   key: string;
   label: string;
-  /** 'multiselect': danh sách ô tích, giá trị là mảng (vd các kho được mượn tại điểm lưu thông). */
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect';
+  /**
+   * 'multiselect': danh sách ô tích, giá trị là mảng (vd các kho được mượn tại điểm lưu thông).
+   * 'password': không bao giờ hiện giá trị cũ; để trống khi sửa = giữ nguyên (gửi null).
+   */
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password';
   /** Lựa chọn của ô 'select'. */
   options?: { value: string | number; label: string }[];
   /** Lựa chọn lấy từ API khi mở màn (vd danh sách loại kho); thêm sẵn lựa chọn trống "—". */
@@ -58,6 +61,17 @@ export interface CrudConfig {
   toolbar?: CrudToolbarAction[];
   /** Danh mục có endpoint ImportTemplate/Import (resource cài ICrudImportable) → hiện nút "Nhập Excel" (quyền add). */
   importable?: boolean;
+  /** Nút thêm trên từng dòng (ví dụ "Kiểm tra kết nối"). */
+  rowActions?: CrudRowAction[];
+}
+
+export interface CrudRowAction {
+  icon: string;
+  title: string;
+  /** Hành động quyền cần có trên module của màn. */
+  action: string;
+  /** Trả về thông báo kết quả (ném lỗi = báo lỗi). */
+  run: (api: Api, row: Record<string, unknown> & { publicId: string }) => Promise<string>;
 }
 
 export interface CrudToolbarAction {
@@ -182,6 +196,14 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 }
                 <td class="td">
                   <div class="flex items-center justify-center space-x-2">
+                    @for (a of c.rowActions ?? []; track a.title) {
+                      @if (can(a.action)) {
+                        <button (click)="runRowAction(a, row); $event.stopPropagation()" [disabled]="busyRow() === row.publicId"
+                                class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="a.title">
+                          <span class="material-icons text-[18px]" [class.animate-spin]="busyRow() === row.publicId">{{ busyRow() === row.publicId ? 'autorenew' : a.icon }}</span>
+                        </button>
+                      }
+                    }
                     @if (can('edit')) {
                       <button (click)="openEdit(row); $event.stopPropagation()" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa">
                         <span class="material-icons text-[18px]">edit</span>
@@ -244,6 +266,11 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                       } @empty { <span class="text-sm text-gray-400">Chưa có lựa chọn nào.</span> }
                     </div>
                   }
+                  @case ('password') {
+                    <input [id]="'f-' + f.key" [name]="f.key" type="password" autocomplete="new-password" class="input" [(ngModel)]="item[f.key]"
+                           [placeholder]="item.publicId && item['has' + f.key[0].toUpperCase() + f.key.slice(1)] ? 'Để trống = giữ mật khẩu đã lưu' : (f.placeholder ?? '')"
+                           [disabled]="locked(f, item)" />
+                  }
                   @case ('status') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]">
                       <option [ngValue]="2">Hoạt động</option>
@@ -297,6 +324,7 @@ export class CrudPage implements OnInit {
   protected readonly page = signal<Page<Row> | null>(null);
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
+  protected readonly busyRow = signal<string | null>(null);
   protected readonly selected = signal<Set<string>>(new Set());
   protected readonly editing = signal<Row | null>(null);
   protected readonly deleting = signal<string[]>([]);
@@ -401,6 +429,8 @@ export class CrudPage implements OnInit {
     this.saving.set(true);
     try {
       const { publicId, id: _id, ...body } = item;
+      for (const f of this.config().fields)
+        if (f.type === 'password' && (body[f.key] === undefined || body[f.key] === '')) body[f.key] = null;
       if (publicId) await this.client.update(publicId, body);
       else await this.client.add(body);
       this.toastr.success(publicId ? 'Cập nhật thành công' : 'Thêm mới thành công');
@@ -410,6 +440,17 @@ export class CrudPage implements OnInit {
       this.toastr.error(errorMessage(e));
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  protected async runRowAction(action: CrudRowAction, row: Row): Promise<void> {
+    this.busyRow.set(row.publicId);
+    try {
+      this.toastr.success(await action.run(this.api, row));
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busyRow.set(null);
     }
   }
 

@@ -112,6 +112,8 @@ export class Menu {
         children: [
           { title: 'Chỉ mục tra cứu (OPAC)', icon: 'manage_search', link: '/search-index', perm: 'SEARCH_INDEX' },
           { title: 'Thống kê tra cứu', icon: 'query_stats', link: '/search-stats', perm: 'SEARCH_STATS' },
+          { title: 'Tra cứu Z39.50', icon: 'travel_explore', link: '/z3950-search', perm: 'CATALOG_BIBS' },
+          { title: 'Máy chủ Z39.50', icon: 'dns', link: '/z3950-configs', perm: 'Z3950_CONFIGS' },
         ],
       },
       {

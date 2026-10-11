@@ -69,6 +69,7 @@ public static class PermissionCatalog
 
         new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
         new("SEARCH_STATS", "Thống kê tra cứu", SearchGroup, [View], SearchLicense),
+        new("Z3950_CONFIGS", "Máy chủ Z39.50 (liên thư viện)", SearchGroup, Crud, SearchLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),
