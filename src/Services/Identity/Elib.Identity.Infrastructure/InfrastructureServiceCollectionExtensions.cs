@@ -70,6 +70,7 @@ public static class InfrastructureServiceCollectionExtensions
         {
             x.AddTenantReplicaConsumers<IdentityDbContext>();
             x.AddConsumer<LoginPolicyChangedConsumer>();
+            x.AddConsumer<ReaderChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
 
@@ -93,6 +94,13 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddHttpMessageHandler<ServiceTokenHandler>();
         services.AddSingleton<ILoginPolicySource, TenantLoginPolicySource>();
+        services.AddHttpClient(HttpReaderSource.HttpClientName, c =>
+            {
+                c.BaseAddress = new Uri(options.PatronServiceUrl.TrimEnd('/') + "/");
+                c.Timeout = TimeSpan.FromSeconds(5);
+            })
+            .AddHttpMessageHandler<ServiceTokenHandler>();
+        services.AddScoped<IReaderSource, HttpReaderSource>();
         services.Configure<ImpersonationOptions>(configuration.GetSection(ImpersonationOptions.SectionName));
         services.PostConfigure<ImpersonationOptions>(o =>
         {

@@ -350,6 +350,12 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             : null;
     }
 
+    /// <summary>Như <see cref="CurrentStateAsync(string, CancellationToken)"/> nhưng theo PublicId — identity hỏi khi đặt mật khẩu cho bạn đọc vừa tạo.</summary>
+    public async Task<ReaderChanged?> CurrentStateAsync(Guid publicId, CancellationToken ct) =>
+        await Set.AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == publicId, ct) is { } reader
+            ? await ToEventAsync(reader, deleted: false, ct)
+            : null;
+
     private async Task PublishAsync(Reader reader, bool deleted, CancellationToken ct)
     {
         if (reader.PublicId == Guid.Empty) reader.PublicId = Guid.CreateVersion7(); // bạn đọc mới: interceptor chỉ gán khi còn trống

@@ -44,6 +44,15 @@ public sealed class Credentials
         LockoutEnd = null;
     }
 
+    /// <summary>Bỏ mật khẩu đã băm (tài khoản bạn đọc chuyển sang mật khẩu mặc định = số thẻ).</summary>
+    public void ClearPassword(bool mustChange)
+    {
+        PasswordHash = "";
+        MustChangePassword = mustChange;
+        AccessFailedCount = 0;
+        LockoutEnd = null;
+    }
+
     public void Unlock()
     {
         AccessFailedCount = 0;

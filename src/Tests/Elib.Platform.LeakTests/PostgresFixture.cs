@@ -44,7 +44,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public static readonly ServiceDatabase[] Services =
     [
-        new("identity", "elib_leak_identity", ["staff_users", "roles"],
+        new("identity", "elib_leak_identity", ["staff_users", "roles", "reader_accounts"],
             (cs, t) => new IdentityDbContext(Options<IdentityDbContext>(cs, t, o => o.UseOpenIddict()), t)),
         new("tenant", "elib_leak_tenant", ["system_parameters", "orgs", "tenant_module_licenses"],
             (cs, t) => new TenantDbContext(Options<TenantDbContext>(cs, t), t)),

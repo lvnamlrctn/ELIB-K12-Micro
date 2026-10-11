@@ -10,6 +10,7 @@ public interface IIdentityDb
     DbSet<SystemUser> SystemUsers { get; }
     DbSet<Role> Roles { get; }
     DbSet<TenantReplicaRecord> TenantReplicas { get; }
+    DbSet<ReaderAccount> ReaderAccounts { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

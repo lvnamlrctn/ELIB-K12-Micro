@@ -59,6 +59,17 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // Mật khẩu OPAC của bạn đọc — quyền theo màn Bạn đọc (READERS) như monolith Reader/ResetPassword.
+        var readerAccounts = app.MapGroup("/api/reader-accounts").WithTags("ReaderAccounts");
+        readerAccounts.MapPost("/Status", [Permission("READERS", "view")] (ReaderAccountStatusRequest request, ReaderAccountService s, CancellationToken ct)
+            => s.StatusAsync(request, ct));
+        readerAccounts.MapPut("/{readerPublicId:guid}/password", [Permission("READERS", "edit")] (Guid readerPublicId, SetReaderPasswordRequest request,
+            ReaderAccountService s, CancellationToken ct) => s.SetPasswordAsync(readerPublicId, request, ct));
+        readerAccounts.MapPut("/BulkPassword", [Permission("READERS", "edit")] (BulkReaderPasswordRequest request, ReaderAccountService s, CancellationToken ct)
+            => s.BulkSetPasswordAsync(request, ct));
+        readerAccounts.MapPost("/{readerPublicId:guid}/unlock", [Permission("READERS", "edit")] (Guid readerPublicId, ReaderAccountService s, CancellationToken ct)
+            => s.UnlockAsync(readerPublicId, ct));
+
         var roles = app.MapGroup("/api/roles").WithTags("Roles");
         roles.MapGet("/", [Permission("ROLE", "view")] (RoleAdminService s, CancellationToken ct) => s.ListAsync(ct));
         app.MapGet("/api/permission-catalog", [Permission("ROLE", "view")] (RoleAdminService s, CancellationToken ct) => s.CatalogAsync(ct))

@@ -330,6 +330,10 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         var state = await Read<ReaderChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/hs-77")));
         Assert.Equal((created.PublicId, "HS-77", "Phạm Minh", "6A1", tenantId), (state.ReaderPublicId, state.CardNo, state.FullName, state.ClassName, state.TenantId));
         Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/KHONGCO"))).StatusCode);
+        var byId = await Read<ReaderChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/{created.PublicId}")));
+        Assert.Equal(("HS-77", tenantId), (byId.CardNo, byId.TenantId));
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/readers/{Guid.NewGuid()}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId + 1}/readers/{created.PublicId}"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenantId}/readers/by-card/HS-77"))).StatusCode);
     }
 }

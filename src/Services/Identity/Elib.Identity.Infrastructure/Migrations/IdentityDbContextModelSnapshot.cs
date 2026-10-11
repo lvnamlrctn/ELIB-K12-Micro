@@ -108,6 +108,109 @@ namespace Elib.Identity.Infrastructure.Migrations
                     b.ToTable("tenant_replicas", "replica");
                 });
 
+            modelBuilder.Entity("Elib.Identity.Domain.ReaderAccount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CardKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("card_key");
+
+                    b.Property<string>("CardNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("card_no");
+
+                    b.Property<bool>("CardNoPassword")
+                        .HasColumnType("boolean")
+                        .HasColumnName("card_no_password");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("email");
+
+                    b.Property<DateOnly?>("ExpireDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expire_date");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("full_name");
+
+                    b.Property<Guid>("ReaderPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reader_public_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Credentials", "Elib.Identity.Domain.ReaderAccount.Credentials#Credentials", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("AccessFailedCount")
+                                .HasColumnType("integer")
+                                .HasColumnName("credentials_access_failed_count");
+
+                            b1.Property<DateTimeOffset?>("LastLoginAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("credentials_last_login_at");
+
+                            b1.Property<DateTimeOffset?>("LockoutEnd")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("credentials_lockout_end");
+
+                            b1.Property<bool>("MustChangePassword")
+                                .HasColumnType("boolean")
+                                .HasColumnName("credentials_must_change_password");
+
+                            b1.Property<string>("PasswordHash")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("credentials_password_hash");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_reader_accounts");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_reader_accounts_tenant_id");
+
+                    b.HasIndex("TenantId", "CardKey")
+                        .HasDatabaseName("ix_reader_accounts_tenant_id_card_key");
+
+                    b.HasIndex("TenantId", "ReaderPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reader_accounts_tenant_id_reader_public_id");
+
+                    b.ToTable("reader_accounts", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Identity.Domain.Role", b =>
                 {
                     b.Property<long>("Id")

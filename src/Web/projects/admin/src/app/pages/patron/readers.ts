@@ -1,11 +1,12 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, CrudClient, CrudPage, NamedItem, Org, Reader, ReaderSearch, STATUS_ACTIVE, errorMessage } from '../../core/api';
+import { Api, CrudClient, CrudPage, NamedItem, Org, Reader, ReaderAccount, ReaderSearch, STATUS_ACTIVE, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ImportDialog } from '../../shared/import-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
+import { ReaderPassword, accountLabel } from './reader-password';
 import { ReaderExport, ReaderPhotos } from './reader-tools';
 
 type ReaderForm = Omit<Reader, 'id' | 'publicId' | 'fullName' | 'status' | 'lockReason' | 'createdAt' | 'photoId'> & { publicId: string | null };
@@ -16,10 +17,10 @@ const BLANK: ReaderForm = {
   academicTitleId: null, issueDate: null, expireDate: null,
 };
 
-/** Bạn đọc (monolith: pages/admin/reader) — tìm theo bộ lọc, thêm/sửa, ảnh thẻ, khoá/mở thẻ, sửa hàng loạt, nhập/xuất Excel. */
+/** Bạn đọc (monolith: pages/admin/reader) — tìm theo bộ lọc, thêm/sửa, ảnh thẻ, khoá/mở thẻ, sửa hàng loạt, mật khẩu OPAC, nhập/xuất Excel. */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, DatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ImportDialog, ReaderExport, ReaderPhotos],
+  imports: [FormsModule, DatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ImportDialog, ReaderExport, ReaderPhotos, ReaderPassword],
   template: `
     <div class="mb-5"><h4 class="page-title">Bạn đọc</h4></div>
 
@@ -77,6 +78,9 @@ const BLANK: ReaderForm = {
           <button (click)="openBulk()" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
             <span class="material-icons text-[18px]">tune</span> Sửa hàng loạt ({{ selected().size }})
           </button>
+          <button (click)="passwordFor.set(selectedReaders())" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
+            <span class="material-icons text-[18px]">key</span> Đặt mật khẩu OPAC ({{ selected().size }})
+          </button>
         }
       </div>
       <span class="text-sm text-gray-500">{{ page()?.totalCount ?? 0 }} bạn đọc</span>
@@ -85,7 +89,7 @@ const BLANK: ReaderForm = {
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
       @if (loading()) { <app-loading /> }
       <div class="overflow-x-auto w-full">
-        <table class="w-full text-left border-collapse min-w-[1000px]">
+        <table class="w-full text-left border-collapse min-w-[1140px]">
           <thead>
             <tr>
               <th class="th w-10 text-center"><input type="checkbox" class="rounded border-gray-300" [checked]="allSelected()" (change)="toggleAll()" /></th>
@@ -97,6 +101,7 @@ const BLANK: ReaderForm = {
               <th class="th w-24">Lớp</th>
               <th class="th w-28">Hạn thẻ</th>
               <th class="th w-32 !text-center">Trạng thái</th>
+              <th class="th w-36 !text-center">Đăng nhập OPAC</th>
               <th class="th w-32 !text-center">Thao tác</th>
             </tr>
           </thead>
@@ -116,10 +121,15 @@ const BLANK: ReaderForm = {
                   {{ r.expireDate ? (r.expireDate | date: 'dd/MM/yyyy') : 'Không hạn' }}
                 </td>
                 <td class="td text-center"><app-status-badge [status]="r.status" inactiveText="Bị khoá" /></td>
+                <td class="td text-center">
+                  @let acc = label(accounts()[r.publicId]);
+                  <span class="inline-block rounded-full px-2 py-0.5 text-xs whitespace-nowrap {{ acc.css }}">{{ acc.text }}</span>
+                </td>
                 <td class="td">
                   <div class="flex items-center justify-center gap-1.5">
                     @if (can('edit')) {
                       <button (click)="openForm(r)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa"><span class="material-icons text-[18px]">edit</span></button>
+                      <button (click)="passwordFor.set([r])" class="icon-btn bg-violet-50 text-violet-600 hover:bg-violet-100" title="Mật khẩu OPAC"><span class="material-icons text-[18px]">key</span></button>
                       @if (r.status === 2) {
                         <button (click)="locking.set(r); lockReason = ''" class="icon-btn bg-amber-50 text-amber-600 hover:bg-amber-100" title="Khoá thẻ"><span class="material-icons text-[18px]">lock</span></button>
                       } @else {
@@ -133,7 +143,7 @@ const BLANK: ReaderForm = {
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="10" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : 'Không có bạn đọc nào' }}</td></tr>
+              <tr><td colspan="11" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : 'Không có bạn đọc nào' }}</td></tr>
             }
           </tbody>
         </table>
@@ -242,6 +252,11 @@ const BLANK: ReaderForm = {
       </app-modal>
     }
 
+    @if (passwordFor(); as list) {
+      <app-reader-password [readers]="list" [account]="list.length === 1 ? accounts()[list[0].publicId] : undefined"
+                           (closed)="passwordFor.set(null)" (saved)="passwordSaved(list.length)" />
+    }
+
     @if (deleting(); as r) {
       <app-confirm-delete [busy]="saving()" [message]="'Xoá bạn đọc ' + r.cardNo + ' — ' + r.fullName + '?'" (confirmed)="remove(r)" (cancelled)="deleting.set(null)" />
     }
@@ -281,6 +296,10 @@ export class Readers implements OnInit {
   protected readonly importing = signal(false);
   protected readonly exporting = signal(false);
   protected readonly uploadingPhotos = signal(false);
+  /** Tình trạng đăng nhập OPAC (identity) của các bạn đọc trên trang — không có thì hiện "—". */
+  protected readonly accounts = signal<Record<string, ReaderAccount>>({});
+  protected readonly passwordFor = signal<Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[] | null>(null);
+  protected readonly label = accountLabel;
   /** Ảnh thẻ của bạn đọc đang sửa (url: link ký có hạn từ media). */
   protected readonly photo = signal<{ publicId: string; photoId: string | null; url: string | null } | null>(null);
   protected readonly photoBusy = signal(false);
@@ -341,6 +360,18 @@ export class Readers implements OnInit {
 
   protected toggleAll(): void {
     this.selected.set(this.allSelected() ? new Set() : new Set((this.page()?.items ?? []).map((r) => r.publicId)));
+  }
+
+  /** Bạn đọc đã chọn (có thể ở trang khác — chỉ cần publicId). */
+  protected selectedReaders(): Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[] {
+    return [...this.selected()].map((publicId) => ({ publicId, cardNo: '', fullName: '' }));
+  }
+
+  protected passwordSaved(count: number): void {
+    // Đặt một bạn đọc thì hộp thoại vẫn mở được lại với tình trạng mới; đặt hàng loạt thì bỏ chọn.
+    this.passwordFor.set(null);
+    if (count > 1) this.selected.set(new Set());
+    void this.loadAccounts();
   }
 
   protected openForm(r: Reader | null): void {
@@ -472,10 +503,25 @@ export class Readers implements OnInit {
     }
   }
 
+  private async loadAccounts(): Promise<void> {
+    const ids = (this.page()?.items ?? []).map((r) => r.publicId);
+    if (!ids.length) {
+      this.accounts.set({});
+      return;
+    }
+    try {
+      const list = await this.api.readerAccounts(ids);
+      this.accounts.set(Object.fromEntries(list.map((a) => [a.readerPublicId, a])));
+    } catch {
+      this.accounts.set({}); // identity không trả lời — danh sách bạn đọc vẫn dùng được
+    }
+  }
+
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
       this.page.set(await this.client.search({ ...this.search, keyword: this.search.keyword?.trim() || undefined }) as unknown as CrudPage<Reader>);
+      void this.loadAccounts();
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

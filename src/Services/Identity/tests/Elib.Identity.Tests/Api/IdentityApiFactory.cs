@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Testing;
 using Elib.BuildingBlocks.TenantReplica;
+using Elib.Contracts.Events.Patron;
 using Elib.Contracts.Events.Platform;
 using Elib.Identity.Application;
 using Elib.Identity.Infrastructure;
@@ -40,6 +41,9 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
 
     /// <summary>CAPTCHA/OTP theo đơn vị (thay cho gọi service tenant). Khoá 0 = tài khoản hệ thống.</summary>
     public FakeLoginPolicySource LoginPolicies { get; } = new();
+
+    /// <summary>Bạn đọc ở patron (thay cho gọi /internal của patron) — khi identity chưa nhận event của bạn đọc.</summary>
+    public FakeReaderSource Readers { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -83,6 +87,8 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ILoginPolicySource>();
             services.AddSingleton<ILoginPolicySource>(LoginPolicies);
+            services.RemoveAll<IReaderSource>();
+            services.AddSingleton<IReaderSource>(Readers);
 
             // Seeder chạy tường minh sau khi tạo schema (InitializeAsync), không chạy nền.
             services.Remove(services.Single(d => d.ImplementationType == typeof(IdentityStartupSeederService)));
@@ -176,4 +182,12 @@ public sealed class FakeLoginPolicySource : ILoginPolicySource
         Task.FromResult(Policies.GetValueOrDefault(tenantId ?? 0, LoginPolicy.None));
 
     public Task InvalidateAsync(long tenantId, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+public sealed class FakeReaderSource : IReaderSource
+{
+    public ConcurrentDictionary<(long TenantId, Guid ReaderId), ReaderChanged> Readers { get; } = new();
+
+    public Task<ReaderChanged?> ReaderAsync(long tenantId, Guid readerPublicId, CancellationToken ct) =>
+        Task.FromResult(Readers.GetValueOrDefault((tenantId, readerPublicId)));
 }

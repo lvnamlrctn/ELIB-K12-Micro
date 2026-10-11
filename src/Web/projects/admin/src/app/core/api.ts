@@ -48,6 +48,11 @@ export interface ReaderBulkUpdate {
   issueDate?: string | null; expireDate?: string | null; status?: number | null;
 }
 
+/** Tình trạng đăng nhập OPAC của bạn đọc (identity) — không có mật khẩu/chuỗi băm. */
+export interface ReaderAccount {
+  readerPublicId: string; hasPassword: boolean; cardNoPassword: boolean; mustChangePassword: boolean; lockedOut: boolean; lastLoginAt: string | null;
+}
+
 // ── Biên mục (service catalog) ──
 export interface MarcSubfield { code: string; value: string; }
 /** Trường điều khiển (001–009) chỉ có value; trường dữ liệu có ind1/ind2 + subfields. */
@@ -414,6 +419,15 @@ export class Api {
   lockReader(publicId: string, reason: string | null) { return this.post<Reader>(`/api/admin/patron/readers/Lock/${publicId}`, { reason }); }
   unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
+  /** Mật khẩu OPAC của bạn đọc nằm ở identity; useCardNo = mật khẩu mặc định là số thẻ. */
+  readerAccounts(readerIds: string[]) { return this.post<ReaderAccount[]>('/api/admin/identity/reader-accounts/Status', { readerIds }); }
+  setReaderPassword(readerId: string, password: string | null, useCardNo: boolean) {
+    return this.put<ReaderAccount>(`/api/admin/identity/reader-accounts/${readerId}/password`, { password, useCardNo });
+  }
+  bulkSetReaderPassword(readerIds: string[], password: string | null, useCardNo: boolean) {
+    return this.put<{ updatedCount: number; notFound: string[] }>('/api/admin/identity/reader-accounts/BulkPassword', { readerIds, password, useCardNo });
+  }
+  unlockReaderAccount(readerId: string) { return this.post<ReaderAccount>(`/api/admin/identity/reader-accounts/${readerId}/unlock`); }
   // Biên mục (catalog): 8 endpoint chuẩn qua crud('bibs' | 'bib-types' | 'worksheets', 'catalog')
   marc21Fields() { return this.get<MarcFieldDef[]>('/api/admin/catalog/marc21/fields'); }
   worksheetsByBibType(bibTypeId: number) { return this.get<Worksheet[]>(`/api/admin/catalog/worksheets/GetByBibType/${bibTypeId}`); }

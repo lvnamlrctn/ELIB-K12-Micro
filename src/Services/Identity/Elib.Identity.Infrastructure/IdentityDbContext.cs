@@ -17,6 +17,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<SystemUser> SystemUsers => Set<SystemUser>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<TenantReplicaRecord> TenantReplicas => Set<TenantReplicaRecord>();
+    public DbSet<ReaderAccount> ReaderAccounts => Set<ReaderAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,18 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             e.Property(r => r.Name).HasMaxLength(100);
             e.Property(r => r.Description).HasMaxLength(500);
             e.HasIndex(r => new { r.TenantId, r.Name }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        modelBuilder.Entity<ReaderAccount>(e =>
+        {
+            e.ToTable("reader_accounts");
+            e.Property(a => a.CardNo).HasMaxLength(50);
+            e.Property(a => a.CardKey).HasMaxLength(50);
+            e.Property(a => a.FullName).HasMaxLength(250);
+            e.Property(a => a.Email).HasMaxLength(250);
+            e.ComplexProperty(a => a.Credentials, c => c.Property(x => x.PasswordHash).HasMaxLength(100));
+            e.HasIndex(a => new { a.TenantId, a.ReaderPublicId }).IsUnique();
+            e.HasIndex(a => new { a.TenantId, a.CardKey });
         });
 
         // OpenIddict tự đặt tên bảng PascalCase — đổi về snake_case cho nhất quán.

@@ -43,6 +43,9 @@ public sealed class IdentityServerOptions
 
     /// <summary>URL nội bộ service tenant — đọc tham số đăng nhập của đơn vị (gọi bằng service token của client svc-identity).</summary>
     public string TenantServiceUrl { get; set; } = "http://tenant:8080";
+
+    /// <summary>URL nội bộ service patron — lấy bạn đọc khi chưa nhận được event ReaderChanged (đặt mật khẩu cho bạn đọc vừa tạo).</summary>
+    public string PatronServiceUrl { get; set; } = "http://patron:8080";
 }
 
 /// <summary>Client OIDC được seed lúc khởi động. Secret của client confidential lấy từ biến môi trường.</summary>

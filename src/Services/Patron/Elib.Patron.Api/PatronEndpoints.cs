@@ -37,6 +37,11 @@ public static class PatronEndpoints
             using (tenant.Use(tenantId))
                 return await r.CurrentStateAsync(cardNo, ct) is { } state ? Results.Ok(state) : Results.NotFound();
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapGet("/internal/tenants/{tenantId:long}/readers/{publicId:guid}", async (long tenantId, Guid publicId, ITenantContext tenant, ReaderResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.CurrentStateAsync(publicId, ct) is { } state ? Results.Ok(state) : Results.NotFound();
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
         readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
             => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));

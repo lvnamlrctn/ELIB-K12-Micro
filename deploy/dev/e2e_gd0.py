@@ -585,6 +585,22 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "CHANGE_STATUS", card)
     step("nhật ký có khoá/mở thẻ bạn đọc (patron → audit)")
 
+    # Mật khẩu OPAC ở identity: bạn đọc vừa nhập có thể chưa tới identity qua event → identity hỏi patron.
+    RA = "/api/admin/identity/reader-accounts"
+    ids = [r["publicId"] for r in mine]
+    s, _, body = tb.request("PUT", f"{RA}/BulkPassword", token=token, json_body={"readerIds": ids, "useCardNo": True})
+    expect(s == 200 and json.loads(body)["updatedCount"] == 3, "đặt mật khẩu OPAC = số thẻ cho 3 bạn đọc (identity, kể cả bạn đọc vừa nhập)", body)
+    s, _, body = tb.request("PUT", f"{RA}/{reader['publicId']}/password", token=token, json_body={"password": "12345", "useCardNo": False})
+    expect(s == 400 and "READER_PASSWORD_INVALID" in body, "mật khẩu bạn đọc dưới 6 ký tự bị từ chối", body)
+    s, _, body = tb.request("PUT", f"{RA}/{reader['publicId']}/password", token=token, json_body={"password": "Thuvien2026", "useCardNo": False})
+    expect(s == 200 and "Thuvien2026" not in body and json.loads(body)["mustChangePassword"], "đặt mật khẩu riêng (bắt đổi ở lần đăng nhập đầu, không trả mật khẩu)", body)
+    s, _, body = tb.request("POST", f"{RA}/Status", token=token, json_body={"readerIds": ids})
+    st = {a["readerPublicId"]: a for a in json.loads(body)} if s == 200 else {}
+    expect(len(st) == 3 and not st[reader["publicId"]]["cardNoPassword"] and all(a["hasPassword"] for a in st.values())
+           and sum(a["cardNoPassword"] for a in st.values()) == 2, "tình trạng đăng nhập OPAC trên danh sách bạn đọc", body)
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "READER_PASSWORD_BULK", "3 bạn đọc")
+    step("nhật ký có đặt mật khẩu OPAC (identity → audit, không ghi mật khẩu)")
+
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==")
     s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,
                             json_body={"purpose": "reader-photo", "fileName": f"{card}.png", "contentType": "image/png", "size": len(png)})
