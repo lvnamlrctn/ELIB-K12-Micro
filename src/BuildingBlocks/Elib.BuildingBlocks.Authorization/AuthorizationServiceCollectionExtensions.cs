@@ -41,6 +41,9 @@ public static class AuthorizationServiceCollectionExtensions
                 options.TokenValidationParameters.NameClaimType = ElibClaimTypes.Subject;
                 options.TokenValidationParameters.ValidAlgorithms = ["RS256"];
                 options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
+                // Gặp kid lạ (identity xoay khoá ký, hoặc DEV khởi động lại với khoá tạm) thì tải lại JWKS sau tối thiểu 30 giây —
+                // mặc định 5 phút: suốt thời gian đó mọi token mới bị 401 và app quản trị lặp đăng nhập.
+                options.RefreshInterval = TimeSpan.FromSeconds(30);
             });
 
         services.AddElibAuthorizationCore();
