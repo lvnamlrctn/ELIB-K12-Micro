@@ -266,6 +266,63 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Lrc_style_import_resolves_tenant_catalogs_and_new_filters_find_readers()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        _factory.References[(tenantId, "orgs")] = [new(31, "Khoa Toán"), new(32, "Bộ môn Đại số", 31), new(33, "Văn phòng"), new(34, "Văn phòng", 31)];
+        _factory.References[(tenantId, "ethnicities")] = [new(1, "Kinh"), new(2, "Tày")];
+        _factory.References[(tenantId, "degrees")] = [new(5, "Đại học")];
+        _factory.References[(tenantId, "academic-titles")] = [new(7, "Tiến sĩ")];
+
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.AddWorksheet("Data");
+        // Tiêu đề như file của ELIB-LRC (không dấu, "Don vi", "Dan toc"…); giới tính LRC: 2 = Nữ.
+        string[] header = ["Ma the", "Ho", "Ten", "Gioi tinh", "Don vi", "Dan toc", "Trinh do", "Hoc ham"];
+        for (var i = 0; i < header.Length; i++) sheet.Cell(1, i + 1).Value = header[i];
+        object[][] rows =
+        [
+            ["SV-0101", "Nguyễn Thị", "Hoa", "2", "khoa  toán", "Tày", "Đại học", ""],
+            ["SV-0102", "Trần", "Bình", "1", "32", "Kinh", "", "Tiến sĩ"],
+        ];
+        for (var r = 0; r < rows.Length; r++)
+            for (var col = 0; col < rows[r].Length; col++) sheet.Cell(r + 2, col + 1).Value = rows[r][col].ToString();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        var form = new MultipartFormDataContent { { new ByteArrayContent(stream.ToArray()), "file", "lrc.xlsx" } };
+        Assert.Equal(2, (await Read<CrudImportResult>(await staff.PostAsync(U("/api/readers/Import"), form))).Imported);
+
+        var all = (await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch(), Json))).Items;
+        var hoa = Assert.Single(all, r => r.CardNo == "SV-0101");
+        Assert.Equal((0, 31L, 2L, 5L, (long?)null), (hoa.Sex, hoa.OrgId, hoa.EthnicityId, hoa.DegreeId, hoa.AcademicTitleId));
+        var binh = Assert.Single(all, r => r.CardNo == "SV-0102");
+        Assert.Equal((32L, 1L, 7L), (binh.OrgId, binh.EthnicityId, binh.AcademicTitleId));
+
+        // Tên đơn vị trùng ở hai nhánh → báo dòng, gợi ý ghi số id.
+        sheet.Cell(2, 1).Value = "SV-0103"; sheet.Cell(2, 5).Value = "Văn phòng"; sheet.Cell(3, 1).Value = "SV-0104";
+        using var ambiguous = new MemoryStream();
+        workbook.SaveAs(ambiguous);
+        var rejected = await staff.PostAsync(U("/api/readers/Import"), new MultipartFormDataContent { { new ByteArrayContent(ambiguous.ToArray()), "file", "lrc.xlsx" } });
+        var error = Assert.Single((await rejected.Content.ReadFromJsonAsync<CrudImportResult>(Json))!.Errors);
+        Assert.Contains("số id", error.Message, StringComparison.Ordinal);
+
+        // Bộ lọc kiểu ELIB-LRC: Họ / Tên / Mã thẻ chứa, nhiều đơn vị (đơn vị + đơn vị con do app gửi).
+        async Task<string[]> Find(ReaderSearch s) =>
+            [.. (await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), s, Json))).Items.Select(r => r.CardNo).Order()];
+        Assert.Equal(["SV-0101"], await Find(new ReaderSearch { LastName = "nguyễn" }));
+        Assert.Equal(["SV-0102"], await Find(new ReaderSearch { FirstName = "BÌNH" }));
+        Assert.Equal(["SV-0101", "SV-0102"], await Find(new ReaderSearch { CardNoContains = "sv-01" }));
+        Assert.Equal(["SV-0101", "SV-0102"], await Find(new ReaderSearch { OrgIds = [31, 32] }));
+        Assert.Equal(["SV-0102"], await Find(new ReaderSearch { OrgIds = [32] }));
+
+        // Xuất kèm tên đơn vị, dân tộc, trình độ, học hàm.
+        var export = await staff.PostAsJsonAsync(U("/api/readers/Export"),
+            new ReaderExportRequest(new ReaderSearch { CardNo = "SV-0102" }, ["cardno", "org", "ethnicity", "degree", "academictitle"]), Json);
+        using var exported = new XLWorkbook(new MemoryStream(await export.Content.ReadAsByteArrayAsync()));
+        Assert.Equal(["SV-0102", "Bộ môn Đại số", "Kinh", "", "Tiến sĩ"], Enumerable.Range(2, 5).Select(i => exported.Worksheet(1).Cell(2, i).GetString()));
+    }
+
+    [Fact]
     public async Task Photos_are_set_per_reader_and_in_bulk_by_card_number()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

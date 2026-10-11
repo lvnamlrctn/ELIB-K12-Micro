@@ -265,6 +265,27 @@ public sealed class CatalogApiTests : IClassFixture<TenantApiFactory>, IAsyncLif
     }
 
     [Fact]
+    public async Task Reference_catalogs_are_listed_for_services_only_and_per_tenant()
+    {
+        var tenant = await NewTenantAsync();
+        var other = await NewTenantAsync();
+        var staff = Staff(tenant.Id);
+        var school = await Read<OrgDto>(await staff.PostAsJsonAsync("/api/orgs/Add", new OrgRequest("Khoa Toán", null, 1, null, null)));
+        await Read<OrgDto>(await staff.PostAsJsonAsync("/api/orgs/Add", new OrgRequest("Bộ môn Đại số", school.Id, 1, null, null)));
+        await Read<OrgDto>(await Staff(other.Id).PostAsJsonAsync("/api/orgs/Add", new OrgRequest("Khoa của trường khác", null, 1, null, null)));
+
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        var orgs = await Read<IReadOnlyList<ReferenceItem>>(await service.GetAsync(U($"/internal/tenants/{tenant.Id}/reference/orgs")));
+        Assert.Equal([("Khoa Toán", (long?)null), ("Bộ môn Đại số", school.Id)], orgs.Select(o => (o.Name, o.ParentId)));
+        // Danh mục mặc định seed khi khởi tạo đơn vị (54 dân tộc…).
+        var ethnicities = await Read<IReadOnlyList<ReferenceItem>>(await service.GetAsync(U($"/internal/tenants/{tenant.Id}/reference/ethnicities")));
+        Assert.Contains(ethnicities, e => e.Name == "Kinh");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await service.GetAsync(U($"/internal/tenants/{tenant.Id}/reference/khong-co"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenant.Id}/reference/orgs"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Deleted_builtin_parameter_falls_back_to_catalog_default()
     {
         var tenant = await NewTenantAsync();

@@ -1,5 +1,7 @@
 import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
+import { Language } from '../../core/i18n';
 import { Api, ExportField, ReaderSearch, errorMessage, saveFile } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
@@ -8,25 +10,25 @@ import { readZip } from '../../shared/zip';
 /** Xuất danh sách bạn đọc ra Excel (monolith: Reader/Export) theo bộ lọc đang chọn ở màn danh sách. */
 @Component({
   selector: 'app-reader-export',
-  imports: [FormsModule, Modal],
+  imports: [FormsModule, Modal, TranslatePipe],
   template: `
-    <app-modal title="Xuất danh sách bạn đọc" widthClass="max-w-lg" (closed)="closed.emit()">
-      <p class="text-sm text-gray-600 mb-3">Xuất <b>{{ total() }}</b> bạn đọc theo bộ lọc hiện tại. File có cùng tiêu đề cột với file nhập, nên sửa xong nhập lại được.</p>
+    <app-modal title="READER.EXPORT_DIALOG_TITLE" widthClass="max-w-lg" (closed)="closed.emit()">
+      <p class="text-sm text-gray-600 mb-3">{{ 'READER.EXPORT_TEXT' | translate: { count: total() } }}</p>
       <div class="flex justify-between items-center mb-2">
-        <span class="form-label !mb-0">Trường xuất</span>
-        <button type="button" class="text-xs text-blue-600 hover:underline" (click)="toggleAll()">{{ allChecked() ? 'Bỏ chọn hết' : 'Chọn hết' }}</button>
+        <span class="form-label !mb-0">{{ 'READER.EXPORT_FIELDS' | translate }}</span>
+        <button type="button" class="text-xs text-blue-600 hover:underline" (click)="toggleAll()">{{ (allChecked() ? 'READER.EXPORT_UNSELECT_ALL' : 'READER.EXPORT_SELECT_ALL') | translate }}</button>
       </div>
       <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
         @for (f of fields(); track f.code) {
           <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-            <input type="checkbox" class="rounded border-gray-300" [checked]="checked().has(f.code)" (change)="toggle(f.code)" /> {{ f.name }}
+            <input type="checkbox" class="rounded border-gray-300" [checked]="checked().has(f.code)" (change)="toggle(f.code)" /> {{ fieldLabel(f) | translate }}
           </label>
         }
       </div>
       <ng-container footer>
-        <button type="button" class="btn-secondary" (click)="closed.emit()">Đóng</button>
+        <button type="button" class="btn-secondary" (click)="closed.emit()">{{ 'COMMON.CLOSE' | translate }}</button>
         <button type="button" class="btn-primary" [disabled]="busy() || checked().size === 0" (click)="run()">
-          <span class="material-icons text-[16px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'download' }}</span> Xuất Excel
+          <span class="material-icons text-[16px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'download' }}</span> {{ 'READER.EXPORT_CONFIRM' | translate }}
         </button>
       </ng-container>
     </app-modal>
@@ -39,10 +41,16 @@ export class ReaderExport implements OnInit {
 
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly language = inject(Language);
   protected readonly fields = signal<ExportField[]>([]);
   protected readonly checked = signal<Set<string>>(new Set());
   protected readonly busy = signal(false);
   protected readonly allChecked = computed(() => this.fields().every((f) => this.checked().has(f.code)));
+
+  /** Tên trường theo ngôn ngữ (mã trường của patron → khoá dịch); trường lạ hiện tên backend gửi. */
+  protected fieldLabel(f: ExportField): string {
+    return EXPORT_LABELS[f.code] ?? f.name;
+  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -70,7 +78,7 @@ export class ReaderExport implements OnInit {
     try {
       const { pageIndex: _p, pageSize: _s, ...search } = this.search();
       const fields = this.fields().map((f) => f.code).filter((c) => this.checked().has(c));
-      saveFile(await this.api.exportReaders({ ...search, keyword: search.keyword?.trim() || undefined }, fields), 'danh-sach-ban-doc.xlsx');
+      saveFile(await this.api.exportReaders({ ...search, keyword: search.keyword?.trim() || undefined }, fields), `${this.language.t('READER.EXPORT_FILE_NAME')}.xlsx`);
       this.closed.emit();
     } catch (e) {
       this.toastr.error(errorMessage(e));
@@ -79,6 +87,15 @@ export class ReaderExport implements OnInit {
     }
   }
 }
+
+/** Mã trường xuất của patron → khoá dịch. */
+const EXPORT_LABELS: Record<string, string> = {
+  cardno: 'READER.CARD_CODE', lastname: 'READER.FIRST_NAME', firstname: 'READER.LAST_NAME', birthdate: 'READER.BIRTH_DATE', sex: 'READER.GENDER',
+  readertype: 'READER.READER_TYPE', class: 'READER.ACADEMIC_CLASS', course: 'READER.COURSE', org: 'READER.ORG', ethnicity: 'READER.ETHNIC',
+  degree: 'READER.DEGREE', academictitle: 'READER.PROF', email: 'READER.EMAIL', phone: 'READER.PHONE', address: 'READER.ADDRESS',
+  citizenid: 'READER.CITIZEN_ID', carduid: 'READER.CARD_UID', issuedate: 'READER.ISSUED_DATE', expiredate: 'READER.EXPIRED_DATE',
+  status: 'READER.STATUS', lockreason: 'READER.LOCK_REASON',
+};
 
 const PHOTO_TYPES: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -93,36 +110,33 @@ interface PhotoFailure { name: string; error: string; }
  */
 @Component({
   selector: 'app-reader-photos',
-  imports: [Modal],
+  imports: [Modal, TranslatePipe],
   template: `
-    <app-modal title="Tải ảnh bạn đọc hàng loạt" widthClass="max-w-lg" (closed)="closed.emit()">
-      <p class="text-sm text-gray-600">
-        Đặt tên mỗi ảnh theo <b>số thẻ</b> bạn đọc (VD <span class="font-mono">HS-001.jpg</span>), rồi chọn một file <b>.zip</b> chứa các ảnh hoặc chọn nhiều ảnh cùng lúc.
-        JPG, PNG, WEBP, tối đa 2 MB mỗi ảnh. Ảnh mới thay ảnh cũ.
-      </p>
+    <app-modal title="READER.PHOTOS_TITLE" widthClass="max-w-lg" (closed)="closed.emit()">
+      <p class="text-sm text-gray-600">{{ 'READER.PHOTOS_HINT' | translate }}</p>
       <input type="file" multiple accept=".zip,application/zip,image/jpeg,image/png,image/webp" [disabled]="busy()"
              class="mt-3 block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
              (change)="pick($event)" />
-      @if (items().length) { <p class="text-sm text-gray-700 mt-3">Đã chọn <b>{{ items().length }}</b> file.</p> }
+      @if (items().length) { <p class="text-sm text-gray-700 mt-3">{{ 'READER.PHOTOS_SELECTED' | translate: { count: items().length } }}</p> }
 
       @if (busy()) {
         <div class="mt-3">
           <div class="h-2 bg-gray-100 rounded"><div class="h-2 bg-blue-500 rounded transition-all" [style.width.%]="progress()"></div></div>
-          <p class="text-xs text-gray-500 mt-1">Đang tải {{ done() }}/{{ items().length }} ảnh...</p>
+          <p class="text-xs text-gray-500 mt-1">{{ 'READER.PHOTOS_PROGRESS' | translate: { done: done(), total: items().length } }}</p>
         </div>
       }
 
       @if (result(); as r) {
         <div class="mt-4 text-sm space-y-2">
-          <div class="alert-success !block">Đã cập nhật ảnh cho <b>{{ r.matched }}</b> bạn đọc.</div>
+          <div class="alert-success !block">{{ 'READER.PHOTOS_MATCHED' | translate: { count: r.matched } }}</div>
           @if (r.notFound.length) {
-            <div class="alert-error !block"><b>{{ r.notFound.length }}</b> ảnh không khớp số thẻ nào: <span class="font-mono text-xs">{{ r.notFound.join(', ') }}</span></div>
+            <div class="alert-error !block">{{ 'READER.PHOTOS_NOT_FOUND' | translate: { count: r.notFound.length } }} <span class="font-mono text-xs">{{ r.notFound.join(', ') }}</span></div>
           }
           @if (r.failed.length) {
             <div class="alert-error !block">
-              <div class="font-medium mb-1">{{ r.failed.length }} ảnh lỗi:</div>
+              <div class="font-medium mb-1">{{ 'READER.PHOTOS_FAILED' | translate: { count: r.failed.length } }}</div>
               <ul class="max-h-40 overflow-y-auto text-xs list-disc pl-5">
-                @for (f of r.failed; track f.name) { <li><span class="font-mono">{{ f.name }}</span>: {{ f.error }}</li> }
+                @for (f of r.failed; track f.name) { <li><span class="font-mono">{{ f.name }}</span>: {{ f.error | translate }}</li> }
               </ul>
             </div>
           }
@@ -130,9 +144,9 @@ interface PhotoFailure { name: string; error: string; }
       }
 
       <ng-container footer>
-        <button type="button" class="btn-secondary" (click)="closed.emit()" [disabled]="busy()">Đóng</button>
+        <button type="button" class="btn-secondary" (click)="closed.emit()" [disabled]="busy()">{{ 'COMMON.CLOSE' | translate }}</button>
         <button type="button" class="btn-primary" [disabled]="busy() || !items().length" (click)="run()">
-          <span class="material-icons text-[16px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'cloud_upload' }}</span> Tải lên
+          <span class="material-icons text-[16px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'cloud_upload' }}</span> {{ 'READER.PHOTOS_UPLOAD' | translate }}
         </button>
       </ng-container>
     </app-modal>
@@ -163,7 +177,7 @@ export class ReaderPhotos {
         }
       }
     } catch (e) {
-      this.toastr.error(e instanceof Error ? e.message : 'Không đọc được file .zip.');
+      this.toastr.error(e instanceof Error ? e.message : 'READER.ZIP_UNREADABLE');
     }
     this.items.set(items);
   }
@@ -178,9 +192,9 @@ export class ReaderPhotos {
       for (let it = queue.shift(); it; it = queue.shift()) {
         try {
           const type = PHOTO_TYPES[it.name.split('.').pop()?.toLowerCase() ?? ''];
-          if (!type) throw new Error('Chỉ nhận ảnh JPG, PNG, WEBP.');
-          if (!it.cardNo) throw new Error('Tên file không có số thẻ.');
-          if (it.size > MAX_PHOTO_BYTES) throw new Error('Ảnh lớn hơn 2 MB.');
+          if (!type) throw new Error('READER.PHOTO_TYPE_INVALID');
+          if (!it.cardNo) throw new Error('READER.PHOTO_NO_CARD');
+          if (it.size > MAX_PHOTO_BYTES) throw new Error('READER.PHOTO_TOO_BIG');
           const file = await this.api.upload('reader-photo', new File([await it.read()], it.name, { type }));
           uploaded.push({ cardNo: it.cardNo, fileId: file.id });
         } catch (e) {

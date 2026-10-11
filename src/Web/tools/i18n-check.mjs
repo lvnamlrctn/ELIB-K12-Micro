@@ -12,7 +12,16 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APPS = {
   opac: { src: 'projects/opac/src/app', i18n: 'projects/opac/public/i18n', strict: ['projects/opac/src/app'] },
-  admin: { src: 'projects/admin/src/app', i18n: 'projects/admin/public/i18n', strict: [] },
+  // Admin chuyển dần từng màn (docs: GĐ C) — liệt kê thư mục/file đã chuyển xong.
+  admin: {
+    src: 'projects/admin/src/app', i18n: 'projects/admin/public/i18n',
+    strict: [
+      'projects/admin/src/app/layout', 'projects/admin/src/app/core/i18n.ts',
+      'projects/admin/src/app/shared/crud-page.ts', 'projects/admin/src/app/shared/import-dialog.ts', 'projects/admin/src/app/shared/toastr.ts',
+      'projects/admin/src/app/shared/ui.ts', 'projects/admin/src/app/shared/zip.ts',
+      'projects/admin/src/app/pages/patron/readers.ts', 'projects/admin/src/app/pages/patron/reader-',
+    ],
+  },
 };
 const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_'];
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;

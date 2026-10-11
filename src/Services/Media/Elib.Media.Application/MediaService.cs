@@ -45,6 +45,10 @@ public sealed record MediaFileDto(Guid Id, string Purpose, string FileName, stri
 
 public sealed record DownloadDto(string Url, DateTimeOffset? ExpiresAt);
 
+public sealed record FileUrlsRequest(IReadOnlyList<Guid>? Ids);
+
+public sealed record FileUrlDto(Guid Id, string Url, DateTimeOffset? ExpiresAt);
+
 /// <summary>Lấy file từ URL ngoài về kho (ảnh bìa tra theo ISBN…).</summary>
 public sealed record ImportRequest(string Purpose, string Url);
 
@@ -166,6 +170,29 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         if (file.IsPublic) return new DownloadDto(storage.PublicUrl(file.Bucket, file.ObjectKey), null);
         var expiry = TimeSpan.FromMinutes(_options.DownloadUrlMinutes);
         return new DownloadDto(await storage.PresignGetAsync(file.Bucket, file.ObjectKey, expiry), clock.GetUtcNow() + expiry);
+    }
+
+    public const int MaxUrlsPerCall = 100;
+
+    /// <summary>
+    /// Link xem nhiều file một lần (ảnh nhỏ trong danh sách bạn đọc, in thẻ): file không có, chưa xong, hoặc không thuộc đơn vị thì bỏ qua
+    /// (không báo lỗi cả lượt). Link ký có hạn như <see cref="DownloadAsync"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<FileUrlDto>> UrlsAsync(FileUrlsRequest request, CancellationToken ct)
+    {
+        var ids = (request.Ids ?? []).Where(id => id != Guid.Empty).Distinct().ToList();
+        if (ids.Count > MaxUrlsPerCall)
+            throw new BusinessRuleException("MEDIA_URLS_TOO_MANY", $"Mỗi lần lấy tối đa {MaxUrlsPerCall} link.");
+        var files = await db.Files.AsNoTracking().Where(f => ids.Contains(f.PublicId) && f.Status == MediaFileStatus.Ready).ToListAsync(ct);
+        var expiry = TimeSpan.FromMinutes(_options.DownloadUrlMinutes);
+        var result = new List<FileUrlDto>(files.Count);
+        foreach (var file in files)
+        {
+            result.Add(file.IsPublic
+                ? new FileUrlDto(file.PublicId, storage.PublicUrl(file.Bucket, file.ObjectKey), null)
+                : new FileUrlDto(file.PublicId, await storage.PresignGetAsync(file.Bucket, file.ObjectKey, expiry), clock.GetUtcNow() + expiry));
+        }
+        return result;
     }
 
     private async Task<UploadTicketDto> CreateTicketAsync(long tenantId, MediaPurpose purpose, string fileName, string contentType, long size, CancellationToken ct)

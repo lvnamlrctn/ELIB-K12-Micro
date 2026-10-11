@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Testing;
+using Elib.BuildingBlocks.Tenancy;
+using Elib.Patron.Application;
 using Elib.Patron.Infrastructure;
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
@@ -23,6 +25,9 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
 
     public ConcurrentQueue<object> Published { get; } = new();
     public FakePermissionSource Permissions { get; } = new();
+
+    /// <summary>Danh mục của service tenant (đơn vị, dân tộc…) theo (đơn vị, loại) — thay cho gọi /internal của tenant.</summary>
+    public ConcurrentDictionary<(long TenantId, string Kind), List<ReferenceItem>> References { get; } = new();
 
     public IEnumerable<T> PublishedOf<T>() => Published.OfType<T>();
 
@@ -46,6 +51,8 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
             services.AddHeaderTestAuth();
             services.RemoveAll<IPermissionSource>();
             services.AddSingleton<IPermissionSource>(Permissions);
+            services.RemoveAll<ITenantReferences>();
+            services.AddScoped<ITenantReferences>(sp => new FakeTenantReferences(References, sp.GetRequiredService<ITenantContext>()));
         });
     }
 
@@ -104,4 +111,10 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
 
         public Task PublishFault<T>(PublishContext<T> context, Exception exception) where T : class => Task.CompletedTask;
     }
+}
+
+public sealed class FakeTenantReferences(ConcurrentDictionary<(long TenantId, string Kind), List<ReferenceItem>> all, ITenantContext tenant) : ITenantReferences
+{
+    public Task<IReadOnlyList<ReferenceItem>> ListAsync(string kind, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ReferenceItem>>(all.GetValueOrDefault((tenant.RequireTenantId(), kind)) ?? []);
 }

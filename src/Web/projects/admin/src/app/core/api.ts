@@ -41,8 +41,11 @@ export interface Reader {
 }
 export interface ExportField { code: string; name: string; }
 export interface ReaderPhotosResult { matched: number; notFound: string[]; }
+/** Bộ lọc như ELIB-LRC: họ/tên/mã thẻ chứa, đơn vị (kèm đơn vị con), ngày cấp và hạn thẻ trong khoảng. Ngày yyyy-MM-dd. */
 export interface ReaderSearch extends CrudSearch {
   readerTypeId?: number | null; classId?: number | null; courseId?: number | null; expired?: boolean | null;
+  cardNoContains?: string | null; lastName?: string | null; firstName?: string | null; orgIds?: number[] | null;
+  issuedFrom?: string | null; issuedTo?: string | null; expiredFrom?: string | null; expiredTo?: string | null;
 }
 export interface ReaderBulkUpdate {
   publicIds: string[]; readerTypeId?: number | null; classId?: number | null; courseId?: number | null;
@@ -424,6 +427,8 @@ export class Api {
   // Bạn đọc (patron): 8 endpoint chuẩn qua crud('readers', 'patron') + khoá/mở thẻ, sửa hàng loạt
   lockReader(publicId: string, reason: string | null) { return this.post<Reader>(`/api/admin/patron/readers/Lock/${publicId}`, { reason }); }
   unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
+  /** Link xem nhiều file (ảnh thẻ) một lần — tối đa 100; file không thuộc đơn vị/chưa xong bị bỏ qua. */
+  fileUrls(ids: string[]) { return this.post<{ id: string; url: string; expiresAt: string | null }[]>('/api/admin/media/files/urls', { ids }); }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
   /** Mật khẩu OPAC của bạn đọc nằm ở identity; useCardNo = mật khẩu mặc định là số thẻ. */
   readerAccounts(readerIds: string[]) { return this.post<ReaderAccount[]>('/api/admin/identity/reader-accounts/Status', { readerIds }); }

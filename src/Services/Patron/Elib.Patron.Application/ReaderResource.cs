@@ -13,7 +13,21 @@ namespace Elib.Patron.Application;
 /// <summary>Tìm bạn đọc (monolith: ReaderSearchRequest). Keyword tìm trong số thẻ, họ tên, email, điện thoại, CCCD.</summary>
 public sealed class ReaderSearch : CrudSearch
 {
+    /// <summary>Đúng số thẻ.</summary>
     public string? CardNo { get; set; }
+
+    /// <summary>Số thẻ chứa chuỗi (ô "Mã thẻ" của ELIB-LRC).</summary>
+    public string? CardNoContains { get; set; }
+
+    /// <summary>Họ đệm chứa (không phân biệt hoa thường).</summary>
+    public string? LastName { get; set; }
+
+    /// <summary>Tên chứa (không phân biệt hoa thường).</summary>
+    public string? FirstName { get; set; }
+
+    /// <summary>Thuộc một trong các đơn vị — app Admin gửi đơn vị đã chọn kèm mọi đơn vị con của nó trong cây.</summary>
+    public IReadOnlyList<long>? OrgIds { get; set; }
+
     public long? ReaderTypeId { get; set; }
     public long? ClassId { get; set; }
     public long? CourseId { get; set; }
@@ -28,15 +42,16 @@ public sealed class ReaderSearch : CrudSearch
 }
 
 /// <summary>
-/// Thêm/sửa bạn đọc. Ngày dạng yyyy-MM-dd. <see cref="ReaderTypeName"/>/<see cref="ClassName"/>/<see cref="CourseName"/>:
-/// thay cho id khi nhập Excel (tra theo tên trong danh mục của đơn vị).
+/// Thêm/sửa bạn đọc. Ngày dạng yyyy-MM-dd. Các trường *Name: thay cho id khi nhập Excel — loại/lớp/khoá tra trong danh mục của patron;
+/// đơn vị, dân tộc, trình độ, học hàm tra ở service tenant (tên duy nhất hoặc số id).
 /// </summary>
 public sealed record ReaderRequest(
     string CardNo, string? LastName, string FirstName, string? CitizenId = null, string? CardUid = null, string? Email = null,
     string? Phone = null, string? Address = null, DateOnly? BirthDate = null, int? Sex = null, long? ReaderTypeId = null,
     long? ClassId = null, long? CourseId = null, long? OrgId = null, long? DegreeId = null, long? EthnicityId = null,
     long? AcademicTitleId = null, DateOnly? IssueDate = null, DateOnly? ExpireDate = null, int? Status = null,
-    string? ReaderTypeName = null, string? ClassName = null, string? CourseName = null);
+    string? ReaderTypeName = null, string? ClassName = null, string? CourseName = null,
+    string? OrgName = null, string? EthnicityName = null, string? DegreeName = null, string? AcademicTitleName = null);
 
 /// <summary>Danh mục chỉ trả id — app Admin ghép tên từ danh mục đã tải (loại, lớp, khoá; phòng ban… ở service tenant).</summary>
 public sealed record ReaderDto(
@@ -72,7 +87,8 @@ public sealed record ReaderExportRequest(ReaderSearch? Search, IReadOnlyList<str
 /// Bạn đọc (monolith: ReaderController). Ngoài 8 endpoint chuẩn: Lock/Unlock, CheckExist, BulkUpdate, ImportTemplate/Import.
 /// Mọi thay đổi phát <see cref="ReaderChanged"/> (outbox, cùng transaction) cho bản sao ở các service khác.
 /// </summary>
-public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock)
+public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock,
+    ITenantReferences references)
     : CrudResource<ReaderResource, Reader, ReaderSearch, ReaderRequest, ReaderDto>(db), ICrudImportable<ReaderRequest>
 {
     public const int MaxBulk = 2000;
@@ -94,14 +110,31 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         return reader;
     }
 
-    /// <summary>Tra tên loại/lớp/khoá (nhập Excel) sang id trước khi tạo.</summary>
+    /// <summary>Tra tên loại/lớp/khoá (patron) và đơn vị/dân tộc/trình độ/học hàm (tenant) — nhập Excel — sang id trước khi tạo.</summary>
     protected override async Task<Reader> CreateAsync(ReaderRequest request, CancellationToken ct) =>
         Create(request with
         {
             ReaderTypeId = request.ReaderTypeId ?? await IdByNameAsync<ReaderType>(request.ReaderTypeName, "Loại bạn đọc", ct),
             ClassId = request.ClassId ?? await IdByNameAsync<SchoolClass>(request.ClassName, "Lớp", ct),
             CourseId = request.CourseId ?? await IdByNameAsync<Course>(request.CourseName, "Khoá", ct),
+            OrgId = request.OrgId ?? await ReferenceIdAsync(ReferenceKinds.Orgs, request.OrgName, "Đơn vị", ct),
+            EthnicityId = request.EthnicityId ?? await ReferenceIdAsync(ReferenceKinds.Ethnicities, request.EthnicityName, "Dân tộc", ct),
+            DegreeId = request.DegreeId ?? await ReferenceIdAsync(ReferenceKinds.Degrees, request.DegreeName, "Trình độ", ct),
+            AcademicTitleId = request.AcademicTitleId ?? await ReferenceIdAsync(ReferenceKinds.AcademicTitles, request.AcademicTitleName, "Học hàm", ct),
         });
+
+    private readonly Dictionary<string, ReferenceLookup> _references = new(StringComparer.Ordinal);
+
+    /// <summary>Danh mục của tenant, tải một lần cho cả lượt nhập/xuất.</summary>
+    private async Task<ReferenceLookup> ReferencesAsync(string kind, CancellationToken ct)
+    {
+        if (!_references.TryGetValue(kind, out var lookup))
+            _references[kind] = lookup = new ReferenceLookup(await references.ListAsync(kind, ct));
+        return lookup;
+    }
+
+    private async Task<long?> ReferenceIdAsync(string kind, string? text, string field, CancellationToken ct) =>
+        string.IsNullOrWhiteSpace(text) ? null : (await ReferencesAsync(kind, ct)).Resolve(text, field);
 
     protected override void Update(Reader entity, ReaderRequest request)
     {
@@ -115,6 +148,28 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         {
             var cardNo = s.CardNo.Trim().ToUpperInvariant();
             query = query.Where(x => x.CardNo == cardNo);
+        }
+        if (!string.IsNullOrWhiteSpace(s.CardNoContains))
+        {
+            var part = s.CardNoContains.Trim().ToUpperInvariant();
+            query = query.Where(x => x.CardNo.Contains(part));
+        }
+#pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang lower() của SQL
+        if (!string.IsNullOrWhiteSpace(s.LastName))
+        {
+            var last = s.LastName.Trim().ToLowerInvariant();
+            query = query.Where(x => x.LastName != null && x.LastName.ToLower().Contains(last));
+        }
+        if (!string.IsNullOrWhiteSpace(s.FirstName))
+        {
+            var first = s.FirstName.Trim().ToLowerInvariant();
+            query = query.Where(x => x.FirstName.ToLower().Contains(first));
+        }
+#pragma warning restore CA1862, CA1304, CA1311
+        if (s.OrgIds is { Count: > 0 } orgIds)
+        {
+            var ids = orgIds.Distinct().Take(500).ToList();
+            query = query.Where(x => x.OrgId != null && ids.Contains(x.OrgId.Value));
         }
         if (s.ReaderTypeId is { } type) query = query.Where(x => x.ReaderTypeId == type);
         if (s.ClassId is { } cls) query = query.Where(x => x.ClassId == cls);
@@ -246,6 +301,10 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         new("readertype", "Loại bạn đọc", r => r.ReaderType),
         new("class", "Lớp", r => r.Class),
         new("course", "Khoá", r => r.Course),
+        new("org", "Đơn vị", r => r.Org),
+        new("ethnicity", "Dân tộc", r => r.Ethnicity),
+        new("degree", "Trình độ", r => r.Degree),
+        new("academictitle", "Học hàm", r => r.AcademicTitle),
         new("email", "Email", r => r.Reader.Email),
         new("phone", "Điện thoại", r => r.Reader.Phone),
         new("address", "Địa chỉ", r => r.Reader.Address),
@@ -269,11 +328,19 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         var types = await NamesAsync<ReaderType>(ct);
         var classes = await NamesAsync<SchoolClass>(ct);
         var courses = await NamesAsync<Course>(ct);
+        // Danh mục của tenant chỉ tải khi có cột cần đến (tenant tạm không trả lời thì xuất được các cột còn lại).
+        var keys = columns.Select(c => c.Key).ToHashSet(StringComparer.Ordinal);
+        var orgs = keys.Contains("org") ? await ReferencesAsync(ReferenceKinds.Orgs, ct) : null;
+        var ethnicities = keys.Contains("ethnicity") ? await ReferencesAsync(ReferenceKinds.Ethnicities, ct) : null;
+        var degrees = keys.Contains("degree") ? await ReferencesAsync(ReferenceKinds.Degrees, ct) : null;
+        var titles = keys.Contains("academictitle") ? await ReferencesAsync(ReferenceKinds.AcademicTitles, ct) : null;
         return CrudExcel.Export("Bạn đọc", columns, readers.Select(r => new ReaderExportRow(r,
-            CatalogName(types, r.ReaderTypeId), CatalogName(classes, r.ClassId), CatalogName(courses, r.CourseId))));
+            CatalogName(types, r.ReaderTypeId), CatalogName(classes, r.ClassId), CatalogName(courses, r.CourseId),
+            orgs?.Name(r.OrgId), ethnicities?.Name(r.EthnicityId), degrees?.Name(r.DegreeId), titles?.Name(r.AcademicTitleId))));
     }
 
-    private sealed record ReaderExportRow(Reader Reader, string? ReaderType, string? Class, string? Course);
+    private sealed record ReaderExportRow(Reader Reader, string? ReaderType, string? Class, string? Course,
+        string? Org = null, string? Ethnicity = null, string? Degree = null, string? AcademicTitle = null);
 
     private async Task<Dictionary<long, string>> NamesAsync<T>(CancellationToken ct) where T : NamedCatalogItem =>
         await Db.Set<T>().AsNoTracking().ToDictionaryAsync(x => x.Id, x => x.Name, ct);
@@ -292,7 +359,11 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         new("sex", "Giới tính", false, "Nam / Nữ", "Gioi tinh", "Sex"),
         new("readertype", "Loại bạn đọc", false, "Tên đúng như danh mục Loại bạn đọc.", "ReaderType", "Doi tuong"),
         new("class", "Lớp", false, "Tên đúng như danh mục Lớp.", "Class"),
-        new("course", "Khoá", false, "Tên đúng như danh mục Khoá.", "Course", "Nien khoa"),
+        new("course", "Khoá", false, "Tên đúng như danh mục Khoá.", "Course", "Nien khoa", "Khoa hoc"),
+        new("org", "Đơn vị", false, "Tên đơn vị/phòng ban (không trùng) hoặc số id.", "Org", "Don vi", "Phong ban", "OrgName"),
+        new("ethnicity", "Dân tộc", false, "Tên đúng như danh mục Dân tộc.", "Ethnic", "Dan toc", "Ethenic"),
+        new("degree", "Trình độ", false, "Tên đúng như danh mục Trình độ.", "Degree", "Trinh do"),
+        new("academictitle", "Học hàm", false, "Tên đúng như danh mục Học hàm học vị.", "Prof", "Hoc ham", "Hoc ham hoc vi"),
         new("email", "Email"),
         new("phone", "Điện thoại", false, null, "Phone", "So dien thoai"),
         new("address", "Địa chỉ", false, null, "Address"),
@@ -317,14 +388,16 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             CitizenId: row.Get("citizenid"), CardUid: row.Get("carduid"), Email: row.Get("email"), Phone: row.Get("phone"), Address: row.Get("address"),
             BirthDate: row.Date("birthdate", "Ngày sinh"), Sex: ParseSex(row.Get("sex")),
             IssueDate: issue, ExpireDate: row.Date("expiredate", "Ngày hết hạn") ?? issue.AddYears(1),
-            ReaderTypeName: row.Get("readertype"), ClassName: row.Get("class"), CourseName: row.Get("course"));
+            ReaderTypeName: row.Get("readertype"), ClassName: row.Get("class"), CourseName: row.Get("course"),
+            OrgName: row.Get("org"), EthnicityName: row.Get("ethnicity"), DegreeName: row.Get("degree"), AcademicTitleName: row.Get("academictitle"));
     }
 
     private static int? ParseSex(string? text) => text?.Trim().ToUpperInvariant() switch
     {
         null or "" => null,
         "NAM" or "1" or "M" or "MALE" => Sex.Male,
-        "NỮ" or "NU" or "0" or "F" or "FEMALE" => Sex.Female,
+        // ELIB-LRC xuất/nhập Nữ = 2 (form của LRC gửi 0) — nhận cả hai.
+        "NỮ" or "NU" or "0" or "2" or "F" or "FEMALE" => Sex.Female,
         _ => throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Giới tính '{text}' không hợp lệ (Nam/Nữ)."),
     };
 

@@ -51,6 +51,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<TenantQueries>();
         services.AddScoped<ProvisioningService>();
         services.AddScoped<ParameterQueries>();
+        services.AddScoped<ReferenceQueries>();
         services.AddScoped<TenantDefaults>();
 
         services.AddCrudResource<SystemParameterResource>();

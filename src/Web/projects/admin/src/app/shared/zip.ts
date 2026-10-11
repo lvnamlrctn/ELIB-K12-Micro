@@ -14,14 +14,14 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
   const buffer = await file.arrayBuffer();
   const view = new DataView(buffer);
   const eocd = findEndOfCentralDirectory(view);
-  if (eocd < 0) throw new Error('File không phải .zip hợp lệ.');
+  if (eocd < 0) throw new Error('ZIP.INVALID');
   const count = view.getUint16(eocd + 10, true);
   let offset = view.getUint32(eocd + 16, true);
-  if (count === 0xffff || offset === 0xffffffff) throw new Error('File .zip quá lớn (zip64) — chia thành nhiều file nhỏ hơn.');
+  if (count === 0xffff || offset === 0xffffffff) throw new Error('ZIP.TOO_LARGE');
 
   const entries: ZipEntry[] = [];
   for (let i = 0; i < count; i++) {
-    if (view.getUint32(offset, true) !== 0x02014b50) throw new Error('File .zip bị hỏng.');
+    if (view.getUint32(offset, true) !== 0x02014b50) throw new Error('ZIP.CORRUPT');
     const flags = view.getUint16(offset + 8, true);
     const method = view.getUint16(offset + 10, true);
     const compressedSize = view.getUint32(offset + 20, true);
@@ -36,7 +36,7 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
     const name = path.split('/').pop() ?? '';
     // Bỏ thư mục, file ẩn và rác của macOS (__MACOSX/, .DS_Store).
     if (!name || name.startsWith('.') || path.startsWith('__MACOSX/')) continue;
-    if (flags & 1) throw new Error('File .zip có mật khẩu — hãy nén lại không đặt mật khẩu.');
+    if (flags & 1) throw new Error('ZIP.ENCRYPTED');
 
     entries.push({
       name,
@@ -45,7 +45,7 @@ export async function readZip(file: Blob): Promise<ZipEntry[]> {
         const start = localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true);
         const data = new Blob([new Uint8Array(buffer, start, compressedSize)]);
         if (method === 0) return data;
-        if (method !== 8) throw new Error(`Kiểu nén ${method} không được hỗ trợ.`);
+        if (method !== 8) throw new Error('ZIP.UNSUPPORTED_METHOD');
         return new Response(data.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
       },
     });

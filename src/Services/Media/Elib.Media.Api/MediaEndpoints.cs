@@ -22,6 +22,7 @@ public static class MediaEndpoints
             .AddEndpointFilter(RejectImpersonation);
         files.MapGet("/{id:guid}", (Guid id, MediaService s, CancellationToken ct) => s.GetAsync(id, ct));
         files.MapGet("/{id:guid}/download", (Guid id, MediaService s, CancellationToken ct) => s.DownloadAsync(id, ct));
+        files.MapPost("/urls", (FileUrlsRequest request, MediaService s, CancellationToken ct) => s.UrlsAsync(request, ct));
 
         var system = app.MapGroup("/api/system/files").WithTags("SystemFiles").RequireAuthorization(new RequireSystemContextAttribute());
         system.MapPost("/uploads", (SystemUploadRequest request, MediaService s, CancellationToken ct) => s.RequestSystemUploadAsync(request, ct));

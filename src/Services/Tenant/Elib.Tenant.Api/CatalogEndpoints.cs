@@ -46,6 +46,9 @@ public static class CatalogEndpoints
         app.MapGet("/internal/tenants/{tenantId:long}/parameters", (long tenantId, string? service, ParameterQueries q, CancellationToken ct)
             => q.EffectiveAsync(tenantId, service, ct))
             .WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapGet("/internal/tenants/{tenantId:long}/reference/{kind}", (long tenantId, string kind, ReferenceQueries q, CancellationToken ct)
+            => q.ListAsync(tenantId, kind, ct))
+            .WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
         app.MapPost("/api/tenants/{publicId:guid}/defaults", async (Guid publicId, TenantAdminService s, CancellationToken ct)
             => Results.Ok(new { added = await s.SeedDefaultsAsync(publicId, ct) }))

@@ -70,6 +70,31 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Batch_urls_return_only_ready_files_of_the_same_tenant()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var client = Staff(tenantId);
+        async Task<Guid> Uploaded(HttpClient c)
+        {
+            var t = await Ticket(c, "reader-photo", "image/png", PngBytes.Length, "anh.png");
+            _factory.Storage.Upload(t.UploadUrl, PngBytes);
+            await Read<MediaFileDto>(await c.PostAsync(U($"/api/files/{t.FileId}/complete"), null));
+            return t.FileId;
+        }
+        var a = await Uploaded(client);
+        var b = await Uploaded(client);
+        var pending = (await Ticket(client, "reader-photo", "image/png", PngBytes.Length)).FileId; // chưa upload xong
+        var foreign = await Uploaded(Staff(Interlocked.Increment(ref _nextTenantId)));
+
+        var urls = await Read<List<FileUrlDto>>(await client.PostAsJsonAsync(U("/api/files/urls"), new FileUrlsRequest([a, b, pending, foreign, a])));
+        Assert.Equal(new[] { a, b }.Order(), urls.Select(u => u.Id).Order());
+        Assert.All(urls, u => Assert.Contains("sig=get", u.Url, StringComparison.Ordinal));
+
+        var many = await client.PostAsJsonAsync(U("/api/files/urls"), new FileUrlsRequest(Enumerable.Range(0, 101).Select(_ => Guid.NewGuid()).ToList()));
+        Assert.Equal("MEDIA_URLS_TOO_MANY", await ErrorCode(many));
+    }
+
+    [Fact]
     public async Task Content_that_is_not_the_declared_type_is_rejected_and_deleted()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);
