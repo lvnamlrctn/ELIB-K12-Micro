@@ -33,7 +33,11 @@ public sealed record MediaPurpose(string Code, string Name, bool Public, IReadOn
     public static readonly MediaPurpose ReaderPhoto =
         new("reader-photo", "Ảnh bạn đọc", Public: false, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto];
+    /// <summary>Ảnh bìa tài liệu — hiện công khai trên OPAC (catalog giữ URL trong biểu ghi).</summary>
+    public static readonly MediaPurpose BibCover =
+        new("bib-cover", "Ảnh bìa", Public: true, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
+
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))

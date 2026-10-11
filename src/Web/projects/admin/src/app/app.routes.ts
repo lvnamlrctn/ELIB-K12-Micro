@@ -72,6 +72,7 @@ export const routes: Routes = [
       { path: 'circulation-report', loadComponent: () => import('./pages/circulation/reports').then((m) => m.CirculationReports), canActivate: [tenantGuard, permissionGuard('CIRC_REPORT')], title: 'Báo cáo lưu thông' },
       { path: 'request-books', loadComponent: () => import('./pages/circulation/holds').then((m) => m.Holds), canActivate: [tenantGuard, permissionGuard('REQUEST_BOOKS')], title: 'Yêu cầu mượn' },
       { path: 'search-index', loadComponent: () => import('./pages/search/search-index').then((m) => m.SearchIndex), canActivate: [tenantGuard, permissionGuard('SEARCH_INDEX')], title: 'Chỉ mục tra cứu' },
+      { path: 'search-stats', loadComponent: () => import('./pages/search/search-stats').then((m) => m.SearchStats), canActivate: [tenantGuard, permissionGuard('SEARCH_STATS')], title: 'Thống kê tra cứu' },
       { path: 'fines', loadComponent: () => import('./pages/circulation/fines').then((m) => m.Fines), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Quản lý phạt' },
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'Phiếu phạt' },
       { path: 'borrow', loadComponent: () => import('./pages/circulation/borrow').then((m) => m.Borrow), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'Mượn / Trả' },

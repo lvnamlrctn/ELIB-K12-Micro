@@ -63,7 +63,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         new("circulation", "elib_leak_circulation", ["circ_places", "loan_policies", "loans", "patron_replicas", "item_replicas", "bib_snapshots",
                 "fine_reasons", "fine_tickets", "fine_lines", "holds", "loan_renewals", "photocopies"],
             (cs, t) => new CirculationDbContext(Options<CirculationDbContext>(cs, t), t)),
-        new("search", "elib_leak_search", ["search_bibs", "search_items", "search_sync_states"],
+        new("search", "elib_leak_search", ["search_bibs", "search_items", "search_sync_states", "search_queries"],
             (cs, t) => new SearchDbContext(Options<SearchDbContext>(cs, t), t)),
     ];
 

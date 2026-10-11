@@ -111,6 +111,7 @@ export class Menu {
         module: 'SEARCH',
         children: [
           { title: 'Chỉ mục tra cứu (OPAC)', icon: 'manage_search', link: '/search-index', perm: 'SEARCH_INDEX' },
+          { title: 'Thống kê tra cứu', icon: 'query_stats', link: '/search-stats', perm: 'SEARCH_STATS' },
         ],
       },
       {

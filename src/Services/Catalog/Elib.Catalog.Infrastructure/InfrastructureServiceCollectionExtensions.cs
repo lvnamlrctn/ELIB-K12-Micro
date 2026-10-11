@@ -3,6 +3,7 @@ using Elib.BuildingBlocks.Hosting;
 using Elib.BuildingBlocks.Messaging;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.TenantReplica;
+using Elib.Catalog.Application;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +24,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddTenantReplica<CatalogDbContext>(ServiceName);
         services.AddTenantReplicaBootstrap<CatalogDbContext>(configuration);
         services.AddScoped<ITenantSeeder, CatalogTenantSeeder>();
+        services.Configure<CatalogOptions>(configuration.GetSection(CatalogOptions.SectionName));
+        services.AddHttpClient<ICoverLookup, CoverLookup>(CoverLookup.HttpClientName, c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(8);
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("ELIB-K12/1.0 (+https://thuvientn.vn)");
+        });
         services.AddElibMessaging<CatalogDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<CatalogDbContext>();

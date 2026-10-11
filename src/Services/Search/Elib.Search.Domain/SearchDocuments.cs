@@ -60,6 +60,7 @@ public sealed class SearchBib : Entity, ITenantOwned
     public string? Edition { get; set; }
     public string? PhysicalDescription { get; set; }
     public string? Series { get; set; }
+    public string? CoverUrl { get; set; }
     public int Status { get; set; }
     public bool Deleted { get; set; }
     public long Version { get; set; }

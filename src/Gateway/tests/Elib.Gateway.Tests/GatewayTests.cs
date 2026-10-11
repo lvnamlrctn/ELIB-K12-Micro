@@ -286,4 +286,17 @@ public sealed class GatewayTests : IAsyncLifetime
         // Đơn vị khác không bị ảnh hưởng.
         Assert.Equal(HttpStatusCode.OK, (await _gateway.ClientFor("truong-a.thuvientn.vn").GetAsync(U("/api/opac/search/books"))).StatusCode);
     }
+
+    [Fact]
+    public async Task Opac_routes_have_a_stricter_per_ip_limit_with_retry_after()
+    {
+        HttpResponseMessage last = null!;
+        for (var i = 0; i < 6; i++) last = await ViaProxy("10.0.0.5", "203.0.113.20").GetAsync(U("/api/opac/catalog/bibs/x/marc"));
+        Assert.Equal(HttpStatusCode.TooManyRequests, last.StatusCode);
+        Assert.True(int.Parse(last.Headers.GetValues("Retry-After").Single(), System.Globalization.CultureInfo.InvariantCulture) > 0);
+
+        // Mọi route OPAC (appsettings: search-opac cũng đặt policy "opac") dùng chung hạn mức của IP; IP khác vẫn tra được.
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await ViaProxy("10.0.0.5", "203.0.113.20").GetAsync(U("/api/opac/search/books"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ViaProxy("10.0.0.5", "203.0.113.21").GetAsync(U("/api/opac/catalog/bibs/x/marc"))).StatusCode);
+    }
 }

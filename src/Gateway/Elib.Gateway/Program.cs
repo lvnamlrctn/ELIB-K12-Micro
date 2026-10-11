@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Elib.BuildingBlocks.Authorization;
@@ -35,7 +36,12 @@ services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     o.OnRejected = (ctx, _) =>
-        new ValueTask(GatewayProblem.WriteAsync(ctx.HttpContext, 429, GatewayErrorCodes.TooManyRequests, "Quá nhiều yêu cầu, vui lòng thử lại sau."));
+    {
+        // Cửa sổ trượt (OPAC) không báo RetryAfter — mặc định một đoạn của cửa sổ một phút (6 đoạn).
+        var retryAfter = ctx.Lease.TryGetMetadata(MetadataName.RetryAfter, out var after) ? after : OpacRateLimit.DefaultRetryAfter;
+        ctx.HttpContext.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+        return new ValueTask(GatewayProblem.WriteAsync(ctx.HttpContext, 429, GatewayErrorCodes.TooManyRequests, "Quá nhiều yêu cầu, vui lòng thử lại sau."));
+    };
     o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
     {
         var g = http.RequestServices.GetRequiredService<IOptions<GatewayOptions>>().Value;
@@ -47,6 +53,22 @@ services.AddRateLimiter(o =>
             Window = TimeSpan.FromSeconds(g.RateLimitWindowSeconds),
             QueueLimit = 0,
         });
+    });
+
+    // Route OPAC công khai (appsettings: "RateLimiterPolicy"): giới hạn theo IP thật (sau X-Forwarded-For) trên từng host, chồng lên
+    // giới hạn chung ở trên. Đếm trong bộ nhớ từng instance gateway.
+    o.AddPolicy(OpacRateLimit.Policy, http =>
+    {
+        var g = http.RequestServices.GetRequiredService<IOptions<GatewayOptions>>().Value;
+        return RateLimitPartition.Get(OpacRateLimit.Key(http, OpacRateLimit.Policy), _ => RateLimiter.CreateChained(
+            OpacRateLimit.Window(g.OpacPermitsPerMinute, TimeSpan.FromMinutes(1)),
+            OpacRateLimit.Window(g.OpacPermitsPerHour, TimeSpan.FromHours(1))));
+    });
+    o.AddPolicy(OpacRateLimit.HeavyPolicy, http =>
+    {
+        var g = http.RequestServices.GetRequiredService<IOptions<GatewayOptions>>().Value;
+        return RateLimitPartition.Get(OpacRateLimit.Key(http, OpacRateLimit.HeavyPolicy),
+            _ => OpacRateLimit.Window(g.OpacHeavyPermitsPerMinute, TimeSpan.FromMinutes(1)));
     });
 });
 

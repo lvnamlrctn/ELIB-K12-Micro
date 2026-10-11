@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Testing;
+using Elib.Catalog.Application;
 using Elib.Catalog.Infrastructure;
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
@@ -24,6 +25,7 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
     public ConcurrentQueue<object> Published { get; } = new();
     public FakePermissionSource Permissions { get; } = new();
     public FakeLicenseSource Licenses { get; } = new();
+    public FakeCoverLookup Covers { get; } = new();
 
     public IEnumerable<T> PublishedOf<T>() => Published.OfType<T>();
 
@@ -49,6 +51,8 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IPermissionSource>(Permissions);
             services.RemoveAll<IModuleLicenseSource>();
             services.AddSingleton<IModuleLicenseSource>(Licenses);
+            services.RemoveAll<ICoverLookup>();
+            services.AddSingleton<ICoverLookup>(Covers);
         });
     }
 
@@ -107,4 +111,12 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
 
         public Task PublishFault<T>(PublishContext<T> context, Exception exception) where T : class => Task.CompletedTask;
     }
+}
+
+/// <summary>Ảnh bìa theo ISBN không gọi Google Books/Open Library thật.</summary>
+public sealed class FakeCoverLookup : ICoverLookup
+{
+    public ConcurrentDictionary<string, string> Covers { get; } = new();
+
+    public Task<string?> FindByIsbnAsync(string isbn, CancellationToken ct) => Task.FromResult(Covers.GetValueOrDefault(isbn));
 }

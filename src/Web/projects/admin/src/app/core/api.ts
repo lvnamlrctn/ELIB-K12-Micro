@@ -61,6 +61,8 @@ export interface Bib {
   id: number; mfn: number; publicId: string; bibTypeId: number | null; worksheetId: number | null; leader: string; fields: MarcField[];
   title: string; author: string | null; publisher: string | null; publishYear: string | null; isbns: string[]; ddc: string | null;
   keywords: string | null; status: number; version: number; createdAt: string; updatedAt: string | null;
+  /** Ảnh bìa: ảnh đã upload (/s3/media-public/…) hoặc URL https ngoài. */
+  coverUrl: string | null;
 }
 export interface BibSearch extends CrudSearch { bibTypeId?: number | null; isbn?: string | null; ddc?: string | null; }
 export interface BibInput { bibTypeId: number | null; worksheetId?: number | null; leader?: string | null; fields: MarcField[]; status?: number | null; }
@@ -146,6 +148,13 @@ export interface CirculationReport {
 export interface SearchIndexStatus {
   status: string; startedAt: string | null; finishedAt: string | null; bibs: number; items: number; loans: number; error: string | null;
   indexedBibs: number; visibleBibs: number; indexedItems: number;
+}
+export interface DailySearchStat { date: string; searches: number; zeroResults: number; withClicks: number; }
+export interface QueryStat { text: string; searches: number; avgTotal: number; withClicks: number; }
+/** Thống kê chất lượng tìm kiếm OPAC trong khoảng ngày (service search). */
+export interface SearchStatsSummary {
+  from: string; to: string; searches: number; zeroResults: number; withClicks: number; advancedSearches: number; avgClickPosition: number | null;
+  days: DailySearchStat[]; topQueries: QueryStat[]; topZeroResults: QueryStat[];
 }
 export interface FineReason { id: number; publicId: string; code: string; name: string; amount: number; itemStatus: string | null; isBuiltIn: boolean; }
 /** status: 1 đang xử lý, 2 đã hoàn thành (như monolith). */
@@ -396,6 +405,8 @@ export class Api {
   marc21Fields() { return this.get<MarcFieldDef[]>('/api/admin/catalog/marc21/fields'); }
   worksheetsByBibType(bibTypeId: number) { return this.get<Worksheet[]>(`/api/admin/catalog/worksheets/GetByBibType/${bibTypeId}`); }
   bibByMfn(mfn: number) { return this.get<Bib>(`/api/admin/catalog/bibs/GetByMfn/${mfn}`); }
+  setBibCover(publicId: string, coverUrl: string | null) { return this.put<Bib>('/api/admin/catalog/bibs/Cover', { publicId, coverUrl }); }
+  lookupCover(isbn: string) { return this.get<{ url: string | null }>('/api/admin/catalog/bibs/LookupCover', { isbn }); }
   checkIsbn(isbn: string, excludePublicId?: string) { return this.get<IsbnMatch[]>('/api/admin/catalog/bibs/CheckIsbn', { isbn, excludePublicId }); }
   previewMarc(file: File) { return this.post<MarcFilePreview>('/api/admin/catalog/bibs/PreviewMarc', fileForm(file)); }
   /** Nhập file MARC. Bị từ chối (có biểu ghi lỗi) → body 400 vẫn là MarcImportResult, trả về như kết quả thường. */
@@ -435,6 +446,12 @@ export class Api {
   // Chỉ mục tra cứu (search, quyền SEARCH_INDEX)
   searchIndexStatus() { return this.get<SearchIndexStatus>('/api/admin/search/index/Status'); }
   rebuildSearchIndex() { return this.post<{ status: string }>('/api/admin/search/index/Rebuild'); }
+  searchStats(from: string | null, to: string | null) {
+    const q: Record<string, string> = {};
+    if (from) q['from'] = from;
+    if (to) q['to'] = to;
+    return this.get<SearchStatsSummary>('/api/admin/search/stats/Summary', q);
+  }
   // Đặt mượn (circulation, quyền REQUEST_BOOKS)
   searchHolds(search: HoldSearch) { return this.post<CrudPage<Hold>>('/api/admin/circulation/holds/Search', search); }
   placeHold(body: { cardNo: string; mfn?: number | null; barcode?: string | null; note?: string | null }) { return this.post<Hold>('/api/admin/circulation/holds/Place', body); }

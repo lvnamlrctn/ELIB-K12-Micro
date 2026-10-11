@@ -32,13 +32,17 @@ public sealed record OpacSearchRequest
     public IReadOnlyList<string>? Stores { get; init; }
     public bool AvailableOnly { get; init; }
     public string? Sort { get; init; }
+
+    /// <summary>Chỉ đổi bộ lọc/sắp xếp của câu tìm đang xem — không tính là lượt tìm mới trong thống kê.</summary>
+    public bool Refine { get; init; }
+
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 10;
 }
 
 public sealed record OpacBib(
     Guid PublicId, long Mfn, string Title, string? Author, string? Publisher, string? PublishYear, string? MaterialType, string? Language,
-    string? Ddc, string? Isbns, string? Summary, int Copies, int Available);
+    string? Ddc, string? Isbns, string? Summary, int Copies, int Available, string? CoverUrl);
 
 public sealed record FacetCount(string Key, int Count);
 
@@ -46,7 +50,8 @@ public sealed record OpacFacets(
     IReadOnlyList<FacetCount> Years, IReadOnlyList<FacetCount> Authors, IReadOnlyList<FacetCount> MaterialTypes, IReadOnlyList<FacetCount> Languages,
     IReadOnlyList<FacetCount> Stores, int AvailableCount);
 
-public sealed record OpacSearchResult(int Total, int Page, int PageSize, IReadOnlyList<OpacBib> Items, OpacFacets Facets);
+/// <summary><see cref="QueryId"/>: mã lượt tìm (thống kê) — trình duyệt gửi lại khi bạn đọc mở một kết quả; null nếu không ghi lượt tìm.</summary>
+public sealed record OpacSearchResult(int Total, int Page, int PageSize, IReadOnlyList<OpacBib> Items, OpacFacets Facets, Guid? QueryId = null);
 
 /// <summary>Bản sách trên trang chi tiết: trạng thái hiển thị "Sẵn sàng" / "Đang mượn" (kèm hạn trả) / "Đang xử lý".</summary>
 public sealed record OpacCopy(string Barcode, string? StoreName, string Status, string StatusName, DateTimeOffset? DueAt);
@@ -54,7 +59,7 @@ public sealed record OpacCopy(string Barcode, string? StoreName, string Status, 
 public sealed record OpacBibDetail(
     Guid PublicId, long Mfn, string Title, string? Author, string? OtherAuthors, string? Publisher, string? PublishPlace, string? PublishYear,
     string? Edition, string? PhysicalDescription, string? Series, string? MaterialType, string? Language, string? Ddc, string? Cutter,
-    string? Isbns, string? Keywords, string? Summary, int Copies, int Available, IReadOnlyList<OpacCopy> Holdings);
+    string? Isbns, string? Keywords, string? Summary, int Copies, int Available, IReadOnlyList<OpacCopy> Holdings, string? CoverUrl);
 
 /// <summary>Tra cứu công khai trên chỉ mục của search (chỉ biểu ghi hiện trên OPAC — Status 2, chưa xoá) của đơn vị theo host.</summary>
 public sealed class OpacSearch(ISearchDb db)
@@ -90,7 +95,7 @@ public sealed class OpacSearch(ISearchDb db)
             .ToList();
         return new OpacBibDetail(b.BibPublicId, b.Mfn, b.Title, b.Author, b.OtherAuthors, b.Publisher, b.PublishPlace, b.PublishYear, b.Edition,
             b.PhysicalDescription, b.Series, b.MaterialType, b.Language, b.Ddc, b.Cutter, b.Isbns, b.Keywords, b.Summary,
-            holdings.Count, holdings.Count(h => h.Status == "available"), holdings);
+            holdings.Count, holdings.Count(h => h.Status == "available"), holdings, b.CoverUrl);
     }
 
     /// <summary>Gợi ý nhan đề khi gõ: nhan đề bắt đầu bằng cụm đã gõ đứng trước.</summary>
@@ -165,7 +170,8 @@ public sealed class OpacSearch(ISearchDb db)
         b.BibPublicId, b.Mfn, b.Title, b.Author, b.Publisher, b.PublishYear, b.MaterialType, b.Language, b.Ddc, b.Isbns,
         b.Summary != null && b.Summary.Length > 300 ? b.Summary.Substring(0, 300) + "…" : b.Summary,
         Copies.Count(i => i.Mfn == b.Mfn),
-        Copies.Count(i => i.Mfn == b.Mfn && i.Status == "R" && !i.OnLoan));
+        Copies.Count(i => i.Mfn == b.Mfn && i.Status == "R" && !i.OnLoan),
+        b.CoverUrl);
 #pragma warning restore CA1845
 
     private async Task<OpacFacets> FacetsAsync(IQueryable<SearchBib> query, CancellationToken ct)

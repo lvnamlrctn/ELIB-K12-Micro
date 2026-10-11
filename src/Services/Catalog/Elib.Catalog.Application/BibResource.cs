@@ -30,7 +30,7 @@ public sealed record BibRequest(long? BibTypeId, IReadOnlyList<MarcField> Fields
 public sealed record BibDto(
     long Id, long Mfn, Guid PublicId, long? BibTypeId, long? WorksheetId, string Leader, IReadOnlyList<MarcField> Fields,
     string Title, string? Author, string? Publisher, string? PublishYear, IReadOnlyList<string> Isbns, string? Ddc, string? Keywords,
-    int Status, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    int Status, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, string? CoverUrl = null);
 
 public sealed record IsbnMatch(Guid PublicId, long Mfn, string Title);
 
@@ -47,7 +47,7 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
 
     protected override Expression<Func<Bib, BibDto>> Projection => x => new BibDto(
         x.Id, x.Id, x.PublicId, x.BibTypeId, x.WorksheetId, x.Leader, WithSystemFields(x.Fields, x.Id, x.UpdatedAt ?? x.CreatedAt),
-        x.Title, x.Author, x.Publisher, x.PublishYear, SplitIsbns(x.Isbns), x.Ddc, x.Keywords, x.Status, x.Version, x.CreatedAt, x.UpdatedAt);
+        x.Title, x.Author, x.Publisher, x.PublishYear, SplitIsbns(x.Isbns), x.Ddc, x.Keywords, x.Status, x.Version, x.CreatedAt, x.UpdatedAt, x.CoverUrl);
 
     protected override Bib Create(BibRequest request) =>
         throw new NotSupportedException("Biểu ghi tạo qua CreateAsync (cần tra loại biểu ghi).");
@@ -208,6 +208,7 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
             PhysicalDescription = d.PhysicalDescription,
             Series = d.Series,
             OtherAuthors = d.OtherAuthors,
+            CoverUrl = bib.CoverUrl,
             Status = bib.Status,
             Deleted = deleted,
             Version = bib.Version + (deleted ? 1 : 0),

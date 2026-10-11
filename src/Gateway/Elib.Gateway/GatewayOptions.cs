@@ -18,6 +18,17 @@ public sealed class GatewayOptions
     public int RateLimitWindowSeconds { get; set; } = 60;
 
     /// <summary>
+    /// Tra cứu OPAC công khai (route có RateLimiterPolicy "opac"): tối đa bấy nhiêu request mỗi phút VÀ mỗi giờ cho một IP trên một host —
+    /// chống quét dữ liệu thư mục. Trường học thường ra Internet chung một IP (phòng máy) nên để rộng hơn nhu cầu của một người.
+    /// </summary>
+    public int OpacPermitsPerMinute { get; set; } = 180;
+
+    public int OpacPermitsPerHour { get; set; } = 3000;
+
+    /// <summary>Thao tác OPAC tốn tài nguyên (RateLimiterPolicy "opac-heavy": tải biểu ghi, tra Z39.50 ra thư viện khác) — mỗi phút một IP.</summary>
+    public int OpacHeavyPermitsPerMinute { get; set; } = 20;
+
+    /// <summary>
     /// Dải IP (CIDR) của reverse proxy/ingress đứng trước gateway — chỉ tin X-Forwarded-For/Proto từ các địa chỉ này
     /// (IP thật của client cho rate limit, https cho URL do identity sinh). Rỗng = chỉ loopback.
     /// Không đặt 0.0.0.0/0 khi gateway nhận traffic trực tiếp từ Internet: client sẽ giả được IP để lách rate limit.

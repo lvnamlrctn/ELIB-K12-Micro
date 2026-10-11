@@ -9,6 +9,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<SearchIndex>();
         services.AddScoped<IndexRebuilder>();
         services.AddScoped<OpacSearch>();
+        services.AddScoped<SearchStats>();
         return services;
     }
 }

@@ -35,6 +35,7 @@ public sealed class SearchDbContext(DbContextOptions<SearchDbContext> options, I
             e.Property(x => x.Edition).HasMaxLength(250);
             e.Property(x => x.PhysicalDescription).HasMaxLength(250);
             e.Property(x => x.Series).HasMaxLength(500);
+            e.Property(x => x.CoverUrl).HasMaxLength(1000);
             e.Property(x => x.TitleFold).HasMaxLength(1000);
             e.Property(x => x.AuthorFold).HasMaxLength(2000);
             e.Property(x => x.PublisherFold).HasMaxLength(500);
@@ -57,6 +58,15 @@ public sealed class SearchDbContext(DbContextOptions<SearchDbContext> options, I
             e.HasIndex(x => new { x.TenantId, x.ItemPublicId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Mfn });
             e.HasIndex(x => new { x.TenantId, x.BarcodeKey });
+        });
+
+        modelBuilder.Entity<SearchQuery>(e =>
+        {
+            e.ToTable("search_queries");
+            e.Property(x => x.Text).HasMaxLength(SearchQuery.MaxTextLength);
+            e.Property(x => x.TextFold).HasMaxLength(SearchQuery.MaxTextLength);
+            e.HasIndex(x => new { x.TenantId, x.QueryId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.At });
         });
 
         modelBuilder.Entity<SearchSyncState>(e =>

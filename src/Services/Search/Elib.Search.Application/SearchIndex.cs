@@ -49,6 +49,7 @@ public sealed class SearchIndex(ISearchDb db, TimeProvider clock)
         bib.Edition = TextFold.Cut(e.Edition, 250);
         bib.PhysicalDescription = TextFold.Cut(e.PhysicalDescription, 250);
         bib.Series = TextFold.Cut(e.Series, 500);
+        bib.CoverUrl = e.CoverUrl is { Length: <= 1000 } cover ? cover : null;
         bib.Status = e.Status;
         bib.Deleted = e.Deleted;
         bib.Version = e.Version;

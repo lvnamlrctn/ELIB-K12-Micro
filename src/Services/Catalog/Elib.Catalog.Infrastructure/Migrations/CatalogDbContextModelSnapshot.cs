@@ -125,6 +125,11 @@ namespace Elib.Catalog.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("bib_type_id");
 
+                    b.Property<string>("CoverUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cover_url");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

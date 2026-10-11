@@ -7,6 +7,7 @@ import { MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
 import { BibItems } from '../holdings/bib-items';
+import { BibCover } from './bib-cover';
 import { MarcPick } from './marc-tools';
 
 /** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
@@ -20,7 +21,7 @@ const BLANK_FIELDS: MarcField[] = [
 /** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems],
+  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" title="Quay lại"><span class="material-icons">arrow_back</span></a>
@@ -75,6 +76,7 @@ const BLANK_FIELDS: MarcField[] = [
       }
 
       @if (bib(); as b) {
+        <app-bib-cover [bib]="b" [editable]="session.can('CATALOG_BIBS:edit')" (changed)="bib.set($event)" />
         @if (hasHoldings()) { <app-bib-items [mfn]="b.mfn" /> }
       }
 
@@ -97,7 +99,7 @@ export class BibEdit implements OnInit {
 
   private readonly api = inject(Api);
   private readonly router = inject(Router);
-  private readonly session = inject(Session);
+  protected readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
   private readonly client: CrudClient<Bib> = this.api.crud<Bib>('bibs', 'catalog');
 

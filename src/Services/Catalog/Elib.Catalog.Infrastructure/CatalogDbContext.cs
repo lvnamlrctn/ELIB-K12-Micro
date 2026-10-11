@@ -55,6 +55,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             e.Property(x => x.Isbns).HasMaxLength(1000);
             e.Property(x => x.Ddc).HasMaxLength(50);
             e.Property(x => x.Keywords).HasMaxLength(2000);
+            e.Property(x => x.CoverUrl).HasMaxLength(Bib.MaxCoverUrlLength);
             e.Property(x => x.Language).HasMaxLength(10);
             e.Property(x => x.SearchText).HasMaxLength(4000);
             e.Property(x => x.Version).IsConcurrencyToken();

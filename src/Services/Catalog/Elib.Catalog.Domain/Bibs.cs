@@ -84,7 +84,7 @@ public sealed class Worksheet : TenantEntity
 /// MFN = <see cref="Entity.Id"/> như quy ước của monolith. Trạng thái: 2 = hiện trên OPAC, 1 = ẩn.
 /// <see cref="Version"/> tăng ở mỗi thay đổi — bản sao ở holdings/circulation/search bỏ qua event cũ hơn.
 /// </summary>
-public sealed class Bib : TenantEntity, IHasStatus
+public sealed partial class Bib : TenantEntity, IHasStatus
 {
     private Bib() { }
 
@@ -111,6 +111,9 @@ public sealed class Bib : TenantEntity, IHasStatus
     public int Status { get; private set; } = IHasStatus.Active;
     public long Version { get; private set; }
 
+    /// <summary>Ảnh bìa (monolith: Bib.Images): ảnh đã upload cho đơn vị (media, bucket công khai) hoặc URL https bên ngoài.</summary>
+    public string? CoverUrl { get; private set; }
+
     public IReadOnlyList<string> IsbnList => Isbns.Split('|', StringSplitOptions.RemoveEmptyEntries);
 
     /// <summary>Biểu ghi mới. <paramref name="type"/> null → Leader mặc định của sách (a/m).</summary>
@@ -132,6 +135,33 @@ public sealed class Bib : TenantEntity, IHasStatus
         Status = StatusRules.Validate(status);
         Version++;
     }
+
+    public const int MaxCoverUrlLength = 1000;
+
+    /// <summary>
+    /// Đặt/bỏ ảnh bìa. Chỉ nhận ảnh đã upload cho CHÍNH đơn vị này qua media (<paramref name="mediaPublicPrefix"/>/{đơn vị}/bib-cover/…)
+    /// hoặc URL https (ảnh bìa tra theo ISBN ở Open Library…) — không nhận http, javascript:, data: hay đường dẫn khác trên hệ thống.
+    /// </summary>
+    public void SetCover(string? url, string mediaPublicPrefix)
+    {
+        var value = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        if (value is not null && !IsAllowedCover(value, $"{(mediaPublicPrefix ?? "").TrimEnd('/')}/{TenantId}/bib-cover/"))
+            throw new BusinessRuleException("BIB_COVER_INVALID", "Ảnh bìa phải là ảnh đã upload cho đơn vị này hoặc đường dẫn https.");
+        if (value == CoverUrl) return;
+        CoverUrl = value;
+        Version++;
+    }
+
+    private static bool IsAllowedCover(string url, string ownPrefix)
+    {
+        if (url.Length > MaxCoverUrlLength || url.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'' or '<' or '>' or '\\')) return false;
+        if (url.StartsWith(ownPrefix, StringComparison.Ordinal)) return MediaPathPattern().IsMatch(url[ownPrefix.Length..]);
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.UserInfo);
+    }
+
+    /// <summary>Phần sau tiền tố của key media: yyyy/MM/{guid N}.{png|jpg|webp}.</summary>
+    [GeneratedRegex("^[0-9]{4}/[0-9]{2}/[0-9a-f]{32}\\.(png|jpg|webp)$")]
+    private static partial Regex MediaPathPattern();
 
     private void Apply(BibType? type, string? leader, IEnumerable<MarcField> fields, DateOnly today, string? agencyCode)
     {

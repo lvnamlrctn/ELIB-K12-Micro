@@ -5,6 +5,7 @@ type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.Inte
   BibPublicId : System.Guid required
   BibTypeId : Nullable<System.Int64>
   BibTypeName : System.String?
+  CoverUrl : System.String?
   Cutter : System.String?
   Ddc : System.String?
   Deleted : System.Boolean

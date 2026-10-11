@@ -6,6 +6,7 @@ using Elib.Catalog.Application;
 using Elib.Catalog.Domain;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Platform;
+using Microsoft.Extensions.Options;
 
 namespace Elib.Catalog.Api;
 
@@ -45,9 +46,24 @@ public static class CatalogEndpoints
                 new MarcImportOptions(bibTypeId, status, skipDuplicates ?? true, skipInvalid ?? false), ct);
             return result.Rejected ? Results.Json(result, statusCode: StatusCodes.Status400BadRequest) : Results.Ok(result);
         }).DisableAntiforgery();
+        // Ảnh bìa: đặt URL (ảnh đã upload qua media, purpose bib-cover, hoặc https ngoài) / tra theo ISBN (Google Books, Open Library).
+        bibs.MapPut("/Cover", [Permission("CATALOG_BIBS", "edit")] (SetCoverRequest request, BibResource r, IOptions<CatalogOptions> options, CancellationToken ct)
+            => r.SetCoverAsync(request, options.Value.MediaPublicPrefix, ct));
+        bibs.MapGet("/LookupCover", [PermissionAny("CATALOG_BIBS:add", "CATALOG_BIBS:edit")] (string? isbn, ICoverLookup lookup, CancellationToken ct)
+            => BibResource.LookupCoverAsync(isbn, lookup, ct));
         bibs.MapPost("/ExportMarc", [Permission("CATALOG_BIBS", "view")] async (MarcExportRequest request, BibResource r, CancellationToken ct) =>
         {
             var file = await r.ExportMarcAsync(request, ct);
+            return Results.File(file.Content, file.ContentType, file.FileName);
+        });
+
+        // OPAC (gateway: /api/opac/catalog/** → /api/opac/**, công khai theo host đơn vị, license SEARCH ở gateway): xem MARC/ISBD và
+        // tải biểu ghi (.mrc / MARCXML) — chỉ biểu ghi đang hiện trên OPAC.
+        var opac = app.MapGroup("/api/opac/bibs").WithTags("Opac").AllowAnonymous();
+        opac.MapGet("/{publicId:guid}/marc", (Guid publicId, BibResource r, CancellationToken ct) => r.OpacMarcAsync(publicId, ct));
+        opac.MapGet("/{publicId:guid}/export", async (Guid publicId, string? format, BibResource r, CancellationToken ct) =>
+        {
+            var file = await r.OpacExportAsync(publicId, format, ct);
             return Results.File(file.Content, file.ContentType, file.FileName);
         });
 

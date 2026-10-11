@@ -1,8 +1,9 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
-import { Facet, SearchApi, SearchRequest, SearchResult, languageName } from '../core/search';
+import { ActivatedRoute, ParamMap, Router, RouterLink, convertToParamMap } from '@angular/router';
+import { SavedSearch, SavedSearches, SearchParams } from '../core/saved-searches';
+import { Bib, Facet, SearchApi, SearchRequest, SearchResult, languageName, searchErrorMessage } from '../core/search';
 
 const PAGE_SIZE = 10;
 type FacetKey = 'materialTypes' | 'authors' | 'years' | 'languages' | 'stores';
@@ -51,8 +52,39 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
         <div class="mt-3 flex items-center gap-4 text-sm">
           <button type="button" class="text-blue-600 hover:underline inline-flex items-center gap-1" (click)="showAdvanced.set(!showAdvanced())">
             <span class="material-icons text-[18px]">tune</span> Tìm nâng cao</button>
-          @if (hasCriteria()) { <a routerLink="/tim-kiem" class="text-slate-500 hover:underline">Xoá điều kiện</a> }
+          @if (hasCriteria()) {
+            <a routerLink="/tim-kiem" class="text-slate-500 hover:underline">Xoá điều kiện</a>
+            @if (current(); as s) {
+              <button type="button" class="text-green-700 hover:underline inline-flex items-center gap-1" (click)="saved.remove(s.id); current.set(undefined)" title="Bỏ lưu">
+                <span class="material-icons text-[18px]">bookmark</span> Đã lưu</button>
+            } @else {
+              <button type="button" class="text-blue-600 hover:underline inline-flex items-center gap-1" (click)="saveCurrent()">
+                <span class="material-icons text-[18px]">bookmark_border</span> Lưu tìm kiếm</button>
+            }
+          }
+          @if (saved.items().length) {
+            <button type="button" class="ml-auto text-slate-600 hover:underline inline-flex items-center gap-1" (click)="toggleSaved()"
+                    [attr.aria-expanded]="showSaved()">
+              <span class="material-icons text-[18px]">bookmarks</span> Đã lưu ({{ saved.items().length }})</button>
+          }
         </div>
+        @if (showSaved()) {
+          <div class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <div class="text-xs text-slate-500 mb-2">Tìm kiếm đã lưu trên trình duyệt này — mở lại để xem tài liệu mới bổ sung.</div>
+            <ul class="divide-y divide-slate-200">
+              @for (s of saved.items(); track s.id) {
+                <li class="flex items-center gap-2 py-1.5 text-sm">
+                  <a [routerLink]="['/tim-kiem']" [queryParams]="s.params" class="flex-1 min-w-0 truncate text-blue-700 hover:underline">{{ s.name }}</a>
+                  @if ((fresh()[s.id] || 0) > 0) {
+                    <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs whitespace-nowrap">{{ fresh()[s.id] }} kết quả mới</span>
+                  }
+                  <button type="button" class="text-slate-400 hover:text-red-600" (click)="removeSaved(s.id)" [attr.aria-label]="'Xoá ' + s.name" title="Xoá">
+                    <span class="material-icons text-[18px]">close</span></button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
         @if (showAdvanced()) {
           <form (ngSubmit)="submit()" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @for (f of advanced; track f.key) {
@@ -131,13 +163,18 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
         }
 
         <ul class="space-y-3">
-          @for (b of result()?.items ?? []; track b.publicId) {
+          @for (b of result()?.items ?? []; track b.publicId; let i = $index) {
             <li class="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 hover:border-blue-300 transition">
-              <div class="w-14 h-20 rounded bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
-                <span class="material-icons">menu_book</span>
-              </div>
+              @if (b.coverUrl && !brokenCovers().has(b.publicId)) {
+                <img [src]="b.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="coverFailed(b.publicId)"
+                     class="w-14 h-20 rounded object-cover bg-slate-100 shrink-0 border border-slate-200" />
+              } @else {
+                <div class="w-14 h-20 rounded bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
+                  <span class="material-icons">menu_book</span>
+                </div>
+              }
               <div class="min-w-0 flex-1">
-                <a [routerLink]="['/tai-lieu', b.publicId]" class="font-semibold text-slate-900 hover:text-blue-700">{{ b.title }}</a>
+                <a [routerLink]="['/tai-lieu', b.publicId]" (click)="opened(b, i)" class="font-semibold text-slate-900 hover:text-blue-700">{{ b.title }}</a>
                 <div class="text-sm text-slate-600 mt-0.5">
                   {{ b.author ?? 'Không rõ tác giả' }}@if (b.publisher) { · {{ b.publisher }} }@if (b.publishYear) { · {{ b.publishYear }} }
                 </div>
@@ -177,6 +214,7 @@ export class Search implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly saved = inject(SavedSearches);
 
   protected readonly facets = FACETS;
   protected readonly advanced = ADVANCED;
@@ -186,6 +224,12 @@ export class Search implements OnInit {
   protected readonly suggestions = signal<string[]>([]);
   protected readonly showAdvanced = signal(false);
   protected readonly showFacets = signal(false);
+  protected readonly showSaved = signal(false);
+  /** Số kết quả mới của từng tìm kiếm đã lưu (tính khi mở danh sách). */
+  protected readonly fresh = signal<Record<string, number>>({});
+  protected readonly current = signal<SavedSearch | undefined>(undefined);
+  protected readonly brokenCovers = signal(new Set<string>());
+  private queryId: string | null = null;
   protected q = '';
   protected adv: Record<string, string> = {};
   protected yearFrom: number | null = null;
@@ -199,6 +243,7 @@ export class Search implements OnInit {
   ngOnInit(): void {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       this.params = p;
+      this.current.set(this.saved.find(paramsOf(p)));
       this.q = p.get('q') ?? '';
       this.adv = Object.fromEntries(ADVANCED.map((f) => [f.param, p.get(f.param) ?? '']));
       this.yearFrom = num(p.get('tunam'));
@@ -269,6 +314,48 @@ export class Search implements OnInit {
     this.submit();
   }
 
+  /** Bạn đọc mở kết quả — ghi vị trí trên toàn danh sách cho thống kê chất lượng tìm kiếm. */
+  protected opened(b: Bib, index: number): void {
+    const r = this.result();
+    if (this.queryId && r) this.api.click(this.queryId, b.publicId, (r.page - 1) * r.pageSize + index + 1);
+  }
+
+  protected coverFailed(publicId: string): void {
+    this.brokenCovers.update((s) => new Set(s).add(publicId));
+  }
+
+  protected saveCurrent(): void {
+    if (!this.params) return;
+    const params = paramsOf(this.params);
+    this.current.set(this.saved.save(describe(params), params, this.result()?.total ?? 0));
+  }
+
+  protected removeSaved(id: string): void {
+    this.saved.remove(id);
+    if (this.current()?.id === id) this.current.set(undefined);
+    if (!this.saved.items().length) this.showSaved.set(false);
+  }
+
+  protected toggleSaved(): void {
+    const open = !this.showSaved();
+    this.showSaved.set(open);
+    if (open) void this.countFresh();
+  }
+
+  /** Chạy lại từng tìm kiếm đã lưu (1 kết quả/trang, không tính thống kê) để biết có thêm bao nhiêu kết quả so với lần xem trước. */
+  private async countFresh(): Promise<void> {
+    const counts: Record<string, number> = {};
+    for (const s of this.saved.items()) {
+      try {
+        const r = await this.api.search({ ...buildRequest(convertToParamMap(s.params)), page: 1, pageSize: 1, refine: true });
+        counts[s.id] = Math.max(0, r.total - s.total);
+      } catch {
+        break; // vượt giới hạn tra cứu / mất mạng — bỏ qua phần còn lại
+      }
+    }
+    this.fresh.set(counts);
+  }
+
   protected hideSuggest(): void {
     setTimeout(() => this.suggestions.set([]), 150);
   }
@@ -278,32 +365,95 @@ export class Search implements OnInit {
   }
 
   private async load(): Promise<void> {
-    const p = this.params!;
-    const request: SearchRequest = {
-      q: this.q || null,
-      yearFrom: this.yearFrom,
-      yearTo: this.yearTo,
-      materialTypes: p.getAll('loai'),
-      authors: p.getAll('tacgia'),
-      years: p.getAll('nam').map(Number).filter((y) => !Number.isNaN(y)),
-      languages: p.getAll('ngonngu'),
-      stores: p.getAll('kho'),
-      availableOnly: this.availableOnly,
-      sort: this.sort || null,
-      page: this.page,
-      pageSize: PAGE_SIZE,
-    };
-    for (const f of ADVANCED) (request as unknown as Record<string, unknown>)[f.key] = this.adv[f.param] || null;
+    const request = buildRequest(this.params!);
+    // Cùng câu tìm với lượt trước trong tab này (đổi bộ lọc, sắp xếp, lật trang, quay lại từ trang chi tiết) → không tính lượt tìm mới.
+    const criteria = criteriaKey(request);
+    const last = readLast();
+    const refine = last?.criteria === criteria;
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.result.set(await this.api.search(request));
-    } catch {
-      this.error.set('Không tra cứu được lúc này, vui lòng thử lại.');
+      const result = await this.api.search({ ...request, refine });
+      this.result.set(result);
+      this.queryId = refine ? last!.queryId : result.queryId;
+      if (!refine) writeLast({ criteria, queryId: result.queryId });
+      const saved = this.current();
+      if (saved && result.total !== saved.total) this.saved.seen(saved.id, result.total);
+    } catch (e) {
+      this.error.set(searchErrorMessage(e));
     } finally {
       this.loading.set(false);
     }
   }
+}
+
+/** Điều kiện tìm trên URL → yêu cầu tra cứu (trang hiện tại, và chạy lại tìm kiếm đã lưu). */
+function buildRequest(p: ParamMap): SearchRequest {
+  const request: SearchRequest = {
+    q: p.get('q') || null,
+    yearFrom: num(p.get('tunam')),
+    yearTo: num(p.get('dennam')),
+    materialTypes: p.getAll('loai'),
+    authors: p.getAll('tacgia'),
+    years: p.getAll('nam').map(Number).filter((y) => !Number.isNaN(y)),
+    languages: p.getAll('ngonngu'),
+    stores: p.getAll('kho'),
+    availableOnly: p.get('consach') === '1',
+    sort: p.get('sapxep') || null,
+    page: Math.max(1, num(p.get('trang')) ?? 1),
+    pageSize: PAGE_SIZE,
+  };
+  for (const f of ADVANCED) (request as unknown as Record<string, unknown>)[f.key] = p.get(f.param) || null;
+  return request;
+}
+
+/** Phần "câu tìm" (từ khoá + ô nâng cao + khoảng năm) — khác nhau mới là lượt tìm mới. */
+function criteriaKey(r: SearchRequest): string {
+  return JSON.stringify([r.q, ...ADVANCED.map((f) => r[f.key] ?? null), r.yearFrom, r.yearTo]);
+}
+
+const LAST_KEY = 'opac.lastQuery';
+
+function readLast(): { criteria: string; queryId: string | null } | null {
+  try {
+    return JSON.parse(sessionStorage.getItem(LAST_KEY) ?? 'null');
+  } catch {
+    return null;
+  }
+}
+
+function writeLast(value: { criteria: string; queryId: string | null }): void {
+  try {
+    sessionStorage.setItem(LAST_KEY, JSON.stringify(value));
+  } catch {
+    // không lưu được thì lượt quay lại tính như lượt tìm mới
+  }
+}
+
+/** Tham số URL của tìm kiếm hiện tại (bỏ số trang) — để lưu và so khớp tìm kiếm đã lưu. */
+function paramsOf(p: ParamMap): SearchParams {
+  const params: SearchParams = {};
+  for (const k of p.keys) {
+    if (k === 'trang') continue;
+    const values = p.getAll(k);
+    params[k] = values.length === 1 ? values[0] : values;
+  }
+  return params;
+}
+
+/** Tên tự đặt cho tìm kiếm đã lưu: từ khoá, các ô nâng cao, bộ lọc. */
+function describe(params: SearchParams): string {
+  const all = (k: string): string[] => (params[k] === undefined ? [] : Array.isArray(params[k]) ? (params[k] as string[]) : [params[k] as string]);
+  const parts: string[] = [];
+  if (all('q').length) parts.push(`"${all('q')[0]}"`);
+  for (const f of ADVANCED) if (all(f.param).length) parts.push(`${f.label}: ${all(f.param)[0]}`);
+  for (const f of FACETS) {
+    const values = all(f.param);
+    if (values.length) parts.push(`${f.title}: ${values.map((v) => (f.key === 'languages' ? languageName(v) : v)).join(', ')}`);
+  }
+  if (all('tunam').length || all('dennam').length) parts.push(`Năm ${all('tunam')[0] ?? '…'}–${all('dennam')[0] ?? '…'}`);
+  if (all('consach').length) parts.push('Còn sách');
+  return parts.join(' · ') || 'Tất cả tài liệu';
 }
 
 function num(value: string | null): number | null {

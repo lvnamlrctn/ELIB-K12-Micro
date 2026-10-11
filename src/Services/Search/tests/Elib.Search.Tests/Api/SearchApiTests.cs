@@ -179,4 +179,40 @@ public sealed class SearchApiTests(SearchApiFactory factory) : IClassFixture<Sea
         var unlicensed = Staff(Interlocked.Increment(ref _nextTenantId));
         Assert.Equal(HttpStatusCode.Forbidden, (await unlicensed.GetAsync(U("/api/index/Status"))).StatusCode);
     }
+
+    [Fact]
+    public async Task Search_stats_count_new_searches_zero_results_and_clicks_but_not_refinements()
+    {
+        var tenantId = NewTenant();
+        var kieu = Bib(tenantId, "Truyện Kiều", "Nguyễn Du", "2019") with { CoverUrl = "https://covers.openlibrary.org/b/isbn/9786042000001-L.jpg" };
+        await Publish(kieu);
+        var opac = Opac(tenantId);
+
+        var first = await Search(opac, new OpacSearchRequest { Q = "Truyện Kiều" });
+        Assert.Equal(kieu.CoverUrl, Assert.Single(first.Items).CoverUrl);
+        Assert.NotNull(first.QueryId);
+        Assert.Null((await Search(opac, new OpacSearchRequest { Q = "Truyện Kiều", Sort = "newest", Refine = true })).QueryId); // đổi sắp xếp
+        Assert.Null((await Search(opac, new OpacSearchRequest { Q = "Truyện Kiều", Page = 2 })).QueryId); // lật trang
+        Assert.Null((await Search(opac, new OpacSearchRequest { Years = [2019] })).QueryId); // chỉ duyệt bộ lọc
+        var second = await Search(opac, new OpacSearchRequest { Q = "truyen kieu" });
+        await Search(opac, new OpacSearchRequest { Author = "xuân diệu" });
+        await Search(opac, new OpacSearchRequest { Q = "Xuân Diệu" });
+
+        // Mở kết quả: lượt tìm đầu mở kết quả 1 (hai lần — vẫn là một lượt có mở); mã lạ bị bỏ qua lặng lẽ.
+        foreach (var queryId in new[] { first.QueryId!.Value, first.QueryId!.Value, Guid.NewGuid() })
+            Assert.Equal(HttpStatusCode.NoContent,
+                (await opac.PostAsJsonAsync(U("/api/opac/stats/click"), new OpacClickRequest(queryId, kieu.BibPublicId, 1), Json)).StatusCode);
+        Assert.Equal(kieu.CoverUrl, (await Read<OpacBibDetail>(await opac.GetAsync(U($"/api/opac/bibs/{kieu.BibPublicId}")))).CoverUrl);
+
+        var stats = await Read<SearchStatsSummary>(await Staff(tenantId, "SEARCH_STATS:view").GetAsync(U("/api/stats/Summary")));
+        Assert.Equal((4, 2, 1, 1, 1.0), (stats.Searches, stats.ZeroResults, stats.WithClicks, stats.AdvancedSearches, stats.AvgClickPosition));
+        Assert.Equal(new QueryStat("truyen kieu", 2, 1, 1), stats.TopQueries[0]); // gộp không dấu, hiện câu gõ gần nhất
+        Assert.Equal(new QueryStat("Xuân Diệu", 2, 0, 0), Assert.Single(stats.TopZeroResults)); // tìm nhanh + tìm theo tác giả
+        Assert.Equal(4, Assert.Single(stats.Days).Searches);
+        Assert.Equal(0, (await Read<SearchStatsSummary>(await Staff(NewTenant()).GetAsync(U("/api/stats/Summary")))).Searches); // đơn vị khác
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId, "SEARCH_INDEX:view").GetAsync(U("/api/stats/Summary"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await Staff(tenantId).GetAsync(U("/api/stats/Summary?from=2026-01-10&to=2026-01-01"))).StatusCode);
+    }
 }

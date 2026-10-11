@@ -19,7 +19,16 @@ public static class SearchEndpoints
     public static IEndpointRouteBuilder MapSearchEndpoints(this IEndpointRouteBuilder app)
     {
         var opac = app.MapGroup("/api/opac").WithTags("Opac").AllowAnonymous();
-        opac.MapPost("/bibs/Search", (OpacSearchRequest request, OpacSearch s, CancellationToken ct) => s.SearchAsync(request, ct));
+        opac.MapPost("/bibs/Search", async (OpacSearchRequest request, OpacSearch s, SearchStats stats, CancellationToken ct) =>
+        {
+            var result = await s.SearchAsync(request, ct);
+            return result with { QueryId = await stats.RecordAsync(request, result.Total, ct) };
+        });
+        opac.MapPost("/stats/click", async (OpacClickRequest request, SearchStats stats, CancellationToken ct) =>
+        {
+            await stats.RecordClickAsync(request, ct);
+            return Results.NoContent();
+        });
         opac.MapGet("/bibs/{publicId:guid}", (Guid publicId, OpacSearch s, CancellationToken ct) => s.DetailAsync(publicId, ct));
         opac.MapGet("/bibs/{publicId:guid}/similar", (Guid publicId, int? size, OpacSearch s, CancellationToken ct) => s.SimilarAsync(publicId, size ?? 8, ct));
         opac.MapGet("/suggest", (string? q, OpacSearch s, CancellationToken ct) => s.SuggestAsync(q, ct));
@@ -36,6 +45,10 @@ public static class SearchEndpoints
             _ = runner.Start(tenant.RequireTenantId());
             return Results.Accepted(value: new { Status = SearchSyncState.Running });
         });
+
+        // Thống kê chất lượng tìm kiếm OPAC.
+        app.MapGet("/api/stats/Summary", [Permission("SEARCH_STATS", "view")] (DateOnly? from, DateOnly? to, SearchStats stats, CancellationToken ct)
+            => stats.SummaryAsync(from, to, ct)).WithTags("Stats").RequireAuthorization(new RequiresModuleAttribute(Module));
         return app;
     }
 }

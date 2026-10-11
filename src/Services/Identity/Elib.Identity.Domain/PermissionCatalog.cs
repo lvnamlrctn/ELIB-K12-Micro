@@ -68,6 +68,7 @@ public static class PermissionCatalog
         new("FINE_REASONS", "Lý do phạt", CirculationGroup, Crud, CirculationLicense),
 
         new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
+        new("SEARCH_STATS", "Thống kê tra cứu", SearchGroup, [View], SearchLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),
