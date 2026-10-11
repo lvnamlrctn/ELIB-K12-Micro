@@ -133,7 +133,8 @@ const VIEW_KEY = 'elib.readers.view';
             <span class="material-icons text-[18px]">key</span> {{ 'READER.SET_OPAC_PASSWORD' | translate: { count: selected().size } }}</button>
         }
       </div>
-      <div class="flex items-center gap-2">
+      <!-- ml-auto: khi thanh công cụ xuống dòng vẫn nằm bên phải — menu chọn cột (right-0) không tràn ra ngoài. -->
+      <div class="flex items-center gap-2 ml-auto">
         <span class="text-sm text-gray-500">{{ 'READER.COUNT' | translate: { count: page()?.totalCount ?? 0 } }}</span>
         <div class="relative">
           <button type="button" class="btn-secondary !py-1.5 !px-2" [title]="'READER.COLUMNS' | translate" (click)="columnsOpen.set(!columnsOpen())">

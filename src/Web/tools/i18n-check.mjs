@@ -43,9 +43,9 @@ function flatten(obj, prefix = '', out = new Map()) {
   return out;
 }
 
-/** Bỏ chú thích để không báo chữ có dấu trong comment (giữ nguyên chuỗi). */
+/** Bỏ chú thích (TS và HTML trong template) để không báo chữ có dấu trong comment (giữ nguyên chuỗi). */
 function stripComments(code) {
-  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 }
 
 const listApp = process.argv[2] === '--list' ? process.argv[3] : null;
