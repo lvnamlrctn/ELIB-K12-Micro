@@ -45,7 +45,7 @@ type Tab = 'info' | 'isbd' | 'marc';
                   @if (b.materialType) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ b.materialType }}</span> }
                   @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">Chưa có bản phục vụ</span> }
                   @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">Còn {{ b.available }}/{{ b.copies }} bản</span> }
-                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">Đã mượn hết</span> }
+                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ onLoan(b) ? 'Đã mượn hết' : 'Đang xử lý, chưa phục vụ' }}</span> }
                 </div>
               </div>
             </div>
@@ -186,6 +186,10 @@ export class BibDetail {
 
   constructor() {
     effect(() => void this.load(this.publicId()));
+  }
+
+  protected onLoan(b: Detail): boolean {
+    return b.holdings.some((c) => c.status === 'on-loan');
   }
 
   /** ISBD và MARC lấy từ catalog khi bạn đọc mở tab lần đầu. */

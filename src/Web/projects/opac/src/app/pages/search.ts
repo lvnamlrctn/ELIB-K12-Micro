@@ -188,7 +188,7 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
                   @if (b.ddc) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">DDC {{ b.ddc }}</span> }
                   @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">Chưa có bản phục vụ</span> }
                   @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">Còn {{ b.available }}/{{ b.copies }} bản</span> }
-                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">Đã mượn hết ({{ b.copies }} bản)</span> }
+                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">Chưa có bản sẵn sàng ({{ b.copies }} bản)</span> }
                 </div>
               </div>
             </li>
