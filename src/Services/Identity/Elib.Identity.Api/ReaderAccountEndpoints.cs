@@ -193,7 +193,7 @@ public static class ReaderAccountEndpoints
               <button type="submit">Đăng Nhập &rarr;</button>
             </form>
             """;
-        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell("Đăng nhập bạn đọc", "Xem sách đang mượn, gia hạn và đặt mượn tài liệu", body), status);
+        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell("Đăng nhập bạn đọc", "Dùng số thẻ thư viện và mật khẩu thư viện đã cấp", body), status);
     }
 
     private static IResult PasswordPage(HttpContext ctx, IAntiforgery antiforgery, string? error, int status = 200)
