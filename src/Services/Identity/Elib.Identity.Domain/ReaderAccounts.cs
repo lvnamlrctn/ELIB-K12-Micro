@@ -61,6 +61,13 @@ public sealed class ReaderAccount : Entity, ITenantOwned
         Credentials.SetPasswordHash(hash, mustChange: true);
     }
 
+    /// <summary>Bạn đọc tự đổi mật khẩu (lần đầu hoặc trên trang tài khoản) — hết bắt đổi.</summary>
+    public void ChangeOwnPassword(string hash)
+    {
+        CardNoPassword = false;
+        Credentials.SetPasswordHash(hash, mustChange: false);
+    }
+
     /// <summary>Mật khẩu mặc định = số thẻ (không phân biệt hoa/thường) — bạn đọc phải đổi ở lần đăng nhập đầu.</summary>
     public void UseCardNoPassword()
     {

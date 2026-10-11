@@ -170,9 +170,13 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
         Assert.Equal(HttpStatusCode.Forbidden, upload.StatusCode);
         Assert.Equal("IMPERSONATION_READONLY", await ErrorCode(upload));
 
+        // Token bạn đọc: không upload, cũng không đọc/tải file của đơn vị (ảnh thẻ riêng tư...) — chặn ngay ở policy.
         var reader = _factory.CreateClient().WithClaims(TestClaims.Reader(tenantId));
-        Assert.Equal("MEDIA_STAFF_ONLY", await ErrorCode(await reader.PostAsJsonAsync(U("/api/files/uploads"),
+        Assert.Equal("PERMISSION_DENIED", await ErrorCode(await reader.PostAsJsonAsync(U("/api/files/uploads"),
             new UploadRequest("attachment", "a.png", "image/png", 100))));
+        var file = await Ticket(Staff(tenantId), "attachment", "image/png", PngBytes.Length);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync(U($"/api/files/{file.FileId}/download"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync(U($"/api/files/{file.FileId}"))).StatusCode);
     }
 
     [Fact]

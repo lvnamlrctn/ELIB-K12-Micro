@@ -60,6 +60,7 @@ public static class AuthorizationServiceCollectionExtensions
         services.AddScoped<IAuthorizationHandler, ModuleHandler>();
         services.AddScoped<IAuthorizationHandler, SystemContextHandler>();
         services.AddSingleton<IAuthorizationHandler, ServiceCallerHandler>();
+        services.AddSingleton<IAuthorizationHandler, SubjectTypeHandler>();
         return services;
     }
 }

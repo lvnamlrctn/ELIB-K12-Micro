@@ -169,6 +169,9 @@ services:
       Identity__Clients__elib-admin__PostLogoutRedirectUris__0: ${PUBLIC_ORIGIN:-http://${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/
       Identity__Clients__elib-admin__RedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/callback
       Identity__Clients__elib-admin__PostLogoutRedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/admin/
+      # OPAC (SPA, PKCE) ở gốc host đơn vị: chỉ bạn đọc đăng nhập (trang /account/reader-login của identity).
+      Identity__Clients__elib-opac__RedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/tai-khoan/callback
+      Identity__Clients__elib-opac__PostLogoutRedirectUriPatterns__0: ${PUBLIC_TENANT_ORIGIN_PATTERN:-http://*.${DEV_DOMAIN}:${GATEWAY_PORT:-8080}}/
       Identity__BootstrapAdmin__UserName: sysadmin
       Identity__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:?chạy ./init-env.sh trước}
       # Email nhận OTP của sysadmin (khi bật SYSTEM_LOGIN_OTP). Thư DEV đi vào Mailpit.

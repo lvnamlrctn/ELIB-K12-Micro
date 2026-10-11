@@ -46,7 +46,10 @@ services.AddRateLimiter(o =>
     {
         var g = http.RequestServices.GetRequiredService<IOptions<GatewayOptions>>().Value;
         // Theo host + người dùng (đã đăng nhập) hoặc IP (ẩn danh) — một trường không làm nghẽn trường khác.
-        var who = http.User.FindFirstValue(ElibClaimTypes.Subject) ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // sub của nhân viên và bạn đọc là hai dãy số riêng — kèm sub_type để không chung hạn mức.
+        var who = http.User.FindFirstValue(ElibClaimTypes.Subject) is { } sub
+            ? $"{http.User.FindFirstValue(ElibClaimTypes.SubjectType)}:{sub}"
+            : http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetFixedWindowLimiter($"{http.Request.Host.Host}|{who}", _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = g.RateLimitPermits,

@@ -35,6 +35,8 @@ internal static class ElibPolicyNames
     public const string ModulePrefix = "elib-module:";
     public const string SystemContext = "elib-system";
     public const string ServiceCaller = "elib-service";
+    public const string Staff = ElibPolicies.Staff;
+    public const string Reader = ElibPolicies.Reader;
 
     public static string Permission(string code) => PermissionPrefix + code;
 

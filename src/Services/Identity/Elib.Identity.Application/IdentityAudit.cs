@@ -15,7 +15,8 @@ public sealed class IdentityAudit(IPublishEndpoint publisher, ICurrentActor acto
 {
     public const string Service = "identity";
 
-    public sealed record Who(long? Id, string? Name);
+    /// <summary><see cref="Kind"/>: loại tài khoản (mặc định nhân viên, hoặc "anonymous" khi chưa xác định được tài khoản).</summary>
+    public sealed record Who(long? Id, string? Name, string? Kind = null);
 
     public Task TenantAsync(long tenantId, string action, string entityType, string? entityId, string summary, CancellationToken ct, Who? who = null)
     {
@@ -61,7 +62,7 @@ public sealed class IdentityAudit(IPublishEndpoint publisher, ICurrentActor acto
     public static Who Of(SignInIdentity identity) => new(identity.UserId, $"{identity.FullName} ({identity.UserName})");
 
     private EventActor Actor(Who? who) =>
-        who is null ? new EventActor(actor.Id, actor.Kind) : new EventActor(who.Id, who.Id is null ? "anonymous" : ElibSubjectTypes.Staff);
+        who is null ? new EventActor(actor.Id, actor.Kind) : new EventActor(who.Id, who.Kind ?? (who.Id is null ? "anonymous" : ElibSubjectTypes.Staff));
 
     private static string? CallerName(HttpContext? ctx)
     {

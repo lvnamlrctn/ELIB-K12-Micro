@@ -23,6 +23,8 @@
 - **Kiosk, máy SIP2, thiết bị ra vào:** Client Credentials, mỗi thiết bị một client gắn `tenant_id` và scope hẹp (ví dụ `circulation.selfcheck`, `space.access`). Cấp và thu hồi trong Admin.
 - **Service-to-service:** Client Credentials ([§4](#4-service-to-service)).
 
+**Token bạn đọc và nhân viên cùng issuer, cùng audience `elib-api`** — `sub` của hai loại là hai dãy số riêng. Vì vậy mọi kiểm tra phải xét kèm `sub_type`: route quản trị ở gateway (`/api/admin/**`, `/api/system/**`, `/api/me`) dùng policy `elib-staff`, route của bạn đọc dùng `elib-reader`; `[Permission]` chỉ nhận nhân viên; endpoint chỉ "đã đăng nhập" mà không có `[Permission]` phải gắn `RequireStaff`/`RequireReader` (lớp thứ hai sau gateway).
+
 ### Claim trong access token
 
 ```

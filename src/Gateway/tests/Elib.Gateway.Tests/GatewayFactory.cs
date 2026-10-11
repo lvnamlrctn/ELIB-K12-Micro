@@ -103,7 +103,7 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Routes:catalog-opac:Transforms:0:PathPattern"] = "/api/opac/{**rest}",
             ["ReverseProxy:Routes:catalog-opac:Metadata:Module"] = "SEARCH",
             ["ReverseProxy:Routes:circulation-admin:ClusterId"] = "search",
-            ["ReverseProxy:Routes:circulation-admin:AuthorizationPolicy"] = "default",
+            ["ReverseProxy:Routes:circulation-admin:AuthorizationPolicy"] = "elib-staff",
             ["ReverseProxy:Routes:circulation-admin:Match:Path"] = "/api/admin/circulation/{**rest}",
             ["ReverseProxy:Routes:circulation-admin:Transforms:0:PathPattern"] = "/api/{**rest}",
             ["ReverseProxy:Routes:circulation-admin:Metadata:Module"] = "CIRCULATION",

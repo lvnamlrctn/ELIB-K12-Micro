@@ -1,3 +1,4 @@
+using Elib.BuildingBlocks.Tenancy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
@@ -19,12 +20,16 @@ public sealed class ElibAuthorizationPolicyProvider(IOptions<AuthorizationOption
                 ? new SystemContextRequirement()
             : policyName == ElibPolicyNames.ServiceCaller
                 ? new ServiceCallerRequirement()
+            : policyName == ElibPolicyNames.Staff
+                ? new SubjectTypeRequirement(ElibSubjectTypes.Staff)
+            : policyName == ElibPolicyNames.Reader
+                ? new SubjectTypeRequirement(ElibSubjectTypes.Reader)
             : null;
 
         if (requirement is null) return await base.GetPolicyAsync(policyName);
 
         var builder = new AuthorizationPolicyBuilder();
-        if (requirement is PermissionRequirement or SystemContextRequirement or ServiceCallerRequirement) builder.RequireAuthenticatedUser();
+        if (requirement is PermissionRequirement or SystemContextRequirement or ServiceCallerRequirement or SubjectTypeRequirement) builder.RequireAuthenticatedUser();
         return builder.AddRequirements(requirement).Build();
     }
 }

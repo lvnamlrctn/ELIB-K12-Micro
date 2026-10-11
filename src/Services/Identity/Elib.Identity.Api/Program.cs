@@ -17,6 +17,7 @@ if (app.Configuration.GetValue<bool>(DatabaseMigration.MigrateOnStartupKey))
 app.UseElibServiceDefaults();
 app.UseAntiforgery();
 app.MapAccountEndpoints();
+app.MapReaderAccountEndpoints();
 app.MapConnectEndpoints();
 app.MapIdentityAdminEndpoints();
 app.Run();

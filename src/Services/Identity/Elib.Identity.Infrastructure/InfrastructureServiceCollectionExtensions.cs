@@ -20,6 +20,9 @@ public static class IdentityCookie
 {
     /// <summary>Phiên đăng nhập trên trang của identity (không phải token API).</summary>
     public const string Scheme = "Elib.Identity.Login";
+
+    /// <summary>Phiên đăng nhập của bạn đọc (OPAC) — tách khỏi phiên nhân viên: cùng trình duyệt vẫn không lẫn tài khoản.</summary>
+    public const string ReaderScheme = "Elib.Identity.Reader";
 }
 
 public sealed class BCryptPasswordHasher : IPasswordHasher
@@ -163,6 +166,17 @@ public static class InfrastructureServiceCollectionExtensions
                 o.LoginPath = "/account/login";
                 o.LogoutPath = "/account/logout";
                 o.Cookie.Name = "elib.identity";
+                o.Cookie.HttpOnly = true;
+                o.Cookie.SameSite = SameSiteMode.Lax;
+                o.Cookie.SecurePolicy = options.RequireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+                o.ExpireTimeSpan = TimeSpan.FromHours(1);
+                o.SlidingExpiration = true;
+            })
+            .AddCookie(IdentityCookie.ReaderScheme, o =>
+            {
+                o.LoginPath = "/account/reader-login";
+                o.LogoutPath = "/account/logout";
+                o.Cookie.Name = "elib.identity.reader";
                 o.Cookie.HttpOnly = true;
                 o.Cookie.SameSite = SameSiteMode.Lax;
                 o.Cookie.SecurePolicy = options.RequireHttps ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;

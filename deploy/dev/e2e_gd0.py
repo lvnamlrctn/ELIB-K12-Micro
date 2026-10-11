@@ -146,6 +146,38 @@ def pkce_login(b, origin, user, password, tenant_hint=None, otp_code=None):
     return json.loads(body)["access_token"]
 
 
+def reader_login(b, origin, card, password, new_password):
+    """Luồng của OPAC (client elib-opac): authorize → đăng nhập bạn đọc → đổi mật khẩu lần đầu → callback?code → token."""
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    redirect = origin + "/tai-khoan/callback"
+    q = {"client_id": "elib-opac", "response_type": "code", "redirect_uri": redirect, "scope": "openid profile offline_access elib-api",
+         "code_challenge": challenge, "code_challenge_method": "S256", "state": "e2e"}
+    s, h, body = b.request("GET", "/connect/authorize?" + urllib.parse.urlencode(q))
+    expect(s == 302 and "/account/reader-login" in h.get("Location", ""), "OPAC authorize → trang đăng nhập bạn đọc", f"{s} {body[:200]}")
+    login_path = path_of(h["Location"])
+    s, h, page = b.request("GET", login_path)
+    af = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page)
+    return_url = urllib.parse.parse_qs(urllib.parse.urlsplit(login_path).query)["ReturnUrl"][0]
+    s, h, body = b.request("POST", "/account/reader-login", data={"__RequestVerificationToken": html.unescape(af.group(1)), "cardNo": card,
+                                                                 "password": password, "returnUrl": return_url})
+    expect(s == 302 and path_of(h["Location"]) == "/account/reader-password", f"bạn đọc {card} đăng nhập bằng số thẻ → bắt đổi mật khẩu",
+           f"{s} {re.sub('<[^>]+>', ' ', body)[:300]}")
+    s, h, page = b.request("GET", "/account/reader-password")
+    af = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page)
+    s, h, body = b.request("POST", "/account/reader-password", data={"__RequestVerificationToken": html.unescape(af.group(1)),
+                                                                    "newPassword": new_password, "confirmPassword": new_password})
+    expect(s == 302, "đổi mật khẩu lần đầu", f"{s} {re.sub('<[^>]+>', ' ', body)[:300]}")
+    s, h, body = b.request("GET", path_of(h["Location"]))
+    loc = h.get("Location", "")
+    expect(s == 302 and loc.startswith(redirect), f"chuyển về OPAC {redirect}", f"{s} {loc} {body[:200]}")
+    code = urllib.parse.parse_qs(urllib.parse.urlsplit(loc).query)["code"][0]
+    s, h, body = b.request("POST", "/connect/token", data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect,
+                                                          "client_id": "elib-opac", "code_verifier": verifier})
+    expect(s == 200, "OPAC đổi code lấy token bạn đọc (PKCE)", f"{s} {body[:200]}")
+    return json.loads(body)["access_token"]
+
+
 def xlsx(rows):
     """File .xlsx tối thiểu (chuỗi inline) — máy DEV không có thư viện Excel cho Python."""
     def col(i): return chr(ord("A") + i)
@@ -600,6 +632,13 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
            and sum(a["cardNoPassword"] for a in st.values()) == 2, "tình trạng đăng nhập OPAC trên danh sách bạn đọc", body)
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "READER_PASSWORD_BULK", "3 bạn đọc")
     step("nhật ký có đặt mật khẩu OPAC (identity → audit, không ghi mật khẩu)")
+    rb = Browser(GATEWAY, host=host, proto="https")
+    rtoken = reader_login(rb, origin, f"{card}-2".lower(), f"{card}-2", "Docsach2026")
+    s, _, body = rb.request("GET", "/api/opac/account/me", token=rtoken)
+    expect(s == 200 and json.loads(body)["cardNo"] == f"{card}-2" and not json.loads(body)["mustChangePassword"], "OPAC: bạn đọc xem thông tin thẻ", body)
+    s, _, body = rb.request("POST", f"{P}/readers/Search", token=rtoken, json_body={"keyword": card})
+    s2, _, _ = rb.request("GET", "/api/me", token=rtoken)
+    expect(s == 403 and s2 == 403, "token bạn đọc không dùng được API quản trị (gateway chặn theo loại tài khoản)", f"{s} {s2} {body[:200]}")
 
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==")
     s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,

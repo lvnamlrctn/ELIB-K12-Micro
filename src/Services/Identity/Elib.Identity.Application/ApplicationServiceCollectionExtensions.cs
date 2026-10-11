@@ -14,6 +14,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<UserAdminService>();
         services.AddScoped<RoleAdminService>();
         services.AddScoped<ReaderAccountService>();
+        services.AddScoped<ReaderSignInService>();
         services.AddScoped<IdentityTenantSeeder>();
         services.AddScoped<ITenantSeeder>(sp => sp.GetRequiredService<IdentityTenantSeeder>());
         services.AddScoped<TenantBootstrapService>();

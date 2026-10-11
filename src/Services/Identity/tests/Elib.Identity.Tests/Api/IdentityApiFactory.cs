@@ -29,6 +29,7 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
     public const string Issuer = "http://localhost/";
     public const string AdminRedirect = "https://admin.test/callback";
     public const string TenantRedirectPattern = "https://*.truong.test/admin/callback";
+    public const string OpacRedirectPattern = "https://*.truong.test/tai-khoan/callback";
     public const string GatewaySecret = "gateway-secret-for-tests";
     public const string GatewayKey = "gateway-signing-key-for-identity-tests-0123456789";
     private const string Combined = "TestOrToken";
@@ -58,6 +59,7 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
             ["Identity:UseEphemeralKeys"] = "true",
             ["Identity:Clients:elib-admin:RedirectUris:0"] = AdminRedirect,
             ["Identity:Clients:elib-admin:RedirectUriPatterns:0"] = TenantRedirectPattern,
+            ["Identity:Clients:elib-opac:RedirectUriPatterns:0"] = OpacRedirectPattern,
             ["Identity:Clients:svc-gateway:ClientSecret"] = GatewaySecret,
             ["Identity:Clients:svc-tenant:ClientSecret"] = "tenant-secret-for-tests",
             ["Identity:Clients:svc-notification:ClientSecret"] = "notification-secret-for-tests",

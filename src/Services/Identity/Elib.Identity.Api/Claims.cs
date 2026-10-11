@@ -79,6 +79,38 @@ internal static class ElibPrincipals
         return Finish(identity, scopes);
     }
 
+    /// <summary>Id hồ sơ bạn đọc ở patron (ReaderPublicId) — service khác tra bạn đọc theo claim này, không theo sub.</summary>
+    public const string ReaderIdClaim = "reader_id";
+
+    public const string CardNoClaim = "card_no";
+
+    /// <summary>Phiên đăng nhập bạn đọc trên trang identity (cookie riêng <see cref="IdentityCookie.ReaderScheme"/>).</summary>
+    public static ClaimsPrincipal ForReaderCookie(ReaderIdentity who)
+    {
+        var identity = new ClaimsIdentity(IdentityCookie.ReaderScheme, Claims.Name, Claims.Role);
+        identity.AddClaim(new Claim(Claims.Subject, who.AccountId.ToString(CultureInfo.InvariantCulture)));
+        identity.AddClaim(new Claim(Claims.Name, who.FullName));
+        identity.AddClaim(new Claim(ElibClaimTypes.SubjectType, ElibSubjectTypes.Reader));
+        identity.AddClaim(new Claim(ElibClaimTypes.TenantId, who.TenantId.ToString(CultureInfo.InvariantCulture)));
+        return new ClaimsPrincipal(identity);
+    }
+
+    public static bool IsReader(ClaimsPrincipal principal) => principal.FindFirstValue(ElibClaimTypes.SubjectType) == ElibSubjectTypes.Reader;
+
+    /// <summary>Access token bạn đọc: sub = id tài khoản bạn đọc ở identity (dãy số riêng với nhân viên — luôn xét kèm sub_type).</summary>
+    public static ClaimsPrincipal ForReaderToken(ReaderIdentity who, IEnumerable<string> scopes)
+    {
+        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, Claims.Name, Claims.Role);
+        identity.SetClaim(Claims.Subject, who.AccountId.ToString(CultureInfo.InvariantCulture))
+            .SetClaim(Claims.Name, who.FullName)
+            .SetClaim(Claims.PreferredUsername, who.CardNo)
+            .SetClaim(ElibClaimTypes.SubjectType, ElibSubjectTypes.Reader)
+            .SetClaim(ElibClaimTypes.TenantId, who.TenantId.ToString(CultureInfo.InvariantCulture))
+            .SetClaim(ReaderIdClaim, who.ReaderPublicId.ToString())
+            .SetClaim(CardNoClaim, who.CardNo);
+        return Finish(identity, scopes);
+    }
+
     public static ClaimsPrincipal ForService(string clientId, IEnumerable<string> scopes)
     {
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, Claims.Name, Claims.Role);

@@ -13,7 +13,7 @@ public static class MediaEndpoints
 {
     public static IEndpointRouteBuilder MapMediaEndpoints(this IEndpointRouteBuilder app)
     {
-        var files = app.MapGroup("/api/files").WithTags("Files").RequireAuthorization();
+        var files = app.MapGroup("/api/files").WithTags("Files").RequireAuthorization(new RequireStaffAttribute());
         files.MapPost("/uploads", (UploadRequest request, MediaService s, CancellationToken ct) => s.RequestUploadAsync(request, ct))
             .AddEndpointFilter(RejectImpersonation);
         files.MapPost("/{id:guid}/complete", (Guid id, MediaService s, CancellationToken ct) => s.CompleteAsync(id, ct))

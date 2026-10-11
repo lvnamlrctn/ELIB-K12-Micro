@@ -24,7 +24,7 @@ public static class AdminEndpoints
             if (actor.Id is not { } userId || await signIn.ReloadAsync(tenantId, userId, ct) is not { } who) return Results.Unauthorized();
             var granted = await permissions.GetEffectiveAsync(tenantId, userId, ct);
             return Results.Ok(new MeDto(who.UserId, who.TenantId, who.UserName, who.FullName, who.MustChangePassword, granted.Order(StringComparer.Ordinal).ToList()));
-        }).RequireAuthorization().WithTags("Me");
+        }).RequireAuthorization(new RequireStaffAttribute()).WithTags("Me");
 
         app.MapPost("/api/me/password", async (ChangePasswordRequest request, ClaimsPrincipal principal, ICurrentActor actor, ITenantContext tenant,
             SignInService signIn, CancellationToken ct) =>
@@ -33,7 +33,7 @@ public static class AdminEndpoints
                 return Results.Forbid();
             await signIn.ChangePasswordAsync(tenant.IsSystem ? null : tenant.TenantId, userId, request.CurrentPassword, request.NewPassword, ct);
             return Results.NoContent();
-        }).RequireAuthorization().WithTags("Me");
+        }).RequireAuthorization(new RequireStaffAttribute()).WithTags("Me");
 
         var users = app.MapGroup("/api/users").WithTags("Users");
         users.MapGet("/", [Permission("USER", "view")] (UserAdminService s, string? search, int? page, int? pageSize, CancellationToken ct)

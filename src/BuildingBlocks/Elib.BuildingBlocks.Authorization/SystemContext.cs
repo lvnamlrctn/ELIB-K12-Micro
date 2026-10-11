@@ -59,3 +59,37 @@ public sealed class NoModuleLicenseSource : IModuleLicenseSource
 {
     public Task<bool> IsLicensedAsync(long tenantId, string moduleCode, CancellationToken cancellationToken) => Task.FromResult(false);
 }
+
+/// <summary>
+/// Tên policy theo loại tài khoản — dùng cả ở route gateway ("AuthorizationPolicy": "elib-staff") lẫn endpoint của service.
+/// Token bạn đọc và token nhân viên cùng ký bởi identity, cùng audience: route quản trị phải chặn theo sub_type, không chỉ "đã đăng nhập".
+/// </summary>
+public static class ElibPolicies
+{
+    public const string Staff = "elib-staff";
+    public const string Reader = "elib-reader";
+}
+
+/// <summary>Chỉ tài khoản nhân viên (đơn vị hoặc hệ thống) — endpoint quản trị không gắn [Permission].</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+public sealed class RequireStaffAttribute() : AuthorizeAttribute(ElibPolicyNames.Staff);
+
+/// <summary>Chỉ bạn đọc đã đăng nhập OPAC (sub_type=reader, sub = id tài khoản bạn đọc ở identity).</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+public sealed class RequireReaderAttribute() : AuthorizeAttribute(ElibPolicyNames.Reader);
+
+public sealed class SubjectTypeRequirement(string subjectType) : IAuthorizationRequirement
+{
+    public string SubjectType { get; } = subjectType;
+}
+
+public sealed class SubjectTypeHandler : AuthorizationHandler<SubjectTypeRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, SubjectTypeRequirement requirement)
+    {
+        if (context.User.FindFirstValue(ElibClaimTypes.SubjectType) == requirement.SubjectType) context.Succeed(requirement);
+        else context.Fail(new ElibFailureReason(this, ElibErrorCodes.PermissionDenied,
+            requirement.SubjectType == ElibSubjectTypes.Reader ? "Chức năng dành cho bạn đọc đã đăng nhập." : "Chỉ tài khoản nhân viên được dùng chức năng này."));
+        return Task.CompletedTask;
+    }
+}

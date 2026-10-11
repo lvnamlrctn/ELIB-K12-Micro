@@ -125,6 +125,25 @@ public sealed class GatewayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reader_token_only_reaches_reader_routes_and_staff_token_only_admin_routes()
+    {
+        // Cùng issuer/audience: route quản trị chặn theo sub_type, không chỉ "đã đăng nhập".
+        var reader = _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Reader(11));
+        foreach (var path in new[] { "/api/admin/circulation/loans", "/api/me", "/api/admin/media/files/x/download", "/api/admin/identity/users" })
+            Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync(U(path))).StatusCode);
+
+        var me = await reader.GetAsync(U("/api/opac/account/me"));
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        var echo = (await me.Content.ReadFromJsonAsync<Echo>())!;
+        Assert.Equal(("/api/reader/me", "11"), (echo.Path, echo.Headers["X-Tenant-Id"]));
+
+        var staff = _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Staff(11));
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U("/api/opac/account/me"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _gateway.ClientFor("truong-a.thuvientn.vn").GetAsync(U("/api/opac/account/me"))).StatusCode);
+        Assert.Equal("TENANT_MISMATCH", await Code(await _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Reader(12)).GetAsync(U("/api/opac/account/me"))));
+    }
+
+    [Fact]
     public async Task System_routes_only_on_system_host_and_without_tenant_header()
     {
         var onSystemHost = await _gateway.ClientFor("quantri.thuvientn.vn", TestClaims.SuperAdmin).GetAsync(U("/api/system/tenant/tenants"));

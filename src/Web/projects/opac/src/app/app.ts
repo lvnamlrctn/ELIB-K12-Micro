@@ -1,6 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { Library } from './core/library';
+import { ReaderAuth } from './core/reader-auth';
 
 /** Khung OPAC: thanh trên (logo + tên thư viện + đăng nhập), nội dung, chân trang có thông tin liên hệ. */
 @Component({
@@ -29,9 +30,16 @@ import { Library } from './core/library';
             <a routerLink="/thu-vien-so" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">Thư viện số</a>
           }
         </nav>
-        <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
-          <span class="material-icons text-[18px]">person</span><span class="hidden sm:inline">Đăng nhập</span>
-        </a>
+        @if (auth.loggedIn()) {
+          <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 max-w-[45vw]"
+             title="Tài khoản của tôi">
+            <span class="material-icons text-[18px]">account_circle</span><span class="hidden sm:inline truncate">{{ auth.displayName() }}</span>
+          </a>
+        } @else {
+          <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
+            <span class="material-icons text-[18px]">person</span><span class="hidden sm:inline">Đăng nhập</span>
+          </a>
+        }
       </div>
     </header>
 
@@ -77,9 +85,11 @@ import { Library } from './core/library';
 })
 export class App implements OnInit {
   protected readonly library = inject(Library);
+  protected readonly auth = inject(ReaderAuth);
   protected readonly p = this.library.parameters;
 
   ngOnInit(): void {
     void this.library.load();
+    void this.auth.restore();
   }
 }

@@ -1,3 +1,4 @@
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Identity.Application;
 using Elib.Identity.Infrastructure;
 using Microsoft.AspNetCore;
@@ -11,6 +12,9 @@ namespace Elib.Identity.Api;
 /// <summary>Endpoint OIDC (passthrough): OpenIddict kiểm tra request, ở đây chỉ quyết định AI được phát token với claim gì.</summary>
 public static class ConnectEndpoints
 {
+    /// <summary>App OPAC — chỉ phát token cho bạn đọc (phiên <see cref="IdentityCookie.ReaderScheme"/>); app khác chỉ cho nhân viên.</summary>
+    public const string OpacClientId = "elib-opac";
+
     public static IEndpointRouteBuilder MapConnectEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapMethods("/connect/authorize", [HttpMethods.Get, HttpMethods.Post], (Delegate)AuthorizeAsync).ExcludeFromDescription().DisableAntiforgery();
@@ -30,9 +34,11 @@ public static class ConnectEndpoints
         return (await impersonation.ReloadAsync(tenantId, who.UserId, ct), expiresAt);
     }
 
-    private static async Task<IResult> AuthorizeAsync(HttpContext ctx, SignInService signIn, ImpersonationService impersonation, TimeProvider clock, CancellationToken ct)
+    private static async Task<IResult> AuthorizeAsync(HttpContext ctx, SignInService signIn, ImpersonationService impersonation, TimeProvider clock,
+        ReaderSignInService readers, ITenantContext tenant, CancellationToken ct)
     {
         var request = ctx.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("Không đọc được yêu cầu OIDC.");
+        if (request.ClientId == OpacClientId) return await AuthorizeReaderAsync(ctx, request, readers, tenant, ct);
         var requestedTenant = (string?)request["tenant"];
 
         var session = await ctx.AuthenticateAsync(IdentityCookie.Scheme);
@@ -55,7 +61,27 @@ public static class ConnectEndpoints
             authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static async Task<IResult> TokenAsync(HttpContext ctx, SignInService signIn, ImpersonationService impersonation, TimeProvider clock, CancellationToken ct)
+    /// <summary>Bạn đọc: chỉ trên host của đơn vị, phiên phải cùng đơn vị với host; còn bị bắt đổi mật khẩu thì đăng nhập lại (bước đổi mật khẩu).</summary>
+    private static async Task<IResult> AuthorizeReaderAsync(HttpContext ctx, OpenIddictRequest request, ReaderSignInService readers, ITenantContext tenant,
+        CancellationToken ct)
+    {
+        if (tenant.TenantId is not { } hostTenant)
+            return Results.Forbid(Error(Errors.InvalidRequest, "Bạn đọc đăng nhập trên trang tra cứu của trường."), [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+
+        var session = await ctx.AuthenticateAsync(IdentityCookie.ReaderScheme);
+        var reader = session.Succeeded && ElibPrincipals.ReadSession(session.Principal!) is (long sessionTenant, var accountId) && sessionTenant == hostTenant
+            ? await readers.ReloadAsync(hostTenant, accountId, ct)
+            : null;
+        if (reader is null || reader.MustChangePassword)
+        {
+            if (session.Succeeded) await ctx.SignOutAsync(IdentityCookie.ReaderScheme);
+            return ChallengeLogin(ctx, IdentityCookie.ReaderScheme);
+        }
+        return Results.SignIn(ElibPrincipals.ForReaderToken(reader, request.GetScopes()), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private static async Task<IResult> TokenAsync(HttpContext ctx, SignInService signIn, ImpersonationService impersonation, TimeProvider clock,
+        ReaderSignInService readers, CancellationToken ct)
     {
         var request = ctx.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("Không đọc được yêu cầu OIDC.");
 
@@ -65,6 +91,14 @@ public static class ConnectEndpoints
         if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
         {
             var previous = (await ctx.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
+            if (previous is not null && ElibPrincipals.IsReader(previous))
+            {
+                // Bạn đọc: thẻ bị khoá/xoá, đơn vị tạm ngưng, hoặc thư viện vừa đặt lại mật khẩu → không cấp token mới.
+                return ElibPrincipals.ReadSession(previous) is (long readerTenant, var accountId)
+                       && await readers.ReloadAsync(readerTenant, accountId, ct) is { MustChangePassword: false } reader
+                    ? Results.SignIn(ElibPrincipals.ForReaderToken(reader, previous.GetScopes()), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)
+                    : Results.Forbid(Error(Errors.InvalidGrant, "Tài khoản không còn hiệu lực."), [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+            }
             // Tải lại người dùng ở MỖI lần làm mới: bị khoá/vô hiệu hoá/đơn vị tạm ngưng thì không cấp token mới; stamp quyền luôn mới nhất.
             if (previous is not null && ElibPrincipals.ReadSession(previous) is { } who
                 && await ReloadAsync(previous, who, signIn, impersonation, clock, ct) is ({ } user, var impersonationExpiresAt))
@@ -73,13 +107,7 @@ public static class ConnectEndpoints
                     authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             }
 
-            return Results.Forbid(
-                new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Tài khoản không còn hiệu lực.",
-                }),
-                [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+            return Results.Forbid(Error(Errors.InvalidGrant, "Tài khoản không còn hiệu lực."), [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
         }
 
         throw new InvalidOperationException("Grant type không được hỗ trợ.");
@@ -88,14 +116,21 @@ public static class ConnectEndpoints
     private static async Task<IResult> LogoutAsync(HttpContext ctx)
     {
         await ctx.SignOutAsync(IdentityCookie.Scheme);
+        await ctx.SignOutAsync(IdentityCookie.ReaderScheme);
         return Results.SignOut(new AuthenticationProperties { RedirectUri = "/account/login" }, [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
     }
 
-    private static IResult ChallengeLogin(HttpContext ctx)
+    private static AuthenticationProperties Error(string error, string description) => new(new Dictionary<string, string?>
+    {
+        [OpenIddictServerAspNetCoreConstants.Properties.Error] = error,
+        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description,
+    });
+
+    private static IResult ChallengeLogin(HttpContext ctx, string scheme = IdentityCookie.Scheme)
     {
         var parameters = ctx.Request.HasFormContentType ? ctx.Request.Form.ToList() : ctx.Request.Query.ToList();
         return Results.Challenge(
             new AuthenticationProperties { RedirectUri = ctx.Request.PathBase + ctx.Request.Path + QueryString.Create(parameters) },
-            [IdentityCookie.Scheme]);
+            [scheme]);
     }
 }
