@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
@@ -72,11 +72,12 @@ export class Library {
 export class LibraryTitleStrategy extends TitleStrategy {
   private readonly title = inject(Title);
   private readonly library = inject(Library);
-  private readonly language = inject(Language);
+  // Lấy lúc đổi tiêu đề — Router cần TitleStrategy khi khởi tạo; inject Language (→ TranslateService → HTTP) sớm dễ thành vòng (NG0200).
+  private readonly injector = inject(Injector);
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const key = this.buildTitle(snapshot);
     const name = this.library.name();
-    this.title.setTitle(key ? [this.language.t(key), name].filter(Boolean).join(' — ') : name);
+    this.title.setTitle(key ? [this.injector.get(Language).t(key), name].filter(Boolean).join(' — ') : name);
   }
 }
