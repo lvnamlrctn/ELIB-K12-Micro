@@ -28,6 +28,9 @@ public sealed class FakeZ3950Server : IAsyncDisposable
     public ConcurrentQueue<byte[]> Requests { get; } = new();
     public bool RejectInit { get; set; }
 
+    /// <summary>Số lượt Present kế tiếp trả chẩn đoán Bib-1 13 thay vì bản ghi (máy chủ tạm giới hạn như Library of Congress).</summary>
+    public int ThrottlePresents { get; set; }
+
     /// <summary>Bản ghi MARC21 ISO2709 UTF-8 tối thiểu: 245$a nhan đề, 100$a tác giả, 260$b$c, 020$a.</summary>
     public static byte[] Iso2709(string title, string author, string? isbn = null)
     {
@@ -116,6 +119,13 @@ public sealed class FakeZ3950Server : IAsyncDisposable
 
     private byte[] Present(byte[] pdu)
     {
+        if (ThrottlePresents > 0)
+        {
+            ThrottlePresents--;
+            // nonSurrogateDiagnostic [130]: DefaultDiagFormat { OID bib-1 diag, INTEGER 13 }
+            byte[] diag = [.. Tlv(0x06, [0x2A, 0x86, 0x48, 0xCE, 0x13, 0x04, 0x01]), 0x02, 0x01, 13];
+            return Wrap(0xB9, [.. Int(0x98, 0), .. Int(0x99, 1), 0x9B, 0x01, 0x05, 0xBF, 0x81, 0x02, (byte)(diag.Length + 2), 0x30, (byte)diag.Length, .. diag]);
+        }
         int start = 1, count = 1;
         var pos = HeaderLength(pdu);
         while (pos < pdu.Length)

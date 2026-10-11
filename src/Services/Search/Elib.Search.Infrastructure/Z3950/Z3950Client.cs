@@ -22,7 +22,7 @@ public sealed class Z3950Options
     /// </summary>
     public bool AllowPrivateNetworks { get; set; }
 
-    public int TimeoutSeconds { get; set; } = 15;
+    public int TimeoutSeconds { get; set; } = 30;
 
     /// <summary>Một phản hồi (PDU, trang SRU) lớn hơn mức này bị bỏ — chặn máy chủ lạ gửi dữ liệu vô hạn.</summary>
     public int MaxResponseBytes { get; set; } = 8 * 1024 * 1024;
@@ -62,9 +62,16 @@ public sealed partial class Z3950Client(IHttpClientFactory httpFactory, IOptions
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
         try
         {
-            return target.SruUrl is { } url
-                ? await SruSearchAsync(url, terms, start, count, timeout.Token)
-                : await BerSearchAsync(target, terms, start, count, timeout.Token);
+            if (target.SruUrl is { } url) return await SruSearchAsync(url, terms, start, count, timeout.Token);
+            var result = await BerSearchAsync(target, terms, start, count, timeout.Token);
+            // Máy chủ lớn (Library of Congress) tạm từ chối Present khi bị gọi dồn — mỗi trang là một phiên mới — và trả chẩn đoán Bib-1
+            // thay vì bản ghi; gọi lại sau vài giây thì được. Thử lại tối đa 2 lần (như monolith, ELIB-LRC 09-29).
+            for (var retry = 1; retry <= 2 && result.Connected && result.Total >= start && result.Records.Count == 0 && result.Error is not null; retry++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1.5 * retry), timeout.Token);
+                result = await BerSearchAsync(target, terms, start, count, timeout.Token);
+            }
+            return result;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

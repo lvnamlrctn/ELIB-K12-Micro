@@ -85,6 +85,7 @@ public sealed class Z3950ApiTests(SearchApiFactory factory) : IClassFixture<Sear
         var initPdu = remote.Requests.First(p => p[0] == 0xB4);
         Assert.Contains("bi-mat", Encoding.UTF8.GetString(initPdu), StringComparison.Ordinal); // idPass
 
+        remote.ThrottlePresents = 1; // lần đầu bị từ chối tạm (Bib-1 13) → client thử lại
         var page2 = Assert.Single(await Read<List<Z3950ServerResult>>(await staff.PostAsJsonAsync(U("/api/z3950/Search"),
             new Z3950SearchRequest { Title = "Truyện Kiều", PageSize = 2, Page = 2, ServerIds = [server.PublicId] }, Json)));
         Assert.Equal([(3, "Kiều truyện")], page2.Hits.Select(h => (h.Position, h.Title)));
