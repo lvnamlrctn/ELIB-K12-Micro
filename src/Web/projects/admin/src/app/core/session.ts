@@ -2,21 +2,11 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Api, Features, Me } from './api';
 
 /** Tên hiển thị module bán (đồng bộ với ModuleCatalog của service tenant). */
-export const MODULE_NAMES: Record<string, string> = {
-  CATALOG: 'Biên mục',
-  HOLDINGS: 'Quản lý kho',
-  CIRCULATION: 'Lưu thông',
-  ACQUISITION: 'Bổ sung',
-  SERIALS: 'Ấn phẩm định kỳ',
-  DIGITAL: 'Thư viện số',
-  SEARCH: 'Tra cứu OPAC',
-  PAYMENT: 'Thanh toán trực tuyến',
-  SPACE: 'Không gian & đặt phòng',
-  AI: 'Trợ lý AI',
-  PORTAL: 'Cổng thông tin',
-  REPORTING: 'Báo cáo tổng hợp',
-  SCHOOL: 'Chương trình, EOffice, Huy hiệu',
-};
+/** Khoá dịch tên phân hệ license (MODULE_LICENSE.*). */
+export const MODULE_NAMES: Record<string, string> = Object.fromEntries(
+  ['CATALOG', 'HOLDINGS', 'CIRCULATION', 'ACQUISITION', 'SERIALS', 'DIGITAL', 'SEARCH', 'PAYMENT', 'SPACE', 'AI', 'PORTAL', 'REPORTING', 'SCHOOL']
+    .map((code) => [code, `MODULE_LICENSE.${code}`]),
+);
 
 /**
  * Người đang đăng nhập + đơn vị của host. tenantId = null → quản trị nền tảng (host hệ thống).

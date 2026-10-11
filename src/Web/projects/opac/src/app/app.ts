@@ -1,15 +1,17 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
+import { LANGS, Language } from './core/i18n';
 import { Library } from './core/library';
 import { ReaderAuth } from './core/reader-auth';
 
-/** Khung OPAC: thanh trên (logo + tên thư viện + đăng nhập), nội dung, chân trang có thông tin liên hệ. */
+/** Khung OPAC: thanh trên (logo + tên thư viện + ngôn ngữ + đăng nhập), nội dung, chân trang có thông tin liên hệ. */
 @Component({
   selector: 'opac-root',
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, TranslatePipe],
   template: `
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-      <div class="max-w-6xl mx-auto px-4 h-16 flex items-center gap-3">
+      <div class="max-w-6xl mx-auto px-4 h-16 flex items-center gap-2 sm:gap-3">
         <a routerLink="/" class="flex items-center gap-3 min-w-0">
           @if (library.features()?.logoUrl; as logo) {
             <img [src]="logo" alt="" class="w-10 h-10 object-contain shrink-0" />
@@ -22,22 +24,28 @@ import { ReaderAuth } from './core/reader-auth';
         </a>
         <span class="flex-1"></span>
         <nav class="hidden md:flex items-center gap-1 text-sm">
-          <a routerLink="/" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">Trang chủ</a>
+          <a routerLink="/" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">{{ 'OPAC.NAVBAR.HOME' | translate }}</a>
           @if (library.has('SEARCH')) {
-            <a routerLink="/tim-kiem" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">Tra cứu</a>
+            <a routerLink="/tim-kiem" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">{{ 'OPAC.NAVBAR.SEARCH_LINK' | translate }}</a>
           }
           @if (library.has('DIGITAL')) {
-            <a routerLink="/thu-vien-so" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">Thư viện số</a>
+            <a routerLink="/thu-vien-so" class="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100">{{ 'OPAC.NAVBAR.EBOOK' | translate }}</a>
           }
         </nav>
+        <div class="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-medium shrink-0" role="group" [attr.aria-label]="'OPAC.NAVBAR.LANGUAGE' | translate">
+          @for (l of langs; track l) {
+            <button type="button" (click)="language.use(l)" [attr.aria-pressed]="language.lang() === l"
+                    class="px-2 py-1.5 uppercase" [class]="language.lang() === l ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'">{{ l }}</button>
+          }
+        </div>
         @if (auth.loggedIn()) {
-          <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 max-w-[45vw]"
-             title="Tài khoản của tôi">
+          <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 max-w-[40vw]"
+             [title]="'OPAC.NAVBAR.MY_ACCOUNT' | translate">
             <span class="material-icons text-[18px]">account_circle</span><span class="hidden sm:inline truncate">{{ auth.displayName() }}</span>
           </a>
         } @else {
           <a routerLink="/tai-khoan" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
-            <span class="material-icons text-[18px]">person</span><span class="hidden sm:inline">Đăng nhập</span>
+            <span class="material-icons text-[18px]">person</span><span class="hidden sm:inline">{{ 'OPAC.NAVBAR.LOGIN' | translate }}</span>
           </a>
         }
       </div>
@@ -49,7 +57,7 @@ import { ReaderAuth } from './core/reader-auth';
       } @else if (library.error(); as error) {
         <div class="max-w-md mx-auto text-center py-24 px-4">
           <span class="material-icons text-slate-300 text-6xl">domain_disabled</span>
-          <p class="mt-4 text-lg text-slate-700">{{ error }}</p>
+          <p class="mt-4 text-lg text-slate-700">{{ error | translate }}</p>
         </div>
       } @else {
         <router-outlet />
@@ -76,8 +84,8 @@ import { ReaderAuth } from './core/reader-auth';
           }
         </div>
         <div class="md:text-right text-slate-400">
-          <a href="/admin/" class="hover:text-white">Quản trị thư viện</a>
-          <div class="mt-2 text-xs">Vận hành trên nền tảng ELIB K12</div>
+          <a href="/admin/" class="hover:text-white">{{ 'OPAC.FOOTER.ADMIN' | translate }}</a>
+          <div class="mt-2 text-xs">{{ 'OPAC.FOOTER.POWERED_BY' | translate }}</div>
         </div>
       </div>
     </footer>
@@ -86,6 +94,8 @@ import { ReaderAuth } from './core/reader-auth';
 export class App implements OnInit {
   protected readonly library = inject(Library);
   protected readonly auth = inject(ReaderAuth);
+  protected readonly language = inject(Language);
+  protected readonly langs = LANGS;
   protected readonly p = this.library.parameters;
 
   ngOnInit(): void {

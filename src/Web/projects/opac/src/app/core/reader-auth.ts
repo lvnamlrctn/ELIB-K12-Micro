@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpClient, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
 import { firstValueFrom } from 'rxjs';
@@ -95,14 +95,3 @@ export const readerAuthInterceptor: HttpInterceptorFn = (req, next) => {
   const token = READER_APIS.some((p) => req.url.startsWith(p)) ? inject(ReaderAuth).accessToken() : null;
   return next(token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req);
 };
-
-/** Thông báo lỗi tiếng Việt từ problem+json của API. */
-export function accountError(e: unknown): string {
-  if (e instanceof HttpErrorResponse) {
-    const body = e.error as { detail?: string; title?: string } | null;
-    if (e.status === 401) return 'Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.';
-    if (e.status === 429) return 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút.';
-    return body?.detail || body?.title || 'Không kết nối được máy chủ, vui lòng thử lại.';
-  }
-  return 'Có lỗi xảy ra, vui lòng thử lại.';
-}

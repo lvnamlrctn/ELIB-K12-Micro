@@ -45,23 +45,26 @@ export interface Z3950Request {
 /** MARC + ISBD của biểu ghi (service catalog, /api/opac/catalog/**). */
 export interface OpacMarc { publicId: string; mfn: number; leader: string; fields: MarcField[]; isbd: string[]; }
 
-/** Mã ngôn ngữ MARC (041/008) thường gặp → tên hiển thị. */
-const LANGUAGES: Record<string, string> = {
-  vie: 'Tiếng Việt', eng: 'Tiếng Anh', fre: 'Tiếng Pháp', fra: 'Tiếng Pháp', chi: 'Tiếng Trung', zho: 'Tiếng Trung', rus: 'Tiếng Nga',
-  jpn: 'Tiếng Nhật', kor: 'Tiếng Hàn', ger: 'Tiếng Đức', deu: 'Tiếng Đức',
-};
+/** Mã ngôn ngữ MARC (041/008) có tên dịch sẵn (OPAC.LANG_CODE.*); mã khác hiện nguyên. */
+const LANGUAGE_CODES = new Set(['vie', 'eng', 'fre', 'fra', 'chi', 'zho', 'rus', 'jpn', 'kor', 'ger', 'deu']);
+
+/** Thông báo để template dịch: {{ m.key | translate: m.params }}. */
+export interface Msg { key: string; params?: Record<string, unknown>; }
 
 /** Thông báo lỗi tra cứu cho bạn đọc — 429: gateway giới hạn số lượt tìm từ một địa chỉ (chống quét dữ liệu). */
-export function searchErrorMessage(error: unknown): string {
+export function searchErrorMessage(error: unknown): Msg {
   if (error instanceof HttpErrorResponse && error.status === 429) {
     const wait = Number(error.headers.get('Retry-After'));
-    return `Bạn tra cứu quá nhanh. Vui lòng chờ ${wait > 0 ? `${wait} giây` : 'ít phút'} rồi thử lại.`;
+    return wait > 0 ? { key: 'OPAC.ERRORS.TOO_FAST_SECONDS', params: { seconds: wait } } : { key: 'OPAC.ERRORS.TOO_FAST' };
   }
-  return 'Không tra cứu được lúc này, vui lòng thử lại.';
+  return { key: 'OPAC.ERRORS.SEARCH_FAILED' };
 }
 
+/** Khoá dịch tên ngôn ngữ (qua pipe translate), hoặc chính mã nếu chưa có tên. */
 export function languageName(code: string | null | undefined): string {
-  return code ? LANGUAGES[code.toLowerCase()] ?? code : '';
+  if (!code) return '';
+  const c = code.toLowerCase();
+  return LANGUAGE_CODES.has(c) ? `OPAC.LANG_CODE.${c.toUpperCase()}` : code;
 }
 
 @Injectable({ providedIn: 'root' })

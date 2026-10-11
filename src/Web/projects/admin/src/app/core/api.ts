@@ -1,3 +1,4 @@
+import { translateError } from './i18n';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
@@ -315,8 +316,13 @@ async function blobRequest(request: Promise<Blob>): Promise<Blob> {
   }
 }
 
-/** Thông báo lỗi tiếng Việt từ problem+json của service ({ code, detail, title }). */
+/**
+ * Thông báo lỗi theo ngôn ngữ đang chọn: dịch theo mã lỗi ổn định của service (ERRORS.<code>), chưa có bản dịch thì dùng detail
+ * (tiếng Việt) của problem+json. Phần dưới chỉ chạy khi app chưa khởi tạo ngôn ngữ (test).
+ */
 export function errorMessage(error: unknown): string {
+  const translated = translateError(error);
+  if (translated !== null) return translated;
   if (error instanceof HttpErrorResponse) {
     const body = error.error as { detail?: string; title?: string; code?: string } | null;
     if (body?.detail) return body.detail;

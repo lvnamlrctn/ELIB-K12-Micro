@@ -2,6 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 import { MODULE_NAMES, Session } from '../core/session';
 
 export interface MenuItem {
+  /** Khoá dịch (MENU.*) — cũng là khoá nhận diện nhóm đang mở. */
   title: string;
   icon?: string;
   link?: string;
@@ -29,7 +30,7 @@ const MODULE_ICONS: Record<string, string> = {
 };
 
 /**
- * Menu cùng cấu trúc và tên với menu admin của frontend monolith (services/menu.ts, nhãn MENU.* tiếng Việt).
+ * Menu cùng cấu trúc với menu admin của frontend monolith (services/menu.ts); title là khoá dịch MENU.* (tên khoá theo ELIB-LRC).
  * Host hệ thống chỉ có quản trị nền tảng; host đơn vị lọc theo quyền và license (docs 08 §6) — chỉ là giao diện,
  * gateway/service vẫn tự chặn.
  */
@@ -41,13 +42,13 @@ export class Menu {
     if (!this.session.me()) return [];
     if (this.session.isSystem()) {
       return [
-        { title: 'Bảng điều khiển', icon: 'dashboard', link: '/' },
+        { title: 'MENU.DASHBOARD', icon: 'dashboard', link: '/' },
         {
-          title: 'Hệ thống',
+          title: 'MENU.SYSTEM',
           icon: 'dns',
           children: [
-            { title: 'Đơn vị', icon: 'business', link: '/tenant' },
-            { title: 'Nhật ký nền tảng', icon: 'receipt_long', link: '/platform-logs' },
+            { title: 'MENU.TENANTS', icon: 'business', link: '/tenant' },
+            { title: 'MENU.PLATFORM_LOGS', icon: 'receipt_long', link: '/platform-logs' },
           ],
         },
       ];
@@ -55,99 +56,99 @@ export class Menu {
 
     const modules = this.session.features()?.modules ?? [];
     return this.filter([
-      { title: 'Bảng điều khiển', icon: 'dashboard', link: '/' },
+      { title: 'MENU.DASHBOARD', icon: 'dashboard', link: '/' },
       {
-        title: 'Quản lý bạn đọc',
+        title: 'MENU.READER_MGMT',
         icon: 'people',
         children: [
-          { title: 'Bạn đọc', icon: 'people', link: '/readers', perm: 'READERS' },
-          { title: 'Nhóm bạn đọc', icon: 'groups', link: '/reader-groups', perm: 'GROUPREADER' },
+          { title: 'MENU.READERS', icon: 'people', link: '/readers', perm: 'READERS' },
+          { title: 'MENU.READER_GROUPS', icon: 'groups', link: '/reader-groups', perm: 'GROUPREADER' },
           {
-            title: 'Tham số bạn đọc',
+            title: 'MENU.READER_PARAMS',
             icon: 'tune',
             children: [
-              { title: 'Khoá', icon: 'school', link: '/courses', perm: 'COURSES' },
-              { title: 'Lớp', icon: 'class', link: '/academic-classes', perm: 'CLASSES' },
-              { title: 'Loại bạn đọc', icon: 'local_library', link: '/reader-types', perm: 'READER_TYPES' },
-              { title: 'Quốc tịch', icon: 'flag', link: '/nationalities', perm: 'NATIONALITIES' },
-              { title: 'Học hàm học vị', icon: 'workspace_premium', link: '/profs', perm: 'PROFS' },
-              { title: 'Dân tộc', icon: 'diversity_3', link: '/ethnics', perm: 'ETHNICS' },
-              { title: 'Trình độ', icon: 'school', link: '/degrees', perm: 'DEGREES' },
-              { title: 'Chức vụ', icon: 'badge', link: '/chuc-vus', perm: 'POSITIONS' },
-              { title: 'Phòng ban', icon: 'account_tree', link: '/orgs', perm: 'ORGS' },
+              { title: 'MENU.COURSES', icon: 'school', link: '/courses', perm: 'COURSES' },
+              { title: 'MENU.CLASSES', icon: 'class', link: '/academic-classes', perm: 'CLASSES' },
+              { title: 'MENU.READER_TYPES', icon: 'local_library', link: '/reader-types', perm: 'READER_TYPES' },
+              { title: 'MENU.NATIONALITIES', icon: 'flag', link: '/nationalities', perm: 'NATIONALITIES' },
+              { title: 'MENU.PROFS', icon: 'workspace_premium', link: '/profs', perm: 'PROFS' },
+              { title: 'MENU.ETHNICS', icon: 'diversity_3', link: '/ethnics', perm: 'ETHNICS' },
+              { title: 'MENU.DEGREES', icon: 'school', link: '/degrees', perm: 'DEGREES' },
+              { title: 'MENU.POSITIONS', icon: 'badge', link: '/chuc-vus', perm: 'POSITIONS' },
+              { title: 'MENU.ORGS', icon: 'account_tree', link: '/orgs', perm: 'ORGS' },
             ],
           },
         ],
       },
       {
-        title: 'Biên mục',
+        title: 'MENU.CATALOGING',
         icon: 'edit_note',
         module: 'CATALOG',
         children: [
-          { title: 'Biên mục biểu ghi', icon: 'menu_book', link: '/catalog-bibs', perm: 'CATALOG_BIBS' },
-          { title: 'Biểu mẫu biên mục', icon: 'list_alt', link: '/worksheets', perm: 'WORKSHEETS' },
-          { title: 'Loại biểu ghi', icon: 'category', link: '/bib-types', perm: 'BIB_TYPES' },
+          { title: 'MENU.CATALOG_BIBS', icon: 'menu_book', link: '/catalog-bibs', perm: 'CATALOG_BIBS' },
+          { title: 'MENU.WORKSHEETS', icon: 'list_alt', link: '/worksheets', perm: 'WORKSHEETS' },
+          { title: 'MENU.BIB_TYPES', icon: 'category', link: '/bib-types', perm: 'BIB_TYPES' },
         ],
       },
       {
-        title: 'Lưu thông',
+        title: 'MENU.CIRCULATION_GROUP',
         icon: 'swap_vert',
         module: 'CIRCULATION',
         children: [
-          { title: 'Mượn / Trả', icon: 'swap_vert', link: '/borrow', perm: 'BORROW' },
-          { title: 'Yêu cầu mượn', icon: 'bookmark_add', link: '/request-books', perm: 'REQUEST_BOOKS' },
-          { title: 'Lịch sử lưu thông', icon: 'history', link: '/loan-history', perm: 'LOAN_HISTORY' },
-          { title: 'Báo cáo lưu thông', icon: 'bar_chart', link: '/circulation-report', perm: 'CIRC_REPORT' },
-          { title: 'Quản lý phạt', icon: 'gavel', link: '/fines', perm: 'FINES' },
-          { title: 'Photo copy tài liệu', icon: 'print', link: '/photocopy', perm: 'C_PHOTO' },
-          { title: 'Lý do phạt', icon: 'rule_folder', link: '/cfine-types', perm: 'FINE_REASONS' },
-          { title: 'Chính sách lưu thông', icon: 'rule', link: '/circ-policies', perm: 'CIRC_POLICIES' },
-          { title: 'Điểm lưu thông', icon: 'place', link: '/circ-places', perm: 'CIRC_PLACES' },
+          { title: 'MENU.BORROW', icon: 'swap_vert', link: '/borrow', perm: 'BORROW' },
+          { title: 'MENU.REQUEST_BOOKS', icon: 'bookmark_add', link: '/request-books', perm: 'REQUEST_BOOKS' },
+          { title: 'MENU.LOAN_HISTORY', icon: 'history', link: '/loan-history', perm: 'LOAN_HISTORY' },
+          { title: 'MENU.CIRC_REPORT', icon: 'bar_chart', link: '/circulation-report', perm: 'CIRC_REPORT' },
+          { title: 'MENU.FINES', icon: 'gavel', link: '/fines', perm: 'FINES' },
+          { title: 'MENU.PHOTOCOPY', icon: 'print', link: '/photocopy', perm: 'C_PHOTO' },
+          { title: 'MENU.FINE_REASONS', icon: 'rule_folder', link: '/cfine-types', perm: 'FINE_REASONS' },
+          { title: 'MENU.CIRC_POLICIES', icon: 'rule', link: '/circ-policies', perm: 'CIRC_POLICIES' },
+          { title: 'MENU.CIRC_PLACES', icon: 'place', link: '/circ-places', perm: 'CIRC_PLACES' },
         ],
       },
       {
-        title: 'Tra cứu',
+        title: 'MENU.SEARCH_GROUP',
         icon: 'travel_explore',
         module: 'SEARCH',
         children: [
-          { title: 'Chỉ mục tra cứu (OPAC)', icon: 'manage_search', link: '/search-index', perm: 'SEARCH_INDEX' },
-          { title: 'Thống kê tra cứu', icon: 'query_stats', link: '/search-stats', perm: 'SEARCH_STATS' },
-          { title: 'Tra cứu Z39.50', icon: 'travel_explore', link: '/z3950-search', perm: 'CATALOG_BIBS' },
-          { title: 'Máy chủ Z39.50', icon: 'dns', link: '/z3950-configs', perm: 'Z3950_CONFIGS' },
+          { title: 'MENU.SEARCH_INDEX', icon: 'manage_search', link: '/search-index', perm: 'SEARCH_INDEX' },
+          { title: 'MENU.SEARCH_STATS', icon: 'query_stats', link: '/search-stats', perm: 'SEARCH_STATS' },
+          { title: 'MENU.Z3950_SEARCH', icon: 'travel_explore', link: '/z3950-search', perm: 'CATALOG_BIBS' },
+          { title: 'MENU.Z3950_CONFIGS', icon: 'dns', link: '/z3950-configs', perm: 'Z3950_CONFIGS' },
         ],
       },
       {
-        title: 'Quản lý Kho',
+        title: 'MENU.STORE_MGMT',
         icon: 'store',
         module: 'HOLDINGS',
         children: [
-          { title: 'Tìm kiếm tài liệu', icon: 'manage_search', link: '/books', perm: 'DOC_SEARCH' },
-          { title: 'Xếp giá', icon: 'shelves', link: '/shelving', perm: 'MAP_SHELVING' },
-          { title: 'Kho', icon: 'warehouse', link: '/stores', perm: 'STORES' },
-          { title: 'Loại kho', icon: 'category', link: '/store-types', perm: 'STORE_TYPES' },
+          { title: 'MENU.DOC_SEARCH', icon: 'manage_search', link: '/books', perm: 'DOC_SEARCH' },
+          { title: 'MENU.SHELVING', icon: 'shelves', link: '/shelving', perm: 'MAP_SHELVING' },
+          { title: 'MENU.STORES', icon: 'warehouse', link: '/stores', perm: 'STORES' },
+          { title: 'MENU.STORE_TYPES', icon: 'category', link: '/store-types', perm: 'STORE_TYPES' },
         ],
       },
       {
-        title: 'Phân hệ đã mua',
+        title: 'MENU.MODULES_OWNED',
         icon: 'apps',
         children: modules.map((code) => ({ title: MODULE_NAMES[code] ?? code, icon: MODULE_ICONS[code] ?? 'extension', link: `/phan-he/${code}` })),
       },
       {
-        title: 'Hệ thống',
+        title: 'MENU.SYSTEM',
         icon: 'dns',
         children: [
-          { title: 'Cán bộ quản lý thư viện', icon: 'manage_accounts', link: '/users', perm: 'USER' },
-          { title: 'Phân quyền', icon: 'admin_panel_settings', link: '/roles', perm: 'ROLE' },
-          { title: 'Tham số hệ thống', icon: 'settings_applications', link: '/system-parameters', perm: 'SYSTEM_PARAMS' },
-          { title: 'Tiền tệ', icon: 'currency_exchange', link: '/currencies', perm: 'CURRENCIES' },
-          { title: 'Nhật ký hệ thống', icon: 'receipt_long', link: '/system-logs', perm: 'SYSTEM_LOG' },
+          { title: 'MENU.USERS', icon: 'manage_accounts', link: '/users', perm: 'USER' },
+          { title: 'MENU.ROLES', icon: 'admin_panel_settings', link: '/roles', perm: 'ROLE' },
+          { title: 'MENU.SYSTEM_PARAMS', icon: 'settings_applications', link: '/system-parameters', perm: 'SYSTEM_PARAMS' },
+          { title: 'MENU.CURRENCIES', icon: 'currency_exchange', link: '/currencies', perm: 'CURRENCIES' },
+          { title: 'MENU.SYSTEM_LOG', icon: 'receipt_long', link: '/system-logs', perm: 'SYSTEM_LOG' },
           {
-            title: 'Gửi thông báo',
+            title: 'MENU.NOTIFICATIONS',
             icon: 'mail',
             children: [
-              { title: 'Cấu hình email', icon: 'settings', link: '/email-settings', perm: 'NOTIFICATION_CONFIG' },
-              { title: 'Mẫu email', icon: 'drafts', link: '/email-templates', perm: 'NOTIFICATION_TEMPLATES' },
-              { title: 'Nhật ký gửi tin', icon: 'history', link: '/notification-logs', perm: 'NOTIFICATION_LOGS' },
+              { title: 'MENU.EMAIL_SETTINGS', icon: 'settings', link: '/email-settings', perm: 'NOTIFICATION_CONFIG' },
+              { title: 'MENU.EMAIL_TEMPLATES', icon: 'drafts', link: '/email-templates', perm: 'NOTIFICATION_TEMPLATES' },
+              { title: 'MENU.NOTIFICATION_LOGS', icon: 'history', link: '/notification-logs', perm: 'NOTIFICATION_LOGS' },
             ],
           },
         ],

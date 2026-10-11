@@ -280,6 +280,42 @@ public sealed partial class ReaderLoginTests(IdentityApiFactory factory) : IClas
         await SignInAsync(Browser(tenantId), "HS-400", "moi-hon-400");
     }
 
+    [Fact]
+    public async Task Login_pages_follow_the_language_cookie_of_opac_and_admin()
+    {
+        var tenantId = await NewTenantAsync();
+        await ReaderAsync(tenantId, "HS-500", null);
+
+        var vi = await (await Browser(tenantId).GetAsync(U("/account/reader-login"))).Content.ReadAsStringAsync();
+        Assert.Contains("<html lang=\"vi\">", vi, StringComparison.Ordinal);
+        Assert.Contains("Số thẻ hoặc email", vi, StringComparison.Ordinal);
+
+        // Cookie elib_lang do OPAC/Admin ghi khi chọn ngôn ngữ.
+        var browser = Browser(tenantId);
+        browser.DefaultRequestHeaders.Add("Cookie", "elib_lang=en");
+        var en = await (await browser.GetAsync(U("/account/reader-login"))).Content.ReadAsStringAsync();
+        Assert.Contains("<html lang=\"en\">", en, StringComparison.Ordinal);
+        Assert.Contains("Card number or email", en, StringComparison.Ordinal);
+        Assert.Contains("lang=vi", en, StringComparison.Ordinal); // link đổi ngôn ngữ
+
+        // ?lang=en ghi cookie → các bước sau (POST, đổi mật khẩu lần đầu) vẫn tiếng Anh, kể cả lỗi nghiệp vụ.
+        var switched = Browser(tenantId);
+        var page = await switched.GetAsync(U("/account/reader-login?lang=en"));
+        Assert.Contains("elib_lang=en", string.Join(';', page.Headers.GetValues("Set-Cookie")), StringComparison.Ordinal);
+        var wrong = await switched.PostAsync(U("/account/reader-login"), new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Antiforgery(page), ["cardNo"] = "HS-500", ["password"] = "sai", ["returnUrl"] = "/",
+        }));
+        Assert.Contains("Incorrect card number or password.", await wrong.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        await PostLogin(switched, "HS-500", "HS-500");
+        var form = await switched.GetAsync(U("/account/reader-password"));
+        var same = await switched.PostAsync(U("/account/reader-password"), new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await Antiforgery(form), ["newPassword"] = "hs-500", ["confirmPassword"] = "hs-500",
+        }));
+        Assert.Contains("must not be your card number", await same.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     [GeneratedRegex("name=\"__RequestVerificationToken\" value=\"([^\"]+)\"")]
     private static partial Regex AntiforgeryField();
 }

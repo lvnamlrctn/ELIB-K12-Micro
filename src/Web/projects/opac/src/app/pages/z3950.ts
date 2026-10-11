@@ -2,7 +2,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { SearchApi, Z3950Hit, Z3950Request, Z3950Result, Z3950Server, searchErrorMessage } from '../core/search';
+import { TranslatePipe } from '@ngx-translate/core';
+import { Msg, SearchApi, Z3950Hit, Z3950Request, Z3950Result, Z3950Server, searchErrorMessage } from '../core/search';
 
 const PAGE_SIZE = 10;
 
@@ -12,22 +13,22 @@ const PAGE_SIZE = 10;
  */
 @Component({
   selector: 'opac-z3950',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink, TranslatePipe],
   template: `
     <section class="bg-white border-b border-slate-200">
       <div class="max-w-6xl mx-auto px-4 py-6">
         <a routerLink="/tim-kiem" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
-          <span class="material-icons text-[18px]">arrow_back</span> Tra cứu trong thư viện</a>
-        <h1 class="mt-3 text-xl font-bold text-slate-900">Tra cứu liên thư viện</h1>
-        <p class="text-sm text-slate-600">Tìm tài liệu trong mục lục của các thư viện khác (Z39.50).</p>
+          <span class="material-icons text-[18px]">arrow_back</span> {{ 'OPAC.Z3950.BACK' | translate }}</a>
+        <h1 class="mt-3 text-xl font-bold text-slate-900">{{ 'OPAC.Z3950.TITLE' | translate }}</h1>
+        <p class="text-sm text-slate-600">{{ 'OPAC.Z3950.SUBTITLE' | translate }}</p>
 
         @if (loaded() && !servers().length) {
-          <p class="mt-4 text-sm text-slate-500">Thư viện chưa mở tra cứu liên thư viện.</p>
+          <p class="mt-4 text-sm text-slate-500">{{ 'OPAC.Z3950.NOT_ENABLED' | translate }}</p>
         } @else {
           <form (ngSubmit)="search()" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @for (f of fields; track f.key) {
               <div>
-                <label class="block text-xs text-slate-500 mb-1" [for]="'z-' + f.key">{{ f.label }}</label>
+                <label class="block text-xs text-slate-500 mb-1" [for]="'z-' + f.key">{{ f.label | translate }}</label>
                 <input [id]="'z-' + f.key" [name]="f.key" [(ngModel)]="query[f.key]" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
               </div>
             }
@@ -38,7 +39,7 @@ const PAGE_SIZE = 10;
                 </label>
               }
               <button type="submit" [disabled]="loading()" class="ml-auto px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50">
-                {{ loading() ? 'Đang tìm...' : 'Tìm' }}</button>
+                {{ (loading() ? 'OPAC.SEARCH.SEARCHING' : 'OPAC.SEARCH.SEARCH_BTN') | translate }}</button>
             </div>
           </form>
         }
@@ -46,18 +47,18 @@ const PAGE_SIZE = 10;
     </section>
 
     <section class="max-w-6xl mx-auto px-4 py-6 space-y-5">
-      @if (error()) { <div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm">{{ error() }}</div> }
+      @if (error(); as e) { <div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm">{{ e.key | translate: e.params }}</div> }
       @for (r of results(); track r.serverId) {
         <div class="bg-white border border-slate-200 rounded-xl">
           <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-3 flex-wrap">
             <div class="font-semibold text-slate-900">{{ r.serverName }}</div>
             @if (r.error) { <span class="text-sm text-red-600">{{ r.error }}</span> }
-            @else { <span class="text-sm text-slate-500">{{ r.total }} kết quả</span> }
+            @else { <span class="text-sm text-slate-500">{{ 'OPAC.Z3950.RESULTS_N' | translate: { count: r.total } }}</span> }
             @if (r.total > r.pageSize) {
               <span class="ml-auto flex items-center gap-2 text-sm">
-                <button type="button" class="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40" [disabled]="r.page <= 1 || paging() === r.serverId" (click)="go(r, r.page - 1)">Trước</button>
+                <button type="button" class="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40" [disabled]="r.page <= 1 || paging() === r.serverId" (click)="go(r, r.page - 1)">{{ 'COMMON.PREV' | translate }}</button>
                 <span class="text-slate-600">{{ r.page }} / {{ pages(r) }}</span>
-                <button type="button" class="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40" [disabled]="r.page >= pages(r) || paging() === r.serverId" (click)="go(r, r.page + 1)">Sau</button>
+                <button type="button" class="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40" [disabled]="r.page >= pages(r) || paging() === r.serverId" (click)="go(r, r.page + 1)">{{ 'COMMON.NEXT' | translate }}</button>
               </span>
             }
           </div>
@@ -65,9 +66,9 @@ const PAGE_SIZE = 10;
             @for (h of r.hits; track h.position) {
               <li class="px-4 py-3">
                 <button type="button" class="text-left w-full" (click)="toggleOpen(r.serverId + h.position)" [attr.aria-expanded]="open() === r.serverId + h.position">
-                  <div class="font-medium text-slate-900 hover:text-blue-700">{{ h.title ?? '(không nhan đề)' }}</div>
+                  <div class="font-medium text-slate-900 hover:text-blue-700">{{ h.title ?? ('OPAC.Z3950.NO_TITLE' | translate) }}</div>
                   <div class="text-sm text-slate-600">
-                    {{ h.author ?? 'Không rõ tác giả' }}@if (h.publisher) { · {{ h.publisher }} }@if (h.year) { · {{ h.year }} }@if (h.isbn) { · ISBN {{ h.isbn }} }
+                    {{ h.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }}@if (h.publisher) { · {{ h.publisher }} }@if (h.year) { · {{ h.year }} }@if (h.isbn) { · ISBN {{ h.isbn }} }
                   </div>
                 </button>
                 @if (open() === r.serverId + h.position) { <ng-container [ngTemplateOutlet]="marc" [ngTemplateOutletContext]="{ $implicit: h }" /> }
@@ -102,10 +103,10 @@ export class Z3950 implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly fields: { key: 'title' | 'author' | 'isbn' | 'keyword'; label: string }[] = [
-    { key: 'title', label: 'Nhan đề' },
-    { key: 'author', label: 'Tác giả' },
-    { key: 'isbn', label: 'ISBN' },
-    { key: 'keyword', label: 'Từ khoá' },
+    { key: 'title', label: 'OPAC.SEARCH.F_TITLE' },
+    { key: 'author', label: 'OPAC.SEARCH.F_AUTHOR' },
+    { key: 'isbn', label: 'OPAC.SEARCH.F_ISBN' },
+    { key: 'keyword', label: 'OPAC.SEARCH.F_KEYWORD' },
   ];
   protected readonly servers = signal<Z3950Server[]>([]);
   protected readonly chosen = signal(new Set<string>());
@@ -113,7 +114,7 @@ export class Z3950 implements OnInit {
   protected readonly loading = signal(false);
   protected readonly paging = signal<string | null>(null);
   protected readonly results = signal<Z3950Result[]>([]);
-  protected readonly error = signal<string | null>(null);
+  protected readonly error = signal<Msg | null>(null);
   protected readonly open = signal<string | null>(null);
   protected query: Record<string, string> = {};
   private last: Omit<Z3950Request, 'page' | 'pageSize'> = {};
@@ -154,11 +155,11 @@ export class Z3950 implements OnInit {
   protected async search(): Promise<void> {
     const terms = Object.fromEntries(this.fields.map((f) => [f.key, this.query[f.key]?.trim() || null]));
     if (!Object.values(terms).some((v) => v)) {
-      this.error.set('Nhập ít nhất một điều kiện tìm.');
+      this.error.set({ key: 'OPAC.Z3950.NEED_TERM' });
       return;
     }
     if (!this.chosen().size) {
-      this.error.set('Chọn ít nhất một thư viện.');
+      this.error.set({ key: 'OPAC.Z3950.NEED_SERVER' });
       return;
     }
     this.last = { ...terms, serverIds: [...this.chosen()] };

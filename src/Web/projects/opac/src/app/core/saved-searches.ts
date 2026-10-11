@@ -21,7 +21,7 @@ export class SavedSearches {
   readonly items = signal<SavedSearch[]>(read());
 
   save(name: string, params: SearchParams, total: number): SavedSearch {
-    const entry: SavedSearch = { id: newId(), name: name.trim().slice(0, 120) || 'Tìm kiếm', params, total, savedAt: new Date().toISOString() };
+    const entry: SavedSearch = { id: newId(), name: name.trim().slice(0, 120) || '…', params, total, savedAt: new Date().toISOString() };
     const same = this.items().filter((s) => key(s.params) !== key(params));
     this.set([entry, ...same].slice(0, MAX_SAVED));
     return entry;

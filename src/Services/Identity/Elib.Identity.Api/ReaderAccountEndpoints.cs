@@ -47,19 +47,21 @@ public static class ReaderAccountEndpoints
             CancellationToken ct) =>
         {
             var host = await HostTenantAsync(tenant, signIn, ct);
-            return host is null ? NoTenantPage(ctx) : LoginPage(ctx, antiforgery, host, AccountEndpoints.SafeReturnUrl(returnUrl), null, null);
+            var t = IdentityTexts.For(ctx);
+            return host is null ? NoTenantPage(ctx, t) : LoginPage(ctx, t, antiforgery, host, AccountEndpoints.SafeReturnUrl(returnUrl), null, null);
         }).ExcludeFromDescription();
 
         app.MapPost("/account/reader-login", async ([FromForm] ReaderLoginForm form, HttpContext ctx, IAntiforgery antiforgery, ITenantContext tenant,
             SignInService signIn, ReaderSignInService readers, IDataProtectionProvider protection, CancellationToken ct) =>
         {
             var host = await HostTenantAsync(tenant, signIn, ct);
-            if (host is null) return NoTenantPage(ctx);
+            var t = IdentityTexts.For(ctx);
+            if (host is null) return NoTenantPage(ctx, t);
             var returnUrl = AccountEndpoints.SafeReturnUrl(form.ReturnUrl);
 
             var result = await readers.LoginAsync(host.TenantId, form.CardNo, form.Password, ct);
             if (!result.Succeeded)
-                return LoginPage(ctx, antiforgery, host, returnUrl, form.CardNo, Message(result.Error!.Value), StatusCodes.Status401Unauthorized);
+                return LoginPage(ctx, t, antiforgery, host, returnUrl, form.CardNo, Message(t, result.Error!.Value), StatusCodes.Status401Unauthorized);
 
             var who = result.Identity!;
             if (who.MustChangePassword)
@@ -78,21 +80,22 @@ public static class ReaderAccountEndpoints
         app.MapGet("/account/reader-password", (HttpContext ctx, IAntiforgery antiforgery, ITenantContext tenant, IDataProtectionProvider protection) =>
             ReadTicket(ctx, tenant, protection) is null
                 ? Results.LocalRedirect("/account/reader-login")
-                : PasswordPage(ctx, antiforgery, null)).ExcludeFromDescription();
+                : PasswordPage(ctx, IdentityTexts.For(ctx), antiforgery, null)).ExcludeFromDescription();
 
         app.MapPost("/account/reader-password", async ([FromForm] ReaderPasswordForm form, HttpContext ctx, IAntiforgery antiforgery, ITenantContext tenant,
             IDataProtectionProvider protection, ReaderSignInService readers, CancellationToken ct) =>
         {
             if (ReadTicket(ctx, tenant, protection) is not { } ticket) return Results.LocalRedirect("/account/reader-login");
+            var t = IdentityTexts.For(ctx);
             if (form.NewPassword != form.ConfirmPassword)
-                return PasswordPage(ctx, antiforgery, "Hai lần nhập mật khẩu không khớp.", StatusCodes.Status400BadRequest);
+                return PasswordPage(ctx, t, antiforgery, t["READER_PASSWORD_MISMATCH"], StatusCodes.Status400BadRequest);
             try
             {
                 await readers.ChangePasswordAsync(ticket.TenantId, ticket.AccountId, null, form.NewPassword, requireCurrent: false, ct);
             }
             catch (BusinessRuleException ex) when (ex.StatusCode == StatusCodes.Status400BadRequest)
             {
-                return PasswordPage(ctx, antiforgery, ex.Message, StatusCodes.Status400BadRequest);
+                return PasswordPage(ctx, t, antiforgery, t.Code(ex.Code) ?? ex.Message, StatusCodes.Status400BadRequest);
             }
 
             ctx.Response.Cookies.Delete(FirstPasswordCookie, TicketCookieOptions(ctx));
@@ -159,19 +162,19 @@ public static class ReaderAccountEndpoints
     private static async Task<TenantReplicaRecord?> HostTenantAsync(ITenantContext tenant, SignInService signIn, CancellationToken ct) =>
         tenant.TenantId is { } id ? await signIn.FindTenantAsync(id, ct) : null;
 
-    private static string Message(LoginError error) => error switch
+    private static string Message(IdentityTexts t, LoginError error) => error switch
     {
-        LoginError.LockedOut => "Tài khoản tạm khoá do đăng nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.",
-        LoginError.AccountDisabled => "Thẻ bạn đọc đang bị khoá. Vui lòng liên hệ thư viện.",
-        LoginError.TenantUnavailable => "Thư viện đang tạm ngưng phục vụ trực tuyến.",
-        _ => "Số thẻ hoặc mật khẩu không đúng.",
+        LoginError.LockedOut => t["READER_ERR_LOCKED_OUT"],
+        LoginError.AccountDisabled => t["READER_ERR_DISABLED"],
+        LoginError.TenantUnavailable => t["READER_ERR_TENANT"],
+        _ => t["READER_ERR_CREDENTIALS"],
     };
 
-    private static IResult NoTenantPage(HttpContext ctx) =>
-        AccountEndpoints.Html(ctx, AccountEndpoints.Shell("Đăng nhập bạn đọc", "Không xác định được thư viện",
-            """<div class="err" role="alert">Vui lòng đăng nhập từ trang tra cứu (OPAC) của trường bạn.</div>"""), StatusCodes.Status404NotFound);
+    private static IResult NoTenantPage(HttpContext ctx, IdentityTexts t) =>
+        AccountEndpoints.Html(ctx, AccountEndpoints.Shell(ctx, t, t["READER_LOGIN_TITLE"], t["READER_NO_TENANT_SUBTITLE"],
+            $"""<div class="err" role="alert">{E.Encode(t["READER_NO_TENANT"])}</div>"""), StatusCodes.Status404NotFound);
 
-    private static IResult LoginPage(HttpContext ctx, IAntiforgery antiforgery, TenantReplicaRecord host, string returnUrl, string? cardNo, string? error,
+    private static IResult LoginPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, TenantReplicaRecord host, string returnUrl, string? cardNo, string? error,
         int status = 200)
     {
         var tokens = antiforgery.GetAndStoreTokens(ctx);
@@ -182,21 +185,21 @@ public static class ReaderAccountEndpoints
               <input type="hidden" name="returnUrl" value="{{E.Encode(returnUrl)}}">
               <div class="unit">{{AccountEndpoints.UnitIcon}}<span>{{E.Encode(host.Name)}}</span></div>
               <div class="field">
-                <label for="cardNo">Số thẻ hoặc email</label>
-                <div class="box">{{AccountEndpoints.PersonIcon}}<input id="cardNo" name="cardNo" value="{{E.Encode(cardNo ?? "")}}" autocomplete="username" placeholder="Số thẻ bạn đọc" required autofocus></div>
+                <label for="cardNo">{{E.Encode(t["READER_CARD"])}}</label>
+                <div class="box">{{AccountEndpoints.PersonIcon}}<input id="cardNo" name="cardNo" value="{{E.Encode(cardNo ?? "")}}" autocomplete="username" placeholder="{{E.Encode(t["READER_CARD_PLACEHOLDER"])}}" required autofocus></div>
               </div>
               <div class="field">
-                <label for="password">Mật khẩu</label>
-                <div class="box">{{AccountEndpoints.LockIcon}}<input id="password" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required></div>
-                <div class="hint">Chưa có mật khẩu hoặc quên mật khẩu? Liên hệ thư viện của trường.</div>
+                <label for="password">{{E.Encode(t["PASSWORD"])}}</label>
+                <div class="box">{{AccountEndpoints.LockIcon}}<input id="password" name="password" type="password" autocomplete="current-password" placeholder="{{E.Encode(t["PASSWORD"])}}" required></div>
+                <div class="hint">{{E.Encode(t["READER_HINT"])}}</div>
               </div>
-              <button type="submit">Đăng Nhập &rarr;</button>
+              <button type="submit">{{t["SIGN_IN_BTN"]}}</button>
             </form>
             """;
-        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell("Đăng nhập bạn đọc", "Dùng số thẻ thư viện và mật khẩu thư viện đã cấp", body), status);
+        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell(ctx, t, t["READER_LOGIN_TITLE"], t["READER_LOGIN_SUBTITLE"], body), status);
     }
 
-    private static IResult PasswordPage(HttpContext ctx, IAntiforgery antiforgery, string? error, int status = 200)
+    private static IResult PasswordPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, string? error, int status = 200)
     {
         var tokens = antiforgery.GetAndStoreTokens(ctx);
         var body = $$"""
@@ -204,17 +207,17 @@ public static class ReaderAccountEndpoints
               {{(error is null ? "" : $"<div class=\"err\" role=\"alert\">{E.Encode(error)}</div>")}}
               <input type="hidden" name="{{E.Encode(tokens.FormFieldName)}}" value="{{E.Encode(tokens.RequestToken ?? "")}}">
               <div class="field">
-                <label for="newPassword">Mật khẩu mới</label>
+                <label for="newPassword">{{E.Encode(t["READER_NEW_PASSWORD"])}}</label>
                 <div class="box">{{AccountEndpoints.LockIcon}}<input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="{{Domain.ReaderAccount.MinPasswordLength}}" required autofocus></div>
-                <div class="hint">Từ {{Domain.ReaderAccount.MinPasswordLength}} ký tự, không trùng số thẻ.</div>
+                <div class="hint">{{E.Encode(t.Format("READER_NEW_PASSWORD_HINT", Domain.ReaderAccount.MinPasswordLength))}}</div>
               </div>
               <div class="field">
-                <label for="confirmPassword">Nhập lại mật khẩu mới</label>
+                <label for="confirmPassword">{{E.Encode(t["READER_CONFIRM_PASSWORD"])}}</label>
                 <div class="box">{{AccountEndpoints.LockIcon}}<input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required></div>
               </div>
-              <button type="submit">Đổi mật khẩu &rarr;</button>
+              <button type="submit">{{t["READER_CHANGE_BTN"]}}</button>
             </form>
             """;
-        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell("Đặt mật khẩu mới", "Lần đầu đăng nhập: hãy đổi mật khẩu thư viện đã cấp", body), status);
+        return AccountEndpoints.Html(ctx, AccountEndpoints.Shell(ctx, t, t["READER_NEW_PASSWORD_TITLE"], t["READER_NEW_PASSWORD_SUBTITLE"], body), status);
     }
 }

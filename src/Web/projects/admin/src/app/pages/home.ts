@@ -1,3 +1,4 @@
+import { TranslatePipe } from '@ngx-translate/core';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, TenantSummary } from '../core/api';
@@ -9,7 +10,7 @@ interface Stat { label: string; value: string | number; icon: string; color: str
 /** Bảng điều khiển — thẻ số liệu và lối tắt kiểu dashboard admin cũ (số liệu nghiệp vụ có khi các phân hệ được port). */
 @Component({
   selector: 'app-home',
-  imports: [RouterLink, TenantStatusBadge],
+  imports: [RouterLink, TenantStatusBadge, TranslatePipe],
   template: `
     <div class="mb-5">
       <h4 class="page-title">Bảng điều khiển</h4>
@@ -59,7 +60,7 @@ interface Stat { label: string; value: string | number; icon: string; color: str
             @for (m of modules(); track m.code) {
               <a [routerLink]="['/phan-he', m.code]" class="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50/50 transition-colors">
                 <span class="material-icons text-blue-600">extension</span>
-                <span class="text-sm font-medium text-gray-700">{{ m.name }}</span>
+                <span class="text-sm font-medium text-gray-700">{{ m.name | translate }}</span>
               </a>
             }
           </div>

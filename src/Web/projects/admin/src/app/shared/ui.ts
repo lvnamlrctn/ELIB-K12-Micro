@@ -1,12 +1,14 @@
 import { Component, computed, input, output } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 
 /** Phân trang — kiểu mat-paginator đã chỉnh style của frontend monolith (số dòng/trang, "1 – 10 / 55", nút trang). */
 @Component({
   selector: 'app-paginator',
+  imports: [TranslatePipe],
   template: `
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-3 border-t border-gray-100">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-medium text-gray-500">Số dòng mỗi trang</span>
+        <span class="text-sm font-medium text-gray-500">{{ 'DATATABLE.ITEMS_PER_PAGE' | translate }}</span>
         <select class="px-3 py-1.5 text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 [value]="pageSize()" (change)="changeSize($any($event.target).value)">
           @for (size of sizes(); track size) { <option [value]="size">{{ size }}</option> }
@@ -55,14 +57,15 @@ export class Paginator {
   }
 }
 
-/** Hộp thoại có tiêu đề, thân cuộn được và chân nút — như modal thêm/sửa của các màn admin cũ. */
+/** Hộp thoại có tiêu đề (khoá dịch hoặc câu sẵn), thân cuộn được và chân nút — như modal thêm/sửa của các màn admin cũ. */
 @Component({
   selector: 'app-modal',
+  imports: [TranslatePipe],
   template: `
     <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-h-[92vh] overflow-hidden flex flex-col" [class]="widthClass()">
         <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
-          <h3 class="text-lg font-bold text-gray-800">{{ title() }}</h3>
+          <h3 class="text-lg font-bold text-gray-800">{{ title() | translate }}</h3>
           <button type="button" (click)="closed.emit()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
             <span class="material-icons text-[18px]">close</span>
           </button>
@@ -79,9 +82,10 @@ export class Modal {
   readonly closed = output<void>();
 }
 
-/** Xác nhận xoá — biểu tượng cảnh báo đỏ như bản cũ. */
+/** Xác nhận xoá — biểu tượng cảnh báo đỏ như bản cũ. Chữ: khoá dịch hoặc câu sẵn. */
 @Component({
   selector: 'app-confirm-delete',
+  imports: [TranslatePipe],
   template: `
     <div class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -89,14 +93,14 @@ export class Modal {
           <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <span class="material-icons text-3xl">warning</span>
           </div>
-          <h3 class="text-lg font-bold text-gray-800 mb-2">{{ title() }}</h3>
-          <p class="text-gray-600 text-sm mb-2">{{ message() }}</p>
+          <h3 class="text-lg font-bold text-gray-800 mb-2">{{ title() | translate }}</h3>
+          <p class="text-gray-600 text-sm mb-2">{{ message() | translate: messageParams() }}</p>
           @if (warning()) {
-            <p class="text-amber-600 text-xs mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{{ warning() }}</p>
+            <p class="text-amber-600 text-xs mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{{ warning()! | translate }}</p>
           }
           <div class="flex gap-3 mt-5">
-            <button type="button" (click)="cancelled.emit()" class="btn-secondary flex-1">Huỷ</button>
-            <button type="button" (click)="confirmed.emit()" [disabled]="busy()" class="btn-danger flex-1">{{ confirmText() }}</button>
+            <button type="button" (click)="cancelled.emit()" class="btn-secondary flex-1">{{ 'COMMON.CANCEL' | translate }}</button>
+            <button type="button" (click)="confirmed.emit()" [disabled]="busy()" class="btn-danger flex-1">{{ confirmText() | translate }}</button>
           </div>
         </div>
       </div>
@@ -104,10 +108,11 @@ export class Modal {
   `,
 })
 export class ConfirmDelete {
-  readonly title = input('Xác nhận xoá');
-  readonly message = input('Bạn có chắc chắn muốn xoá? Thao tác này không thể hoàn tác.');
+  readonly title = input('COMMON.DELETE_CONFIRM_TITLE');
+  readonly message = input('COMMON.DELETE_CONFIRM_IRREVERSIBLE');
+  readonly messageParams = input<Record<string, unknown> | undefined>(undefined);
   readonly warning = input<string | null>(null);
-  readonly confirmText = input('Xoá');
+  readonly confirmText = input('COMMON.DELETE');
   readonly busy = input(false);
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();
@@ -116,28 +121,30 @@ export class ConfirmDelete {
 /** Lớp phủ khi đang tải bảng. */
 @Component({
   selector: 'app-loading',
+  imports: [TranslatePipe],
   template: `
     <div class="absolute inset-0 bg-white/60 z-10 flex flex-col items-center justify-center backdrop-blur-[1px]">
       <span class="material-icons animate-spin text-blue-600 text-4xl mb-2">autorenew</span>
-      <p class="text-blue-600 font-medium">Đang tải dữ liệu...</p>
+      <p class="text-blue-600 font-medium">{{ 'COMMON.LOADING' | translate }}</p>
     </div>
   `,
 })
 export class Loading {}
 
-/** Nhãn trạng thái 2 = hoạt động / 1 = không hoạt động. */
+/** Nhãn trạng thái 2 = hoạt động / 1 = không hoạt động (chữ: khoá dịch hoặc câu sẵn). */
 @Component({
   selector: 'app-status-badge',
+  imports: [TranslatePipe],
   template: `
     @if (status() === 2) {
-      <span class="badge-on"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>{{ activeText() }}</span>
+      <span class="badge-on"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>{{ activeText() | translate }}</span>
     } @else {
-      <span class="badge-off"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ inactiveText() }}</span>
+      <span class="badge-off"><span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>{{ inactiveText() | translate }}</span>
     }
   `,
 })
 export class StatusBadge {
   readonly status = input.required<number>();
-  readonly activeText = input('Hoạt động');
-  readonly inactiveText = input('Không hoạt động');
+  readonly activeText = input('COMMON.ACTIVE');
+  readonly inactiveText = input('COMMON.STATUS_INACTIVE');
 }

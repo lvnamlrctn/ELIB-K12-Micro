@@ -1,9 +1,11 @@
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, effect, inject, input, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
+import { LDatePipe } from '../core/i18n';
 import { Library } from '../core/library';
-import { Bib, BibDetail as Detail, MarcField, OpacMarc, SearchApi, languageName, searchErrorMessage } from '../core/search';
+import { Bib, BibDetail as Detail, MarcField, Msg, OpacMarc, SearchApi, languageName, searchErrorMessage } from '../core/search';
 
 type Tab = 'info' | 'isbd' | 'marc';
 
@@ -13,25 +15,25 @@ type Tab = 'info' | 'isbd' | 'marc';
  */
 @Component({
   selector: 'opac-bib-detail',
-  imports: [DatePipe, NgTemplateOutlet, RouterLink],
+  imports: [LDatePipe, NgTemplateOutlet, RouterLink, TranslatePipe],
   template: `
     <div class="max-w-6xl mx-auto px-4 py-6">
       <a routerLink="/tim-kiem" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
-        <span class="material-icons text-[18px]">arrow_back</span> Tra cứu</a>
+        <span class="material-icons text-[18px]">arrow_back</span> {{ 'OPAC.NAVBAR.SEARCH_LINK' | translate }}</a>
 
       @if (loading()) {
         <div class="flex justify-center py-24"><span class="material-icons animate-spin text-blue-600 text-4xl">autorenew</span></div>
       } @else if (notFound()) {
         <div class="text-center py-24 text-slate-600">
           <span class="material-icons text-6xl text-slate-300">find_in_page</span>
-          <p class="mt-3">Không tìm thấy tài liệu (có thể đã bị ẩn hoặc xoá).</p>
+          <p class="mt-3">{{ 'OPAC.BOOK_DETAIL.NOT_FOUND' | translate }}</p>
         </div>
       } @else if (bib(); as b) {
         <div class="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
           <article class="bg-white border border-slate-200 rounded-xl p-6">
             <div class="flex gap-5">
               @if (b.coverUrl && !coverBroken()) {
-                <img [src]="b.coverUrl" [alt]="'Bìa ' + b.title" referrerpolicy="no-referrer" (error)="coverBroken.set(true)"
+                <img [src]="b.coverUrl" [alt]="('OPAC.BOOK_DETAIL.COVER_OF' | translate) + ' ' + b.title" referrerpolicy="no-referrer" (error)="coverBroken.set(true)"
                      class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0" />
               } @else {
                 <div class="w-24 h-32 rounded-lg bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
@@ -43,9 +45,9 @@ type Tab = 'info' | 'isbd' | 'marc';
                 @if (b.author) { <div class="mt-1 text-slate-700">{{ b.author }}</div> }
                 <div class="mt-3 flex gap-2 flex-wrap text-xs">
                   @if (b.materialType) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ b.materialType }}</span> }
-                  @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">Chưa có bản phục vụ</span> }
-                  @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">Còn {{ b.available }}/{{ b.copies }} bản</span> }
-                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ onLoan(b) ? 'Đã mượn hết' : 'Đang xử lý, chưa phục vụ' }}</span> }
+                  @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">{{ 'OPAC.COMMON.NO_COPIES' | translate }}</span> }
+                  @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">{{ 'OPAC.COMMON.AVAILABLE_OF' | translate: { available: b.available, copies: b.copies } }}</span> }
+                  @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ (onLoan(b) ? 'OPAC.SEARCH.ALL_BORROWED' : 'OPAC.BOOK_DETAIL.PROCESSING') | translate }}</span> }
                 </div>
               </div>
             </div>
@@ -54,12 +56,12 @@ type Tab = 'info' | 'isbd' | 'marc';
               @for (t of tabs; track t.key) {
                 <button type="button" role="tab" [attr.aria-selected]="tab() === t.key" (click)="openTab(t.key)"
                         class="px-3 py-2 -mb-px border-b-2" [class]="tab() === t.key ? 'border-blue-600 text-blue-700 font-medium' : 'border-transparent text-slate-500 hover:text-slate-800'">
-                  {{ t.label }}</button>
+                  {{ t.label | translate }}</button>
               }
               <span class="ml-auto pb-1.5 flex gap-3 text-xs">
-                <a [href]="api.exportUrl(b.publicId, 'iso2709')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" title="Tải biểu ghi ISO 2709">
+                <a [href]="api.exportUrl(b.publicId, 'iso2709')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_ISO' | translate">
                   <span class="material-icons text-[16px]">download</span>.mrc</a>
-                <a [href]="api.exportUrl(b.publicId, 'marcxml')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" title="Tải biểu ghi MARCXML">
+                <a [href]="api.exportUrl(b.publicId, 'marcxml')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_MARCXML' | translate">
                   <span class="material-icons text-[16px]">download</span>MARCXML</a>
               </span>
             </div>
@@ -68,11 +70,11 @@ type Tab = 'info' | 'isbd' | 'marc';
               @case ('info') {
                 <dl class="mt-4 grid sm:grid-cols-[160px_1fr] gap-x-4 gap-y-2 text-sm">
                   @for (row of rows(); track row[0]) {
-                    <dt class="text-slate-500">{{ row[0] }}</dt><dd class="text-slate-800 whitespace-pre-line">{{ row[1] }}</dd>
+                    <dt class="text-slate-500">{{ row[0] | translate }}</dt><dd class="text-slate-800 whitespace-pre-line">{{ row[1] | translate }}</dd>
                   }
                 </dl>
                 @if (b.summary) {
-                  <h2 class="mt-6 font-semibold text-slate-900">Tóm tắt</h2>
+                  <h2 class="mt-6 font-semibold text-slate-900">{{ 'OPAC.BOOK_DETAIL.SUMMARY' | translate }}</h2>
                   <p class="mt-2 text-sm text-slate-700 whitespace-pre-line">{{ b.summary }}</p>
                 }
               }
@@ -80,7 +82,7 @@ type Tab = 'info' | 'isbd' | 'marc';
                 @if (marc(); as m) {
                   <div class="mt-4 border border-slate-200 rounded-lg p-4 bg-amber-50/40 text-sm text-slate-800 font-serif space-y-2">
                     @for (p of m.isbd; track $index) { <p [class.indent-8]="$index === 0">{{ p }}</p> }
-                    @if (!m.isbd.length) { <p class="text-slate-500">Biểu ghi chưa đủ thông tin để trình bày ISBD.</p> }
+                    @if (!m.isbd.length) { <p class="text-slate-500">{{ 'OPAC.BOOK_DETAIL.NO_ISBD' | translate }}</p> }
                   </div>
                 } @else { <ng-container [ngTemplateOutlet]="marcState" /> }
               }
@@ -107,16 +109,16 @@ type Tab = 'info' | 'isbd' | 'marc';
               }
             }
             <ng-template #marcState>
-              @if (marcError(); as err) { <p class="mt-4 text-sm text-red-700">{{ err }}</p> }
-              @else { <p class="mt-4 text-sm text-slate-500">Đang tải...</p> }
+              @if (marcError(); as err) { <p class="mt-4 text-sm text-red-700">{{ err.key | translate: err.params }}</p> }
+              @else { <p class="mt-4 text-sm text-slate-500">{{ 'OPAC.COMMON.LOADING' | translate }}</p> }
             </ng-template>
 
-            <h2 class="mt-8 font-semibold text-slate-900">Bản sách ({{ b.copies }})</h2>
+            <h2 class="mt-8 font-semibold text-slate-900">{{ 'OPAC.BOOK_DETAIL.COPIES_N' | translate: { count: b.copies } }}</h2>
             @if (b.holdings.length) {
               <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-sm min-w-[420px]">
                   <thead><tr class="text-left text-slate-500 border-b border-slate-200">
-                    <th class="py-2 pr-3 font-medium">Số ĐKCB</th><th class="py-2 pr-3 font-medium">Kho</th><th class="py-2 font-medium">Tình trạng</th>
+                    <th class="py-2 pr-3 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_BARCODE' | translate }}</th><th class="py-2 pr-3 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_STORE' | translate }}</th><th class="py-2 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_STATUS' | translate }}</th>
                   </tr></thead>
                   <tbody>
                     @for (c of b.holdings; track c.barcode) {
@@ -124,8 +126,8 @@ type Tab = 'info' | 'isbd' | 'marc';
                         <td class="py-2 pr-3 font-mono">{{ c.barcode }}</td>
                         <td class="py-2 pr-3">{{ c.storeName ?? '—' }}</td>
                         <td class="py-2">
-                          <span [class]="c.status === 'available' ? 'text-green-700' : c.status === 'on-loan' ? 'text-amber-700' : 'text-slate-500'">{{ c.statusName }}</span>
-                          @if (c.dueAt) { <span class="text-slate-500"> — hạn trả {{ c.dueAt | date: 'dd/MM/yyyy' }}</span> }
+                          <span [class]="c.status === 'available' ? 'text-green-700' : c.status === 'on-loan' ? 'text-amber-700' : 'text-slate-500'">{{ copyStatus(c.status, c.statusName) | translate }}</span>
+                          @if (c.dueAt) { <span class="text-slate-500"> — {{ 'OPAC.BOOK_DETAIL.DUE' | translate: { date: (c.dueAt | ldate) } }}</span> }
                         </td>
                       </tr>
                     }
@@ -133,20 +135,20 @@ type Tab = 'info' | 'isbd' | 'marc';
                 </table>
               </div>
             } @else {
-              <p class="mt-2 text-sm text-slate-500">Thư viện chưa có bản sách phục vụ cho tài liệu này.</p>
+              <p class="mt-2 text-sm text-slate-500">{{ 'OPAC.BOOK_DETAIL.NO_COPIES' | translate }}</p>
             }
           </article>
 
           <aside class="space-y-4">
             @if (library.has('CIRCULATION')) {
               <div class="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-                <div class="font-medium text-slate-900 mb-1">Mượn tài liệu</div>
-                Mang thẻ bạn đọc đến quầy để mượn, hoặc nhờ thủ thư đặt giữ khi sách đã mượn hết. Đặt mượn trực tuyến sẽ có khi mở đăng nhập bạn đọc.
+                <div class="font-medium text-slate-900 mb-1">{{ 'OPAC.BOOK_DETAIL.BORROW_TITLE' | translate }}</div>
+                {{ 'OPAC.BOOK_DETAIL.BORROW_HINT' | translate }}
               </div>
             }
             @if (similar().length) {
               <div class="bg-white border border-slate-200 rounded-xl p-4">
-                <div class="font-medium text-slate-900 mb-3">Tài liệu liên quan</div>
+                <div class="font-medium text-slate-900 mb-3">{{ 'OPAC.BOOK_DETAIL.SIMILAR' | translate }}</div>
                 <ul class="space-y-3">
                   @for (s of similar(); track s.publicId) {
                     <li>
@@ -176,13 +178,13 @@ export class BibDetail {
   protected readonly notFound = signal(false);
   protected readonly coverBroken = signal(false);
   protected readonly tabs: { key: Tab; label: string }[] = [
-    { key: 'info', label: 'Thông tin' },
+    { key: 'info', label: 'OPAC.BOOK_DETAIL.TAB_INFO' },
     { key: 'isbd', label: 'ISBD' },
     { key: 'marc', label: 'MARC' },
   ];
   protected readonly tab = signal<Tab>('info');
   protected readonly marc = signal<OpacMarc | null>(null);
-  protected readonly marcError = signal<string | null>(null);
+  protected readonly marcError = signal<Msg | null>(null);
 
   constructor() {
     effect(() => void this.load(this.publicId()));
@@ -201,6 +203,11 @@ export class BibDetail {
     this.api.marc(b.publicId).then((m) => this.marc.set(m), (e) => this.marcError.set(searchErrorMessage(e)));
   }
 
+  /** Tình trạng bản sách theo mã (available | on-loan | processing); mã lạ thì hiện tên backend gửi. */
+  protected copyStatus(status: string, name: string): string {
+    return status === 'available' || status === 'on-loan' || status === 'processing' ? `OPAC.BOOK_DETAIL.STATUS_${status.toUpperCase().replace('-', '_')}` : name;
+  }
+
   /** Chỉ thị trường dữ liệu, khoảng trắng hiện là # như phiếu MARC. */
   protected indicators(f: MarcField): string {
     return f.subfields?.length ? `${f.ind1 || ' '}${f.ind2 || ' '}`.replaceAll(' ', '#') : '';
@@ -211,15 +218,15 @@ export class BibDetail {
     if (!b) return [];
     const publication = [b.publishPlace, b.publisher, b.publishYear].filter(Boolean).join(' : ');
     const all: [string, string | null][] = [
-      ['Tác giả khác', b.otherAuthors],
-      ['Xuất bản', publication || null],
-      ['Lần xuất bản', b.edition],
-      ['Mô tả vật lý', b.physicalDescription],
-      ['Tùng thư', b.series],
+      ['OPAC.BOOK_DETAIL.OTHER_AUTHORS', b.otherAuthors],
+      ['OPAC.BOOK_DETAIL.PUBLICATION', publication || null],
+      ['OPAC.BOOK_DETAIL.EDITION', b.edition],
+      ['OPAC.BOOK_DETAIL.PHYSICAL', b.physicalDescription],
+      ['OPAC.BOOK_DETAIL.SERIES', b.series],
       ['ISBN', b.isbns],
-      ['Phân loại', [b.ddc, b.cutter].filter(Boolean).join(' ') || null],
-      ['Ngôn ngữ', languageName(b.language) || null],
-      ['Từ khoá', b.keywords],
+      ['OPAC.BOOK_DETAIL.CLASSIFICATION', [b.ddc, b.cutter].filter(Boolean).join(' ') || null],
+      ['OPAC.COMMON.LANGUAGE', languageName(b.language) || null],
+      ['OPAC.SEARCH.F_KEYWORD', b.keywords],
     ];
     return all.filter((r): r is [string, string] => !!r[1]);
   }

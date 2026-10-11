@@ -1,13 +1,15 @@
 import { Component, Injectable, inject, signal } from '@angular/core';
 import { NgClass } from '@angular/common';
+import { TranslatePipe } from '@ngx-translate/core';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+/** message: khoá dịch (kèm params) hoặc câu đã dịch sẵn — pipe translate trả lại nguyên câu không phải khoá. */
 export interface Toast {
   id: number;
   type: ToastType;
   message: string;
-  title?: string;
+  params?: Record<string, unknown>;
 }
 
 /** Thông báo góc phải trên — như ToastrService/app-toastr của frontend monolith. */
@@ -16,36 +18,36 @@ export class ToastrService {
   readonly toasts = signal<Toast[]>([]);
   private nextId = 1;
 
-  success(message: string, title?: string): void {
-    this.show('success', message, title);
+  success(message: string, params?: Record<string, unknown>): void {
+    this.show('success', message, params);
   }
 
-  error(message: string, title?: string): void {
-    this.show('error', message, title, 6000);
+  error(message: string, params?: Record<string, unknown>): void {
+    this.show('error', message, params, 6000);
   }
 
-  info(message: string, title?: string): void {
-    this.show('info', message, title);
+  info(message: string, params?: Record<string, unknown>): void {
+    this.show('info', message, params);
   }
 
-  warning(message: string, title?: string): void {
-    this.show('warning', message, title);
+  warning(message: string, params?: Record<string, unknown>): void {
+    this.show('warning', message, params);
   }
 
   remove(id: number): void {
     this.toasts.update((list) => list.filter((t) => t.id !== id));
   }
 
-  private show(type: ToastType, message: string, title: string | undefined, timeout = 3500): void {
+  private show(type: ToastType, message: string, params: Record<string, unknown> | undefined, timeout = 3500): void {
     const id = this.nextId++;
-    this.toasts.update((list) => [...list, { id, type, message, title }]);
+    this.toasts.update((list) => [...list, { id, type, message, params }]);
     setTimeout(() => this.remove(id), timeout);
   }
 }
 
 @Component({
   selector: 'app-toastr',
-  imports: [NgClass],
+  imports: [NgClass, TranslatePipe],
   template: `
     <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
       @for (toast of toastr.toasts(); track toast.id) {
@@ -66,8 +68,7 @@ export class ToastrService {
             }
           </div>
           <div class="flex-1 text-sm">
-            @if (toast.title) { <h4 class="font-bold mb-1">{{ toast.title }}</h4> }
-            <p [class.font-medium]="!toast.title">{{ toast.message }}</p>
+            <p class="font-medium">{{ toast.message | translate: toast.params }}</p>
           </div>
           <button (click)="toastr.remove(toast.id)" class="shrink-0 opacity-50 hover:opacity-100 transition-opacity">
             <span class="material-icons text-[18px]">close</span>

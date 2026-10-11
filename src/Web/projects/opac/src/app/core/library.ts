@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Title } from '@angular/platform-browser';
+import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
+import { Language } from './i18n';
 import { firstValueFrom } from 'rxjs';
 
 /** /api/opac/tenant/features — đơn vị lấy theo host (gateway), không cần đăng nhập. */
@@ -22,11 +24,11 @@ export class Library {
 
   readonly features = signal<Features | null>(null);
   readonly parameters = signal<Record<string, string>>({});
-  /** null = đang tải; chuỗi = lỗi hiển thị cho người dùng. */
+  /** null = không lỗi; chuỗi = khoá dịch của lỗi hiển thị cho người dùng. */
   readonly error = signal<string | null>(null);
   readonly loaded = signal(false);
 
-  readonly name = computed(() => this.parameters()['LIBRARYNAME'] || this.features()?.name || 'Thư viện');
+  readonly name = computed(() => this.parameters()['LIBRARYNAME'] || this.features()?.name || '');
   readonly shortName = computed(() => this.features()?.logoText || this.name());
   readonly active = computed(() => this.features()?.status === 'Active');
 
@@ -47,10 +49,10 @@ export class Library {
     } catch (e) {
       const status = (e as { status?: number }).status;
       this.error.set(
-        status === 403 ? 'Thư viện đang tạm ngưng hoạt động.'
-          : status === 404 ? 'Không có thư viện nào ở địa chỉ này.'
-            : status === 503 ? 'Thư viện đang được khởi tạo, vui lòng quay lại sau ít phút.'
-              : 'Không kết nối được máy chủ, vui lòng thử lại.');
+        status === 403 ? 'OPAC.ERRORS.LIBRARY_SUSPENDED'
+          : status === 404 ? 'OPAC.ERRORS.LIBRARY_NOT_FOUND'
+            : status === 503 ? 'OPAC.ERRORS.LIBRARY_PROVISIONING'
+              : 'OPAC.ERRORS.NETWORK');
     } finally {
       this.loaded.set(true);
     }
@@ -62,5 +64,19 @@ export class Library {
       link.type = '';
       link.href = url;
     }
+  }
+}
+
+/** Tiêu đề tab: "<tên trang đã dịch> — <tên thư viện>" (title của route là khoá dịch). */
+@Injectable({ providedIn: 'root' })
+export class LibraryTitleStrategy extends TitleStrategy {
+  private readonly title = inject(Title);
+  private readonly library = inject(Library);
+  private readonly language = inject(Language);
+
+  override updateTitle(snapshot: RouterStateSnapshot): void {
+    const key = this.buildTitle(snapshot);
+    const name = this.library.name();
+    this.title.setTitle(key ? [this.language.t(key), name].filter(Boolean).join(' — ') : name);
   }
 }

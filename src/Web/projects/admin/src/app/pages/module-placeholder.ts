@@ -1,11 +1,13 @@
+import { TranslatePipe } from '@ngx-translate/core';
 import { Component, computed, inject, input } from '@angular/core';
 import { MODULE_NAMES, Session } from '../core/session';
 
 /** Chỗ cho các phân hệ GĐ1+ — hiện ra trong menu theo license nhưng chưa có màn hình. */
 @Component({
+  imports: [TranslatePipe],
   selector: 'app-module-placeholder',
   template: `
-    <div class="mb-5"><h4 class="page-title">{{ name() }}</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ name() | translate }}</h4></div>
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
       @if (licensed()) {
         <span class="material-icons text-5xl text-blue-300 mb-3">construction</span>

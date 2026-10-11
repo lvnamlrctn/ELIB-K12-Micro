@@ -98,6 +98,8 @@ jobs:
           cache: npm
           cache-dependency-path: src/Web/package-lock.json
       - run: npm ci --no-audit --no-fund
+      # Đa ngữ: vi/en đủ khoá như nhau, khoá dùng trong code có trong từ điển, màn đã chuyển không còn chữ viết thẳng.
+      - run: node tools/i18n-check.mjs
       - run: npx ng build admin --configuration production
       - run: npx ng build opac --configuration production
 

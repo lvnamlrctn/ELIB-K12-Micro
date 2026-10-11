@@ -1,12 +1,14 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
+import { LDatePipe, LNumberPipe, Language } from '../core/i18n';
 import { Api, CrudClient, CrudPage as Page, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
 import { ImportDialog } from './import-dialog';
 import { ToastrService } from './toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from './ui';
 
+/** Mọi nhãn (title, label, placeholder, hint, options[].label…) là khoá dịch hoặc câu sẵn — template luôn qua pipe translate. */
 export interface CrudColumn {
   key: string;
   label: string;
@@ -91,26 +93,26 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, DatePipe, DecimalPipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
+  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-      <h4 class="page-title">{{ c.title }}</h4>
+      <h4 class="page-title">{{ c.title | translate }}</h4>
     </div>
 
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div>
-          <label for="kw" class="field-label">{{ c.searchLabel }}</label>
-          <input id="kw" type="text" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" [placeholder]="c.searchPlaceholder" />
+          <label for="kw" class="field-label">{{ c.searchLabel | translate }}</label>
+          <input id="kw" type="text" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" [placeholder]="c.searchPlaceholder | translate" />
         </div>
         @if (c.hasStatus) {
           <div>
-            <label for="st" class="field-label">Trạng thái</label>
+            <label for="st" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>
             <select id="st" class="input" [(ngModel)]="status" (change)="search()">
-              <option [ngValue]="null">Tất cả</option>
-              <option [ngValue]="2">Hoạt động</option>
-              <option [ngValue]="1">Không hoạt động</option>
+              <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+              <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
+              <option [ngValue]="1">{{ 'COMMON.STATUS_INACTIVE' | translate }}</option>
             </select>
           </div>
         } @else {
@@ -119,7 +121,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
         <div class="hidden xl:block"></div>
         <div class="flex items-end">
           <button (click)="search()" class="btn-primary w-full">
-            <span class="material-icons text-[18px]">search</span> Tìm kiếm
+            <span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}
           </button>
         </div>
       </div>
@@ -128,25 +130,25 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
     <div class="panel flex gap-3 items-center justify-between flex-wrap">
       <div class="flex gap-2">
         @if (can('add')) {
-          <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">add</span> Thêm mới</button>
+          <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">add</span> {{ 'COMMON.ADD_BTN' | translate }}</button>
           @if (c.importable) {
-            <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> Nhập Excel</button>
+            <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> {{ 'COMMON.IMPORT_EXCEL' | translate }}</button>
           }
         }
         @if (can('delete')) {
           <button (click)="confirmBulk()" [disabled]="selected().size === 0" class="btn-outline-danger">
-            <span class="material-icons text-[18px]">delete</span> Xoá mục đã chọn
+            <span class="material-icons text-[18px]">delete</span> {{ 'COMMON.DELETE_SELECTED' | translate }}
           </button>
         }
         @for (t of c.toolbar ?? []; track t.label) {
           @if (can(t.action)) {
             <button (click)="runTool(t)" [disabled]="saving()" class="btn-secondary !py-1.5 !px-3">
-              <span class="material-icons text-[18px]">{{ t.icon }}</span> {{ t.label }}
+              <span class="material-icons text-[18px]">{{ t.icon }}</span> {{ t.label | translate }}
             </button>
           }
         }
       </div>
-      <span class="text-sm text-gray-500">{{ page()?.totalCount ?? 0 }} bản ghi</span>
+      <span class="text-sm text-gray-500">{{ 'COMMON.RECORDS_N' | translate: { count: page()?.totalCount ?? 0 } }}</span>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -159,9 +161,9 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 <input type="checkbox" class="rounded border-gray-300 cursor-pointer" [checked]="allSelected()" (change)="toggleAll()" />
               </th>
               <th class="th w-16 !text-center">ID</th>
-              @for (col of c.columns; track col.key) { <th class="th" [style.width]="col.width">{{ col.label }}</th> }
-              @if (c.hasStatus) { <th class="th w-36 !text-center">Trạng thái</th> }
-              <th class="th w-28 !text-center">Thao tác</th>
+              @for (col of c.columns; track col.key) { <th class="th" [style.width]="col.width">{{ col.label | translate }}</th> }
+              @if (c.hasStatus) { <th class="th w-36 !text-center">{{ 'COMMON.STATUS' | translate }}</th> }
+              <th class="th w-28 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -175,21 +177,21 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 @for (col of c.columns; track col.key; let first = $first) {
                   <td class="td" [class.font-medium]="first" [class.text-gray-800]="first">
                     @switch (col.type) {
-                      @case ('number') { {{ $any(row[col.key]) | number: '1.0-4' }} }
+                      @case ('number') { {{ $any(row[col.key]) | lnumber: '1.0-4' }} }
                       @case ('bool') {
-                        @if (row[col.key]) { <span class="badge-info">Có</span> } @else { <span class="text-gray-300">—</span> }
+                        @if (row[col.key]) { <span class="badge-info">{{ 'COMMON.YES' | translate }}</span> } @else { <span class="text-gray-300">—</span> }
                       }
                       @case ('mono') { <span class="font-mono text-[13px]">{{ row[col.key] }}</span> }
-                      @case ('lookup') { {{ optionLabel(col.key, row[col.key]) }} }
-                      @case ('date') { <span class="whitespace-nowrap">{{ $any(row[col.key]) | date: 'dd/MM/yyyy' }}</span> }
+                      @case ('lookup') { {{ optionLabel(col.key, row[col.key]) | translate }} }
+                      @case ('date') { <span class="whitespace-nowrap">{{ $any(row[col.key]) | ldate }}</span> }
                       @default { <span class="line-clamp-2 break-all">{{ row[col.key] ?? '—' }}</span> }
                     }
-                    @if (first && c.badge?.(row); as b) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">{{ b }}</span> }
+                    @if (first && c.badge?.(row); as b) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">{{ b | translate }}</span> }
                   </td>
                 }
                 @if (c.hasStatus) {
                   <td class="td text-center" (click)="$event.stopPropagation()">
-                    <button type="button" [disabled]="!can('edit')" (click)="flipStatus(row)" title="Bấm để đổi trạng thái" class="disabled:cursor-default">
+                    <button type="button" [disabled]="!can('edit')" (click)="flipStatus(row)" [title]="'COMMON.CLICK_TO_TOGGLE_STATUS' | translate" class="disabled:cursor-default">
                       <app-status-badge [status]="$any(row['status'])" />
                     </button>
                   </td>
@@ -199,18 +201,18 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                     @for (a of c.rowActions ?? []; track a.title) {
                       @if (can(a.action)) {
                         <button (click)="runRowAction(a, row); $event.stopPropagation()" [disabled]="busyRow() === row.publicId"
-                                class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="a.title">
+                                class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="a.title | translate">
                           <span class="material-icons text-[18px]" [class.animate-spin]="busyRow() === row.publicId">{{ busyRow() === row.publicId ? 'autorenew' : a.icon }}</span>
                         </button>
                       }
                     }
                     @if (can('edit')) {
-                      <button (click)="openEdit(row); $event.stopPropagation()" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa">
+                      <button (click)="openEdit(row); $event.stopPropagation()" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate">
                         <span class="material-icons text-[18px]">edit</span>
                       </button>
                     }
                     @if (can('delete')) {
-                      <button (click)="confirmOne(row); $event.stopPropagation()" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" title="Xoá">
+                      <button (click)="confirmOne(row); $event.stopPropagation()" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" [title]="'COMMON.DELETE' | translate">
                         <span class="material-icons text-[18px]">delete</span>
                       </button>
                     }
@@ -218,7 +220,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 </td>
               </tr>
             } @empty {
-              <tr><td class="py-8 px-4 text-center text-gray-500" [attr.colspan]="colspan()">{{ loading() ? '' : 'Không có dữ liệu' }}</td></tr>
+              <tr><td class="py-8 px-4 text-center text-gray-500" [attr.colspan]="colspan()">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -229,29 +231,29 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
     </div>
 
     @if (editing(); as item) {
-      <app-modal [title]="item.publicId ? 'Cập nhật ' + c.title.toLowerCase() : 'Thêm mới ' + c.title.toLowerCase()" [widthClass]="c.modalWidth ?? 'max-w-md'" (closed)="editing.set(null)">
+      <app-modal [title]="language.t(item.publicId ? 'COMMON.UPDATE_NAMED' : 'COMMON.ADD_NAMED', { name: language.t(c.title) })" [widthClass]="c.modalWidth ?? 'max-w-md'" (closed)="editing.set(null)">
         <form id="crud-form" (ngSubmit)="save()" class="grid grid-cols-2 gap-4">
           @for (f of c.fields; track f.key) {
             <div [class.col-span-2]="!f.half">
               @if (f.type === 'checkbox') {
                 <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
                   <input type="checkbox" class="rounded border-gray-300" [name]="f.key" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)" />
-                  {{ f.label }}
+                  {{ f.label | translate }}
                 </label>
               } @else {
-                <label class="form-label" [for]="'f-' + f.key">{{ f.label }} @if (f.required) { <span class="text-red-500">*</span> }</label>
+                <label class="form-label" [for]="'f-' + f.key">{{ f.label | translate }} @if (f.required) { <span class="text-red-500">*</span> }</label>
                 @switch (f.type) {
                   @case ('textarea') {
                     <textarea [id]="'f-' + f.key" [name]="f.key" rows="5" class="input font-mono text-[13px]" [(ngModel)]="item[f.key]"
-                              [placeholder]="f.placeholder ?? ''" [disabled]="locked(f, item)"></textarea>
+                              [placeholder]="(f.placeholder ?? '') | translate" [disabled]="locked(f, item)"></textarea>
                   }
                   @case ('number') {
                     <input [id]="'f-' + f.key" [name]="f.key" type="number" step="any" class="input" [(ngModel)]="item[f.key]"
-                           [placeholder]="f.placeholder ?? ''" [required]="!!f.required" [disabled]="locked(f, item)" />
+                           [placeholder]="(f.placeholder ?? '') | translate" [required]="!!f.required" [disabled]="locked(f, item)" />
                   }
                   @case ('select') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)">
-                      @for (o of optionsOf(f); track o.value) { <option [ngValue]="o.value">{{ o.label }}</option> }
+                      @for (o of optionsOf(f); track o.value) { <option [ngValue]="o.value">{{ o.label | translate }}</option> }
                     </select>
                   }
                   @case ('multiselect') {
@@ -260,38 +262,38 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                         @if (o.value !== null) {
                           <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
                             <input type="checkbox" class="rounded border-gray-300" [checked]="isChecked(item, f.key, o.value)" (change)="toggleValue(item, f.key, o.value)" />
-                            {{ o.label }}
+                            {{ o.label | translate }}
                           </label>
                         }
-                      } @empty { <span class="text-sm text-gray-400">Chưa có lựa chọn nào.</span> }
+                      } @empty { <span class="text-sm text-gray-400">{{ 'COMMON.NO_OPTIONS' | translate }}</span> }
                     </div>
                   }
                   @case ('password') {
                     <input [id]="'f-' + f.key" [name]="f.key" type="password" autocomplete="new-password" class="input" [(ngModel)]="item[f.key]"
-                           [placeholder]="item.publicId && item['has' + f.key[0].toUpperCase() + f.key.slice(1)] ? 'Để trống = giữ mật khẩu đã lưu' : (f.placeholder ?? '')"
+                           [placeholder]="(item.publicId && item['has' + f.key[0].toUpperCase() + f.key.slice(1)] ? 'COMMON.PASSWORD_KEEP' : (f.placeholder ?? '')) | translate"
                            [disabled]="locked(f, item)" />
                   }
                   @case ('status') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]">
-                      <option [ngValue]="2">Hoạt động</option>
-                      <option [ngValue]="1">Không hoạt động</option>
+                      <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
+                      <option [ngValue]="1">{{ 'COMMON.STATUS_INACTIVE' | translate }}</option>
                     </select>
                   }
                   @default {
                     <input [id]="'f-' + f.key" [name]="f.key" type="text" class="input" [(ngModel)]="item[f.key]"
-                           [placeholder]="f.placeholder ?? ''" [required]="!!f.required" [disabled]="locked(f, item)" />
+                           [placeholder]="(f.placeholder ?? '') | translate" [required]="!!f.required" [disabled]="locked(f, item)" />
                   }
                 }
               }
-              @if (f.hint) { <p class="text-xs text-gray-500 mt-1">{{ f.hint }}</p> }
+              @if (f.hint) { <p class="text-xs text-gray-500 mt-1">{{ f.hint | translate }}</p> }
             </div>
           }
         </form>
         <ng-container footer>
-          <button type="button" (click)="editing.set(null)" class="btn-secondary">Huỷ</button>
+          <button type="button" (click)="editing.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="submit" form="crud-form" [disabled]="saving()" class="btn-primary">
             <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span>
-            {{ item.publicId ? 'Cập nhật' : 'Lưu' }}
+            {{ (item.publicId ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}
           </button>
         </ng-container>
       </app-modal>
@@ -303,7 +305,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
 
     @if (deleting().length) {
       <app-confirm-delete [busy]="saving()"
-                          [message]="deleting().length > 1 ? 'Xoá ' + deleting().length + ' mục đã chọn? Thao tác này không thể hoàn tác.' : 'Bạn có chắc chắn muốn xoá mục này? Thao tác này không thể hoàn tác.'"
+                          [message]="deleting().length > 1 ? 'COMMON.DELETE_SELECTED_CONFIRM' : 'COMMON.DELETE_CONFIRM_IRREVERSIBLE'" [messageParams]="{ count: deleting().length }"
                           (confirmed)="doDelete()" (cancelled)="deleting.set([])" />
     }
   `,
@@ -314,6 +316,7 @@ export class CrudPage implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  protected readonly language = inject(Language);
   private client!: CrudClient<Row>;
 
   protected keyword = '';
@@ -423,7 +426,7 @@ export class CrudPage implements OnInit {
     if (!item) return;
     const missing = this.config().fields.find((f) => f.required && (item[f.key] === undefined || item[f.key] === null || String(item[f.key]).trim() === ''));
     if (missing) {
-      this.toastr.warning(`Vui lòng nhập ${missing.label.toLowerCase()}.`);
+      this.toastr.warning('COMMON.REQUIRED_FIELD', { field: this.language.t(missing.label) });
       return;
     }
     this.saving.set(true);
@@ -433,7 +436,7 @@ export class CrudPage implements OnInit {
         if (f.type === 'password' && (body[f.key] === undefined || body[f.key] === '')) body[f.key] = null;
       if (publicId) await this.client.update(publicId, body);
       else await this.client.add(body);
-      this.toastr.success(publicId ? 'Cập nhật thành công' : 'Thêm mới thành công');
+      this.toastr.success(publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');
       this.editing.set(null);
       await this.load();
     } catch (e) {
@@ -458,7 +461,7 @@ export class CrudPage implements OnInit {
     const next = row['status'] === STATUS_ACTIVE ? 1 : STATUS_ACTIVE;
     try {
       await this.client.changeStatus(row.publicId, next);
-      this.toastr.success('Đã đổi trạng thái');
+      this.toastr.success('COMMON.STATUS_CHANGED');
       await this.load();
     } catch (e) {
       this.toastr.error(errorMessage(e));
@@ -490,8 +493,8 @@ export class CrudPage implements OnInit {
     const ids = this.deleting();
     const results = await Promise.allSettled(ids.map((id) => this.client.delete(id)));
     const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-    if (failed.length === 0) this.toastr.success(ids.length > 1 ? `Đã xoá ${ids.length} mục` : 'Xoá thành công');
-    else this.toastr.error(`${failed.length}/${ids.length} mục không xoá được: ${errorMessage(failed[0].reason)}`);
+    if (failed.length === 0) this.toastr.success(ids.length > 1 ? 'COMMON.DELETED_N' : 'COMMON.DELETE_SUCCESS', { count: ids.length });
+    else this.toastr.error('COMMON.DELETE_PARTIAL_FAILED', { failed: failed.length, total: ids.length, error: errorMessage(failed[0].reason) });
     this.saving.set(false);
     this.deleting.set([]);
     this.selected.set(new Set());

@@ -49,7 +49,7 @@ public static class AccountEndpoints
             var safeReturn = SafeReturnUrl(returnUrl);
             var hostTenant = await HostTenantAsync(tenantContext, signIn, ct);
             var captcha = (await policies.GetAsync(tenantContext.TenantId, ct)).Captcha ? await captchas.CreateAsync(ct) : null;
-            return LoginPage(ctx, antiforgery, safeReturn, tenant ?? TenantFromReturnUrl(safeReturn), hostTenant, captcha, userName: null, error: null);
+            return LoginPage(ctx, IdentityTexts.For(ctx), antiforgery, safeReturn, tenant ?? TenantFromReturnUrl(safeReturn), hostTenant, captcha, userName: null, error: null);
         }).ExcludeFromDescription();
 
         app.MapPost("/account/login", async ([FromForm] LoginForm form, HttpContext ctx, IAntiforgery antiforgery, ITenantContext tenantContext,
@@ -59,22 +59,23 @@ public static class AccountEndpoints
             // Trên host của đơn vị: luôn đăng nhập vào ĐÚNG đơn vị của host (header gateway có chữ ký) — bỏ qua trường "tenant" của form.
             var hostTenant = await HostTenantAsync(tenantContext, signIn, ct);
             var hostPolicy = await policies.GetAsync(tenantContext.TenantId, ct);
+            var t = IdentityTexts.For(ctx);
 
-            async Task<IResult> Fail(string message) => LoginPage(ctx, antiforgery, returnUrl, form.Tenant, hostTenant,
+            async Task<IResult> Fail(string message) => LoginPage(ctx, t, antiforgery, returnUrl, form.Tenant, hostTenant,
                 hostPolicy.Captcha ? await captchas.CreateAsync(ct) : null, form.UserName, message, StatusCodes.Status401Unauthorized);
 
             if (tenantContext.TenantId is not null && hostTenant is null) // đơn vị của host chưa đồng bộ về identity
-                return await Fail(Message(LoginError.TenantUnavailable));
+                return await Fail(Message(t, LoginError.TenantUnavailable));
             // CAPTCHA trước khi tra tài khoản: sai CAPTCHA không cho biết tài khoản có tồn tại hay không.
             if (hostPolicy.Captcha && !await captchas.ValidateAsync(form.CaptchaId, form.Captcha, ct))
-                return await Fail("Mã xác nhận không đúng hoặc đã hết hạn.");
+                return await Fail(t["CAPTCHA_INVALID"]);
 
             var result = await signIn.LoginAsync(hostTenant?.Code ?? form.Tenant, form.UserName ?? "", form.Password ?? "", ct);
             if (!result.Succeeded)
             {
                 var failedTenant = hostTenant ?? (string.IsNullOrWhiteSpace(form.Tenant) ? null : await signIn.FindTenantAsync(form.Tenant, ct));
                 await signIn.RecordLoginFailedAsync(failedTenant?.TenantId, form.UserName, result.Error!.Value, ct);
-                return await Fail(Message(result.Error!.Value));
+                return await Fail(Message(t, result.Error!.Value));
             }
 
             var who = result.Identity!;
@@ -93,13 +94,14 @@ public static class AccountEndpoints
 
         app.MapGet("/account/otp", async (HttpContext ctx, IAntiforgery antiforgery, LoginOtpService otp, CancellationToken ct) =>
             await otp.GetAsync(ctx.Request.Cookies[OtpCookie], ct) is { } pending
-                ? OtpPage(ctx, antiforgery, pending, error: null, info: null)
+                ? OtpPage(ctx, IdentityTexts.For(ctx), antiforgery, pending, error: null, info: null)
                 : Results.LocalRedirect("/account/login")).ExcludeFromDescription();
 
         app.MapPost("/account/otp", async ([FromForm] OtpForm form, HttpContext ctx, IAntiforgery antiforgery, SignInService signIn,
             LoginOtpService otp, ITenantContext tenantContext, ILoginPolicySource policies, CaptchaService captchas, CancellationToken ct) =>
         {
             var challenge = ctx.Request.Cookies[OtpCookie];
+            var t = IdentityTexts.For(ctx);
             var (passed, error) = await otp.VerifyAsync(challenge, form.Code, ct);
             if (passed is not null)
             {
@@ -115,16 +117,14 @@ public static class AccountEndpoints
             }
 
             if (error == OtpError.Invalid && await otp.GetAsync(challenge, ct) is { } pending)
-                return OtpPage(ctx, antiforgery, pending, "Mã xác thực không đúng.", info: null, StatusCodes.Status401Unauthorized);
+                return OtpPage(ctx, t, antiforgery, pending, t["OTP_WRONG"], info: null, StatusCodes.Status401Unauthorized);
 
             // Hết hạn / sai quá nhiều lần: bỏ thử thách, đăng nhập lại từ đầu.
             ctx.Response.Cookies.Delete(OtpCookie, OtpCookieOptions(ctx));
             var hostTenant = await HostTenantAsync(tenantContext, signIn, ct);
             var captcha = (await policies.GetAsync(tenantContext.TenantId, ct)).Captcha ? await captchas.CreateAsync(ct) : null;
-            var message = error == OtpError.TooManyAttempts
-                ? "Nhập sai mã xác thực quá nhiều lần. Vui lòng đăng nhập lại."
-                : "Mã xác thực đã hết hạn. Vui lòng đăng nhập lại.";
-            return LoginPage(ctx, antiforgery, "/", null, hostTenant, captcha, null, message, StatusCodes.Status401Unauthorized);
+            var message = error == OtpError.TooManyAttempts ? t["OTP_TOO_MANY"] : t["OTP_EXPIRED"];
+            return LoginPage(ctx, t, antiforgery, "/", null, hostTenant, captcha, null, message, StatusCodes.Status401Unauthorized);
         }).ExcludeFromDescription();
 
         // [FromForm] để minimal API kiểm tra antiforgery cho cả nút "Gửi lại mã".
@@ -133,11 +133,12 @@ public static class AccountEndpoints
             var challenge = ctx.Request.Cookies[OtpCookie];
             var error = await otp.ResendAsync(challenge, ct);
             if (await otp.GetAsync(challenge, ct) is not { } pending) return Results.LocalRedirect("/account/login");
+            var t = IdentityTexts.For(ctx);
             return error switch
             {
-                null => OtpPage(ctx, antiforgery, pending, null, "Đã gửi mã mới. Mã cũ không còn dùng được."),
-                OtpError.TooSoon => OtpPage(ctx, antiforgery, pending, $"Vui lòng đợi {pending.SecondsUntilResend} giây rồi gửi lại.", null),
-                _ => OtpPage(ctx, antiforgery, pending, "Đã gửi lại quá số lần cho phép. Vui lòng đăng nhập lại để nhận mã mới.", null),
+                null => OtpPage(ctx, t, antiforgery, pending, null, t["OTP_RESENT"]),
+                OtpError.TooSoon => OtpPage(ctx, t, antiforgery, pending, t.Format("OTP_WAIT", pending.SecondsUntilResend), null),
+                _ => OtpPage(ctx, t, antiforgery, pending, t["OTP_RESEND_LIMIT"], null),
             };
         }).ExcludeFromDescription();
 
@@ -148,10 +149,11 @@ public static class AccountEndpoints
             var session = await impersonation.RedeemAsync(ticket, tenantContext.TenantId, ctx.Connection.RemoteIpAddress?.ToString(), ct);
             if (session is null)
             {
-                return Html(ctx, Shell("Liên kết không hợp lệ", "Không mở được phiên xem đơn vị",
-                    """
-                    <div class="err" role="alert">Liên kết đã hết hạn, đã được dùng, hoặc không mở đúng tên miền của đơn vị.</div>
-                    <p class="sub">Quay lại trang quản trị nền tảng và bấm "Vào xem đơn vị" lần nữa.</p>
+                var t = IdentityTexts.For(ctx);
+                return Html(ctx, Shell(ctx, t, t["IMP_INVALID_TITLE"], t["IMP_INVALID_SUBTITLE"],
+                    $"""
+                    <div class="err" role="alert">{VietnameseHtml.Encode(t["IMP_INVALID_TEXT"])}</div>
+                    <p class="sub">{VietnameseHtml.Encode(t["IMP_INVALID_HINT"])}</p>
                     """), StatusCodes.Status400BadRequest);
             }
 
@@ -194,12 +196,12 @@ public static class AccountEndpoints
         return q < 0 ? null : QueryHelpers.ParseQuery(returnUrl[q..]).TryGetValue("tenant", out var t) ? t.ToString() : null;
     }
 
-    private static string Message(LoginError error) => error switch
+    private static string Message(IdentityTexts t, LoginError error) => error switch
     {
-        LoginError.LockedOut => "Tài khoản tạm khoá do đăng nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.",
-        LoginError.AccountDisabled => "Tài khoản đã bị vô hiệu hoá. Liên hệ quản trị thư viện.",
-        LoginError.TenantUnavailable => "Đơn vị không tồn tại hoặc đang tạm ngưng.",
-        _ => "Tên đăng nhập hoặc mật khẩu không đúng.",
+        LoginError.LockedOut => t["ERR_LOCKED_OUT"],
+        LoginError.AccountDisabled => t["ERR_DISABLED"],
+        LoginError.TenantUnavailable => t["ERR_TENANT"],
+        _ => t["ERR_CREDENTIALS"],
     };
 
     // Icon SVG nhúng — không tải font/icon từ CDN.
@@ -209,7 +211,7 @@ public static class AccountEndpoints
     private const string ShieldIcon = """<svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4zm-2 16-4-4 1.4-1.4L10 14.2l6.6-6.6L18 9l-8 8z"/></svg>""";
     private const string LibraryIcon = """<svg viewBox="0 0 24 24"><path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.19 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/></svg>""";
 
-    private static IResult LoginPage(HttpContext ctx, IAntiforgery antiforgery, string returnUrl, string? tenant, TenantReplicaRecord? hostTenant,
+    private static IResult LoginPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, string returnUrl, string? tenant, TenantReplicaRecord? hostTenant,
         CaptchaService.Challenge? captcha, string? userName, string? error, int status = 200)
     {
         var tokens = antiforgery.GetAndStoreTokens(ctx);
@@ -218,9 +220,9 @@ public static class AccountEndpoints
             ? $"""<div class="unit">{UnitIcon}<span>{e.Encode(hostTenant.Name)}</span></div>"""
             : $"""
                <div class="field">
-                 <label for="tenant">Mã đơn vị</label>
-                 <div class="box">{UnitIcon}<input id="tenant" name="tenant" value="{e.Encode(tenant ?? "")}" autocomplete="organization" placeholder="Mã đơn vị"></div>
-                 <div class="hint">Để trống nếu là quản trị hệ thống.</div>
+                 <label for="tenant">{e.Encode(t["TENANT_CODE"])}</label>
+                 <div class="box">{UnitIcon}<input id="tenant" name="tenant" value="{e.Encode(tenant ?? "")}" autocomplete="organization" placeholder="{e.Encode(t["TENANT_CODE"])}"></div>
+                 <div class="hint">{e.Encode(t["TENANT_HINT"])}</div>
                </div>
                """;
         var refresh = QueryHelpers.AddQueryString("/account/login", new Dictionary<string, string?> { ["returnUrl"] = returnUrl, ["tenant"] = tenant });
@@ -228,10 +230,10 @@ public static class AccountEndpoints
             ? ""
             : $"""
                <div class="field">
-                 <label for="captcha">Mã xác nhận</label>
-                 <div class="captcha"><img src="data:image/png;base64,{captcha.PngBase64}" width="{CaptchaImage.Width}" height="{CaptchaImage.Height}" alt="Ảnh mã xác nhận">
-                   <a href="{e.Encode(refresh)}">Đổi mã khác</a></div>
-                 <div class="box">{ShieldIcon}<input id="captcha" name="captcha" autocomplete="off" maxlength="{CaptchaService.Length}" placeholder="Nhập {CaptchaService.Length} ký tự trong ảnh" required></div>
+                 <label for="captcha">{e.Encode(t["CAPTCHA"])}</label>
+                 <div class="captcha"><img src="data:image/png;base64,{captcha.PngBase64}" width="{CaptchaImage.Width}" height="{CaptchaImage.Height}" alt="{e.Encode(t["CAPTCHA_ALT"])}">
+                   <a href="{e.Encode(refresh)}">{e.Encode(t["CAPTCHA_REFRESH"])}</a></div>
+                 <div class="box">{ShieldIcon}<input id="captcha" name="captcha" autocomplete="off" maxlength="{CaptchaService.Length}" placeholder="{e.Encode(t.Format("CAPTCHA_PLACEHOLDER", CaptchaService.Length))}" required></div>
                  <input type="hidden" name="captchaId" value="{e.Encode(captcha.Id)}">
                </div>
                """;
@@ -242,21 +244,21 @@ public static class AccountEndpoints
               <input type="hidden" name="returnUrl" value="{{e.Encode(returnUrl)}}">
               {{tenantBlock}}
               <div class="field">
-                <label for="userName">Tên đăng nhập</label>
-                <div class="box">{{PersonIcon}}<input id="userName" name="userName" value="{{e.Encode(userName ?? "")}}" autocomplete="username" placeholder="Tên đăng nhập" required></div>
+                <label for="userName">{{e.Encode(t["USERNAME"])}}</label>
+                <div class="box">{{PersonIcon}}<input id="userName" name="userName" value="{{e.Encode(userName ?? "")}}" autocomplete="username" placeholder="{{e.Encode(t["USERNAME"])}}" required></div>
               </div>
               <div class="field">
-                <label for="password">Mật khẩu</label>
-                <div class="box">{{LockIcon}}<input id="password" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" required></div>
+                <label for="password">{{e.Encode(t["PASSWORD"])}}</label>
+                <div class="box">{{LockIcon}}<input id="password" name="password" type="password" autocomplete="current-password" placeholder="{{e.Encode(t["PASSWORD"])}}" required></div>
               </div>
               {{captchaBlock}}
-              <button type="submit">Đăng Nhập &rarr;</button>
+              <button type="submit">{{t["SIGN_IN_BTN"]}}</button>
             </form>
             """;
-        return Html(ctx, Shell("Đăng nhập", "Chào mừng bạn quay lại hệ thống quản trị", body), status);
+        return Html(ctx, Shell(ctx, t, t["LOGIN_TITLE"], t["LOGIN_SUBTITLE"], body), status);
     }
 
-    private static IResult OtpPage(HttpContext ctx, IAntiforgery antiforgery, OtpPending pending, string? error, string? info, int status = 200)
+    private static IResult OtpPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, OtpPending pending, string? error, string? info, int status = 200)
     {
         var tokens = antiforgery.GetAndStoreTokens(ctx);
         var e = VietnameseHtml;
@@ -264,22 +266,22 @@ public static class AccountEndpoints
         var body = $$"""
             {{(error is null ? "" : $"<div class=\"err\" role=\"alert\">{e.Encode(error)}</div>")}}
             {{(info is null ? "" : $"<div class=\"ok\" role=\"status\">{e.Encode(info)}</div>")}}
-            <p class="sub">Mã xác thực gồm 6 chữ số đã được gửi tới <b>{{e.Encode(pending.MaskedEmail)}}</b>. Mã có hiệu lực trong 5 phút.</p>
+            <p class="sub">{{t.Format("OTP_SENT", e.Encode(pending.MaskedEmail))}}</p>
             <form method="post" action="/account/otp">
               {{token}}
               <div class="field">
-                <label for="code">Mã xác thực</label>
+                <label for="code">{{e.Encode(t["OTP_CODE"])}}</label>
                 <div class="box">{{ShieldIcon}}<input id="code" name="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required autofocus></div>
               </div>
-              <button type="submit">Xác nhận &rarr;</button>
+              <button type="submit">{{t["OTP_CONFIRM"]}}</button>
             </form>
             <form method="post" action="/account/otp/resend" class="links">
               {{token}}
-              <button type="submit" class="link">Gửi lại mã</button>
-              <a href="/account/login">Đăng nhập bằng tài khoản khác</a>
+              <button type="submit" class="link">{{e.Encode(t["OTP_RESEND"])}}</button>
+              <a href="/account/login">{{e.Encode(t["OTP_OTHER_ACCOUNT"])}}</a>
             </form>
             """;
-        return Html(ctx, Shell("Xác thực đăng nhập", "Bước 2: nhập mã gửi qua email", body), status);
+        return Html(ctx, Shell(ctx, t, t["OTP_TITLE"], t["OTP_SUBTITLE"], body), status);
     }
 
     internal static IResult Html(HttpContext ctx, string html, int status)
@@ -292,15 +294,19 @@ public static class AccountEndpoints
     }
 
     /// <summary>Khung trang như trang đăng nhập admin của frontend monolith (pages/login.html): nửa trái thương hiệu, nửa phải nội dung.</summary>
-    internal static string Shell(string heading, string subtitle, string body)
+    internal static string Shell(HttpContext ctx, IdentityTexts t, string heading, string subtitle, string body)
     {
         var e = VietnameseHtml;
+        string Switch(string lang) =>
+            QueryHelpers.AddQueryString(ctx.Request.Path, ctx.Request.Query.Where(q => q.Key != "lang")
+                .SelectMany(q => q.Value.Select(v => new KeyValuePair<string, string?>(q.Key, v))).Append(new("lang", lang)));
+        var langs = $"""<nav class="langs" aria-label="{e.Encode(t["LANGUAGE"])}"><a href="{e.Encode(Switch("vi"))}"{(t.English ? "" : " aria-current=\"true\"")}>VI</a><a href="{e.Encode(Switch("en"))}"{(t.English ? " aria-current=\"true\"" : "")}>EN</a></nav>""";
         return $$"""
             <!doctype html>
-            <html lang="vi">
+            <html lang="{{t.Lang}}">
             <head>
               <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>{{e.Encode(heading)}} — Hệ thống quản lý thư viện</title>
+              <title>{{e.Encode(heading)}} — {{e.Encode(t["SYSTEM_NAME"])}}</title>
               <style>
                 *{box-sizing:border-box}
                 body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#fff;color:#111827}
@@ -344,15 +350,20 @@ public static class AccountEndpoints
                 .links{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
                 button.link{width:auto;padding:0;background:none;box-shadow:none;color:#2563eb;font-size:14px;font-weight:500}
                 button.link:hover{background:none;box-shadow:none;text-decoration:underline}
+                .langs{position:fixed;top:16px;right:16px;display:flex;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;z-index:2}
+                .langs a{padding:6px 10px;font-size:12px;font-weight:600;color:#4b5563}
+                .langs a:hover{text-decoration:none;background:#f3f4f6}
+                .langs a[aria-current]{background:#2563eb;color:#fff}
                 @media (min-width:1024px){ .brand{display:flex} .main{width:50%;padding:48px} .logo{display:none} }
               </style>
             </head>
             <body>
+              {{langs}}
               <div class="page">
                 <div class="brand"><div class="inner">
                   <div class="badge">{{LibraryIcon}}</div>
-                  <h1>Hệ Thống<br>Quản Lý Thư Viện</h1>
-                  <p>Giải pháp toàn diện giúp bạn quản lý kho sách, xuất bản phẩm số và phục vụ độc giả một cách chuyên nghiệp và hiệu quả nhất.</p>
+                  <h1>{{t["BRAND_TITLE"]}}</h1>
+                  <p>{{e.Encode(t["BRAND_TEXT"])}}</p>
                 </div></div>
                 <div class="main"><div class="card">
                   <div class="logo">{{LibraryIcon}}<span>ELIB-K12</span></div>

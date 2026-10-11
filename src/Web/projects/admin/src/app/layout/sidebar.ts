@@ -1,3 +1,4 @@
+import { TranslatePipe } from '@ngx-translate/core';
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { Session } from '../core/session';
@@ -7,7 +8,7 @@ import { Menu, MenuItem } from './menu';
 /** Sidebar tối, kéo giãn được, 3 cấp — giao diện như components/sidebar của frontend monolith. */
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, TranslatePipe],
   host: { class: 'block z-30 h-full relative' },
   styles: `
     aside { width: var(--sbw, 260px); }
@@ -43,7 +44,7 @@ import { Menu, MenuItem } from './menu';
         </button>
       </div>
       @if (unitName(); as name) {
-        <div class="px-4 py-2.5 border-b border-gray-700/60 text-xs text-gray-400 truncate" [title]="name">{{ name }}</div>
+        <div class="px-4 py-2.5 border-b border-gray-700/60 text-xs text-gray-400 truncate" [title]="name | translate">{{ name | translate }}</div>
       }
 
       <nav class="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
@@ -54,14 +55,14 @@ import { Menu, MenuItem } from './menu';
                 <a [routerLink]="item.link" routerLinkActive="bg-blue-600 text-white" [routerLinkActiveOptions]="{ exact: item.link === '/' }"
                    class="flex items-center px-3 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors group">
                   <span class="material-icons text-[20px] mr-3 group-hover:text-white transition-colors">{{ item.icon }}</span>
-                  <span class="font-medium text-sm">{{ item.title }}</span>
+                  <span class="font-medium text-sm">{{ item.title | translate }}</span>
                 </a>
               } @else {
                 <button (click)="toggle(item)"
                         class="w-full flex items-center justify-between px-3 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                   <div class="flex items-center">
                     <span class="material-icons text-[20px] mr-3">{{ item.icon }}</span>
-                    <span class="font-medium text-sm text-left">{{ item.title }}</span>
+                    <span class="font-medium text-sm text-left">{{ item.title | translate }}</span>
                   </div>
                   <span class="material-icons text-[18px] transition-transform duration-300" [class.rotate-180]="isOpen(item)">expand_more</span>
                 </button>
@@ -74,14 +75,14 @@ import { Menu, MenuItem } from './menu';
                           <a [routerLink]="child.link" routerLinkActive="!text-white font-medium bg-white/10"
                              class="relative flex items-center py-2 pl-3 pr-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                             @if (child.icon) { <span class="material-icons text-[18px] mr-2">{{ child.icon }}</span> }
-                            {{ child.title }}
+                            {{ child.title | translate }}
                           </a>
                         } @else {
                           <button (click)="toggle(child)"
                                   class="w-full flex items-center justify-between py-2 pl-3 pr-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                             <div class="flex items-center">
                               @if (child.icon) { <span class="material-icons text-[18px] mr-2">{{ child.icon }}</span> }
-                              <span class="whitespace-nowrap">{{ child.title }}</span>
+                              <span class="whitespace-nowrap">{{ child.title | translate }}</span>
                             </div>
                             <span class="material-icons text-[16px] transition-transform duration-300" [class.rotate-180]="isOpen(child)">expand_more</span>
                           </button>
@@ -92,7 +93,7 @@ import { Menu, MenuItem } from './menu';
                                   <a [routerLink]="sub.link" routerLinkActive="!text-white bg-white/10"
                                      class="flex items-center py-1.5 px-3 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-md transition-colors">
                                     @if (sub.icon) { <span class="material-icons text-[16px] mr-2">{{ sub.icon }}</span> }
-                                    {{ sub.title }}
+                                    {{ sub.title | translate }}
                                   </a>
                                 </li>
                               }
@@ -126,7 +127,7 @@ export class Sidebar {
   }
 
   protected unitName(): string | null {
-    return this.session.isSystem() ? 'Quản trị nền tảng' : (this.session.features()?.name ?? null);
+    return this.session.isSystem() ? 'HEADER.PLATFORM_ADMIN' : (this.session.features()?.name ?? null);
   }
 
   protected isOpen(item: MenuItem): boolean {
