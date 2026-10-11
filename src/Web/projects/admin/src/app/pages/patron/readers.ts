@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudClient, CrudPage, Reader, ReaderAccount, ReaderSearch, errorMessage } from '../../core/api';
@@ -11,6 +12,7 @@ import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../sha
 import { ReaderCatalogs } from './reader-catalogs';
 import { ReaderFormDialog } from './reader-form';
 import { ReaderPassword, accountLabel } from './reader-password';
+import { MAX_PRINT, PRINT_KEY } from './reader-print';
 import { ReaderExport, ReaderPhotos } from './reader-tools';
 
 /** Cột của bảng bạn đọc — người dùng chọn hiện/ẩn (nhớ trên trình duyệt), mặc định như ELIB-LRC. */
@@ -125,6 +127,8 @@ const VIEW_KEY = 'elib.readers.view';
           <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> {{ 'COMMON.IMPORT_EXCEL' | translate }}</button>
         }
         <button (click)="exporting.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">download</span> {{ 'READER.EXPORT_CONFIRM' | translate }}</button>
+        <button (click)="printCards([...selected()])" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
+          <span class="material-icons text-[18px]">print</span> {{ 'READER.PRINT_SELECTED_N' | translate: { count: selected().size } }}</button>
         @if (can('edit')) {
           <button (click)="uploadingPhotos.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">photo_library</span> {{ 'READER.UPLOAD_PHOTOS' | translate }}</button>
           <button (click)="openBulk()" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
@@ -258,6 +262,7 @@ const VIEW_KEY = 'elib.readers.view';
 
     <ng-template #actions let-r>
       <div class="flex items-center justify-center gap-1.5">
+        <button (click)="printCards([r.publicId])" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="'READER.PRINT_CARD' | translate"><span class="material-icons text-[18px]">badge</span></button>
         @if (can('edit')) {
           <button (click)="editing.set({ reader: r })" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[18px]">edit</span></button>
           <button (click)="passwordFor.set({ readers: [r], bulk: false })" class="icon-btn bg-violet-50 text-violet-600 hover:bg-violet-100" [title]="'READER.OPAC_PASSWORD' | translate"><span class="material-icons text-[18px]">key</span></button>
@@ -342,6 +347,7 @@ export class Readers implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
   protected readonly c = inject(ReaderCatalogs);
   private readonly client: CrudClient<Reader> = this.api.crud<Reader>('readers', 'patron');
 
@@ -446,6 +452,20 @@ export class Readers implements OnInit {
   protected setView(view: 'table' | 'card'): void {
     this.view.set(view);
     writeStored(VIEW_KEY, view);
+  }
+
+  /** Mở trang in thẻ cho các bạn đọc (thứ tự giữ nguyên; tối đa MAX_PRINT mỗi lần). */
+  protected printCards(ids: string[]): void {
+    if (ids.length > MAX_PRINT) {
+      this.toastr.warning('READER.PRINT_TOO_MANY', { max: MAX_PRINT });
+      return;
+    }
+    try {
+      sessionStorage.setItem(PRINT_KEY, JSON.stringify(ids));
+    } catch {
+      return;
+    }
+    void this.router.navigateByUrl('/print/reader-cards');
   }
 
   /** Bạn đọc đã chọn (có thể ở trang khác — chỉ cần publicId). */

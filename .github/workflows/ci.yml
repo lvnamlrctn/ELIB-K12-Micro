@@ -100,6 +100,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       # Đa ngữ: vi/en đủ khoá như nhau, khoá dùng trong code có trong từ điển, màn đã chuyển không còn chữ viết thẳng.
       - run: node tools/i18n-check.mjs
+      # Mã vạch Code 128 (in thẻ, thẻ điện tử OPAC) — hàm thuần, chạy bằng node --test.
+      - run: node --test tools/code128.test.mjs
       - run: npx ng build admin --configuration production
       - run: npx ng build opac --configuration production
 

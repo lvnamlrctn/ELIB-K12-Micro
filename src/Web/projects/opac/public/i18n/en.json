@@ -247,7 +247,9 @@
       "PASSWORD_CHANGED": "Password changed.",
       "LOANS_COMING": "Current loans, online renewal and holds will appear on this page in an upcoming update.",
       "LOGIN_FAILED": "Sign-in could not be completed (the link was already used or has expired).",
-      "LOGIN_RETRY": "Try signing in again"
+      "LOGIN_RETRY": "Try signing in again",
+      "E_CARD": "Digital library card",
+      "E_CARD_HINT": "Show the barcode or QR code at the library desk instead of your plastic card."
     },
     "LOGIN": {
       "SIGNING_IN": "Signing in…"

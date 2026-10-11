@@ -28,6 +28,9 @@ public sealed class ReaderSearch : CrudSearch
     /// <summary>Thuộc một trong các đơn vị — app Admin gửi đơn vị đã chọn kèm mọi đơn vị con của nó trong cây.</summary>
     public IReadOnlyList<long>? OrgIds { get; set; }
 
+    /// <summary>Đúng các bạn đọc này (in thẻ đã chọn) — tối đa 500.</summary>
+    public IReadOnlyList<Guid>? PublicIds { get; set; }
+
     public long? ReaderTypeId { get; set; }
     public long? ClassId { get; set; }
     public long? CourseId { get; set; }
@@ -166,6 +169,11 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             query = query.Where(x => x.FirstName.ToLower().Contains(first));
         }
 #pragma warning restore CA1862, CA1304, CA1311
+        if (s.PublicIds is { Count: > 0 } publicIds)
+        {
+            var ids = publicIds.Distinct().Take(500).ToList();
+            query = query.Where(x => ids.Contains(x.PublicId));
+        }
         if (s.OrgIds is { Count: > 0 } orgIds)
         {
             var ids = orgIds.Distinct().Take(500).ToList();

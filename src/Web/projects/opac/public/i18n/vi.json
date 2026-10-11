@@ -247,7 +247,9 @@
       "PASSWORD_CHANGED": "Đã đổi mật khẩu.",
       "LOANS_COMING": "Sách đang mượn, gia hạn trực tuyến và đặt mượn sẽ có trên trang này trong bản cập nhật tới.",
       "LOGIN_FAILED": "Không hoàn tất được đăng nhập (liên kết đã dùng hoặc hết hạn).",
-      "LOGIN_RETRY": "Thử đăng nhập lại"
+      "LOGIN_RETRY": "Thử đăng nhập lại",
+      "E_CARD": "Thẻ thư viện điện tử",
+      "E_CARD_HINT": "Đưa mã vạch hoặc mã QR cho quầy thư viện quét thay thẻ nhựa."
     },
     "LOGIN": {
       "SIGNING_IN": "Đang đăng nhập…"

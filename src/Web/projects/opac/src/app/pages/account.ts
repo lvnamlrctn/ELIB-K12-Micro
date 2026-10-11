@@ -3,12 +3,14 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { LDatePipe, Language } from '../core/i18n';
+import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
+import { ReaderCard } from './reader-card';
 
 /** Tài khoản bạn đọc: chưa đăng nhập → nút đăng nhập; đã đăng nhập → thông tin thẻ, đổi mật khẩu, đăng xuất. */
 @Component({
   selector: 'opac-account',
-  imports: [FormsModule, LDatePipe, TranslatePipe],
+  imports: [FormsModule, LDatePipe, TranslatePipe, ReaderCard],
   template: `
     <div class="max-w-3xl mx-auto px-4 py-8">
       @if (!auth.loggedIn()) {
@@ -53,6 +55,14 @@ import { ReaderAuth, ReaderMe } from '../core/reader-auth';
           <div class="flex justify-center py-12"><span class="material-icons animate-spin text-blue-600 text-3xl">autorenew</span></div>
         }
 
+        @if (me(); as m) {
+          <section class="mt-6">
+            <h2 class="font-semibold text-slate-900 mb-3">{{ 'OPAC.MY_LIBRARY.E_CARD' | translate }}</h2>
+            <opac-reader-card [cardNo]="m.cardNo" [fullName]="m.fullName" [expireDate]="m.expireDate" [library]="library.name()" />
+            <p class="text-xs text-slate-500 mt-2">{{ 'OPAC.MY_LIBRARY.E_CARD_HINT' | translate }}</p>
+          </section>
+        }
+
         <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
           <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.MY_LIBRARY.CHANGE_PASSWORD' | translate }}</h2>
           <form class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end" (ngSubmit)="changePassword()">
@@ -85,6 +95,7 @@ import { ReaderAuth, ReaderMe } from '../core/reader-auth';
 })
 export class Account implements OnInit {
   protected readonly auth = inject(ReaderAuth);
+  protected readonly library = inject(Library);
   private readonly language = inject(Language);
   protected readonly me = signal<ReaderMe | null>(null);
   protected readonly error = signal<string | null>(null);

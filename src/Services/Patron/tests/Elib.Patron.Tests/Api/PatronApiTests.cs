@@ -314,6 +314,7 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         Assert.Equal(["SV-0101", "SV-0102"], await Find(new ReaderSearch { CardNoContains = "sv-01" }));
         Assert.Equal(["SV-0101", "SV-0102"], await Find(new ReaderSearch { OrgIds = [31, 32] }));
         Assert.Equal(["SV-0102"], await Find(new ReaderSearch { OrgIds = [32] }));
+        Assert.Equal(["SV-0101"], await Find(new ReaderSearch { PublicIds = [hoa.PublicId, Guid.NewGuid()] }));
 
         // Xuất kèm tên đơn vị, dân tộc, trình độ, học hàm.
         var export = await staff.PostAsJsonAsync(U("/api/readers/Export"),

@@ -512,7 +512,12 @@
     "PHOTOS_NOT_FOUND": "{{count}} photos match no card number:",
     "PHOTOS_FAILED": "{{count}} photos failed:",
     "PHOTOS_UPLOAD": "Upload",
-    "ZIP_UNREADABLE": "Cannot read the .zip file."
+    "ZIP_UNREADABLE": "Cannot read the .zip file.",
+    "PRINT_SELECTED_N": "Print cards ({{count}})",
+    "PRINT_COUNT": "{{count}} cards",
+    "PRINT_NOW": "Print",
+    "PRINT_EMPTY": "No readers selected for printing.",
+    "PRINT_TOO_MANY": "You can print up to {{max}} cards at a time."
   },
   "READER_TYPE": {
     "TITLE": "Manage Reader Types",

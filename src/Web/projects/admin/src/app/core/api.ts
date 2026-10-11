@@ -46,6 +46,8 @@ export interface ReaderSearch extends CrudSearch {
   readerTypeId?: number | null; classId?: number | null; courseId?: number | null; expired?: boolean | null;
   cardNoContains?: string | null; lastName?: string | null; firstName?: string | null; orgIds?: number[] | null;
   issuedFrom?: string | null; issuedTo?: string | null; expiredFrom?: string | null; expiredTo?: string | null;
+  /** Đúng các bạn đọc này (in thẻ) — tối đa 500. */
+  publicIds?: string[] | null;
 }
 export interface ReaderBulkUpdate {
   publicIds: string[]; readerTypeId?: number | null; classId?: number | null; courseId?: number | null;

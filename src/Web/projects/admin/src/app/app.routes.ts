@@ -24,6 +24,14 @@ const catalog = (path: string, config: CrudConfig) => ({
 // Các màn tải theo trang (lazy) — khung admin + bảng điều khiển nằm trong bundle đầu.
 export const routes: Routes = [
   { path: 'callback', component: Callback },
+  // Trang in (ngoài khung admin — bản in chỉ có nội dung). Guard đăng nhập ở route cha chạy xong rồi mới đến guard quyền.
+  {
+    path: 'print',
+    canActivate: [authGuard],
+    children: [
+      { path: 'reader-cards', loadComponent: () => import('./pages/patron/reader-print').then((m) => m.ReaderPrint), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'READER.PRINT_CARD' },
+    ],
+  },
   {
     path: '',
     component: Shell,
@@ -56,7 +64,7 @@ export const routes: Routes = [
       catalog('academic-classes', CLASSES),
       catalog('courses', COURSES),
       catalog('reader-groups', READER_GROUPS),
-      { path: 'readers', loadComponent: () => import('./pages/patron/readers').then((m) => m.Readers), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'Bạn đọc' },
+      { path: 'readers', loadComponent: () => import('./pages/patron/readers').then((m) => m.Readers), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'MENU.READERS' },
       catalog('bib-types', BIB_TYPES),
       { path: 'worksheets', loadComponent: () => import('./pages/catalog/worksheets').then((m) => m.Worksheets), canActivate: [tenantGuard, permissionGuard('WORKSHEETS')], title: 'Biểu mẫu biên mục' },
       { path: 'catalog-bibs', loadComponent: () => import('./pages/catalog/bibs').then((m) => m.Bibs), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'Biên mục biểu ghi' },

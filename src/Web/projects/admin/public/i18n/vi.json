@@ -512,7 +512,12 @@
     "PHOTOS_NOT_FOUND": "{{count}} ảnh không khớp số thẻ nào:",
     "PHOTOS_FAILED": "{{count}} ảnh lỗi:",
     "PHOTOS_UPLOAD": "Tải lên",
-    "ZIP_UNREADABLE": "Không đọc được file .zip."
+    "ZIP_UNREADABLE": "Không đọc được file .zip.",
+    "PRINT_SELECTED_N": "In thẻ ({{count}})",
+    "PRINT_COUNT": "{{count}} thẻ",
+    "PRINT_NOW": "In",
+    "PRINT_EMPTY": "Chưa chọn bạn đọc nào để in thẻ.",
+    "PRINT_TOO_MANY": "Mỗi lần in tối đa {{max}} thẻ."
   },
   "READER_TYPE": {
     "TITLE": "Quản lý Loại bạn đọc",
