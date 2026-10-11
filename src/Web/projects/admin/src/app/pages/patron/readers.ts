@@ -78,7 +78,7 @@ const BLANK: ReaderForm = {
           <button (click)="openBulk()" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
             <span class="material-icons text-[18px]">tune</span> Sửa hàng loạt ({{ selected().size }})
           </button>
-          <button (click)="passwordFor.set(selectedReaders())" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
+          <button (click)="passwordFor.set({ readers: selectedReaders(), bulk: true })" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
             <span class="material-icons text-[18px]">key</span> Đặt mật khẩu OPAC ({{ selected().size }})
           </button>
         }
@@ -89,12 +89,12 @@ const BLANK: ReaderForm = {
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
       @if (loading()) { <app-loading /> }
       <div class="overflow-x-auto w-full">
-        <table class="w-full text-left border-collapse min-w-[1140px]">
+        <table class="w-full text-left border-collapse min-w-[1280px]">
           <thead>
             <tr>
               <th class="th w-10 text-center"><input type="checkbox" class="rounded border-gray-300" [checked]="allSelected()" (change)="toggleAll()" /></th>
               <th class="th w-32">Số thẻ</th>
-              <th class="th">Họ và tên</th>
+              <th class="th min-w-[180px]">Họ và tên</th>
               <th class="th w-24">Giới tính</th>
               <th class="th w-28">Ngày sinh</th>
               <th class="th w-36">Loại bạn đọc</th>
@@ -129,7 +129,7 @@ const BLANK: ReaderForm = {
                   <div class="flex items-center justify-center gap-1.5">
                     @if (can('edit')) {
                       <button (click)="openForm(r)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa"><span class="material-icons text-[18px]">edit</span></button>
-                      <button (click)="passwordFor.set([r])" class="icon-btn bg-violet-50 text-violet-600 hover:bg-violet-100" title="Mật khẩu OPAC"><span class="material-icons text-[18px]">key</span></button>
+                      <button (click)="passwordFor.set({ readers: [r], bulk: false })" class="icon-btn bg-violet-50 text-violet-600 hover:bg-violet-100" title="Mật khẩu OPAC"><span class="material-icons text-[18px]">key</span></button>
                       @if (r.status === 2) {
                         <button (click)="locking.set(r); lockReason = ''" class="icon-btn bg-amber-50 text-amber-600 hover:bg-amber-100" title="Khoá thẻ"><span class="material-icons text-[18px]">lock</span></button>
                       } @else {
@@ -252,9 +252,9 @@ const BLANK: ReaderForm = {
       </app-modal>
     }
 
-    @if (passwordFor(); as list) {
-      <app-reader-password [readers]="list" [account]="list.length === 1 ? accounts()[list[0].publicId] : undefined"
-                           (closed)="passwordFor.set(null)" (saved)="passwordSaved(list.length)" />
+    @if (passwordFor(); as pw) {
+      <app-reader-password [readers]="pw.readers" [bulk]="pw.bulk" [account]="pw.bulk ? undefined : accounts()[pw.readers[0].publicId]"
+                           (closed)="passwordFor.set(null)" (saved)="passwordSaved(pw.bulk)" />
     }
 
     @if (deleting(); as r) {
@@ -298,7 +298,7 @@ export class Readers implements OnInit {
   protected readonly uploadingPhotos = signal(false);
   /** Tình trạng đăng nhập OPAC (identity) của các bạn đọc trên trang — không có thì hiện "—". */
   protected readonly accounts = signal<Record<string, ReaderAccount>>({});
-  protected readonly passwordFor = signal<Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[] | null>(null);
+  protected readonly passwordFor = signal<{ readers: Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[]; bulk: boolean } | null>(null);
   protected readonly label = accountLabel;
   /** Ảnh thẻ của bạn đọc đang sửa (url: link ký có hạn từ media). */
   protected readonly photo = signal<{ publicId: string; photoId: string | null; url: string | null } | null>(null);
@@ -367,10 +367,10 @@ export class Readers implements OnInit {
     return [...this.selected()].map((publicId) => ({ publicId, cardNo: '', fullName: '' }));
   }
 
-  protected passwordSaved(count: number): void {
-    // Đặt một bạn đọc thì hộp thoại vẫn mở được lại với tình trạng mới; đặt hàng loạt thì bỏ chọn.
+  protected passwordSaved(bulk: boolean): void {
+    // Đặt hàng loạt xong thì bỏ chọn.
     this.passwordFor.set(null);
-    if (count > 1) this.selected.set(new Set());
+    if (bulk) this.selected.set(new Set());
     void this.loadAccounts();
   }
 

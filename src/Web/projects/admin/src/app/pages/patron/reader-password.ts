@@ -22,8 +22,8 @@ export function accountLabel(a: ReaderAccount | undefined): { text: string; css:
   selector: 'app-reader-password',
   imports: [FormsModule, DatePipe, Modal],
   template: `
-    <app-modal [title]="readers().length === 1 ? 'Mật khẩu OPAC — ' + readers()[0].cardNo : 'Đặt mật khẩu OPAC cho ' + readers().length + ' bạn đọc'" (closed)="closed.emit()">
-      @if (readers().length === 1) {
+    <app-modal [title]="bulk() ? 'Đặt mật khẩu OPAC cho ' + readers().length + ' bạn đọc' : 'Mật khẩu OPAC — ' + readers()[0].cardNo" (closed)="closed.emit()">
+      @if (!bulk()) {
         <div class="text-sm text-gray-600 mb-4 space-y-1">
           <div><b>{{ readers()[0].fullName }}</b> — thẻ <span class="font-mono">{{ readers()[0].cardNo }}</span></div>
           @if (account(); as a) {
@@ -44,7 +44,7 @@ export function accountLabel(a: ReaderAccount | undefined): { text: string; css:
         </label>
         <label class="flex items-start gap-2 text-sm cursor-pointer">
           <input type="radio" name="pw-mode" class="mt-1" [checked]="!useCardNo()" (change)="useCardNo.set(false)" />
-          <span>Đặt mật khẩu{{ readers().length > 1 ? ' chung' : '' }}</span>
+          <span>Đặt mật khẩu{{ bulk() ? ' chung' : '' }}</span>
         </label>
         @if (!useCardNo()) {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
@@ -66,6 +66,8 @@ export function accountLabel(a: ReaderAccount | undefined): { text: string; css:
 export class ReaderPassword {
   readonly readers = input.required<Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[]>();
   readonly account = input<ReaderAccount | undefined>();
+  /** Bạn đọc đã chọn trên danh sách (có thể chỉ một) — dùng API hàng loạt, không hiện thông tin từng người. */
+  readonly bulk = input(false);
   readonly closed = output<void>();
   readonly saved = output<void>();
 
@@ -94,7 +96,7 @@ export class ReaderPassword {
     const readers = this.readers();
     this.busy.set(true);
     try {
-      if (readers.length === 1) {
+      if (!this.bulk()) {
         await this.api.setReaderPassword(readers[0].publicId, password, useCardNo);
         this.toastr.success('Đã đặt mật khẩu OPAC.');
       } else {
