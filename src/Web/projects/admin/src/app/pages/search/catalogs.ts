@@ -10,7 +10,7 @@ export const Z3950_SERVERS: CrudConfig = {
   searchPlaceholder: 'VD: Thư viện Quốc hội Mỹ, lx2.loc.gov',
   hasStatus: true,
   columns: [
-    { key: 'name', label: 'Thư viện' },
+    { key: 'name', label: 'Thư viện', width: '220px' },
     { key: 'groupName', label: 'Nhóm', width: '160px' },
     { key: 'host', label: 'Máy chủ', type: 'mono' },
     { key: 'port', label: 'Cổng', type: 'mono', width: '80px' },

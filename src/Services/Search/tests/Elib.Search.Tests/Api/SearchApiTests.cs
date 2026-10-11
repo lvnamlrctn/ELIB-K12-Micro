@@ -184,7 +184,7 @@ public sealed class SearchApiTests(SearchApiFactory factory) : IClassFixture<Sea
     public async Task Search_stats_count_new_searches_zero_results_and_clicks_but_not_refinements()
     {
         var tenantId = NewTenant();
-        var kieu = Bib(tenantId, "Truyện Kiều", "Nguyễn Du", "2019") with { CoverUrl = "https://covers.openlibrary.org/b/isbn/9786042000001-L.jpg" };
+        var kieu = Bib(tenantId, "Truyện Kiều", "Nguyễn Du", "2019") with { CoverUrl = $"/s3/media-public/{tenantId}/bib-cover/2026/10/{Guid.NewGuid():N}.jpg" };
         await Publish(kieu);
         var opac = Opac(tenantId);
 

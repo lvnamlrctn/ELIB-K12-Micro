@@ -45,12 +45,22 @@ public sealed record MediaFileDto(Guid Id, string Purpose, string FileName, stri
 
 public sealed record DownloadDto(string Url, DateTimeOffset? ExpiresAt);
 
+/// <summary>Lấy file từ URL ngoài về kho (ảnh bìa tra theo ISBN…).</summary>
+public sealed record ImportRequest(string Purpose, string Url);
+
+/// <summary>Tải file từ Internet (Infrastructure): chỉ địa chỉ công khai, dừng khi vượt <c>maxBytes</c>. Lỗi → BusinessRuleException có câu báo.</summary>
+public interface IRemoteFileFetcher
+{
+    Task<byte[]> FetchAsync(Uri url, long maxBytes, CancellationToken ct);
+}
+
 /// <summary>
 /// Upload hai bước qua URL ký sẵn: request (cấp URL PUT vào bucket riêng tư) → trình duyệt PUT → complete (kiểm tra dung lượng
 /// và magic bytes; file công khai được chép sang bucket công khai với Content-Type thật). Nội dung chưa kiểm tra không bao giờ
 /// nằm ở bucket công khai — không ai dùng được URL upload để đưa HTML/script lên domain của hệ thống.
 /// </summary>
-public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantContext tenant, ICurrentActor actor, TimeProvider clock, IOptions<MediaOptions> options)
+public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantContext tenant, ICurrentActor actor, TimeProvider clock, IOptions<MediaOptions> options,
+    IRemoteFileFetcher fetcher)
 {
     private readonly MediaOptions _options = options.Value;
 
@@ -103,6 +113,39 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         {
             file.MarkReady(file.Bucket, file.ObjectKey, detected!, stat.Size);
         }
+        await db.SaveChangesAsync(ct);
+        return ToDto(file);
+    }
+
+    /// <summary>
+    /// Lấy ảnh công khai từ URL ngoài về bucket công khai (chỉ mục đích công khai do đơn vị tự cập nhật — ảnh bìa). Trang của hệ thống chỉ hiện
+    /// ảnh trong kho của mình (CSP img-src 'self'): trình duyệt bạn đọc không gọi ra Google/Open Library, ảnh không mất khi nguồn đổi đường dẫn.
+    /// Nội dung kiểm tra như upload (dung lượng, magic bytes).
+    /// </summary>
+    public async Task<MediaFileDto> ImportAsync(ImportRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (actor.Kind != "staff")
+            throw new BusinessRuleException("MEDIA_STAFF_ONLY", "Chỉ cán bộ thư viện được upload file.", 403);
+        var purpose = MediaPurpose.Get(request.Purpose);
+        if (!purpose.Public || purpose.SystemOnly)
+            throw new BusinessRuleException("MEDIA_IMPORT_NOT_ALLOWED", $"{purpose.Name} không lấy từ URL được — upload file.");
+        if (!Uri.TryCreate((request.Url ?? "").Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) || !string.IsNullOrEmpty(uri.UserInfo))
+            throw new BusinessRuleException("MEDIA_URL_INVALID", "Đường dẫn ảnh phải là URL http(s) đầy đủ.");
+
+        var content = await fetcher.FetchAsync(uri, purpose.MaxBytes, ct);
+        var detected = ContentSniffer.Detect(content);
+        if (detected is null || !purpose.AllowedTypes.Contains(detected))
+            throw new BusinessRuleException("MEDIA_TYPE_INVALID", $"Nội dung tải về không phải {MediaFile.AllowedText(purpose)} hợp lệ.");
+
+        var now = clock.GetUtcNow();
+        var name = Path.GetFileName(uri.AbsolutePath);
+        var file = MediaFile.Create(tenant.RequireTenantId(), purpose, name.Length is > 0 and <= 255 ? name : "anh", detected, content.Length,
+            _options.PublicBucket, now);
+        await storage.PutAsync(_options.PublicBucket, file.ObjectKey, content, detected, ct);
+        file.MarkReady(_options.PublicBucket, file.ObjectKey, detected, content.Length);
+        db.Files.Add(file);
         await db.SaveChangesAsync(ct);
         return ToDto(file);
     }

@@ -37,7 +37,7 @@ public sealed record BibChanged : IntegrationEvent
     public string? Series { get; init; }
     public IReadOnlyList<string> OtherAuthors { get; init; } = [];
 
-    /// <summary>Ảnh bìa: ảnh đã upload (/s3/media-public/…) hoặc URL https bên ngoài (tra theo ISBN).</summary>
+    /// <summary>Ảnh bìa: đường dẫn ảnh trong kho media công khai (/s3/media-public/…), cùng origin với OPAC.</summary>
     public string? CoverUrl { get; init; }
 
     /// <summary>2 = hiện trên OPAC, 1 = ẩn.</summary>

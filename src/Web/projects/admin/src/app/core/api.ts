@@ -391,6 +391,8 @@ export class Api {
     await putToStorage(ticket.uploadUrl, file);
     return this.post<MediaFile>(`/api/admin/media/files/${ticket.fileId}/complete`);
   }
+  /** Media lấy ảnh từ URL ngoài về kho công khai (ảnh bìa) — trang của hệ thống chỉ hiện ảnh cùng origin. */
+  importMedia(purpose: string, url: string) { return this.post<MediaFile>('/api/admin/media/files/import', { purpose, url }); }
   /** URL xem file: cố định với file công khai, ký có hạn (vài phút) với file riêng tư. */
   async fileUrl(fileId: string): Promise<string> {
     return (await this.get<{ url: string }>(`/api/admin/media/files/${fileId}/download`)).url;

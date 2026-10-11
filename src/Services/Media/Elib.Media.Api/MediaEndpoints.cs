@@ -18,6 +18,8 @@ public static class MediaEndpoints
             .AddEndpointFilter(RejectImpersonation);
         files.MapPost("/{id:guid}/complete", (Guid id, MediaService s, CancellationToken ct) => s.CompleteAsync(id, ct))
             .AddEndpointFilter(RejectImpersonation);
+        files.MapPost("/import", (ImportRequest request, MediaService s, CancellationToken ct) => s.ImportAsync(request, ct))
+            .AddEndpointFilter(RejectImpersonation);
         files.MapGet("/{id:guid}", (Guid id, MediaService s, CancellationToken ct) => s.GetAsync(id, ct));
         files.MapGet("/{id:guid}/download", (Guid id, MediaService s, CancellationToken ct) => s.DownloadAsync(id, ct));
 

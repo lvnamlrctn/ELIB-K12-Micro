@@ -4,8 +4,9 @@ import { Api, Bib, errorMessage } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
 
 /**
- * Ảnh bìa của biểu ghi (monolith: Bib.Images + "Lấy ảnh bìa theo ISBN"): upload ảnh (media, hiện công khai trên OPAC), tra theo ISBN ở
- * Google Books / Open Library, hoặc dán đường dẫn https. Lưu riêng với MARC — đổi ảnh không cần lưu lại biểu ghi.
+ * Ảnh bìa của biểu ghi (monolith: Bib.Images + "Lấy ảnh bìa theo ISBN"): upload ảnh, tra theo ISBN ở Google Books / Open Library, hoặc dán
+ * đường dẫn ảnh. Ảnh ngoài được media lấy về kho của hệ thống trước (CSP chỉ cho hiện ảnh cùng origin; bạn đọc không gọi ra bên thứ ba).
+ * Lưu riêng với MARC — đổi ảnh không cần lưu lại biểu ghi.
  */
 @Component({
   selector: 'app-bib-cover',
@@ -41,7 +42,7 @@ import { ToastrService } from '../../shared/toastr';
           </div>
           <div class="flex gap-2">
             <input class="input !py-1.5" placeholder="Hoặc dán đường dẫn ảnh https://..." [(ngModel)]="url" aria-label="Đường dẫn ảnh bìa" />
-            <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !url.trim()" (click)="save(url.trim())">Lưu</button>
+            <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !url.trim()" (click)="saveFromUrl()">Lưu</button>
           </div>
           <div class="text-xs text-gray-500">PNG, JPG hoặc WebP, tối đa 2 MB. Ảnh hiện trên trang tra cứu OPAC.</div>
         }
@@ -89,8 +90,26 @@ export class BibCover {
     this.busy.set(true);
     try {
       const found = await this.api.lookupCover(isbn);
-      if (found.url) this.preview.set(found.url);
-      else this.toastr.warning(`Không tìm thấy ảnh bìa cho ISBN ${isbn}.`);
+      if (!found.url) {
+        this.toastr.warning(`Không tìm thấy ảnh bìa cho ISBN ${isbn}.`);
+        return;
+      }
+      const stored = await this.api.importMedia('bib-cover', found.url);
+      if (stored.url) this.preview.set(stored.url);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Ảnh theo đường dẫn: media lấy về kho rồi mới gắn vào biểu ghi. */
+  protected async saveFromUrl(): Promise<void> {
+    this.busy.set(true);
+    try {
+      const stored = await this.api.importMedia('bib-cover', this.url.trim());
+      if (!stored.url) throw new Error('Không nhận được đường dẫn ảnh.');
+      await this.save(stored.url);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

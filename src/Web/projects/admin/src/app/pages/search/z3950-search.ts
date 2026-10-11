@@ -79,7 +79,7 @@ const PAGE_SIZE = 10;
                     <td class="td text-gray-500">{{ h.position }}</td>
                     <td class="td font-medium">{{ h.title ?? '(không nhan đề)' }}</td>
                     <td class="td">{{ h.author ?? '' }}</td>
-                    <td class="td">{{ h.publisher ?? '' }}@if (h.year) { , {{ h.year }} }</td>
+                    <td class="td">{{ publication(h) }}</td>
                     <td class="td font-mono text-[13px]">{{ h.isbn ?? '' }}</td>
                     <td class="td">
                       <div class="flex gap-2 justify-end">
@@ -169,6 +169,10 @@ export class Z3950Search implements OnInit {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     this.chosen.set(next);
+  }
+
+  protected publication(h: Z3950Hit): string {
+    return [h.publisher, h.year].filter((v) => !!v).join(', ');
   }
 
   protected pages(r: Z3950ServerResult): number {

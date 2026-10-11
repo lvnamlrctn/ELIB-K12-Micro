@@ -103,7 +103,7 @@ public sealed class OpacCatalogApiTests(CatalogApiFactory factory) : IClassFixtu
     }
 
     [Fact]
-    public async Task Staff_sets_cover_from_own_upload_or_https_and_looks_it_up_by_isbn()
+    public async Task Staff_sets_cover_from_own_media_only_and_looks_it_up_by_isbn()
     {
         var tenantId = NewTenant();
         var staff = Staff(tenantId);
@@ -118,6 +118,7 @@ public sealed class OpacCatalogApiTests(CatalogApiFactory factory) : IClassFixtu
         {
             $"/s3/media-public/{tenantId + 1}/bib-cover/2026/10/{Guid.NewGuid():N}.jpg", // ảnh của đơn vị khác
             $"/s3/media-public/{tenantId}/attachment/2026/10/{Guid.NewGuid():N}.jpg",
+            "https://covers.openlibrary.org/b/isbn/9786042000011-L.jpg", // ảnh ngoài: media lấy về kho trước (CSP img-src 'self')
             "http://example.com/a.jpg", "javascript:alert(1)", "data:image/png;base64,AAAA", "/api/admin/x",
         })
         {
@@ -131,8 +132,6 @@ public sealed class OpacCatalogApiTests(CatalogApiFactory factory) : IClassFixtu
         Assert.Null((await Read<CoverLookupResult>(await staff.GetAsync(U("/api/bibs/LookupCover?isbn=9780000000002")))).Url);
         Assert.Equal(HttpStatusCode.BadRequest, (await staff.GetAsync(U("/api/bibs/LookupCover?isbn=abc"))).StatusCode);
 
-        var cleared = await Read<BibDto>(await staff.PutAsJsonAsync(U("/api/bibs/Cover"), new SetCoverRequest(bib.PublicId, found.Url), Json));
-        Assert.Equal(found.Url, cleared.CoverUrl);
         Assert.Null((await Read<BibDto>(await staff.PutAsJsonAsync(U("/api/bibs/Cover"), new SetCoverRequest(bib.PublicId, null), Json))).CoverUrl);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await Staff(tenantId, "CATALOG_BIBS:view").PutAsJsonAsync(U("/api/bibs/Cover"), new SetCoverRequest(bib.PublicId, null), Json)).StatusCode);

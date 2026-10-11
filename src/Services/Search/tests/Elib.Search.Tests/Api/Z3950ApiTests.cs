@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Elib.BuildingBlocks.Hosting;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.Testing;
 using Elib.Search.Application;
@@ -144,9 +145,9 @@ public sealed class Z3950ApiTests(SearchApiFactory factory) : IClassFixture<Sear
         Assert.Contains("mạng nội bộ", result.Error, StringComparison.Ordinal);
 
         foreach (var ip in new[] { "10.1.2.3", "172.20.0.5", "192.168.1.1", "127.0.0.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1" })
-            Assert.False(Z3950Client.IsPublic(IPAddress.Parse(ip)), ip);
+            Assert.False(PublicNetwork.IsPublic(IPAddress.Parse(ip)), ip);
         foreach (var ip in new[] { "140.147.249.67", "8.8.8.8", "2001:4860:4860::8888" })
-            Assert.True(Z3950Client.IsPublic(IPAddress.Parse(ip)), ip);
+            Assert.True(PublicNetwork.IsPublic(IPAddress.Parse(ip)), ip);
     }
 
     [Fact]

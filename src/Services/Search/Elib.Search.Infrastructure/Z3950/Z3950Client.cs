@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
+using Elib.BuildingBlocks.Hosting;
 using Elib.Search.Application;
 using Elib.Search.Domain;
 using Microsoft.Extensions.Logging;
@@ -96,7 +97,7 @@ public sealed partial class Z3950Client(IHttpClientFactory httpFactory, IOptions
 
     private static string Friendly(Exception ex) => ex switch
     {
-        Z3950Exception => ex.Message,
+        Z3950Exception or BlockedAddressException => ex.Message,
         OperationCanceledException => "Máy chủ không phản hồi (quá thời gian chờ).",
         SocketException s when s.SocketErrorCode == SocketError.HostNotFound => "Không tìm thấy máy chủ (sai địa chỉ?).",
         SocketException s when s.SocketErrorCode == SocketError.ConnectionRefused => "Máy chủ từ chối kết nối (sai cổng hoặc dịch vụ không chạy).",
@@ -139,7 +140,7 @@ public sealed partial class Z3950Client(IHttpClientFactory httpFactory, IOptions
 
         public static async Task<BerSession> OpenAsync(Z3950Client client, Z3950Target target, CancellationToken ct)
         {
-            var address = await ResolveAsync(target.Host, client._options.AllowPrivateNetworks, ct);
+            var address = await PublicNetwork.ResolveAsync(target.Host, client._options.AllowPrivateNetworks, ct);
             var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             BerSession? session = null;
             try
@@ -335,7 +336,7 @@ public sealed partial class Z3950Client(IHttpClientFactory httpFactory, IOptions
     private async Task<string> GetSruAsync(Uri uri, CancellationToken ct)
     {
         // Kiểm tra trước khi gọi (ConnectCallback của HttpClient kiểm tra lại trên IP thật, kể cả khi bị chuyển hướng).
-        await ResolveAsync(uri.Host, _options.AllowPrivateNetworks, ct);
+        await PublicNetwork.ResolveAsync(uri.Host, _options.AllowPrivateNetworks, ct);
         using var http = httpFactory.CreateClient(SruHttpClient);
         using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
@@ -357,55 +358,6 @@ public sealed partial class Z3950Client(IHttpClientFactory httpFactory, IOptions
         var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };
         using var reader = XmlReader.Create(new StringReader(xml), settings);
         return XDocument.Load(reader);
-    }
-
-    // ── Chặn địa chỉ nội bộ ─────────────────────────────────────────────────
-
-    /// <summary>IP để kết nối (ưu tiên IPv4). Bị chặn nếu BẤT KỲ địa chỉ nào của tên miền là nội bộ (chống DNS trỏ một phần vào mạng trong).</summary>
-    internal static async Task<IPAddress> ResolveAsync(string host, bool allowPrivate, CancellationToken ct)
-    {
-        var addresses = IPAddress.TryParse(host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(host, ct);
-        if (addresses.Length == 0) throw new Z3950Exception("Không tìm thấy máy chủ (sai địa chỉ?).");
-        if (!allowPrivate && addresses.Any(a => !IsPublic(a)))
-            throw new Z3950Exception("Địa chỉ máy chủ thuộc mạng nội bộ — không được phép kết nối.");
-        return addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork) ?? addresses[0];
-    }
-
-    /// <summary>Kiểm tra lại trên socket thật của HttpClient (SRU) — IP đã phân giải lúc kết nối, kể cả sau chuyển hướng.</summary>
-    public static async ValueTask<Stream> ConnectGuardedAsync(SocketsHttpConnectionContext context, bool allowPrivate, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        var address = await ResolveAsync(context.DnsEndPoint.Host, allowPrivate, ct);
-        var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(new IPEndPoint(address, context.DnsEndPoint.Port), ct);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
-    }
-
-    public static bool IsPublic(IPAddress address)
-    {
-        ArgumentNullException.ThrowIfNull(address);
-        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
-        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any)) return false;
-        if (address.AddressFamily == AddressFamily.InterNetwork)
-        {
-            var b = address.GetAddressBytes();
-            return !(b[0] is 0 or 10 or 127 || b[0] >= 224
-                     || (b[0] == 100 && b[1] is >= 64 and <= 127) // CGNAT
-                     || (b[0] == 169 && b[1] == 254)
-                     || (b[0] == 172 && b[1] is >= 16 and <= 31)
-                     || (b[0] == 192 && b[1] == 168)
-                     || (b[0] == 192 && b[1] == 0 && b[2] == 0));
-        }
-        var bytes = address.GetAddressBytes();
-        return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast || (bytes[0] & 0xFE) == 0xFC);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Tra Z39.50/SRU {Target} (cổng {Port}, CSDL {Database}) lỗi")]

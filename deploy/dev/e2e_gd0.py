@@ -32,6 +32,9 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      sao chụp; báo cáo hoạt động + tài liệu mất; xuất Excel lịch sử.
  20. tra cứu OPAC (search): chỉ mục tự dựng khi service mới triển khai, tìm không dấu ẩn danh theo host, tìm nâng cao theo tác giả,
      số bản / bản sẵn sàng, chi tiết + tình trạng từng bản, gợi ý nhan đề, ẩn biểu ghi khỏi OPAC, quản trị chỉ mục (trạng thái, dựng lại).
+ 21. OPAC mở rộng: xem MARC/ISBD + tải .mrc ẩn danh, ảnh bìa (upload media + tra theo ISBN), thống kê tra cứu + lượt mở kết quả,
+     Z39.50 ra Library of Congress (lx2.loc.gov:210/LCDB — máy chủ ngoài, lỗi mạng chỉ cảnh báo), chặn máy chủ trong mạng nội bộ,
+     OPAC chỉ thấy máy chủ được bật, giới hạn lượt tra cứu theo IP (429 + Retry-After — chạy cuối vì chặn OPAC của IP này ~1 phút).
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
   - sysadmin đã đổi mật khẩu bắt buộc: ELIB_SYSADMIN_PASSWORD='...' python3 e2e_gd0.py
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
@@ -906,6 +909,96 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         tb.request("DELETE", f"{H}/items/Delete/{i['publicId']}", token=token)
     s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{sbib['publicId']}", token=token)
     expect(s == 204, "dọn ĐKCB, biểu ghi thử")
+
+    print("21. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
+        {"tag": "020", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "9780747532699"}]},
+        {"tag": "100", "ind1": "1", "ind2": " ", "subfields": [{"code": "a", "value": "Rowling, J. K."}]},
+        {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": f"Harry Potter và hòn đá phù thủy {tag} /"},
+                                                              {"code": "c", "value": "J. K. Rowling"}]},
+        {"tag": "260", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "H. :"}, {"code": "b", "value": "Trẻ,"}, {"code": "c", "value": "2020"}]},
+        {"tag": "300", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "366 tr. ;"}, {"code": "c", "value": "20 cm"}]}]})
+    hbib = json.loads(body) if s == 201 else {}
+    expect(hbib.get("mfn"), f"chuẩn bị biểu ghi MFN {hbib.get('mfn')} có ISBN", body[:200])
+
+    s, _, body = opac.request("GET", f"/api/opac/catalog/bibs/{hbib['publicId']}/marc")
+    marc = json.loads(body) if s == 200 else {}
+    isbd = (marc.get("isbd") or [""])[0]
+    expect(isbd == f"Harry Potter và hòn đá phù thủy {tag} / J. K. Rowling. — H. : Trẻ, 2020. — 366 tr. ; 20 cm."
+           and marc["fields"][0]["tag"] == "001", "OPAC ẩn danh: MARC (kèm 001) + ISBD", body[:300])
+    s, h, raw = opac.request("GET", f"/api/opac/catalog/bibs/{hbib['publicId']}/export", binary=True)
+    expect(s == 200 and raw[:5].isdigit() and raw.endswith(b"\x1d") and f"mfn-{hbib['mfn']}.mrc" in h.get("Content-Disposition", ""),
+           f"tải biểu ghi .mrc ({len(raw)} byte)", str(h)[:200])
+    s, h, raw = opac.request("GET", f"/api/opac/catalog/bibs/{hbib['publicId']}/export?format=marcxml", binary=True)
+    expect(s == 200 and b"<record" in raw, "tải biểu ghi MARCXML")
+
+    s, _, body = tb.request("GET", f"{C}/bibs/LookupCover?isbn=9780747532699", token=token)
+    found = json.loads(body).get("url") if s == 200 else None
+    print(f"  [{'OK' if found else 'CẢNH BÁO'}]  tra ảnh bìa theo ISBN (Google Books/Open Library): {found or 'không thấy / không ra được Internet'}")
+    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==")
+    s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,
+                            json_body={"purpose": "bib-cover", "fileName": "bia.png", "contentType": "image/png", "size": len(png)})
+    ticket = json.loads(body) if s == 200 else {}
+    tb.request("PUT", ticket.get("uploadUrl", "/x"), raw=(png, "image/png"))
+    s, _, body = tb.request("POST", f"/api/admin/media/files/{ticket.get('fileId')}/complete", token=token)
+    cover = json.loads(body).get("url") if s == 200 else None
+    s, _, body = tb.request("PUT", f"{C}/bibs/Cover", token=token, json_body={"publicId": hbib["publicId"], "coverUrl": cover})
+    expect(s == 200 and json.loads(body).get("coverUrl") == cover and cover.startswith("/s3/media-public/"), "upload ảnh bìa (media bib-cover) và gắn vào biểu ghi",
+           body[:200])
+    s, _, body = tb.request("PUT", f"{C}/bibs/Cover", token=token, json_body={"publicId": hbib["publicId"], "coverUrl": "http://evil.example/x.png"})
+    expect(s == 400, "ảnh bìa http/ngoài đơn vị bị từ chối", body[:200])
+    hit = {}
+    for _ in range(30):
+        s, _, body = opac.request("POST", "/api/opac/search/bibs/Search", json_body={"q": f"harry potter {tag}"})
+        items = json.loads(body).get("items", []) if s == 200 else []
+        hit = items[0] if items else {}
+        if hit.get("coverUrl") == cover: break
+        time.sleep(1)
+    query_id = json.loads(body).get("queryId") if s == 200 else None
+    s2, h2, img = opac.request("GET", cover, binary=True)
+    expect(hit.get("coverUrl") == cover and s2 == 200 and img[:4] == b"\x89PNG", "OPAC: kết quả tra cứu có ảnh bìa, ảnh tải công khai qua /s3", body[:200])
+
+    s, _, _ = opac.request("POST", "/api/opac/search/stats/click", json_body={"queryId": query_id, "bibPublicId": hbib["publicId"], "position": 1})
+    opac.request("POST", "/api/opac/search/bibs/Search", json_body={"q": f"khong co tai lieu nay {tag}"})
+    s, _, body = tb.request("GET", f"{S}/stats/Summary", token=token)
+    st = json.loads(body) if s == 200 else {}
+    zero = [q["text"] for q in st.get("topZeroResults", [])]
+    expect(st.get("searches", 0) >= 2 and st.get("withClicks", 0) >= 1 and f"khong co tai lieu nay {tag}" in zero,
+           f"thống kê tra cứu: {st.get('searches')} lượt, {st.get('zeroResults')} không có kết quả, {st.get('withClicks')} lượt mở kết quả", body[:300])
+
+    Z = f"{S}/z3950-servers"
+    s, _, body = tb.request("POST", f"{Z}/Add", token=token, json_body={"name": f"Library of Congress {tag}", "host": "lx2.loc.gov", "port": 210,
+                                                                        "databaseName": "LCDB", "recordSyntax": "USMARC", "showOnOpac": True})
+    loc = json.loads(body) if s == 201 else {}
+    s, _, body = tb.request("POST", f"{Z}/Add", token=token, json_body={"name": f"Nội bộ {tag}", "host": "postgres", "port": 5432, "databaseName": "x"})
+    internal = json.loads(body) if s == 201 else {}
+    expect(loc.get("publicId") and internal.get("publicId"), "khai báo máy chủ Z39.50 (LOC) và một máy chủ trỏ vào mạng nội bộ", body[:200])
+    s, _, body = tb.request("POST", "/api/admin/search/z3950/Search", token=token, json_body={"title": "harry potter", "pageSize": 5})
+    results = {r["serverName"]: r for r in (json.loads(body) if s == 200 else [])}
+    blocked = results.get(f"Nội bộ {tag}", {})
+    expect(s == 200 and not blocked.get("connected") and "mạng nội bộ" in (blocked.get("error") or ""), "máy chủ trong mạng nội bộ bị chặn", body[:300])
+    lr = results.get(f"Library of Congress {tag}", {})
+    if lr.get("connected") and lr.get("total", 0) > 0 and lr.get("hits"):
+        first = lr["hits"][0]
+        step(f"Z39.50 ra Library of Congress: {lr['total']} kết quả, bản ghi 1: {first.get('title')} — {len(first['record']['fields'])} trường MARC")
+    else:
+        print(f"  [CẢNH BÁO] Z39.50 ra Library of Congress không có kết quả: {lr.get('error') or body[:200]}")
+    s, _, body = opac.request("GET", "/api/opac/search/z3950/servers")
+    names = [x["name"] for x in json.loads(body)] if s == 200 else []
+    expect(f"Library of Congress {tag}" in names and f"Nội bộ {tag}" not in names, "OPAC chỉ thấy máy chủ bật \"hiện trên OPAC\"", body[:200])
+    for server in (loc, internal):
+        tb.request("DELETE", f"{Z}/Delete/{server['publicId']}", token=token)
+    s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{hbib['publicId']}", token=token)
+    expect(s == 204, "dọn máy chủ Z39.50, biểu ghi thử")
+
+    # Giới hạn lượt tra cứu: chạy cuối — IP này bị chặn OPAC tới khi cửa sổ trượt qua (~10 giây mỗi đoạn, tối đa 1 phút).
+    limited = None
+    for i in range(400):
+        s, h, _ = opac.request("GET", "/api/opac/search/suggest?q=ha")
+        if s == 429:
+            limited = (i + 1, h.get("Retry-After"))
+            break
+    expect(limited and limited[1], f"giới hạn lượt tra cứu theo IP: request thứ {limited and limited[0]} bị 429, Retry-After {limited and limited[1]} giây")
 
 
 if __name__ == "__main__":

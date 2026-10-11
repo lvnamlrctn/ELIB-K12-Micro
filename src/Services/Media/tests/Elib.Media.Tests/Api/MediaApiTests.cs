@@ -208,4 +208,33 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
         while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(50);
         Assert.True(condition());
     }
+
+    [Fact]
+    public async Task Staff_imports_bib_cover_from_url_into_public_bucket_after_content_check()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var client = Staff(tenantId);
+        _factory.Remote.Files["https://covers.openlibrary.org/b/isbn/9780747532699-L.jpg"] = PngBytes;
+        _factory.Remote.Files["https://evil.example/cover.png"] = "<html><script>alert(1)</script></html>"u8.ToArray();
+
+        var file = await Read<MediaFileDto>(await client.PostAsJsonAsync(U("/api/files/import"),
+            new ImportRequest("bib-cover", "https://covers.openlibrary.org/b/isbn/9780747532699-L.jpg")));
+        Assert.Equal(("image/png", MediaFileStatus.Ready, "9780747532699-L.jpg"), (file.ContentType, file.Status, file.FileName));
+        Assert.StartsWith($"/s3/media-public/{tenantId}/bib-cover/", file.Url, StringComparison.Ordinal);
+        Assert.EndsWith(".png", file.Url, StringComparison.Ordinal); // đuôi theo nội dung thật, không theo URL
+        Assert.Contains(_factory.Storage.Objects.Keys, k => k.StartsWith("media-public/", StringComparison.Ordinal) && file.Url!.EndsWith(k, StringComparison.Ordinal));
+
+        foreach (var (purpose, url, code) in new[]
+        {
+            ("bib-cover", "https://evil.example/cover.png", "MEDIA_TYPE_INVALID"),
+            ("bib-cover", "https://khong-co.example/x.jpg", "MEDIA_FETCH_FAILED"),
+            ("bib-cover", "ftp://x/y.jpg", "MEDIA_URL_INVALID"),
+            ("attachment", "https://covers.openlibrary.org/b/isbn/9780747532699-L.jpg", "MEDIA_IMPORT_NOT_ALLOWED"),
+            ("tenant-logo", "https://covers.openlibrary.org/b/isbn/9780747532699-L.jpg", "MEDIA_IMPORT_NOT_ALLOWED"),
+        })
+        {
+            var response = await client.PostAsJsonAsync(U("/api/files/import"), new ImportRequest(purpose, url));
+            Assert.Equal((HttpStatusCode.BadRequest, code), (response.StatusCode, await ErrorCode(response)));
+        }
+    }
 }

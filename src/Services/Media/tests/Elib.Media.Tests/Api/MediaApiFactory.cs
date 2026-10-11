@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Storage;
+using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Testing;
+using Elib.Media.Application;
 using Elib.Media.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,6 +23,7 @@ public sealed class MediaApiFactory : WebApplicationFactory<Program>
     private bool _initialized;
 
     public InMemoryObjectStorage Storage { get; } = new();
+    public FakeRemoteFiles Remote { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -40,6 +43,8 @@ public sealed class MediaApiFactory : WebApplicationFactory<Program>
             services.AddHeaderTestAuth();
             services.RemoveAll<IObjectStorage>();
             services.AddSingleton<IObjectStorage>(Storage);
+            services.RemoveAll<IRemoteFileFetcher>();
+            services.AddSingleton<IRemoteFileFetcher>(Remote);
         });
     }
 
@@ -115,4 +120,15 @@ public sealed class InMemoryObjectStorage : IObjectStorage
         Objects.TryRemove(Id(bucket, key), out _);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>"Internet" giả cho lấy file từ URL: URL không có trong bảng → lỗi như máy chủ trả 404.</summary>
+public sealed class FakeRemoteFiles : IRemoteFileFetcher
+{
+    public ConcurrentDictionary<string, byte[]> Files { get; } = new();
+
+    public Task<byte[]> FetchAsync(Uri url, long maxBytes, CancellationToken ct) =>
+        Files.TryGetValue(url.AbsoluteUri, out var content)
+            ? content.Length > maxBytes ? throw new BusinessRuleException("MEDIA_TOO_LARGE", "Ảnh quá lớn.") : Task.FromResult(content)
+            : throw new BusinessRuleException("MEDIA_FETCH_FAILED", "Không tải được ảnh (máy chủ trả lỗi 404).");
 }

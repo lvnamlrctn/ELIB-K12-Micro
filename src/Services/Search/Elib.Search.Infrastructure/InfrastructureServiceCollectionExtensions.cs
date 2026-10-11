@@ -44,11 +44,7 @@ public static class InfrastructureServiceCollectionExtensions
                 c.Timeout = TimeSpan.FromSeconds(30);
                 c.DefaultRequestHeaders.UserAgent.ParseAdd("ELIB-K12-Z3950/1.0");
             })
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                ConnectCallback = (context, ct) => Z3950Client.ConnectGuardedAsync(context, allowPrivate, ct),
-                MaxAutomaticRedirections = 3,
-            });
+            .ConfigurePrimaryHttpMessageHandler(() => PublicNetwork.Handler(allowPrivate));
         services.AddScoped<IZ3950Client, Z3950Client>();
 
         services.AddElibMessaging<SearchDbContext>(ServiceName, configuration, x =>

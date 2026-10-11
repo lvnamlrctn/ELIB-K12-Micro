@@ -111,7 +111,7 @@ public sealed partial class Bib : TenantEntity, IHasStatus
     public int Status { get; private set; } = IHasStatus.Active;
     public long Version { get; private set; }
 
-    /// <summary>Ảnh bìa (monolith: Bib.Images): ảnh đã upload cho đơn vị (media, bucket công khai) hoặc URL https bên ngoài.</summary>
+    /// <summary>Ảnh bìa (monolith: Bib.Images): ảnh trong kho media của đơn vị (bucket công khai) — upload, hoặc media lấy về từ URL ngoài.</summary>
     public string? CoverUrl { get; private set; }
 
     public IReadOnlyList<string> IsbnList => Isbns.Split('|', StringSplitOptions.RemoveEmptyEntries);
@@ -139,14 +139,14 @@ public sealed partial class Bib : TenantEntity, IHasStatus
     public const int MaxCoverUrlLength = 1000;
 
     /// <summary>
-    /// Đặt/bỏ ảnh bìa. Chỉ nhận ảnh đã upload cho CHÍNH đơn vị này qua media (<paramref name="mediaPublicPrefix"/>/{đơn vị}/bib-cover/…)
-    /// hoặc URL https (ảnh bìa tra theo ISBN ở Open Library…) — không nhận http, javascript:, data: hay đường dẫn khác trên hệ thống.
+    /// Đặt/bỏ ảnh bìa. Chỉ nhận ảnh trong kho media của CHÍNH đơn vị này (<paramref name="mediaPublicPrefix"/>/{đơn vị}/bib-cover/…): trang của
+    /// hệ thống chỉ hiện ảnh cùng origin (CSP img-src 'self'), ảnh ngoài (Open Library, Google Books) phải lấy về kho qua media trước.
     /// </summary>
     public void SetCover(string? url, string mediaPublicPrefix)
     {
         var value = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
         if (value is not null && !IsAllowedCover(value, $"{(mediaPublicPrefix ?? "").TrimEnd('/')}/{TenantId}/bib-cover/"))
-            throw new BusinessRuleException("BIB_COVER_INVALID", "Ảnh bìa phải là ảnh đã upload cho đơn vị này hoặc đường dẫn https.");
+            throw new BusinessRuleException("BIB_COVER_INVALID", "Ảnh bìa phải là ảnh đã upload (hoặc lấy về kho) của đơn vị này.");
         if (value == CoverUrl) return;
         CoverUrl = value;
         Version++;
@@ -155,8 +155,7 @@ public sealed partial class Bib : TenantEntity, IHasStatus
     private static bool IsAllowedCover(string url, string ownPrefix)
     {
         if (url.Length > MaxCoverUrlLength || url.Any(c => char.IsWhiteSpace(c) || c is '"' or '\'' or '<' or '>' or '\\')) return false;
-        if (url.StartsWith(ownPrefix, StringComparison.Ordinal)) return MediaPathPattern().IsMatch(url[ownPrefix.Length..]);
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.UserInfo);
+        return url.StartsWith(ownPrefix, StringComparison.Ordinal) && MediaPathPattern().IsMatch(url[ownPrefix.Length..]);
     }
 
     /// <summary>Phần sau tiền tố của key media: yyyy/MM/{guid N}.{png|jpg|webp}.</summary>

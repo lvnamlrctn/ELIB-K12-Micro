@@ -22,6 +22,15 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddElibObjectStorage(configuration);
         services.Configure<MediaOptions>(configuration.GetSection(MediaOptions.SectionName));
 
+        // Lấy ảnh từ URL ngoài: chỉ địa chỉ công khai (Media:AllowPrivateNetworks để thử trong mạng nội bộ).
+        var allowPrivate = configuration.GetValue<bool>("Media:AllowPrivateNetworks");
+        services.AddHttpClient<IRemoteFileFetcher, RemoteFileFetcher>(c =>
+            {
+                c.Timeout = TimeSpan.FromSeconds(15);
+                c.DefaultRequestHeaders.UserAgent.ParseAdd("ELIB-K12/1.0 (+https://thuvientn.vn)");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => PublicNetwork.Handler(allowPrivate));
+
         services.AddHostedService<BucketInitializer>();
         services.AddSingleton<PendingUploadCleanup>();
         services.AddHostedService(sp => sp.GetRequiredService<PendingUploadCleanup>());

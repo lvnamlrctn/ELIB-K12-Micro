@@ -74,7 +74,7 @@ public sealed partial class BibResource
         return ToDto(bib);
     }
 
-    /// <summary>Tìm ảnh bìa theo ISBN của biểu ghi (hoặc ISBN nhập tay) — chỉ trả URL, cán bộ xem rồi mới bấm lưu.</summary>
+    /// <summary>Tìm ảnh bìa theo ISBN — chỉ trả URL nguồn; app quản trị nhờ media lấy ảnh về kho rồi mới gắn vào biểu ghi.</summary>
     public static async Task<CoverLookupResult> LookupCoverAsync(string? isbn, ICoverLookup lookup, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(lookup);
