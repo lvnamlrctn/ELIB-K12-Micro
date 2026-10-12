@@ -40,7 +40,7 @@ Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư 
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
 Bước 4 gọi gateway qua 127.0.0.1:<GATEWAY_PORT> với Host của đơn vị (chưa có DNS wildcard), coi như đi qua nginx https.
 """
-import base64, hashlib, html, http.cookiejar, io, json, os, re, secrets, sys, time, urllib.error, urllib.parse, urllib.request, zipfile
+import base64, hashlib, html, http.cookiejar, io, json, os, re, secrets, sys, time, urllib.error, urllib.parse, urllib.request, uuid, zipfile
 from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,8 +69,8 @@ class Browser:
         self.jar = http.cookiejar.CookieJar(policy)
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar), NoRedirect)
 
-    def request(self, method, path, data=None, token=None, json_body=None, raw=None, binary=False):
-        headers = {}
+    def request(self, method, path, data=None, token=None, json_body=None, raw=None, binary=False, headers=None):
+        headers = dict(headers or {})
         if self.host: headers["Host"] = self.host
         if self.proto: headers["X-Forwarded-Proto"] = self.proto
         if token: headers["Authorization"] = "Bearer " + token
@@ -202,6 +202,17 @@ def xlsx(rows):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for name, content in files.items(): z.writestr(name, content)
     return buf.getvalue()
+
+
+def multipart_fields(files, fields):
+    """multipart nhiều phần: files = [(tên trường, tên file, nội dung, kiểu)], fields = {tên: giá trị chuỗi}."""
+    boundary = "e2e" + secrets.token_hex(8)
+    body = b""
+    for field, filename, content, ctype in files:
+        body += (f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{filename}"\r\nContent-Type: {ctype}\r\n\r\n').encode() + content + b"\r\n"
+    for name, value in fields.items():
+        body += (f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n').encode()
+    return body + f"--{boundary}--\r\n".encode(), f"multipart/form-data; boundary={boundary}"
 
 
 def multipart(field, filename, content, ctype):
@@ -669,6 +680,95 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         tb.request("DELETE", f"{P}/readers/Delete/{r['publicId']}", token=token)
     s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"keyword": card})
     expect(s == 200 and json.loads(body)["totalCount"] == 0, "đã dọn bạn đọc thử")
+
+    print("15b. Nhập Excel nâng cao kiểu ELIB-LRC (ghép cột, xem trước, chạy nền)")
+    lrc_class, n_rows = f"E2E-LRC-{tag}", 1200
+    rows = [["DANH SÁCH BẠN ĐỌC (xuất từ ELIB-LRC)"], [], ["STT", "Ma the", "Ho dem", "Ten", "Ngay sinh", "Gioi tinh", "Lop hoc"]]
+    rows += [[str(i), f"L{tag}-{i:04}", "Nguyễn Văn", f"Thử {i}", f"2012{(i % 12) + 1:02}{(i % 28) + 1:02}", "2" if i % 2 else "1", lrc_class]
+             for i in range(1, n_rows + 1)]
+    rows += [[str(n_rows + 1), f"L{tag}-X1", "Lỗi", "Ngày", "31/02/2012", "1", lrc_class], [str(n_rows + 2), f"L{tag}-0001", "Trùng", "Dòng", None, None, None]]
+    lrc = xlsx(rows)
+    s, _, body = tb.request("POST", f"{P}/readers/Import/Columns", token=token, raw=multipart("file", "lrc.xlsx", lrc, XLSX))
+    cols = json.loads(body) if s == 200 else {}
+    sug = cols.get("suggested", {})
+    expect(cols.get("headerRow") == 3 and cols.get("dataRows") == n_rows + 2 and sug.get("cardno") == 2 and sug.get("lastname") == 3 and "class" not in sug,
+           f"đọc cột: tiêu đề ở dòng {cols.get('headerRow')}, {cols.get('dataRows')} dòng, gợi ý {len(sug)} cột", body)
+    options = json.dumps({"headerRow": 3, "columns": {**sug, "class": 7}, "overwrite": False, "readerTypeId": rtype["id"], "autoCreateRefs": True})
+    s, _, body = tb.request("POST", f"{P}/readers/Import/Jobs", token=token, raw=multipart_fields([("file", "lrc.xlsx", lrc, XLSX)], {"options": options}))
+    job = json.loads(body) if s == 200 else {}
+    expect(job.get("status") == "Ready" and job.get("toCreate") == n_rows and job.get("errorCount") == 2 and job.get("hasErrorFile"),
+           f"xem trước: thêm {job.get('toCreate')}, lỗi {job.get('errorCount')} — chưa ghi gì", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Import/Jobs/{job.get('id')}/Start", token=token)
+    expect(s == 200 and json.loads(body)["status"] == "Queued", "bấm chạy nền", body)
+    started = time.time()
+    while time.time() - started < 300:
+        s, _, body = tb.request("GET", f"{P}/readers/Import/Jobs/{job['id']}", token=token)
+        job = json.loads(body) if s == 200 else job
+        if job.get("status") in ("Done", "Failed"): break
+        time.sleep(2)
+    expect(job.get("status") == "Done" and job.get("created") == n_rows and job.get("failed") == 2,
+           f"chạy nền xong sau {time.time() - started:.0f} giây: thêm {job.get('created')}, lỗi {job.get('failed')}", json.dumps(job)[:300])
+    s, h, content = tb.request("GET", f"{P}/readers/Import/Jobs/{job['id']}/Errors", token=token, binary=True)
+    expect(s == 200 and content[:2] == b"PK", f"tải file \"Dòng cần sửa\" ({len(content)} byte)", f"{s}")
+    lrc_filter = {"cardNoContains": f"L{tag}-"}
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={**lrc_filter, "pageSize": 1})
+    expect(s == 200 and json.loads(body)["totalCount"] == n_rows, "bạn đọc nhập được tìm thấy (lớp tự tạo, loại bạn đọc cho cả file)", body)
+
+    print("15c. Thao tác hàng loạt theo bộ lọc, nhóm, lịch sử thay đổi")
+    s, _, body = tb.request("POST", f"{P}/readers/Batch/Preview", token=token, json_body=lrc_filter)
+    preview = json.loads(body) if s == 200 else {}
+    expect(preview.get("count") == n_rows, f"xem trước theo bộ lọc: {preview.get('count')} bạn đọc", body)
+    s, _, body = tb.request("PUT", f"{P}/readers/BatchUpdate", token=token,
+                            json_body={"selection": {"search": {"cardNoContains": "L"}, "token": preview.get("token")}, "expireDate": "2029-06-30"})
+    expect(s == 400 and "READER_BATCH_TOKEN_MISMATCH" in body, "mã xem trước không dùng được cho bộ lọc khác", body)
+    t0 = time.time()
+    s, _, body = tb.request("PUT", f"{P}/readers/BatchUpdate", token=token,
+                            json_body={"selection": {"search": lrc_filter, "token": preview.get("token")}, "expireDate": "2029-06-30"})
+    expect(s == 200 and json.loads(body)["count"] == n_rows, f"sửa hạn thẻ {n_rows} bạn đọc theo bộ lọc ({time.time() - t0:.1f} giây)", body)
+    s, _, body = tb.request("POST", f"{P}/reader-groups/Add", token=token, json_body={"name": f"E2E nhóm {tag}", "code": f"E2E{tag}"})
+    group = json.loads(body) if s == 201 else {}
+    expect(s == 201, "tạo nhóm bạn đọc", body)
+    s, _, body = tb.request("PUT", f"{P}/readers/Groups", token=token,
+                            json_body={"selection": {"search": lrc_filter, "token": preview.get("token")}, "groupId": group.get("id"), "add": True})
+    expect(s == 200 and json.loads(body)["count"] == n_rows, "thêm cả kết quả lọc vào nhóm", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"groupId": group.get("id"), "pageSize": 1})
+    expect(s == 200 and json.loads(body)["totalCount"] == n_rows, "lọc danh sách theo nhóm", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={"cardNo": f"L{tag}-0001"})
+    first = json.loads(body)["items"][0]
+    upd = {k: first[k] for k in ("cardNo", "lastName", "firstName", "citizenId", "cardUid", "email", "address", "birthDate", "sex", "readerTypeId",
+                                 "classId", "courseId", "orgId", "degreeId", "ethnicityId", "academicTitleId", "issueDate", "expireDate")}
+    upd["phone"] = "0912000111"
+    s, _, body = tb.request("PUT", f"{P}/readers/Update/{first['publicId']}", token=token, json_body=upd,
+                            headers={"X-Change-Reason": urllib.parse.quote("Cập nhật điện thoại theo đơn E2E")})
+    expect(s == 200, "sửa bạn đọc kèm lý do sửa", body)
+    hist = []
+    for _ in range(15):  # audit ghi qua event
+        s, _, body = tb.request("GET", f"/api/admin/audit/audit-logs/entity/Reader/{first['publicId']}", token=token)
+        hist = json.loads(body) if s == 200 else []
+        if any(x.get("changes") and "phone" in x["changes"] for x in hist): break
+        time.sleep(1)
+    edit = next((x for x in hist if x.get("changes") and "phone" in x["changes"]), {})
+    ch = json.loads(edit.get("changes") or "{}")
+    expect(ch.get("phone") == [None, "0912000111"] and ch.get("_reason") == "Cập nhật điện thoại theo đơn E2E"
+           and any(x.get("changes") and "expireDate" in x["changes"] for x in hist),
+           f"lịch sử thay đổi: {len(hist)} dòng, có sửa hàng loạt hạn thẻ và điện thoại cũ → mới kèm lý do", json.dumps(hist)[:300])
+    ids = []
+    for page_no in (1, 2, 3):
+        s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={**lrc_filter, "pageSize": 500, "pageIndex": page_no})
+        ids += [r["publicId"] for r in json.loads(body)["items"]] if s == 200 else []
+    s, _, body = tb.request("POST", f"{P}/readers/BulkDelete", token=token, json_body={"publicIds": ids})
+    expect(s == 200 and json.loads(body)["count"] == n_rows, f"xoá nhiều {len(ids)} bạn đọc đã chọn (dọn dữ liệu thử)", body)
+    s, _, body = tb.request("DELETE", f"{P}/reader-groups/Delete/{group.get('publicId')}", token=token)
+    s2, _, body2 = tb.request("POST", f"{P}/classes/SearchAll", token=token, json_body={"keyword": lrc_class})
+    for c in (json.loads(body2) if s2 == 200 else []):
+        if c["name"] == lrc_class: tb.request("DELETE", f"{P}/classes/Delete/{c['publicId']}", token=token)
+    expect(s == 204, "dọn nhóm và lớp thử", body)
+    s, _, body = tb.request("POST", "/api/admin/media/files/urls", token=token, json_body={"ids": [photo["fileId"], str(uuid.uuid4())]})
+    urls = json.loads(body) if s == 200 else []
+    expect(len(urls) == 1 and urls[0]["id"] == photo["fileId"] and urls[0]["url"], "link xem nhiều ảnh một lần (media files/urls, bỏ id lạ)", body)
+    lb = Browser(GATEWAY, host=host, proto="https")
+    s, _, page = lb.request("GET", "/account/login?ReturnUrl=%2F", headers={"Cookie": "elib_lang=en"})
+    expect(s == 200 and 'lang="en"' in page and "Sign in" in page, "trang đăng nhập identity hiện tiếng Anh theo cookie elib_lang", f"{s} {page[:200]}")
 
     print("16. Biên mục (service catalog)")
     C = "/api/admin/catalog"

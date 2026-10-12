@@ -87,3 +87,14 @@ web/
 | `frontend/src/app/services/<domain>/*.service.ts` | Adapter mỏng trên `libs/api/<service>`; bỏ dần |
 | `opac/config.ts` (`APP_CONFIG`, `CHATBOT_API_BASE`) | `shared/tenant` + biến môi trường lúc chạy (`/assets/env.json`), không build lại theo môi trường |
 | Thiếu `frontend/Dockerfile` (compose tham chiếu nhưng không có) | Mỗi app có Dockerfile riêng, build trong CI theo `nx affected` |
+
+## 8. Đa ngữ (vi / en)
+
+Đã làm cho cả ba giao diện: app Admin, OPAC và trang đăng nhập của identity (render ở server).
+
+- **Thư viện:** `@ngx-translate/core` + `@ngx-translate/http-loader` **17.0.0** — cùng bản ELIB-LRC. Từ điển mỗi app ở `projects/{admin,opac}/public/i18n/{vi,en}.json`; giữ **tên khoá của LRC** khi cùng nghĩa (`COMMON.*`, `MENU.*`, `READER.*`, `ORG.*`…) để chép bản dịch qua lại, khoá mới đặt theo màn (`BORROW_PAGE.*`, `READER_IMPORT.*`…). Lỗi API: `ERRORS.<code>` theo mã lỗi của backend, không có khoá thì hiện `detail` của backend.
+- **Ngôn ngữ đang chọn:** dịch vụ `Language` (`core/i18n.ts` của từng app) — mặc định `vi`, nhớ ở `localStorage['elib.lang']`, ghi cookie `elib_lang` (path `/`) để trang đăng nhập identity cùng host hiện đúng ngôn ngữ, đặt `<html lang>`. Đổi bằng nút VI | EN trên header, không tải lại trang. Mọi request `/api/` gửi `Accept-Language`.
+- **Ngày, số:** pipe `ldate` / `lnumber` (định dạng theo ngôn ngữ đang chọn) thay `date` / `number`; tiêu đề tab dịch qua `TitleStrategy` (route khai báo `title` là khoá dịch).
+- **Viết màn mới:** chữ trên giao diện luôn là khoá dịch — template dùng `{{ 'KHOA.CON' | translate }}` (có tham số: `translate: { count: n }`), toastr nhận khoá + tham số (`toastr.success('X.SAVED', { code })`), `CrudConfig` (title, label, placeholder, hint, options) ghi khoá, `ConfirmDelete` nhận `message` + `messageParams`. Câu có HTML (`<b>`) dùng `[innerHTML]="'KHOA' | translate"`.
+- **Kiểm tra trong CI** (`node tools/i18n-check.mjs`): `vi.json` và `en.json` cùng bộ khoá; mọi khoá viết trong code có trong từ điển (khoá ghép động khai báo ở `DYNAMIC`); **không còn chữ tiếng Việt có dấu** trong code của admin và OPAC (ngoài chú thích). Chuỗi là dữ liệu chứ không phải chữ giao diện (tên vai trò dựng sẵn, câu dự phòng khi từ điển chưa nạp) đánh dấu chú thích `i18n-data` trên cùng dòng.
+- **Chưa dịch:** nội dung do backend sinh (thông báo lỗi chưa có mã trong từ điển, tóm tắt nhật ký "Thêm bạn đọc: …", tiêu đề cột báo cáo lưu thông, tên trường MARC lấy từ API catalog) — vẫn tiếng Việt.
