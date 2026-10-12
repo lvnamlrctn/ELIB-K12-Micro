@@ -1482,7 +1482,15 @@
     "IMPORT_JOB_STATE": "This import has already run or is running.",
     "IMPORT_NOTHING_TO_DO": "No valid rows to import — fix the file and preview again.",
     "IMPORT_NO_DATA": "The file has no data rows below the header row.",
-    "IMPORT_OPTIONS_INVALID": "Invalid import options."
+    "IMPORT_OPTIONS_INVALID": "Invalid import options.",
+    "READER_BATCH_TOKEN_REQUIRED": "Preview the affected readers before applying to a filter.",
+    "READER_BATCH_TOKEN_EXPIRED": "The preview is older than 15 minutes — preview again.",
+    "READER_BATCH_TOKEN_MISMATCH": "The filter changed since the preview — preview again.",
+    "READER_BATCH_TOO_MANY": "The filter matches too many readers (max 10,000) — narrow it down.",
+    "READER_BULK_SIZE": "Select between 1 and 2,000 readers at a time.",
+    "READER_GROUPS_TOO_MANY": "A reader can belong to at most 100 groups.",
+    "IMPORT_REF_NOT_FOUND": "The catalog item does not exist.",
+    "IMPORT_REF_AMBIGUOUS": "The catalog name matches several items — use the numeric id."
   },
   "READER_PASSWORD": {
     "TITLE_ONE": "OPAC password — {{card}}",
@@ -1551,5 +1559,46 @@
     "NEXT": "Next",
     "PREVIEW": "Preview",
     "RUN": "Run import"
+  },
+  "READER_BATCH": {
+    "EDIT": "Batch edit",
+    "GROUPS": "Reader groups",
+    "TITLE_UPDATE": "Batch edit readers",
+    "TITLE_GROUPS": "Add / remove readers from a group",
+    "APPLY_TO": "Apply to",
+    "SCOPE_SELECTED": "{{count}} selected readers",
+    "SCOPE_FILTER": "All filtered results ({{count}} readers)",
+    "GROUP": "Group",
+    "GROUP_ACTION": "Action",
+    "GROUP_ADD": "Add to group",
+    "GROUP_REMOVE": "Remove from group",
+    "NO_GROUPS": "No reader groups yet — create them under Catalogs › Reader groups.",
+    "PREVIEW": "Preview",
+    "PREVIEW_HINT": "Click Preview to see exactly how many readers the current filter will change.",
+    "PREVIEW_RESULT": "This will apply to {{count}} readers matching the filter. Confirm within 15 minutes.",
+    "APPLY": "Apply to {{count}} readers",
+    "GROUP_ADDED": "Added {{count}} readers to the group.",
+    "GROUP_REMOVED": "Removed {{count}} readers from the group.",
+    "DELETE_SELECTED": "Delete selected ({{count}})",
+    "DELETE_CONFIRM": "Delete {{count}} selected readers? Deleted readers can no longer borrow.",
+    "DELETED": "Deleted {{count}} readers."
+  },
+  "READER_HISTORY": {
+    "OPEN": "Change history",
+    "TITLE": "Change history — {{card}}",
+    "EMPTY": "No changes recorded yet.",
+    "SYSTEM": "System",
+    "REASON": "Reason for change",
+    "REASON_PH": "Optional — saved in the change history",
+    "FIELD": "Field",
+    "OLD": "Old value",
+    "NEW": "New value",
+    "GROUPS": "Reader groups",
+    "PHOTO": "(photo)",
+    "ACTION_ADD": "Added",
+    "ACTION_UPDATE": "Edited",
+    "ACTION_DELETE": "Deleted",
+    "ACTION_CHANGE_STATUS": "Status changed",
+    "ACTION_IMPORT": "Excel import"
   }
 }

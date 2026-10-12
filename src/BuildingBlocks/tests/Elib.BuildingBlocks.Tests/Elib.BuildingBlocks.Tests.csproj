@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\Elib.BuildingBlocks.Testing\Elib.BuildingBlocks.Testing.csproj" />
     <ProjectReference Include="..\..\Elib.BuildingBlocks.TenantReplica\Elib.BuildingBlocks.TenantReplica.csproj" />
     <ProjectReference Include="..\..\Elib.BuildingBlocks.Storage\Elib.BuildingBlocks.Storage.csproj" />
+    <ProjectReference Include="..\..\Elib.BuildingBlocks.Crud\Elib.BuildingBlocks.Crud.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

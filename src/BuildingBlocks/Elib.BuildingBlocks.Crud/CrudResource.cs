@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text.Json.Nodes;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Domain;
 using Microsoft.AspNetCore.Builder;
@@ -43,12 +44,18 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
     protected virtual string? Describe(TEntity entity) => null;
 
     /// <summary>Ghi nhật ký thao tác — gọi trước SaveChanges (event vào outbox cùng transaction). Override thao tác ghi thì gọi lại.</summary>
-    protected Task AuditAsync(TEntity entity, CrudChange change, CancellationToken ct)
+    protected Task AuditAsync(TEntity entity, CrudChange change, CancellationToken ct, JsonObject? changes = null)
     {
         if (AuditSink is null) return Task.CompletedTask;
         if (entity.PublicId == Guid.Empty) entity.PublicId = Guid.CreateVersion7(); // bản ghi mới: interceptor chỉ gán khi còn trống
-        return AuditSink.RecordAsync(new CrudAuditEntry(typeof(TEntity).Name, EntityName, entity.PublicId, change, Describe(entity)), ct);
+        return AuditSink.RecordAsync(new CrudAuditEntry(typeof(TEntity).Name, EntityName, entity.PublicId, change, Describe(entity), changes), ct);
     }
+
+    /// <summary>Trường DTO không ghi vào diff (ngoài id, thời điểm, trường nhạy cảm) — ví dụ trường ghép từ trường khác.</summary>
+    protected virtual IReadOnlyCollection<string> DiffIgnored => [];
+
+    /// <summary>Diff DTO trước/sau cho nhật ký; <paramref name="before"/> chụp bằng <see cref="ToDto"/> trước khi sửa.</summary>
+    protected JsonObject? Diff(TDto before, TEntity entity) => CrudDiff.Compute(before, ToDto(entity), DiffIgnored);
 
     /// <summary>Tên hiển thị trong thông báo "Không tìm thấy …".</summary>
     protected abstract string EntityName { get; }
@@ -131,10 +138,11 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
     public virtual async Task<TDto> UpdateAsync(Guid publicId, TRequest request, CancellationToken ct)
     {
         var entity = await LoadAsync(publicId, ct);
+        var before = ToDto(entity);
         await UpdateAsync(entity, request, ct);
         await ValidateAsync(entity, ct);
         await OnSavingAsync(entity, CrudChange.Updated, ct);
-        await AuditAsync(entity, CrudChange.Updated, ct);
+        await AuditAsync(entity, CrudChange.Updated, ct, Diff(before, entity));
         await Db.SaveChangesAsync(ct);
         return ToDto(entity);
     }
@@ -152,9 +160,10 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
     public async Task ChangeStatusAsync(ChangeStatusRequest request, CancellationToken ct)
     {
         var entity = await LoadAsync(request.PublicId, ct);
+        var before = ToDto(entity);
         ((IHasStatus)entity).ChangeStatus(request.Status);
         await OnSavingAsync(entity, CrudChange.StatusChanged, ct);
-        await AuditAsync(entity, CrudChange.StatusChanged, ct);
+        await AuditAsync(entity, CrudChange.StatusChanged, ct, Diff(before, entity));
         await Db.SaveChangesAsync(ct);
     }
 

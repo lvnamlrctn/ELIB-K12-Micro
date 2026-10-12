@@ -440,6 +440,49 @@ namespace Elib.Patron.Infrastructure.Migrations
                     b.ToTable("reader_groups", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Patron.Domain.ReaderGroupMember", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<long>("ReaderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reader_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reader_group_members");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_reader_group_members_group_id");
+
+                    b.HasIndex("ReaderId")
+                        .HasDatabaseName("ix_reader_group_members_reader_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_reader_group_members_tenant_id");
+
+                    b.HasIndex("TenantId", "GroupId")
+                        .HasDatabaseName("ix_reader_group_members_tenant_id_group_id");
+
+                    b.HasIndex("TenantId", "ReaderId", "GroupId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reader_group_members_tenant_id_reader_id_group_id");
+
+                    b.ToTable("reader_group_members", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Patron.Domain.ReaderImportJob", b =>
                 {
                     b.Property<long>("Id")
@@ -962,6 +1005,23 @@ namespace Elib.Patron.Infrastructure.Migrations
                         .HasForeignKey("ReaderTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_readers_reader_types_reader_type_id");
+                });
+
+            modelBuilder.Entity("Elib.Patron.Domain.ReaderGroupMember", b =>
+                {
+                    b.HasOne("Elib.Patron.Domain.ReaderGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reader_group_members_reader_groups_group_id");
+
+                    b.HasOne("Elib.Patron.Domain.Reader", null)
+                        .WithMany()
+                        .HasForeignKey("ReaderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reader_group_members_readers_reader_id");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

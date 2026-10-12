@@ -1482,7 +1482,15 @@
     "IMPORT_JOB_STATE": "Lượt nhập này đã chạy hoặc đang chạy.",
     "IMPORT_NOTHING_TO_DO": "Không có dòng hợp lệ nào để nhập — sửa file rồi xem trước lại.",
     "IMPORT_NO_DATA": "File không có dòng dữ liệu nào dưới dòng tiêu đề.",
-    "IMPORT_OPTIONS_INVALID": "Tuỳ chọn nhập không hợp lệ."
+    "IMPORT_OPTIONS_INVALID": "Tuỳ chọn nhập không hợp lệ.",
+    "READER_BATCH_TOKEN_REQUIRED": "Xem trước số bạn đọc bị ảnh hưởng trước khi áp dụng theo bộ lọc.",
+    "READER_BATCH_TOKEN_EXPIRED": "Bản xem trước đã quá 15 phút — xem trước lại.",
+    "READER_BATCH_TOKEN_MISMATCH": "Bộ lọc đã đổi so với lúc xem trước — xem trước lại.",
+    "READER_BATCH_TOO_MANY": "Bộ lọc khớp quá nhiều bạn đọc (tối đa 10.000) — thu hẹp bộ lọc.",
+    "READER_BULK_SIZE": "Chọn từ 1 đến 2.000 bạn đọc mỗi lần.",
+    "READER_GROUPS_TOO_MANY": "Một bạn đọc thuộc tối đa 100 nhóm.",
+    "IMPORT_REF_NOT_FOUND": "Mục danh mục không tồn tại.",
+    "IMPORT_REF_AMBIGUOUS": "Tên danh mục trùng nhiều mục — dùng số id."
   },
   "READER_PASSWORD": {
     "TITLE_ONE": "Mật khẩu OPAC — {{card}}",
@@ -1551,5 +1559,46 @@
     "NEXT": "Tiếp",
     "PREVIEW": "Xem trước",
     "RUN": "Chạy nhập"
+  },
+  "READER_BATCH": {
+    "EDIT": "Sửa hàng loạt",
+    "GROUPS": "Nhóm bạn đọc",
+    "TITLE_UPDATE": "Sửa hàng loạt bạn đọc",
+    "TITLE_GROUPS": "Thêm / bỏ bạn đọc khỏi nhóm",
+    "APPLY_TO": "Áp dụng cho",
+    "SCOPE_SELECTED": "{{count}} bạn đọc đã chọn",
+    "SCOPE_FILTER": "Toàn bộ kết quả lọc ({{count}} bạn đọc)",
+    "GROUP": "Nhóm",
+    "GROUP_ACTION": "Thao tác",
+    "GROUP_ADD": "Thêm vào nhóm",
+    "GROUP_REMOVE": "Bỏ khỏi nhóm",
+    "NO_GROUPS": "Chưa có nhóm bạn đọc — tạo ở Danh mục › Nhóm bạn đọc.",
+    "PREVIEW": "Xem trước",
+    "PREVIEW_HINT": "Bấm Xem trước để biết chính xác số bạn đọc sẽ bị thay đổi theo bộ lọc hiện tại.",
+    "PREVIEW_RESULT": "Sẽ áp dụng cho {{count}} bạn đọc khớp bộ lọc. Xác nhận trong 15 phút.",
+    "APPLY": "Áp dụng cho {{count}} bạn đọc",
+    "GROUP_ADDED": "Đã thêm {{count}} bạn đọc vào nhóm.",
+    "GROUP_REMOVED": "Đã bỏ {{count}} bạn đọc khỏi nhóm.",
+    "DELETE_SELECTED": "Xoá đã chọn ({{count}})",
+    "DELETE_CONFIRM": "Xoá {{count}} bạn đọc đã chọn? Bạn đọc đã xoá không còn mượn được tài liệu.",
+    "DELETED": "Đã xoá {{count}} bạn đọc."
+  },
+  "READER_HISTORY": {
+    "OPEN": "Lịch sử thay đổi",
+    "TITLE": "Lịch sử thay đổi — {{card}}",
+    "EMPTY": "Chưa có thay đổi nào được ghi nhận.",
+    "SYSTEM": "Hệ thống",
+    "REASON": "Lý do sửa",
+    "REASON_PH": "Không bắt buộc — ghi vào lịch sử thay đổi",
+    "FIELD": "Trường",
+    "OLD": "Giá trị cũ",
+    "NEW": "Giá trị mới",
+    "GROUPS": "Nhóm bạn đọc",
+    "PHOTO": "(ảnh)",
+    "ACTION_ADD": "Thêm",
+    "ACTION_UPDATE": "Sửa",
+    "ACTION_DELETE": "Xoá",
+    "ACTION_CHANGE_STATUS": "Đổi trạng thái",
+    "ACTION_IMPORT": "Nhập Excel"
   }
 }

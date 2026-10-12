@@ -23,7 +23,7 @@ const APPS = {
     ],
   },
 };
-const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_'];
+const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_'];
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const KEY = /['"`]((?:[A-Z][A-Z0-9_]*)(?:\.[A-Z0-9_]+)+)['"`]/g;
 

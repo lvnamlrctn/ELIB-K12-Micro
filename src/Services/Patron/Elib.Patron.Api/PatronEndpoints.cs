@@ -31,6 +31,19 @@ public static class PatronEndpoints
             => r.UnlockAsync(publicId, ct));
         readers.MapPut("/BulkUpdate", [Permission("READERS", "edit")] async (ReaderBulkUpdateRequest request, ReaderResource r, CancellationToken ct)
             => Results.Ok(new { updatedCount = await r.BulkUpdateAsync(request, ct) }));
+        // Thao tác hàng loạt kiểu ELIB-LRC: theo danh sách đã chọn hoặc theo bộ lọc (xem trước → mã xác nhận 15 phút).
+        readers.MapPost("/Batch/Preview", [Permission("READERS", "edit")] (ReaderSearch search, ReaderResource r, CancellationToken ct)
+            => r.PreviewSelectionAsync(search, ct));
+        readers.MapPut("/BatchUpdate", [Permission("READERS", "edit")] (ReaderBatchUpdateRequest request, ReaderResource r, CancellationToken ct)
+            => r.BatchUpdateAsync(request, ct));
+        readers.MapPost("/BulkDelete", [Permission("READERS", "delete")] (ReaderBulkDeleteRequest request, ReaderResource r, CancellationToken ct)
+            => r.BulkDeleteAsync(request, ct));
+        readers.MapPut("/Groups", [Permission("READERS", "edit")] (ReaderGroupsRequest request, ReaderResource r, CancellationToken ct)
+            => r.ChangeGroupsAsync(request, ct));
+        readers.MapGet("/Groups/{publicId:guid}", [Permission("READERS", "view")] (Guid publicId, ReaderResource r, CancellationToken ct)
+            => r.GroupsOfAsync(publicId, ct));
+        readers.MapPut("/Groups/{publicId:guid}", [Permission("READERS", "edit")] (Guid publicId, ReaderGroupSetRequest request, ReaderResource r,
+            CancellationToken ct) => r.SetGroupsAsync(publicId, request, ct));
         readers.MapPut("/Photo/{publicId:guid}", [Permission("READERS", "edit")] (Guid publicId, ReaderPhotoRequest request, ReaderResource r, CancellationToken ct)
             => r.SetPhotoAsync(publicId, request.FileId, ct));
         readers.MapPost("/Photos", [Permission("READERS", "edit")] (ReaderPhotosRequest request, ReaderResource r, CancellationToken ct)

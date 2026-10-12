@@ -120,6 +120,35 @@ public sealed class AuditApiTests : IClassFixture<AuditApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Entity_history_is_visible_to_readers_view_with_changes_and_only_for_that_record()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var readerId = Guid.NewGuid();
+        Task Publish(long tenant, string type, Guid id, string summary, string? changes) => _factory.PublishAsync(Entry(tenant, "UPDATE", summary) with
+        {
+            Service = "patron", EntityType = type, EntityId = id.ToString(), ChangesJson = changes,
+        });
+        await Publish(tenantId, "Reader", readerId, "Sửa bạn đọc: HS01", """{"classId":[1,2],"_reason":"Lên lớp"}""");
+        await Publish(tenantId, "Reader", Guid.NewGuid(), "Sửa bạn đọc: HS02", null);
+        await Publish(tenantId + 1, "Reader", readerId, "Sửa bạn đọc: của đơn vị khác", null);
+        await Publish(tenantId, "Ethnicity", readerId, "Sửa dân tộc", null);
+        await WaitTenantLogAsync(tenantId, "Sửa bạn đọc: HS01");
+        await WaitTenantLogAsync(tenantId, "Sửa dân tộc");
+        await WaitTenantLogAsync(tenantId + 1, "Sửa bạn đọc: của đơn vị khác");
+
+        var url = new Uri($"/api/audit-logs/entity/Reader/{readerId}", UriKind.Relative);
+        var rows = await Read<List<EntityHistoryDto>>(await Staff(tenantId, "READERS:view").GetAsync(url));
+        var row = Assert.Single(rows);
+        Assert.Equal(("Sửa bạn đọc: HS01", "patron"), (row.Summary, row.Service));
+        Assert.Equal("Lên lớp", JsonDocument.Parse(row.Changes!).RootElement.GetProperty("_reason").GetString());
+        Assert.Single(await Read<List<EntityHistoryDto>>(await Staff(tenantId).GetAsync(url))); // SYSTEM_LOG:view cũng xem được
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId, "ORGS:view").GetAsync(url)).StatusCode);
+        // Loại bản ghi chưa khai báo màn lịch sử → không có route.
+        Assert.Equal(HttpStatusCode.NotFound, (await Staff(tenantId).GetAsync(new Uri($"/api/audit-logs/entity/Ethnicity/{readerId}", UriKind.Relative))).StatusCode);
+    }
+
+    [Fact]
     public async Task Old_entries_are_purged_after_retention()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

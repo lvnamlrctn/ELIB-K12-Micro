@@ -38,6 +38,7 @@ public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options, ITe
             e.HasIndex(l => new { l.TenantId, l.EventId }).IsUnique();
             e.HasIndex(l => new { l.TenantId, l.OccurredAt });
             e.HasIndex(l => new { l.TenantId, l.Action });
+            e.HasIndex(l => new { l.TenantId, l.EntityType, l.EntityId }); // lịch sử thay đổi của một bản ghi
         });
 
         modelBuilder.Entity<PlatformAuditLog>(e =>

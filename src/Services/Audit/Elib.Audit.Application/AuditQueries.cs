@@ -43,6 +43,10 @@ public sealed record AuditLogDto(
     Guid PublicId, DateTimeOffset OccurredAt, long? ActorId, string ActorKind, string? ActorName, string Service, string Action,
     string EntityType, string? EntityId, string? Summary, string? IpAddress);
 
+/// <summary>Một dòng lịch sử thay đổi của bản ghi. Changes: JSON {"trường": [cũ, mới], "_reason": "lý do"} hoặc null.</summary>
+public sealed record EntityHistoryDto(
+    Guid PublicId, DateTimeOffset OccurredAt, string? ActorName, string Service, string Action, string? Summary, string? Changes);
+
 public sealed record PlatformAuditLogDto(
     Guid PublicId, DateTimeOffset OccurredAt, long? ActorId, string ActorKind, string? ActorName, string Service, string Action,
     string EntityType, string? EntityId, long? TenantId, string? TenantName, string? Summary, string? IpAddress);
@@ -70,6 +74,17 @@ public sealed class AuditQueries(IAuditDb db, ITenantContext tenant)
     {
         tenant.RequireTenantId();
         return await db.AuditLogs.AsNoTracking().Select(l => l.Action).Distinct().OrderBy(a => a).ToListAsync(ct);
+    }
+
+    /// <summary>Lịch sử thay đổi của một bản ghi (loại + PublicId) trong đơn vị hiện tại, mới nhất trước — tối đa 200 dòng.</summary>
+    public async Task<IReadOnlyList<EntityHistoryDto>> EntityHistoryAsync(string entityType, Guid id, CancellationToken ct)
+    {
+        tenant.RequireTenantId();
+        var entityId = id.ToString();
+        return await db.AuditLogs.AsNoTracking().Where(l => l.EntityType == entityType && l.EntityId == entityId)
+            .OrderByDescending(l => l.OccurredAt).ThenByDescending(l => l.Id).Take(MaxPageSize)
+            .Select(l => new EntityHistoryDto(l.PublicId, l.OccurredAt, l.ActorName, l.Service, l.Action, l.Summary, l.ChangesJson))
+            .ToListAsync(ct);
     }
 
     public async Task<CrudPage<PlatformAuditLogDto>> SearchPlatformAsync(PlatformAuditLogSearch search, CancellationToken ct)

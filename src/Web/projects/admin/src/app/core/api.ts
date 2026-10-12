@@ -48,6 +48,18 @@ export interface ReaderSearch extends CrudSearch {
   issuedFrom?: string | null; issuedTo?: string | null; expiredFrom?: string | null; expiredTo?: string | null;
   /** Đúng các bạn đọc này (in thẻ) — tối đa 500. */
   publicIds?: string[] | null;
+  groupId?: number | null;
+}
+/** Bạn đọc cho thao tác hàng loạt: đã tích (≤ 2.000) hoặc toàn bộ kết quả lọc kèm mã xem trước (15 phút). */
+export interface ReaderSelection { publicIds?: string[] | null; search?: ReaderSearch | null; token?: string | null; }
+export interface ReaderSelectionPreview { count: number; token: string; expiresAt: string; }
+export interface ReaderBatchUpdate {
+  selection: ReaderSelection; readerTypeId?: number | null; classId?: number | null; courseId?: number | null; orgId?: number | null;
+  issueDate?: string | null; expireDate?: string | null; status?: number | null;
+}
+/** Một dòng lịch sử thay đổi (audit). changes: JSON {"trường": [cũ, mới], "_reason": "…"}. */
+export interface EntityHistory {
+  publicId: string; occurredAt: string; actorName: string | null; service: string; action: string; summary: string | null; changes: string | null;
 }
 export interface ReaderBulkUpdate {
   publicIds: string[]; readerTypeId?: number | null; classId?: number | null; courseId?: number | null;
@@ -261,7 +273,10 @@ export class CrudClient<T extends { publicId: string }> {
   searchAll(body: CrudSearch = {}) { return firstValueFrom(this.http.post<T[]>(`${this.base}/SearchAll`, body)); }
   get(publicId: string) { return firstValueFrom(this.http.get<T>(`${this.base}/GetById/${publicId}`)); }
   add(body: unknown) { return firstValueFrom(this.http.post<T>(`${this.base}/Add`, body)); }
-  update(publicId: string, body: unknown) { return firstValueFrom(this.http.put<T>(`${this.base}/Update/${publicId}`, body)); }
+  /** reason: lý do sửa (ghi vào lịch sử thay đổi) — header chỉ nhận ASCII nên mã hoá URL. */
+  update(publicId: string, body: unknown, reason?: string | null) {
+    return firstValueFrom(this.http.put<T>(`${this.base}/Update/${publicId}`, body, { headers: reasonHeader(reason) }));
+  }
   delete(publicId: string) { return firstValueFrom(this.http.delete<void>(`${this.base}/Delete/${publicId}`)); }
   changeStatus(publicId: string, status: number) { return firstValueFrom(this.http.put<void>(`${this.base}/ChangeStatus`, { publicId, status })); }
 }
@@ -311,6 +326,12 @@ function fileForm(file: File): FormData {
   const form = new FormData();
   form.append('file', file, file.name);
   return form;
+}
+
+/** Header X-Change-Reason (lý do sửa) — rỗng thì không gửi. */
+export function reasonHeader(reason?: string | null): Record<string, string> {
+  const text = reason?.trim();
+  return text ? { 'X-Change-Reason': encodeURIComponent(text.slice(0, 500)) } : {};
 }
 
 /** Lưu blob thành file tải về. */
@@ -458,6 +479,18 @@ export class Api {
   readerImportErrors(id: string) {
     return blobRequest(firstValueFrom(this.http.get(`/api/admin/patron/readers/Import/Jobs/${id}/Errors`, { responseType: 'blob' })));
   }
+  previewReaderSelection(search: ReaderSearch) { return this.post<ReaderSelectionPreview>('/api/admin/patron/readers/Batch/Preview', search); }
+  batchUpdateReaders(body: ReaderBatchUpdate) { return this.put<{ count: number }>('/api/admin/patron/readers/BatchUpdate', body); }
+  bulkDeleteReaders(publicIds: string[]) { return this.post<{ count: number }>('/api/admin/patron/readers/BulkDelete', { publicIds }); }
+  changeReaderGroups(selection: ReaderSelection, groupId: number, add: boolean) {
+    return this.put<{ count: number }>('/api/admin/patron/readers/Groups', { selection, groupId, add });
+  }
+  readerGroups(publicId: string) { return this.get<number[]>(`/api/admin/patron/readers/Groups/${publicId}`); }
+  setReaderGroups(publicId: string, groupIds: number[], reason?: string | null) {
+    return firstValueFrom(this.http.put<number[]>(`/api/admin/patron/readers/Groups/${publicId}`, { groupIds }, { headers: reasonHeader(reason) }));
+  }
+  /** Lịch sử thay đổi của một bản ghi (audit) — vd entityHistory('Reader', publicId). */
+  entityHistory(entityType: string, publicId: string) { return this.get<EntityHistory[]>(`/api/admin/audit/audit-logs/entity/${entityType}/${publicId}`); }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
   /** Mật khẩu OPAC của bạn đọc nằm ở identity; useCardNo = mật khẩu mặc định là số thẻ. */
   readerAccounts(readerIds: string[]) { return this.post<ReaderAccount[]>('/api/admin/identity/reader-accounts/Status', { readerIds }); }

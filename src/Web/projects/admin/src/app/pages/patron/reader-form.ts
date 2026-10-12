@@ -93,9 +93,28 @@ const BLANK: ReaderForm = {
             <p class="text-xs text-gray-500 mt-1">{{ 'READER.EXPIRE_EMPTY_HINT' | translate }}</p></div>
           <div class="sm:col-span-2 lg:col-span-3"><label class="form-label" for="r-addr">{{ 'READER.ADDRESS' | translate }}</label>
             <input id="r-addr" name="addr" class="input" [(ngModel)]="f.address" /></div>
+          @if (c.groups().length) {
+            <fieldset class="sm:col-span-2 lg:col-span-3">
+              <legend class="form-label">{{ 'READER_HISTORY.GROUPS' | translate }}</legend>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                @for (g of c.groups(); track g.id) {
+                  <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" class="rounded border-gray-300" [checked]="groupIds().includes(g.id)" (change)="toggleGroup(g.id)" /> {{ g.name }}</label>
+                }
+              </div>
+            </fieldset>
+          }
+          @if (f.publicId) {
+            <div class="sm:col-span-2 lg:col-span-3"><label class="form-label" for="r-reason">{{ 'READER_HISTORY.REASON' | translate }}</label>
+              <input id="r-reason" name="reason" class="input" maxlength="500" [(ngModel)]="reason" [placeholder]="'READER_HISTORY.REASON_PH' | translate" /></div>
+          }
         </form>
       </div>
       <ng-container footer>
+        @if (f.publicId) {
+          <button type="button" class="btn-secondary mr-auto" (click)="history.emit()">
+            <span class="material-icons text-[16px]">history</span> {{ 'READER_HISTORY.OPEN' | translate }}</button>
+        }
         <button type="button" class="btn-secondary" (click)="closed.emit()">{{ 'COMMON.CANCEL' | translate }}</button>
         <button type="submit" form="reader-form" class="btn-primary" [disabled]="saving()">
           <span class="material-icons text-[16px]">save</span>{{ (f.publicId ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}</button>
@@ -111,6 +130,8 @@ export class ReaderFormDialog implements OnInit {
   readonly saved = output<void>();
   /** Ảnh thẻ đã đổi (lưu ngay) — chỉ tải lại danh sách. */
   readonly changed = output<void>();
+  /** Mở lịch sử thay đổi của bạn đọc đang sửa. */
+  readonly history = output<void>();
 
   protected readonly c = inject(ReaderCatalogs);
   private readonly api = inject(Api);
@@ -123,6 +144,10 @@ export class ReaderFormDialog implements OnInit {
   protected readonly photoId = signal<string | null>(null);
   protected readonly photoUrl = signal<string | null>(null);
   protected readonly photoBusy = signal(false);
+  /** Nhóm bạn đọc (bảng nối ở patron) — lưu sau hồ sơ, chỉ khi đổi. */
+  protected readonly groupIds = signal<number[]>([]);
+  private initialGroups: number[] = [];
+  protected reason = '';
 
   ngOnInit(): void {
     const r = this.reader();
@@ -135,6 +160,21 @@ export class ReaderFormDialog implements OnInit {
     this.f = { ...rest };
     this.photoId.set(photoId);
     if (photoId) void this.showPhoto(photoId);
+    void this.loadGroups(r.publicId);
+  }
+
+  private async loadGroups(publicId: string): Promise<void> {
+    try {
+      this.initialGroups = await this.api.readerGroups(publicId);
+      this.groupIds.set([...this.initialGroups]);
+    } catch {
+      /* không tải được nhóm — để trống, không ghi đè khi lưu */
+      this.initialGroups = [];
+    }
+  }
+
+  protected toggleGroup(id: number): void {
+    this.groupIds.update((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
 
   protected indent(depth: number): string {
@@ -159,8 +199,10 @@ export class ReaderFormDialog implements OnInit {
     try {
       const { publicId, ...body } = this.f;
       const payload = { ...body, status: publicId ? undefined : STATUS_ACTIVE };
-      if (publicId) await this.client.update(publicId, payload);
-      else await this.client.add(payload);
+      const saved = publicId ? await this.client.update(publicId, payload, this.reason) : await this.client.add(payload);
+      const groups = [...this.groupIds()].sort((a, b) => a - b);
+      if (groups.join() !== [...this.initialGroups].sort((a, b) => a - b).join())
+        await this.api.setReaderGroups(saved.publicId, groups, this.reason);
       this.toastr.success(publicId ? 'READER.SAVED_UPDATE' : 'READER.SAVED_ADD');
       this.saved.emit();
     } catch (e) {

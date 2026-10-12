@@ -168,7 +168,8 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         var moved = await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { ClassId = c7.Id }, Json));
         Assert.Equal(2, moved.TotalCount);
         Assert.All(moved.Items, r => Assert.Equal(new DateOnly(2027, 5, 31), r.ExpireDate));
-        Assert.Contains(_factory.PublishedOf<AuditRecorded>(), a => a.TenantId == tenantId && a.Summary!.Contains("hàng loạt 2", StringComparison.Ordinal));
+        Assert.Contains(_factory.PublishedOf<AuditRecorded>(), a => a.TenantId == tenantId && a.EntityId == r2.PublicId.ToString()
+            && true == a.ChangesJson?.Contains("\"classId\":[" + c6.Id + "," + c7.Id + "]", StringComparison.Ordinal));
 
         var delete = await staff.DeleteAsync(U($"/api/classes/Delete/{c7.PublicId}"));
         Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);

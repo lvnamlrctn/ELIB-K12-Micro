@@ -9,7 +9,9 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
+import { ReaderBatch, ReaderBatchMode } from './reader-batch';
 import { ReaderFormDialog } from './reader-form';
+import { ReaderHistory } from './reader-history';
 import { ReaderImport } from './reader-import';
 import { ReaderPassword, accountLabel } from './reader-password';
 import { MAX_PRINT, PRINT_KEY } from './reader-print';
@@ -48,7 +50,7 @@ const VIEW_KEY = 'elib.readers.view';
  */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, NgTemplateOutlet, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport,
+  imports: [FormsModule, NgTemplateOutlet, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport, ReaderBatch, ReaderHistory,
     ReaderExport, ReaderPhotos, ReaderPassword, ReaderFormDialog],
   providers: [ReaderCatalogs],
   template: `
@@ -87,6 +89,11 @@ const VIEW_KEY = 'elib.readers.view';
             <select id="f-course" name="course" class="input" [(ngModel)]="search.courseId" (change)="find()">
               <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
               @for (o of c.courses(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+            </select></div>
+          <div><label for="f-group" class="field-label">{{ 'READER_BATCH.GROUP' | translate }}</label>
+            <select id="f-group" name="group" class="input" [(ngModel)]="search.groupId" (change)="find()">
+              <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+              @for (g of c.groups(); track g.id) { <option [ngValue]="g.id">{{ g.name }}</option> }
             </select></div>
           <div class="xl:col-span-2"><label for="f-org" class="field-label">{{ 'READER.ORG' | translate }}</label>
             <select id="f-org" name="org" class="input" [(ngModel)]="orgFilter" (change)="find()">
@@ -131,10 +138,16 @@ const VIEW_KEY = 'elib.readers.view';
           <span class="material-icons text-[18px]">print</span> {{ 'READER.PRINT_SELECTED_N' | translate: { count: selected().size } }}</button>
         @if (can('edit')) {
           <button (click)="uploadingPhotos.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">photo_library</span> {{ 'READER.UPLOAD_PHOTOS' | translate }}</button>
-          <button (click)="openBulk()" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
-            <span class="material-icons text-[18px]">tune</span> {{ 'READER.BULK_EDIT' | translate: { count: selected().size } }}</button>
+          <button (click)="batchMode.set('update')" [disabled]="!(page()?.totalCount)" class="btn-secondary !py-1.5 !px-3">
+            <span class="material-icons text-[18px]">tune</span> {{ 'READER_BATCH.EDIT' | translate }}</button>
+          <button (click)="batchMode.set('groups')" [disabled]="!(page()?.totalCount)" class="btn-secondary !py-1.5 !px-3">
+            <span class="material-icons text-[18px]">group_add</span> {{ 'READER_BATCH.GROUPS' | translate }}</button>
           <button (click)="passwordFor.set({ readers: selectedReaders(), bulk: true })" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3">
             <span class="material-icons text-[18px]">key</span> {{ 'READER.SET_OPAC_PASSWORD' | translate: { count: selected().size } }}</button>
+        }
+        @if (can('delete')) {
+          <button (click)="bulkDeleting.set(true)" [disabled]="selected().size === 0" class="btn-secondary !py-1.5 !px-3 !text-red-600">
+            <span class="material-icons text-[18px]">delete_sweep</span> {{ 'READER_BATCH.DELETE_SELECTED' | translate: { count: selected().size } }}</button>
         }
       </div>
       <!-- ml-auto: khi thanh công cụ xuống dòng vẫn nằm bên phải — menu chọn cột (right-0) không tràn ra ngoài. -->
@@ -263,6 +276,7 @@ const VIEW_KEY = 'elib.readers.view';
     <ng-template #actions let-r>
       <div class="flex items-center justify-center gap-1.5">
         <button (click)="printCards([r.publicId])" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="'READER.PRINT_CARD' | translate"><span class="material-icons text-[18px]">badge</span></button>
+        <button (click)="history.set(r)" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="'READER_HISTORY.OPEN' | translate"><span class="material-icons text-[18px]">history</span></button>
         @if (can('edit')) {
           <button (click)="editing.set({ reader: r })" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[18px]">edit</span></button>
           <button (click)="passwordFor.set({ readers: [r], bulk: false })" class="icon-btn bg-violet-50 text-violet-600 hover:bg-violet-100" [title]="'READER.OPAC_PASSWORD' | translate"><span class="material-icons text-[18px]">key</span></button>
@@ -279,7 +293,8 @@ const VIEW_KEY = 'elib.readers.view';
     </ng-template>
 
     @if (editing(); as e) {
-      <app-reader-form [reader]="e.reader" (closed)="editing.set(null)" (saved)="editing.set(null); load()" (changed)="load()" />
+      <app-reader-form [reader]="e.reader" (closed)="editing.set(null)" (saved)="editing.set(null); load()" (changed)="load()"
+                       (history)="history.set(e.reader)" />
     }
 
     @if (locking(); as r) {
@@ -294,30 +309,18 @@ const VIEW_KEY = 'elib.readers.view';
       </app-modal>
     }
 
-    @if (bulk(); as b) {
-      <app-modal [title]="'READER.BULK_TITLE' | translate: { count: selected().size }" (closed)="bulk.set(null)">
-        <p class="text-xs text-gray-500 mb-3">{{ 'READER.BULK_HINT' | translate }}</p>
-        <div class="grid grid-cols-2 gap-4">
-          <div><label class="form-label" for="b-type">{{ 'READER.READER_TYPE' | translate }}</label>
-            <select id="b-type" class="input" [(ngModel)]="b.readerTypeId"><option [ngValue]="null">{{ 'READER.KEEP' | translate }}</option>
-              @for (t of c.types(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }</select></div>
-          <div><label class="form-label" for="b-class">{{ 'READER.ACADEMIC_CLASS' | translate }}</label>
-            <select id="b-class" class="input" [(ngModel)]="b.classId"><option [ngValue]="null">{{ 'READER.KEEP' | translate }}</option>
-              @for (o of c.classes(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label class="form-label" for="b-course">{{ 'READER.COURSE' | translate }}</label>
-            <select id="b-course" class="input" [(ngModel)]="b.courseId"><option [ngValue]="null">{{ 'READER.KEEP' | translate }}</option>
-              @for (o of c.courses(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label class="form-label" for="b-status">{{ 'READER.STATUS' | translate }}</label>
-            <select id="b-status" class="input" [(ngModel)]="b.status"><option [ngValue]="null">{{ 'READER.KEEP' | translate }}</option>
-              <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option><option [ngValue]="1">{{ 'READER.LOCKED' | translate }}</option></select></div>
-          <div><label class="form-label" for="b-issue">{{ 'READER.ISSUED_DATE' | translate }}</label><input id="b-issue" type="date" class="input" [(ngModel)]="b.issueDate" /></div>
-          <div><label class="form-label" for="b-exp">{{ 'READER.EXPIRED_DATE' | translate }}</label><input id="b-exp" type="date" class="input" [(ngModel)]="b.expireDate" /></div>
-        </div>
-        <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="bulk.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
-          <button type="button" class="btn-primary" [disabled]="saving()" (click)="applyBulk(b)"><span class="material-icons text-[18px]">done_all</span>{{ 'COMMON.UPDATE' | translate }}</button>
-        </ng-container>
-      </app-modal>
+    @if (batchMode(); as mode) {
+      <app-reader-batch [mode]="mode" [selectedIds]="[...selected()]" [search]="effectiveSearch()" [total]="page()?.totalCount ?? 0"
+                        (closed)="batchMode.set(null)" (done)="batchDone()" />
+    }
+
+    @if (bulkDeleting()) {
+      <app-confirm-delete [busy]="saving()" message="READER_BATCH.DELETE_CONFIRM" [messageParams]="{ count: selected().size }"
+                          (confirmed)="removeSelected()" (cancelled)="bulkDeleting.set(false)" />
+    }
+
+    @if (history(); as h) {
+      <app-reader-history [publicId]="h.publicId" [cardNo]="h.cardNo" (closed)="history.set(null)" />
     }
 
     @if (passwordFor(); as pw) {
@@ -375,7 +378,9 @@ export class Readers implements OnInit {
   /** Tình trạng đăng nhập OPAC (identity) của các bạn đọc trên trang. */
   protected readonly accounts = signal<Record<string, ReaderAccount>>({});
   protected readonly passwordFor = signal<{ readers: Pick<Reader, 'publicId' | 'cardNo' | 'fullName'>[]; bulk: boolean } | null>(null);
-  protected readonly bulk = signal<{ readerTypeId: number | null; classId: number | null; courseId: number | null; status: number | null; issueDate: string | null; expireDate: string | null } | null>(null);
+  protected readonly batchMode = signal<ReaderBatchMode | null>(null);
+  protected readonly bulkDeleting = signal(false);
+  protected readonly history = signal<Reader | null>(null);
   protected lockReason = '';
 
   protected readonly allSelected = computed(() => {
@@ -491,16 +496,18 @@ export class Readers implements OnInit {
     return this.run(() => this.client.delete(r.publicId), 'READER.DELETED', () => this.deleting.set(null));
   }
 
-  protected openBulk(): void {
-    this.bulk.set({ readerTypeId: null, classId: null, courseId: null, status: null, issueDate: null, expireDate: null });
+  protected batchDone(): void {
+    this.batchMode.set(null);
+    this.selected.set(new Set());
+    void this.load();
   }
 
-  protected applyBulk(b: NonNullable<ReturnType<typeof this.bulk>>): Promise<void> {
+  protected removeSelected(): Promise<void> {
     return this.run(async () => {
-      const { updatedCount } = await this.api.bulkUpdateReaders({ publicIds: [...this.selected()], ...b, issueDate: b.issueDate || null, expireDate: b.expireDate || null });
-      this.toastr.success('READER.BULK_DONE', { count: updatedCount });
+      const { count } = await this.api.bulkDeleteReaders([...this.selected()]);
+      this.toastr.success('READER_BATCH.DELETED', { count });
       this.selected.set(new Set());
-    }, null, () => this.bulk.set(null));
+    }, null, () => this.bulkDeleting.set(false));
   }
 
   private async run(action: () => Promise<unknown>, success: string | null, after?: () => void): Promise<void> {
@@ -558,7 +565,7 @@ export class Readers implements OnInit {
 function blankSearch(pageSize = 10): ReaderSearch {
   return {
     keyword: '', cardNoContains: '', lastName: '', firstName: '', readerTypeId: null, classId: null, courseId: null, status: null, expired: null,
-    issuedFrom: null, issuedTo: null, expiredFrom: null, expiredTo: null, pageIndex: 1, pageSize,
+    issuedFrom: null, issuedTo: null, expiredFrom: null, expiredTo: null, groupId: null, pageIndex: 1, pageSize,
   };
 }
 

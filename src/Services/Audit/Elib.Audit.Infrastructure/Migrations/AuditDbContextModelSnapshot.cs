@@ -125,6 +125,9 @@ namespace Elib.Audit.Infrastructure.Migrations
                     b.HasIndex("TenantId", "OccurredAt")
                         .HasDatabaseName("ix_audit_logs_tenant_id_occurred_at");
 
+                    b.HasIndex("TenantId", "EntityType", "EntityId")
+                        .HasDatabaseName("ix_audit_logs_tenant_id_entity_type_entity_id");
+
                     b.ToTable("audit_logs", (string)null);
                 });
 

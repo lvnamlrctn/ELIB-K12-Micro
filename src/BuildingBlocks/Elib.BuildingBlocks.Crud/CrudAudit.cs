@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Contracts.Events;
 using Elib.Contracts.Events.Platform;
@@ -7,8 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace Elib.BuildingBlocks.Crud;
 
-/// <summary>Một thao tác ghi trên danh mục CRUD cần ghi nhật ký.</summary>
-public sealed record CrudAuditEntry(string EntityType, string EntityName, Guid PublicId, CrudChange Change, string? Label);
+/// <summary>Một thao tác ghi trên danh mục CRUD cần ghi nhật ký. <see cref="Changes"/>: diff trước/sau (<see cref="CrudDiff"/>).</summary>
+public sealed record CrudAuditEntry(string EntityType, string EntityName, Guid PublicId, CrudChange Change, string? Label,
+    JsonObject? Changes = null);
 
 /// <summary>Nơi nhận nhật ký thao tác của <see cref="CrudResource{TSelf,TEntity,TSearch,TRequest,TDto}"/>.</summary>
 public interface ICrudAuditSink
@@ -30,7 +32,7 @@ public sealed class CrudAuditOptions
 /// <summary>
 /// Phát <see cref="AuditRecorded"/> cho service audit (thay UserLog ghi trực tiếp của monolith). Gọi TRƯỚC SaveChanges nên event
 /// nằm trong outbox cùng transaction với dữ liệu — thao tác lỗi thì không có nhật ký.
-/// Ngữ cảnh hệ thống (không có đơn vị) không ghi ở đây.
+/// Ngữ cảnh hệ thống (không có đơn vị) không ghi ở đây. Lý do sửa lấy từ header X-Change-Reason (mã hoá URL), ghi vào ChangesJson.
 /// </summary>
 public sealed class PublishingCrudAuditSink(
     IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, IHttpContextAccessor http, IOptions<CrudAuditOptions> options)
@@ -58,6 +60,7 @@ public sealed class PublishingCrudAuditSink(
             EntityType = entry.EntityType,
             EntityId = entry.PublicId.ToString(),
             Summary = $"{verb} {entry.EntityName.ToLowerInvariant()}" + (string.IsNullOrWhiteSpace(entry.Label) ? "" : $": {entry.Label}"),
+            ChangesJson = CrudDiff.ToJson(entry.Changes, CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString())),
             IpAddress = ctx?.Connection.RemoteIpAddress?.ToString(),
             CorrelationId = ctx?.TraceIdentifier,
         }, cancellationToken);

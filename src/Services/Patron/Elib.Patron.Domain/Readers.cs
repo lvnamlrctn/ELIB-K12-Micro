@@ -45,6 +45,20 @@ public sealed class ReaderGroup : TenantEntity
     }
 }
 
+/// <summary>
+/// Bạn đọc thuộc nhóm (monolith: dbo.ReaderInGroup). Bảng nối, xoá cứng; xoá nhóm thì xoá luôn các dòng thành viên.
+/// </summary>
+public sealed class ReaderGroupMember : Entity, ITenantOwned
+{
+    private ReaderGroupMember() { }
+
+    public long TenantId { get; set; }
+    public long ReaderId { get; private set; }
+    public long GroupId { get; private set; }
+
+    public static ReaderGroupMember Create(long readerId, long groupId) => new() { ReaderId = readerId, GroupId = groupId };
+}
+
 /// <summary>Giới tính theo quy ước monolith: 1 = nam, 0 = nữ, null = không rõ.</summary>
 public static class Sex
 {
@@ -137,11 +151,12 @@ public sealed partial class Reader : TenantEntity, IHasStatus
     }
 
     /// <summary>Sửa hàng loạt (monolith: BulkUpdate/BatchUpdate) — chỉ các trường được gửi.</summary>
-    public void ApplyBulk(long? readerTypeId, long? classId, long? courseId, DateOnly? issueDate, DateOnly? expireDate)
+    public void ApplyBulk(long? readerTypeId, long? classId, long? courseId, DateOnly? issueDate, DateOnly? expireDate, long? orgId = null)
     {
         if (readerTypeId is not null) ReaderTypeId = readerTypeId;
         if (classId is not null) ClassId = classId;
         if (courseId is not null) CourseId = courseId;
+        if (orgId is not null) OrgId = orgId;
         if (issueDate is not null) IssueDate = issueDate;
         if (expireDate is not null) ExpireDate = expireDate;
         CheckDates();

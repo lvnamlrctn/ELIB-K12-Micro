@@ -84,4 +84,11 @@ public sealed class ReaderGroupResource(ICrudDbContext db)
         if (entity.Code is { } code && await Set.AnyAsync(x => x.Code == code && x.Id != entity.Id, ct))
             throw new ConflictException("GROUP_CODE_EXISTS", $"Mã nhóm '{code}' đã có.");
     }
+
+    /// <summary>Xoá nhóm (xoá mềm) thì bỏ luôn các dòng thành viên — cùng transaction.</summary>
+    protected override async Task OnSavingAsync(ReaderGroup entity, CrudChange change, CancellationToken ct)
+    {
+        if (change == CrudChange.Deleted)
+            Db.Set<ReaderGroupMember>().RemoveRange(await Db.Set<ReaderGroupMember>().Where(m => m.GroupId == entity.Id).ToListAsync(ct));
+    }
 }

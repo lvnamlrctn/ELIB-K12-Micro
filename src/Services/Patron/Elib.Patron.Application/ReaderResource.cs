@@ -28,6 +28,9 @@ public sealed class ReaderSearch : CrudSearch
     /// <summary>Thuộc một trong các đơn vị — app Admin gửi đơn vị đã chọn kèm mọi đơn vị con của nó trong cây.</summary>
     public IReadOnlyList<long>? OrgIds { get; set; }
 
+    /// <summary>Thuộc nhóm bạn đọc này.</summary>
+    public long? GroupId { get; set; }
+
     /// <summary>Đúng các bạn đọc này (in thẻ đã chọn) — tối đa 500.</summary>
     public IReadOnlyList<Guid>? PublicIds { get; set; }
 
@@ -99,6 +102,9 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
     protected override string EntityName => "Bạn đọc";
 
     protected override string? Describe(Reader entity) => $"{entity.CardNo} — {entity.FullName}";
+
+    /// <summary>Họ tên ghép từ họ đệm + tên (đã có trong diff); ngày tạo không đổi.</summary>
+    protected override IReadOnlyCollection<string> DiffIgnored => ["fullName"];
 
     protected override Expression<Func<Reader, ReaderDto>> Projection => x => new ReaderDto(
         x.Id, x.PublicId, x.CardNo, x.LastName, x.FirstName,
@@ -179,6 +185,8 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
             var ids = orgIds.Distinct().Take(500).ToList();
             query = query.Where(x => x.OrgId != null && ids.Contains(x.OrgId.Value));
         }
+        if (s.GroupId is { } group)
+            query = query.Where(x => Db.Set<ReaderGroupMember>().Any(m => m.ReaderId == x.Id && m.GroupId == group));
         if (s.ReaderTypeId is { } type) query = query.Where(x => x.ReaderTypeId == type);
         if (s.ClassId is { } cls) query = query.Where(x => x.ClassId == cls);
         if (s.CourseId is { } course) query = query.Where(x => x.CourseId == course);
@@ -247,13 +255,12 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
         var readers = await Set.Where(x => ids.Contains(x.PublicId)).ToListAsync(ct);
         foreach (var reader in readers)
         {
+            var before = ToDto(reader);
             reader.ApplyBulk(request.ReaderTypeId, request.ClassId, request.CourseId, request.IssueDate, request.ExpireDate);
             if (request.Status is { } status && status != reader.Status) reader.ChangeStatus(status);
             await PublishAsync(reader, deleted: false, ct);
+            await AuditAsync(reader, CrudChange.Updated, ct, Diff(before, reader));
         }
-        if (AuditSink is not null && readers.Count > 0)
-            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Reader), EntityName, Guid.Empty, CrudChange.Updated,
-                $"sửa hàng loạt {readers.Count} bạn đọc"), ct);
         await Db.SaveChangesAsync(ct);
         return readers.Count;
     }
@@ -261,9 +268,10 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
     public async Task<ReaderDto> SetPhotoAsync(Guid publicId, Guid? fileId, CancellationToken ct)
     {
         var reader = await LoadAsync(publicId, ct);
+        var before = ToDto(reader);
         reader.SetPhoto(fileId);
         await PublishAsync(reader, deleted: false, ct);
-        await AuditAsync(reader, CrudChange.Updated, ct);
+        await AuditAsync(reader, CrudChange.Updated, ct, Diff(before, reader));
         await Db.SaveChangesAsync(ct);
         return ToDto(reader);
     }
@@ -421,9 +429,10 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
     private async Task<ReaderDto> ChangeAsync(Guid publicId, Action<Reader> change, CancellationToken ct)
     {
         var reader = await LoadAsync(publicId, ct);
+        var before = ToDto(reader);
         change(reader);
         await PublishAsync(reader, deleted: false, ct);
-        await AuditAsync(reader, CrudChange.StatusChanged, ct);
+        await AuditAsync(reader, CrudChange.StatusChanged, ct, Diff(before, reader));
         await Db.SaveChangesAsync(ct);
         return ToDto(reader);
     }
