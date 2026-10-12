@@ -150,11 +150,11 @@ export interface Hold {
 }
 export interface HoldSearch extends CrudSearch { cardNo?: string | null; holdStatus?: number | null; mfn?: number | null; }
 export const HOLD_STATUSES: { code: number; name: string; badge: string }[] = [
-  { code: 1, name: 'Chờ sách', badge: 'badge-warn' },
-  { code: 2, name: 'Đang giữ sách', badge: 'badge-info' },
-  { code: 3, name: 'Đã mượn', badge: 'badge-on' },
-  { code: 4, name: 'Đã huỷ', badge: 'badge-off' },
-  { code: 5, name: 'Hết hạn giữ', badge: 'badge-off' },
+  { code: 1, name: 'HOLD_STATUS.1', badge: 'badge-warn' },
+  { code: 2, name: 'HOLD_STATUS.2', badge: 'badge-info' },
+  { code: 3, name: 'HOLD_STATUS.3', badge: 'badge-on' },
+  { code: 4, name: 'HOLD_STATUS.4', badge: 'badge-off' },
+  { code: 5, name: 'HOLD_STATUS.5', badge: 'badge-off' },
 ];
 /** state: open | overdue | returned; from/to: yyyy-MM-dd (ngày mượn). */
 export interface LoanSearch extends CrudSearch {

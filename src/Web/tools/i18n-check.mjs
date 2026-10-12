@@ -22,7 +22,7 @@ const APPS = {
       'projects/admin/src/app/pages/patron/readers.ts', 'projects/admin/src/app/pages/patron/reader-',
       'projects/admin/src/app/pages/system', 'projects/admin/src/app/pages/tenant', 'projects/admin/src/app/pages/patron',
       'projects/admin/src/app/pages/audit-logs.ts', 'projects/admin/src/app/pages/notification', 'projects/admin/src/app/pages/catalog',
-      'projects/admin/src/app/pages/holdings', 'projects/admin/src/app/shared',
+      'projects/admin/src/app/pages/holdings', 'projects/admin/src/app/shared', 'projects/admin/src/app/pages/circulation',
     ],
   },
 };

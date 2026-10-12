@@ -1,8 +1,9 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api, CrudPage, FineTicket, FineTicketSearch, FineTicketTotals, errorMessage } from '../../core/api';
+import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
@@ -13,14 +14,14 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-fines',
-  imports: [FormsModule, DatePipe, DecimalPipe, RouterLink, Loading, Paginator, Modal, ConfirmDelete],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
-      <h4 class="page-title">Quản lý phạt</h4>
+      <h4 class="page-title">{{ 'FINES_PAGE.TITLE' | translate }}</h4>
       @if (can('add')) {
         <div class="ml-auto flex gap-2">
-          <button class="btn-primary" (click)="openCreate('build')"><span class="material-icons text-[18px]">playlist_add_check</span> Lập phiếu cho bạn đọc</button>
-          <button class="btn-secondary" (click)="openCreate('manual')"><span class="material-icons text-[18px]">add</span> Phiếu thủ công</button>
+          <button class="btn-primary" (click)="openCreate('build')"><span class="material-icons text-[18px]">playlist_add_check</span> {{ 'FINES_PAGE.BUILD' | translate }}</button>
+          <button class="btn-secondary" (click)="openCreate('manual')"><span class="material-icons text-[18px]">add</span> {{ 'FINES_PAGE.MANUAL' | translate }}</button>
         </div>
       }
     </div>
@@ -28,41 +29,41 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div class="md:col-span-2">
-          <label for="fn-kw" class="field-label">Số phiếu / số thẻ / họ tên</label>
+          <label for="fn-kw" class="field-label">{{ 'FINES_PAGE.SEARCH_LABEL' | translate }}</label>
           <input id="fn-kw" class="input" [(ngModel)]="search.keyword" (keydown.enter)="find()" placeholder="VD: PT001, HS001..." />
         </div>
         <div>
-          <label for="fn-status" class="field-label">Trạng thái</label>
+          <label for="fn-status" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>
           <select id="fn-status" class="input" [(ngModel)]="search.ticketStatus" (change)="find()">
-            <option [ngValue]="null">Tất cả</option>
-            <option [ngValue]="1">Đang xử lý</option>
-            <option [ngValue]="2">Đã hoàn thành</option>
+            <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+            <option [ngValue]="1">{{ 'FINES_PAGE.OPEN' | translate }}</option>
+            <option [ngValue]="2">{{ 'FINES_PAGE.DONE' | translate }}</option>
           </select>
         </div>
         <div class="flex items-end pb-2">
           <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" class="rounded border-gray-300" [(ngModel)]="search.unpaid" (change)="find()" /> Còn nợ tiền phạt
+            <input type="checkbox" class="rounded border-gray-300" [(ngModel)]="search.unpaid" (change)="find()" /> {{ 'FINES_PAGE.UNPAID_ONLY' | translate }}
           </label>
         </div>
         <div>
-          <label for="fn-from" class="field-label">Ngày phạt từ</label>
+          <label for="fn-from" class="field-label">{{ 'FINES_PAGE.FROM' | translate }}</label>
           <input id="fn-from" type="date" class="input" [(ngModel)]="search.from" (change)="find()" />
         </div>
         <div>
-          <label for="fn-to" class="field-label">đến ngày</label>
+          <label for="fn-to" class="field-label">{{ 'FINES_PAGE.TO' | translate }}</label>
           <input id="fn-to" type="date" class="input" [(ngModel)]="search.to" (change)="find()" />
         </div>
       </div>
       <div class="flex justify-end mt-4">
-        <button (click)="find()" class="btn-primary"><span class="material-icons text-[18px]">search</span> Tìm kiếm</button>
+        <button (click)="find()" class="btn-primary"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
       </div>
     </div>
 
     @if (totals(); as t) {
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        <div class="panel !mb-0"><div class="text-xs text-gray-500">Phải thu</div><div class="text-xl font-semibold text-gray-800">{{ t.receivable | number: '1.0-0' }} đ</div></div>
-        <div class="panel !mb-0"><div class="text-xs text-gray-500">Đã thu</div><div class="text-xl font-semibold text-green-700">{{ t.received | number: '1.0-0' }} đ</div></div>
-        <div class="panel !mb-0"><div class="text-xs text-gray-500">Còn lại</div><div class="text-xl font-semibold" [class.text-red-600]="t.remaining > 0">{{ t.remaining | number: '1.0-0' }} đ</div></div>
+        <div class="panel !mb-0"><div class="text-xs text-gray-500">{{ 'FINES_PAGE.RECEIVABLE' | translate }}</div><div class="text-xl font-semibold text-gray-800">{{ t.receivable | lnumber: '1.0-0' }} {{ 'COMMON.VND' | translate }}</div></div>
+        <div class="panel !mb-0"><div class="text-xs text-gray-500">{{ 'FINES_PAGE.RECEIVED' | translate }}</div><div class="text-xl font-semibold text-green-700">{{ t.received | lnumber: '1.0-0' }} {{ 'COMMON.VND' | translate }}</div></div>
+        <div class="panel !mb-0"><div class="text-xs text-gray-500">{{ 'FINES_PAGE.REMAINING' | translate }}</div><div class="text-xl font-semibold" [class.text-red-600]="t.remaining > 0">{{ t.remaining | lnumber: '1.0-0' }} {{ 'COMMON.VND' | translate }}</div></div>
       </div>
     }
 
@@ -71,9 +72,9 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
       <div class="overflow-x-auto w-full">
         <table class="w-full text-left border-collapse min-w-[1000px]">
           <thead><tr>
-            <th class="th w-24">Số phiếu</th><th class="th">Bạn đọc</th><th class="th w-28">Ngày phạt</th><th class="th w-20 !text-center">Lần</th>
-            <th class="th w-32 !text-right">Tổng</th><th class="th w-32 !text-right">Đã nộp</th><th class="th w-32 !text-right">Còn lại</th>
-            <th class="th w-32">Trạng thái</th><th class="th w-24 !text-center">Thao tác</th>
+            <th class="th w-24">{{ 'FINES_PAGE.CODE' | translate }}</th><th class="th">{{ 'FINES_PAGE.READER' | translate }}</th><th class="th w-28">{{ 'FINES_PAGE.DATE' | translate }}</th><th class="th w-20 !text-center">{{ 'FINES_PAGE.ROUND' | translate }}</th>
+            <th class="th w-32 !text-right">{{ 'FINES_PAGE.TOTAL' | translate }}</th><th class="th w-32 !text-right">{{ 'FINES_PAGE.PAID' | translate }}</th><th class="th w-32 !text-right">{{ 'FINES_PAGE.REMAINING' | translate }}</th>
+            <th class="th w-32">{{ 'COMMON.STATUS' | translate }}</th><th class="th w-24 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
           </tr></thead>
           <tbody>
             @for (t of page()?.items ?? []; track t.publicId) {
@@ -81,23 +82,23 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
                 <td class="td font-mono text-[13px]"><a class="text-blue-600 hover:underline" [routerLink]="['/fine-ticket', t.publicId]">{{ t.code }}</a></td>
                 <td class="td">{{ t.readerName ?? '—' }}<div class="text-[11px] text-gray-400 font-mono">{{ t.cardNo }}</div>
                   @if (t.note) { <div class="text-[11px] text-gray-500">{{ t.note }}</div> }</td>
-                <td class="td text-[13px]">{{ t.fineDate | date: 'dd/MM/yyyy' }}</td>
+                <td class="td text-[13px]">{{ t.fineDate | ldate: 'dd/MM/yyyy' }}</td>
                 <td class="td text-center">{{ t.round }}</td>
-                <td class="td text-right">{{ t.total | number: '1.0-0' }}</td>
-                <td class="td text-right">{{ t.paid | number: '1.0-0' }}</td>
-                <td class="td text-right" [class.text-red-600]="t.remaining > 0" [class.font-semibold]="t.remaining > 0">{{ t.remaining | number: '1.0-0' }}</td>
-                <td class="td"><span [class]="t.status === 2 ? 'badge-on' : 'badge-info'">{{ t.status === 2 ? 'Đã hoàn thành' : 'Đang xử lý' }}</span></td>
+                <td class="td text-right">{{ t.total | lnumber: '1.0-0' }}</td>
+                <td class="td text-right">{{ t.paid | lnumber: '1.0-0' }}</td>
+                <td class="td text-right" [class.text-red-600]="t.remaining > 0" [class.font-semibold]="t.remaining > 0">{{ t.remaining | lnumber: '1.0-0' }}</td>
+                <td class="td"><span [class]="t.status === 2 ? 'badge-on' : 'badge-info'">{{ (t.status === 2 ? 'FINES_PAGE.DONE' : 'FINES_PAGE.OPEN') | translate }}</span></td>
                 <td class="td">
                   <div class="flex items-center justify-center gap-1">
-                    <a class="icon-btn text-blue-600 hover:bg-blue-50" title="Chi tiết" [routerLink]="['/fine-ticket', t.publicId]"><span class="material-icons text-[18px]">visibility</span></a>
+                    <a class="icon-btn text-blue-600 hover:bg-blue-50" [title]="'FINES_PAGE.DETAIL' | translate" [routerLink]="['/fine-ticket', t.publicId]"><span class="material-icons text-[18px]">visibility</span></a>
                     @if (can('delete') && t.status === 1 && t.paid === 0) {
-                      <button class="icon-btn text-red-600 hover:bg-red-50" title="Xoá" (click)="deleting.set(t)"><span class="material-icons text-[18px]">delete</span></button>
+                      <button class="icon-btn text-red-600 hover:bg-red-50" [title]="'COMMON.DELETE' | translate" (click)="deleting.set(t)"><span class="material-icons text-[18px]">delete</span></button>
                     }
                   </div>
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="9" class="py-8 text-center text-gray-500">{{ loading() ? '' : 'Không có phiếu phạt nào' }}</td></tr>
+              <tr><td colspan="9" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('FINES_PAGE.EMPTY' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -108,34 +109,34 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
     </div>
 
     @if (creating(); as mode) {
-      <app-modal [title]="mode === 'build' ? 'Lập phiếu phạt cho bạn đọc' : 'Phiếu phạt thủ công'" widthClass="max-w-md" (closed)="creating.set(null)">
+      <app-modal [title]="mode === 'build' ? 'FINES_PAGE.BUILD_TITLE' : 'FINES_PAGE.MANUAL_TITLE'" widthClass="max-w-md" (closed)="creating.set(null)">
         <div class="space-y-4">
           <div>
-            <label for="fn-card" class="form-label">Số thẻ bạn đọc</label>
-            <input id="fn-card" class="input font-mono" [(ngModel)]="cardNo" placeholder="Quét hoặc nhập số thẻ" autocomplete="off" />
+            <label for="fn-card" class="form-label">{{ 'FINES_PAGE.CARD' | translate }}</label>
+            <input id="fn-card" class="input font-mono" [(ngModel)]="cardNo" [placeholder]="'FINES_PAGE.CARD_PH' | translate" autocomplete="off" />
           </div>
           @if (mode === 'build') {
-            <p class="text-sm text-gray-600">Gom mọi tài liệu bạn đọc đang mượn quá hạn vào phiếu phạt đang mở (chưa có thì lập phiếu mới). Tiền phạt = số ngày quá hạn × tiền phạt mỗi ngày của chính sách.</p>
+            <p class="text-sm text-gray-600">{{ 'FINES_PAGE.BUILD_HINT' | translate }}</p>
           } @else {
             <div>
-              <label for="fn-amount" class="form-label">Số tiền phạt (đ)</label>
+              <label for="fn-amount" class="form-label">{{ 'FINES_PAGE.AMOUNT' | translate }}</label>
               <input id="fn-amount" type="number" min="0" class="input" [(ngModel)]="amount" />
             </div>
             <div>
-              <label for="fn-note" class="form-label">Ghi chú</label>
-              <input id="fn-note" class="input" maxlength="1000" [(ngModel)]="note" placeholder="VD: Làm hỏng thẻ" />
+              <label for="fn-note" class="form-label">{{ 'COMMON.NOTE' | translate }}</label>
+              <input id="fn-note" class="input" maxlength="1000" [(ngModel)]="note" [placeholder]="'FINES_PAGE.NOTE_EG' | translate" />
             </div>
           }
         </div>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="creating.set(null)">Huỷ</button>
-          <button type="button" class="btn-primary" [disabled]="busy() || !cardNo.trim()" (click)="create(mode)">{{ mode === 'build' ? 'Lập phiếu' : 'Thêm phiếu' }}</button>
+          <button type="button" class="btn-secondary" (click)="creating.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-primary" [disabled]="busy() || !cardNo.trim()" (click)="create(mode)">{{ (mode === 'build' ? 'FINES_PAGE.CREATE_BUILD' : 'FINES_PAGE.CREATE_MANUAL') | translate }}</button>
         </ng-container>
       </app-modal>
     }
 
     @if (deleting(); as d) {
-      <app-confirm-delete [message]="'Xoá phiếu phạt ' + d.code + ' của thẻ ' + d.cardNo + '?'" (confirmed)="remove(d)" (cancelled)="deleting.set(null)" />
+      <app-confirm-delete message="FINES_PAGE.DELETE_CONFIRM" [messageParams]="{ code: d.code, card: d.cardNo }" (confirmed)="remove(d)" (cancelled)="deleting.set(null)" />
     }
   `,
 })
@@ -203,7 +204,7 @@ export class Fines implements OnInit {
   protected async remove(t: FineTicket): Promise<void> {
     try {
       await this.api.deleteFineTicket(t.publicId);
-      this.toastr.success(`Đã xoá phiếu ${t.code}.`);
+      this.toastr.success('FINES_PAGE.DELETED', { code: t.code });
       this.deleting.set(null);
       await this.load();
     } catch (e) {

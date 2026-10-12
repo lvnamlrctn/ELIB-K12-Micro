@@ -1,8 +1,9 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { RouterLink } from '@angular/router';
 import { Api, FineLine, FineReason, FineTicketDetail, errorMessage } from '../../core/api';
+import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
@@ -15,69 +16,69 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
  */
 @Component({
   selector: 'app-fine-ticket',
-  imports: [FormsModule, DatePipe, DecimalPipe, RouterLink, Loading],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
-      <a routerLink="/fines" class="icon-btn text-gray-500 hover:bg-gray-100" title="Danh sách phiếu phạt"><span class="material-icons">arrow_back</span></a>
-      <h4 class="page-title">Phiếu phạt {{ detail()?.ticket?.code ?? '' }}</h4>
+      <a routerLink="/fines" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'FINE_TICKET_PAGE.BACK' | translate"><span class="material-icons">arrow_back</span></a>
+      <h4 class="page-title">{{ 'FINE_TICKET_PAGE.TITLE' | translate: { code: detail()?.ticket?.code ?? '' } }}</h4>
       @if (detail(); as d) {
-        <span [class]="d.ticket.status === 2 ? 'badge-on' : 'badge-info'">{{ d.ticket.status === 2 ? 'Đã hoàn thành' : 'Đang xử lý' }}</span>
+        <span [class]="d.ticket.status === 2 ? 'badge-on' : 'badge-info'">{{ (d.ticket.status === 2 ? 'FINES_PAGE.DONE' : 'FINES_PAGE.OPEN') | translate }}</span>
       }
     </div>
 
     @if (detail(); as d) {
       <div class="panel">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-          <div><div class="text-gray-500 text-xs">Bạn đọc</div><div class="font-medium">{{ d.ticket.readerName ?? '—' }}</div><div class="font-mono text-xs text-gray-500">{{ d.ticket.cardNo }}</div></div>
-          <div><div class="text-gray-500 text-xs">Ngày phạt</div><div>{{ d.ticket.fineDate | date: 'dd/MM/yyyy HH:mm' }}</div></div>
-          <div><div class="text-gray-500 text-xs">Lần phạt</div><div>{{ d.ticket.round }}</div></div>
-          <div><div class="text-gray-500 text-xs">Tiền phạt / ngày quá hạn</div><div>{{ d.finePerDay | number: '1.0-0' }} đ</div></div>
+          <div><div class="text-gray-500 text-xs">{{ 'FINE_TICKET_PAGE.READER' | translate }}</div><div class="font-medium">{{ d.ticket.readerName ?? '—' }}</div><div class="font-mono text-xs text-gray-500">{{ d.ticket.cardNo }}</div></div>
+          <div><div class="text-gray-500 text-xs">{{ 'FINE_TICKET_PAGE.DATE' | translate }}</div><div>{{ d.ticket.fineDate | ldate: 'dd/MM/yyyy HH:mm' }}</div></div>
+          <div><div class="text-gray-500 text-xs">{{ 'FINE_TICKET_PAGE.ROUND' | translate }}</div><div>{{ d.ticket.round }}</div></div>
+          <div><div class="text-gray-500 text-xs">{{ 'FINE_TICKET_PAGE.FINE_PER_DAY' | translate }}</div><div>{{ d.finePerDay | lnumber: '1.0-0' }} {{ 'COMMON.VND' | translate }}</div></div>
         </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative mb-5">
         @if (busy()) { <app-loading /> }
-        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">Dòng phạt ({{ lines().length }})</div>
+        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">{{ 'FINE_TICKET_PAGE.LINES' | translate: { count: lines().length } }}</div>
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse min-w-[900px]">
             <thead><tr>
-              <th class="th w-32">Số ĐKCB</th><th class="th">Nhan đề</th><th class="th w-28">Hạn trả</th><th class="th w-24 !text-center">Ngày quá hạn</th>
-              <th class="th w-56">Lý do</th><th class="th w-40 !text-right">Số tiền (đ)</th><th class="th w-14"></th>
+              <th class="th w-32">{{ 'FINE_TICKET_PAGE.BARCODE' | translate }}</th><th class="th">{{ 'FINE_TICKET_PAGE.TITLE_COL' | translate }}</th><th class="th w-28">{{ 'FINE_TICKET_PAGE.DUE' | translate }}</th><th class="th w-24 !text-center">{{ 'FINE_TICKET_PAGE.OVERDUE_DAYS' | translate }}</th>
+              <th class="th w-56">{{ 'FINE_TICKET_PAGE.REASON' | translate }}</th><th class="th w-40 !text-right">{{ 'FINE_TICKET_PAGE.AMOUNT' | translate }}</th><th class="th w-14"></th>
             </tr></thead>
             <tbody>
               @for (l of lines(); track $index) {
                 <tr>
                   <td class="td font-mono text-[13px]">
                     @if (l.id === null && editable()) {
-                      <input class="input !py-1 font-mono" [(ngModel)]="l.barcode" placeholder="Không bắt buộc" [attr.aria-label]="'ĐKCB dòng ' + ($index + 1)" />
+                      <input class="input !py-1 font-mono" [(ngModel)]="l.barcode" [placeholder]="'FINE_TICKET_PAGE.OPTIONAL' | translate" [attr.aria-label]="'FINE_TICKET_PAGE.BARCODE_N' | translate: { n: $index + 1 }" />
                     } @else { {{ l.barcode ?? '—' }} }
                   </td>
-                  <td class="td">{{ l.title ?? (l.id === null ? 'Dòng mới' : '—') }}
-                    @if (l.barcode && l.id !== null) { <div class="text-[11px]" [class.text-amber-700]="l.loanOpen" [class.text-gray-400]="!l.loanOpen">{{ l.loanOpen ? 'Đang mượn' : 'Đã đóng lượt mượn' }}</div> }
+                  <td class="td">{{ l.title ?? (l.id === null ? ('FINE_TICKET_PAGE.NEW_LINE' | translate) : '—') }}
+                    @if (l.barcode && l.id !== null) { <div class="text-[11px]" [class.text-amber-700]="l.loanOpen" [class.text-gray-400]="!l.loanOpen">{{ (l.loanOpen ? 'FINE_TICKET_PAGE.LOAN_OPEN' : 'FINE_TICKET_PAGE.LOAN_CLOSED') | translate }}</div> }
                   </td>
-                  <td class="td text-[13px]">{{ l.dueAt ? (l.dueAt | date: 'dd/MM/yyyy') : '—' }}</td>
+                  <td class="td text-[13px]">{{ l.dueAt ? (l.dueAt | ldate: 'dd/MM/yyyy') : '—' }}</td>
                   <td class="td text-center">{{ l.overdueDays || '' }}</td>
                   <td class="td">
-                    <select class="input !py-1" [(ngModel)]="l.reasonCode" (ngModelChange)="reasonChanged(l)" [disabled]="!editable()" [attr.aria-label]="'Lý do dòng ' + ($index + 1)">
+                    <select class="input !py-1" [(ngModel)]="l.reasonCode" (ngModelChange)="reasonChanged(l)" [disabled]="!editable()" [attr.aria-label]="'FINE_TICKET_PAGE.REASON_N' | translate: { n: $index + 1 }">
                       @for (r of reasons(); track r.code) { <option [value]="r.code">{{ r.name }}</option> }
                     </select>
                   </td>
-                  <td class="td"><input type="number" min="0" class="input !py-1 text-right" [(ngModel)]="l.amount" (ngModelChange)="version.update(bump)" [disabled]="!editable()" [attr.aria-label]="'Số tiền dòng ' + ($index + 1)" /></td>
+                  <td class="td"><input type="number" min="0" class="input !py-1 text-right" [(ngModel)]="l.amount" (ngModelChange)="version.update(bump)" [disabled]="!editable()" [attr.aria-label]="'FINE_TICKET_PAGE.AMOUNT_N' | translate: { n: $index + 1 }" /></td>
                   <td class="td text-center">
                     @if (editable()) {
-                      <button class="icon-btn text-red-600 hover:bg-red-50" title="Xoá dòng" (click)="removeLine($index)"><span class="material-icons text-[18px]">close</span></button>
+                      <button class="icon-btn text-red-600 hover:bg-red-50" [title]="'FINE_TICKET_PAGE.REMOVE_LINE' | translate" (click)="removeLine($index)"><span class="material-icons text-[18px]">close</span></button>
                     }
                   </td>
                 </tr>
               } @empty {
-                <tr><td colspan="7" class="py-6 text-center text-gray-500">Phiếu thủ công — không có dòng tài liệu</td></tr>
+                <tr><td colspan="7" class="py-6 text-center text-gray-500">{{ 'FINE_TICKET_PAGE.NO_LINES' | translate }}</td></tr>
               }
             </tbody>
           </table>
         </div>
         @if (editable()) {
           <div class="px-5 py-3 border-t border-gray-100">
-            <button class="btn-secondary !py-1.5" (click)="addLine()"><span class="material-icons text-[18px]">add</span> Thêm dòng phạt</button>
+            <button class="btn-secondary !py-1.5" (click)="addLine()"><span class="material-icons text-[18px]">add</span> {{ 'FINE_TICKET_PAGE.ADD_LINE' | translate }}</button>
           </div>
         }
       </div>
@@ -85,46 +86,46 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
       <div class="panel">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label for="ft-total" class="field-label">Tổng tiền phạt (đ)</label>
+            <label for="ft-total" class="field-label">{{ 'FINE_TICKET_PAGE.TOTAL' | translate }}</label>
             @if (lines().length === 0) {
               <input id="ft-total" type="number" min="0" class="input" [(ngModel)]="manualAmount" [disabled]="!can('edit')" />
             } @else {
-              <div id="ft-total" class="input bg-gray-50">{{ total() | number: '1.0-0' }}</div>
+              <div id="ft-total" class="input bg-gray-50">{{ total() | lnumber: '1.0-0' }}</div>
             }
           </div>
           <div>
-            <label for="ft-discount" class="field-label">Giảm trừ (đ)</label>
+            <label for="ft-discount" class="field-label">{{ 'FINE_TICKET_PAGE.DISCOUNT' | translate }}</label>
             <input id="ft-discount" type="number" min="0" class="input" [(ngModel)]="discount" [disabled]="!can('edit')" />
           </div>
           <div>
-            <label for="ft-paid" class="field-label">Đã nộp (đ)</label>
+            <label for="ft-paid" class="field-label">{{ 'FINE_TICKET_PAGE.PAID' | translate }}</label>
             <div class="flex gap-2">
               <input id="ft-paid" type="number" min="0" class="input" [(ngModel)]="paid" [disabled]="!can('edit')" />
-              @if (can('edit')) { <button class="btn-secondary !px-2 whitespace-nowrap" title="Nộp đủ số còn lại" (click)="payAll()">Nộp đủ</button> }
+              @if (can('edit')) { <button class="btn-secondary !px-2 whitespace-nowrap" [title]="'FINE_TICKET_PAGE.PAY_ALL_TIP' | translate" (click)="payAll()">{{ 'FINE_TICKET_PAGE.PAY_ALL' | translate }}</button> }
             </div>
           </div>
           <div>
-            <div class="field-label">Còn phải nộp</div>
-            <div class="text-xl font-semibold pt-1" [class.text-red-600]="remaining() > 0">{{ remaining() | number: '1.0-0' }} đ</div>
+            <div class="field-label">{{ 'FINE_TICKET_PAGE.REMAINING' | translate }}</div>
+            <div class="text-xl font-semibold pt-1" [class.text-red-600]="remaining() > 0">{{ remaining() | lnumber: '1.0-0' }} {{ 'COMMON.VND' | translate }}</div>
           </div>
           <div class="md:col-span-4">
-            <label for="ft-note" class="field-label">Ghi chú</label>
+            <label for="ft-note" class="field-label">{{ 'COMMON.NOTE' | translate }}</label>
             <input id="ft-note" class="input" maxlength="1000" [(ngModel)]="note" [disabled]="!can('edit')" />
           </div>
         </div>
         @if (can('edit')) {
           <div class="flex justify-end gap-2 mt-4">
             @if (d.ticket.status === 2) {
-              <button class="btn-secondary" [disabled]="busy()" (click)="save(1)">Mở lại phiếu</button>
+              <button class="btn-secondary" [disabled]="busy()" (click)="save(1)">{{ 'FINE_TICKET_PAGE.REOPEN' | translate }}</button>
             } @else {
-              <button class="btn-secondary" [disabled]="busy()" (click)="save(1)"><span class="material-icons text-[18px]">save</span> Lưu</button>
-              <button class="btn-primary" [disabled]="busy()" (click)="save(2)"><span class="material-icons text-[18px]">task_alt</span> Lưu và hoàn thành</button>
+              <button class="btn-secondary" [disabled]="busy()" (click)="save(1)"><span class="material-icons text-[18px]">save</span> {{ 'COMMON.SAVE' | translate }}</button>
+              <button class="btn-primary" [disabled]="busy()" (click)="save(2)"><span class="material-icons text-[18px]">task_alt</span> {{ 'FINE_TICKET_PAGE.SAVE_DONE' | translate }}</button>
             }
           </div>
         }
       </div>
     } @else if (!busy()) {
-      <div class="panel text-gray-500">Không tìm thấy phiếu phạt.</div>
+      <div class="panel text-gray-500">{{ 'FINE_TICKET_PAGE.NOT_FOUND' | translate }}</div>
     }
   `,
 })
@@ -225,7 +226,7 @@ export class FineTicketPage implements OnInit {
         deletedLineIds: this.editable() ? this.deleted : [],
       });
       this.apply(saved);
-      this.toastr.success(status === 2 ? `Đã hoàn thành phiếu ${saved.ticket.code}.` : `Đã lưu phiếu ${saved.ticket.code}.`);
+      this.toastr.success(status === 2 ? 'FINE_TICKET_PAGE.COMPLETED' : 'FINE_TICKET_PAGE.SAVED', { code: saved.ticket.code });
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

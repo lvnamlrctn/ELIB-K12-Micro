@@ -1,8 +1,10 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { formatDate } from '@angular/common';
 import { Component, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Router } from '@angular/router';
 import { Api, CheckoutLine, CircPlace, Loan, ReaderPanel, ReturnResult, errorMessage } from '../../core/api';
+import { LDatePipe, LNumberPipe, Language } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
@@ -15,12 +17,12 @@ const PLACE_KEY = 'elib.circulation.place';
  */
 @Component({
   selector: 'app-borrow',
-  imports: [FormsModule, DatePipe, DecimalPipe, Modal],
+  imports: [FormsModule, LDatePipe, LNumberPipe, Modal, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
-      <h4 class="page-title">Mượn / Trả</h4>
+      <h4 class="page-title">{{ 'BORROW_PAGE.TITLE' | translate }}</h4>
       <div class="ml-auto flex items-center gap-2">
-        <label for="bw-place" class="text-sm text-gray-600">Điểm lưu thông</label>
+        <label for="bw-place" class="text-sm text-gray-600">{{ 'BORROW_PAGE.PLACE' | translate }}</label>
         <select id="bw-place" class="input !w-64" [ngModel]="placeId()" (ngModelChange)="choosePlace($event)">
           @for (p of places(); track p.id) { <option [ngValue]="p.id">{{ p.code }} — {{ p.name }}</option> }
         </select>
@@ -32,38 +34,38 @@ const PLACE_KEY = 'elib.circulation.place';
         <div class="panel !mb-0">
           <div class="flex gap-3 items-end flex-wrap">
             <div class="flex-1 min-w-[220px]">
-              <label for="bw-card" class="form-label">Số thẻ bạn đọc</label>
-              <input id="bw-card" #cardInput class="input font-mono" [(ngModel)]="cardNo" (keydown.enter)="loadReader()" placeholder="Quét hoặc nhập số thẻ" autocomplete="off" />
+              <label for="bw-card" class="form-label">{{ 'BORROW_PAGE.CARD' | translate }}</label>
+              <input id="bw-card" #cardInput class="input font-mono" [(ngModel)]="cardNo" (keydown.enter)="loadReader()" [placeholder]="'BORROW_PAGE.CARD_PH' | translate" autocomplete="off" />
             </div>
             <button type="button" class="btn-primary" [disabled]="busy() || !cardNo.trim()" (click)="loadReader()">
-              <span class="material-icons text-[18px]">person_search</span> Xem bạn đọc</button>
+              <span class="material-icons text-[18px]">person_search</span> {{ 'BORROW_PAGE.VIEW_READER' | translate }}</button>
           </div>
 
           @if (reader(); as r) {
             <div class="mt-4 flex gap-4 items-start border-t border-gray-100 pt-4">
               <div class="w-20 h-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                @if (photoUrl()) { <img [src]="photoUrl()" alt="Ảnh thẻ" class="w-full h-full object-cover" /> }
+                @if (photoUrl()) { <img [src]="photoUrl()" [alt]="'BORROW_PAGE.PHOTO_ALT' | translate" class="w-full h-full object-cover" /> }
                 @else { <span class="material-icons text-gray-300 text-[40px]">person</span> }
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-lg font-semibold text-gray-800">{{ r.fullName }}</div>
                 <div class="text-sm text-gray-600">
-                  Thẻ <b class="font-mono">{{ r.cardNo }}</b>
+                  <span [innerHTML]="'BORROW_PAGE.CARD_LINE' | translate: { card: r.cardNo }"></span>
                   @if (r.readerTypeName) { · {{ r.readerTypeName }} }
-                  @if (r.className) { · Lớp {{ r.className }} }
-                  @if (r.courseName) { · Khoá {{ r.courseName }} }
-                  @if (r.expireDate) { · Hạn thẻ {{ r.expireDate | date: 'dd/MM/yyyy' }} }
+                  @if (r.className) { · {{ 'BORROW_PAGE.CLASS' | translate: { name: r.className } }} }
+                  @if (r.courseName) { · {{ 'BORROW_PAGE.COURSE' | translate: { name: r.courseName } }} }
+                  @if (r.expireDate) { · {{ 'BORROW_PAGE.CARD_EXPIRY' | translate: { date: (r.expireDate | ldate: 'dd/MM/yyyy') } }} }
                 </div>
                 <div class="text-xs text-gray-500 mt-1">
-                  Chính sách: mượn {{ r.loanDays }} ngày{{ r.maxLoans != null ? ', tối đa ' + r.maxLoans + ' tài liệu' : '' }}{{ r.maxRenewals != null ? ', gia hạn tối đa ' + r.maxRenewals + ' lần' : '' }}.
+                  {{ policy(r) }}
                 </div>
                 @if (r.blockReason) { <div class="alert-error !block mt-2">{{ r.blockReason }}</div> }
                 @if (r.unpaidFines > 0 || (r.hasOverdue && canFine())) {
                   <div class="mt-2 flex items-center gap-3 flex-wrap text-sm">
-                    @if (r.unpaidFines > 0) { <span class="badge-danger">Còn nợ tiền phạt {{ r.unpaidFines | number: '1.0-0' }} đ</span> }
+                    @if (r.unpaidFines > 0) { <span class="badge-danger">{{ 'BORROW_PAGE.UNPAID' | translate: { amount: (r.unpaidFines | lnumber: '1.0-0') } }}</span> }
                     @if (canFine()) {
                       <button type="button" class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="fine([])">
-                        <span class="material-icons text-[16px]">gavel</span> Lập phiếu phạt</button>
+                        <span class="material-icons text-[16px]">gavel</span> {{ 'BORROW_PAGE.CREATE_FINE' | translate }}</button>
                     }
                   </div>
                 }
@@ -73,11 +75,11 @@ const PLACE_KEY = 'elib.circulation.place';
             @if (r.canBorrow && can('add')) {
               <div class="mt-4 flex gap-3 items-end flex-wrap">
                 <div class="flex-1 min-w-[220px]">
-                  <label for="bw-item" class="form-label">Quét ĐKCB để mượn</label>
-                  <input id="bw-item" #itemInput class="input font-mono" [(ngModel)]="barcode" (keydown.enter)="checkout()" placeholder="Số ĐKCB" autocomplete="off" />
+                  <label for="bw-item" class="form-label">{{ 'BORROW_PAGE.SCAN_ITEM' | translate }}</label>
+                  <input id="bw-item" #itemInput class="input font-mono" [(ngModel)]="barcode" (keydown.enter)="checkout()" [placeholder]="'BORROW_PAGE.BARCODE' | translate" autocomplete="off" />
                 </div>
                 <button type="button" class="btn-primary" [disabled]="busy() || !barcode.trim()" (click)="checkout()">
-                  <span class="material-icons text-[18px]">outbox</span> Mượn</button>
+                  <span class="material-icons text-[18px]">outbox</span> {{ 'BORROW_PAGE.CHECKOUT' | translate }}</button>
               </div>
             }
             @if (lines().length) {
@@ -92,14 +94,14 @@ const PLACE_KEY = 'elib.circulation.place';
 
         @if (reader()?.holds?.length) {
           <div class="panel !mb-0">
-            <div class="font-semibold text-gray-800 mb-2">Đặt mượn ({{ reader()!.holds!.length }})</div>
+            <div class="font-semibold text-gray-800 mb-2">{{ 'BORROW_PAGE.HOLDS' | translate: { count: reader()!.holds!.length } }}</div>
             <ul class="space-y-1.5 text-sm">
               @for (h of reader()!.holds!; track h.publicId) {
                 <li class="flex items-center gap-2 flex-wrap">
-                  <span [class]="h.status === 2 ? 'badge-info' : 'badge-warn'">{{ h.status === 2 ? 'Đang giữ' : 'Chờ sách' }}</span>
+                  <span [class]="h.status === 2 ? 'badge-info' : 'badge-warn'">{{ (h.status === 2 ? 'BORROW_PAGE.HOLD_HELD' : 'BORROW_PAGE.HOLD_WAITING') | translate }}</span>
                   <span>{{ h.title ?? 'MFN ' + h.mfn }}</span>
-                  @if (h.status === 2) { <span class="text-gray-600">— bản <b class="font-mono">{{ h.barcode }}</b>, lấy trước hết {{ h.expiresAt | date: 'dd/MM/yyyy' }}</span> }
-                  @else if (h.queuePosition) { <span class="text-gray-500">— thứ tự chờ {{ h.queuePosition }}</span> }
+                  @if (h.status === 2) { <span class="text-gray-600" [innerHTML]="'BORROW_PAGE.HOLD_COPY' | translate: { barcode: h.barcode, date: (h.expiresAt | ldate: 'dd/MM/yyyy') }"></span> }
+                  @else if (h.queuePosition) { <span class="text-gray-500">{{ 'BORROW_PAGE.HOLD_QUEUE' | translate: { n: h.queuePosition } }}</span> }
                 </li>
               }
             </ul>
@@ -108,36 +110,36 @@ const PLACE_KEY = 'elib.circulation.place';
 
         @if (reader(); as r) {
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">Đang mượn ({{ r.currentLoans.length }})</div>
+            <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">{{ 'BORROW_PAGE.ON_LOAN' | translate: { count: r.currentLoans.length } }}</div>
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse min-w-[760px]">
                 <thead><tr>
-                  <th class="th w-32">Số ĐKCB</th><th class="th">Nhan đề</th><th class="th w-28">Ngày mượn</th><th class="th w-28">Hạn trả</th>
-                  <th class="th w-20 !text-center">Gia hạn</th><th class="th w-40 !text-center">Thao tác</th>
+                  <th class="th w-32">{{ 'BORROW_PAGE.BARCODE' | translate }}</th><th class="th">{{ 'BORROW_PAGE.TITLE_COL' | translate }}</th><th class="th w-28">{{ 'BORROW_PAGE.LOANED' | translate }}</th><th class="th w-28">{{ 'BORROW_PAGE.DUE' | translate }}</th>
+                  <th class="th w-20 !text-center">{{ 'BORROW_PAGE.RENEWALS' | translate }}</th><th class="th w-40 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
                 </tr></thead>
                 <tbody>
                   @for (l of r.currentLoans; track l.publicId) {
                     <tr class="hover:bg-gray-50/50">
                       <td class="td font-mono text-[13px]">{{ l.barcode }}</td>
                       <td class="td">{{ l.title ?? '—' }} @if (l.note) { <div class="text-[11px] text-amber-700">{{ l.note }}</div> }</td>
-                      <td class="td text-[13px]">{{ l.loanedAt | date: 'dd/MM/yyyy' }}</td>
-                      <td class="td text-[13px]" [class.text-red-600]="overdue(l)" [class.font-semibold]="overdue(l)">{{ l.dueAt | date: 'dd/MM/yyyy' }}</td>
+                      <td class="td text-[13px]">{{ l.loanedAt | ldate: 'dd/MM/yyyy' }}</td>
+                      <td class="td text-[13px]" [class.text-red-600]="overdue(l)" [class.font-semibold]="overdue(l)">{{ l.dueAt | ldate: 'dd/MM/yyyy' }}</td>
                       <td class="td text-center">{{ l.renewCount }}</td>
                       <td class="td">
                         @if (can('edit')) {
                           <div class="flex items-center justify-center gap-1.5">
-                            <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="returnLoan(l)">Trả</button>
-                            <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="openAction(l, 'renew')">Gia hạn</button>
-                            <button class="icon-btn text-gray-500 hover:bg-gray-100" title="Ghi chú" (click)="openAction(l, 'note')"><span class="material-icons text-[18px]">edit_note</span></button>
+                            <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="returnLoan(l)">{{ 'BORROW_PAGE.RETURN' | translate }}</button>
+                            <button class="btn-secondary !py-1 !px-2.5 !text-xs" [disabled]="busy()" (click)="openAction(l, 'renew')">{{ 'BORROW_PAGE.RENEW' | translate }}</button>
+                            <button class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'BORROW_PAGE.NOTE' | translate" (click)="openAction(l, 'note')"><span class="material-icons text-[18px]">edit_note</span></button>
                             @if (canFine()) {
-                              <button class="icon-btn text-red-600 hover:bg-red-50" title="Báo mất — lập phiếu phạt" (click)="fine([l.publicId])"><span class="material-icons text-[18px]">report</span></button>
+                              <button class="icon-btn text-red-600 hover:bg-red-50" [title]="'BORROW_PAGE.REPORT_LOST' | translate" (click)="fine([l.publicId])"><span class="material-icons text-[18px]">report</span></button>
                             }
                           </div>
                         }
                       </td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="6" class="py-6 text-center text-gray-500">Không có tài liệu đang mượn</td></tr>
+                    <tr><td colspan="6" class="py-6 text-center text-gray-500">{{ 'BORROW_PAGE.NO_LOANS' | translate }}</td></tr>
                   }
                 </tbody>
               </table>
@@ -147,19 +149,19 @@ const PLACE_KEY = 'elib.circulation.place';
       </div>
 
       <div class="panel !mb-0 h-fit">
-        <label for="bw-return" class="form-label">Trả sách — quét ĐKCB</label>
+        <label for="bw-return" class="form-label">{{ 'BORROW_PAGE.RETURN_SCAN' | translate }}</label>
         <div class="flex gap-2">
-          <input id="bw-return" class="input font-mono" [(ngModel)]="returnCode" (keydown.enter)="quickReturn()" placeholder="Số ĐKCB" autocomplete="off" [disabled]="!can('edit')" />
-          <button type="button" class="btn-primary" [disabled]="busy() || !returnCode.trim() || !can('edit')" (click)="quickReturn()">Trả</button>
+          <input id="bw-return" class="input font-mono" [(ngModel)]="returnCode" (keydown.enter)="quickReturn()" [placeholder]="'BORROW_PAGE.BARCODE' | translate" autocomplete="off" [disabled]="!can('edit')" />
+          <button type="button" class="btn-primary" [disabled]="busy() || !returnCode.trim() || !can('edit')" (click)="quickReturn()">{{ 'BORROW_PAGE.RETURN' | translate }}</button>
         </div>
         <ul class="mt-4 space-y-2">
           @for (r of returns(); track r.loan.publicId) {
             <li class="text-sm border border-gray-100 rounded-lg p-2.5" [class.border-red-200]="r.overdueDays > 0" [class.bg-red-50]="r.overdueDays > 0">
               <div><span class="font-mono font-medium">{{ r.loan.barcode }}</span> — {{ r.loan.title ?? '' }}</div>
-              <div class="text-xs text-gray-600">{{ r.loan.readerName ?? '' }} (thẻ {{ r.loan.cardNo }}) · mượn {{ r.loan.loanedAt | date: 'dd/MM/yyyy' }}</div>
-              @if (r.overdueDays > 0) { <div class="text-xs font-semibold text-red-600">Quá hạn {{ r.overdueDays }} ngày</div> }
+              <div class="text-xs text-gray-600">{{ 'BORROW_PAGE.RETURNED_LINE' | translate: { name: r.loan.readerName ?? '', card: r.loan.cardNo, date: (r.loan.loanedAt | ldate: 'dd/MM/yyyy') } }}</div>
+              @if (r.overdueDays > 0) { <div class="text-xs font-semibold text-red-600">{{ 'BORROW_PAGE.OVERDUE_DAYS' | translate: { days: r.overdueDays } }}</div> }
               @if (r.holdFor; as h) {
-                <div class="text-xs font-semibold text-blue-700 mt-1">Để riêng — giữ cho đặt mượn của {{ h.readerName ?? '' }} (thẻ {{ h.cardNo }}) đến {{ h.expiresAt | date: 'dd/MM/yyyy' }}</div>
+                <div class="text-xs font-semibold text-blue-700 mt-1">{{ 'BORROW_PAGE.HOLD_SHELF' | translate: { name: h.readerName ?? '', card: h.cardNo, date: (h.expiresAt | ldate: 'dd/MM/yyyy') } }}</div>
               }
             </li>
           }
@@ -168,24 +170,24 @@ const PLACE_KEY = 'elib.circulation.place';
     </div>
 
     @if (action(); as a) {
-      <app-modal [title]="(a.kind === 'renew' ? 'Gia hạn ' : 'Ghi chú ') + a.loan.barcode" widthClass="max-w-md" (closed)="action.set(null)">
+      <app-modal [title]="(a.kind === 'renew' ? 'BORROW_PAGE.RENEW_TITLE' : 'BORROW_PAGE.NOTE_TITLE') | translate: { barcode: a.loan.barcode }" widthClass="max-w-md" (closed)="action.set(null)">
         <div class="space-y-4">
           @if (a.kind === 'note') {
             <div>
-              <label for="bw-note" class="form-label">Ghi chú</label>
+              <label for="bw-note" class="form-label">{{ 'BORROW_PAGE.NOTE' | translate }}</label>
               <input id="bw-note" class="input" maxlength="1000" [(ngModel)]="noteText" />
             </div>
           } @else {
-            <p class="text-sm text-gray-600">Hạn hiện tại {{ a.loan.dueAt | date: 'dd/MM/yyyy' }}, đã gia hạn {{ a.loan.renewCount }} lần.</p>
+            <p class="text-sm text-gray-600">{{ 'BORROW_PAGE.CURRENT_DUE' | translate: { date: (a.loan.dueAt | ldate: 'dd/MM/yyyy'), count: a.loan.renewCount } }}</p>
           }
           <div>
-            <label for="bw-reason" class="form-label">Lý do</label>
-            <input id="bw-reason" class="input" maxlength="500" [(ngModel)]="reason" placeholder="Bắt buộc" />
+            <label for="bw-reason" class="form-label">{{ 'BORROW_PAGE.REASON' | translate }}</label>
+            <input id="bw-reason" class="input" maxlength="500" [(ngModel)]="reason" [placeholder]="'BORROW_PAGE.REQUIRED' | translate" />
           </div>
         </div>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="action.set(null)">Huỷ</button>
-          <button type="button" class="btn-primary" [disabled]="busy() || !reason.trim()" (click)="runAction(a.loan, a.kind)">Lưu</button>
+          <button type="button" class="btn-secondary" (click)="action.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-primary" [disabled]="busy() || !reason.trim()" (click)="runAction(a.loan, a.kind)">{{ 'COMMON.SAVE' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -195,6 +197,15 @@ export class Borrow implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly language = inject(Language);
+
+  /** "Chính sách: mượn 14 ngày, tối đa 5 tài liệu, gia hạn tối đa 2 lần." */
+  protected policy(r: ReaderPanel): string {
+    let text = this.language.t('BORROW_PAGE.POLICY', { days: r.loanDays });
+    if (r.maxLoans != null) text += this.language.t('BORROW_PAGE.POLICY_MAX', { count: r.maxLoans });
+    if (r.maxRenewals != null) text += this.language.t('BORROW_PAGE.POLICY_RENEW', { count: r.maxRenewals });
+    return text + '.';
+  }
   private readonly router = inject(Router);
   private readonly itemInput = viewChild<ElementRef<HTMLInputElement>>('itemInput');
 
@@ -273,7 +284,7 @@ export class Borrow implements OnInit {
     const place = this.placeId();
     if (!code || !r) return;
     if (place == null) {
-      this.toastr.error('Chọn điểm lưu thông.');
+      this.toastr.error('BORROW_PAGE.CHOOSE_PLACE');
       return;
     }
     await this.run(async () => {
@@ -313,10 +324,10 @@ export class Borrow implements OnInit {
     await this.run(async () => {
       if (kind === 'renew') {
         const renewed = await this.api.renewLoan(loan.publicId, this.reason.trim());
-        this.toastr.success(`Đã gia hạn ${renewed.barcode} đến ${new Date(renewed.dueAt).toLocaleDateString('vi-VN')}.`);
+        this.toastr.success('BORROW_PAGE.RENEWED', { barcode: renewed.barcode, date: formatDate(renewed.dueAt, 'dd/MM/yyyy', this.language.locale()) });
       } else {
         await this.api.noteLoan(loan.publicId, this.noteText, this.reason.trim());
-        this.toastr.success('Đã cập nhật ghi chú.');
+        this.toastr.success('BORROW_PAGE.NOTE_SAVED');
       }
       this.action.set(null);
       await this.refresh();
