@@ -1,7 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Router, RouterLink } from '@angular/router';
 import { Api, Z3950Hit, Z3950SearchRequest, Z3950ServerOption, Z3950ServerResult, errorMessage } from '../../core/api';
+import { Language } from '../../core/i18n';
 import { MarcDrafts } from '../../core/marc-draft';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
@@ -15,12 +17,12 @@ const PAGE_SIZE = 10;
  */
 @Component({
   selector: 'app-z3950-search',
-  imports: [FormsModule, Modal, RouterLink],
+  imports: [FormsModule, Modal, RouterLink, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
-      <h4 class="page-title">Tra cứu Z39.50</h4>
+      <h4 class="page-title">{{ 'Z3950_PAGE.TITLE' | translate }}</h4>
       @if (session.can('Z3950_CONFIGS:view')) {
-        <a routerLink="/z3950-configs" class="btn-secondary !py-1.5 ml-auto"><span class="material-icons text-[18px]">dns</span> Máy chủ Z39.50</a>
+        <a routerLink="/z3950-configs" class="btn-secondary !py-1.5 ml-auto"><span class="material-icons text-[18px]">dns</span> {{ 'Z3950_PAGE.SERVERS' | translate }}</a>
       }
     </div>
 
@@ -28,13 +30,13 @@ const PAGE_SIZE = 10;
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         @for (f of fields; track f.key) {
           <div>
-            <label class="form-label" [for]="'z-' + f.key">{{ f.label }}</label>
-            <input class="input" [id]="'z-' + f.key" [name]="f.key" [(ngModel)]="query[f.key]" [placeholder]="f.placeholder" />
+            <label class="form-label" [for]="'z-' + f.key">{{ f.label | translate }}</label>
+            <input class="input" [id]="'z-' + f.key" [name]="f.key" [(ngModel)]="query[f.key]" [placeholder]="f.placeholder ? (f.placeholder | translate) : ''" />
           </div>
         }
       </div>
       <div class="mt-4">
-        <div class="form-label">Thư viện</div>
+        <div class="form-label">{{ 'Z3950_PAGE.LIBRARIES' | translate }}</div>
         @if (servers().length) {
           <div class="flex flex-wrap gap-x-5 gap-y-1.5">
             @for (s of servers(); track s.publicId) {
@@ -45,12 +47,12 @@ const PAGE_SIZE = 10;
             }
           </div>
         } @else {
-          <p class="text-sm text-gray-500">Chưa có máy chủ Z39.50 nào đang hoạt động — thêm ở màn "Máy chủ Z39.50".</p>
+          <p class="text-sm text-gray-500">{{ 'Z3950_PAGE.NO_SERVERS' | translate }}</p>
         }
       </div>
       <div class="flex justify-end mt-4">
         <button type="submit" class="btn-primary" [disabled]="loading() || !servers().length">
-          <span class="material-icons text-[18px]" [class.animate-spin]="loading()">{{ loading() ? 'autorenew' : 'travel_explore' }}</span> Tìm
+          <span class="material-icons text-[18px]" [class.animate-spin]="loading()">{{ loading() ? 'autorenew' : 'travel_explore' }}</span> {{ 'Z3950_PAGE.FIND' | translate }}
         </button>
       </div>
     </form>
@@ -60,24 +62,24 @@ const PAGE_SIZE = 10;
         <div class="flex items-center gap-3 flex-wrap mb-2">
           <div class="font-medium text-gray-800">{{ r.serverName }}</div>
           @if (r.error) { <span class="badge-danger">{{ r.error }}</span> }
-          @else { <span class="text-sm text-gray-500">{{ r.total }} kết quả</span> }
+          @else { <span class="text-sm text-gray-500">{{ 'Z3950_PAGE.RESULTS' | translate: { count: r.total } }}</span> }
           @if (r.total > r.pageSize) {
             <div class="ml-auto flex items-center gap-2 text-sm">
-              <button type="button" class="btn-secondary !py-1 !px-2" [disabled]="r.page <= 1 || paging() === r.serverId" (click)="page(r, r.page - 1)">Trước</button>
-              <span>Trang {{ r.page }} / {{ pages(r) }}</span>
-              <button type="button" class="btn-secondary !py-1 !px-2" [disabled]="r.page >= pages(r) || paging() === r.serverId" (click)="page(r, r.page + 1)">Sau</button>
+              <button type="button" class="btn-secondary !py-1 !px-2" [disabled]="r.page <= 1 || paging() === r.serverId" (click)="page(r, r.page - 1)">{{ 'Z3950_PAGE.PREV' | translate }}</button>
+              <span>{{ 'Z3950_PAGE.PAGE_OF' | translate: { page: r.page, pages: pages(r) } }}</span>
+              <button type="button" class="btn-secondary !py-1 !px-2" [disabled]="r.page >= pages(r) || paging() === r.serverId" (click)="page(r, r.page + 1)">{{ 'Z3950_PAGE.NEXT' | translate }}</button>
             </div>
           }
         </div>
         @if (r.hits.length) {
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse min-w-[720px]">
-              <thead><tr><th class="th w-12">#</th><th class="th">Nhan đề</th><th class="th">Tác giả</th><th class="th">Xuất bản</th><th class="th">ISBN</th><th class="th w-28"></th></tr></thead>
+              <thead><tr><th class="th w-12">#</th><th class="th">{{ 'Z3950_PAGE.TITLE_COL' | translate }}</th><th class="th">{{ 'Z3950_PAGE.AUTHOR' | translate }}</th><th class="th">{{ 'Z3950_PAGE.PUBLISHED' | translate }}</th><th class="th">ISBN</th><th class="th w-28"></th></tr></thead>
               <tbody>
                 @for (h of r.hits; track h.position) {
                   <tr class="hover:bg-gray-50/50">
                     <td class="td text-gray-500">{{ h.position }}</td>
-                    <td class="td font-medium">{{ h.title ?? '(không nhan đề)' }}</td>
+                    <td class="td font-medium">{{ h.title ?? ('Z3950_PAGE.NO_TITLE' | translate) }}</td>
                     <td class="td">{{ h.author ?? '' }}</td>
                     <td class="td">{{ publication(h) }}</td>
                     <td class="td font-mono text-[13px]">{{ h.isbn ?? '' }}</td>
@@ -86,7 +88,7 @@ const PAGE_SIZE = 10;
                         <button type="button" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" title="Xem MARC" (click)="viewing.set({ hit: h, server: r })">
                           <span class="material-icons text-[18px]">visibility</span></button>
                         @if (session.can('CATALOG_BIBS:add')) {
-                          <button type="button" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Biên mục từ bản ghi này" (click)="catalogue(h, r)">
+                          <button type="button" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'Z3950_PAGE.CATALOGUE' | translate" (click)="catalogue(h, r)">
                             <span class="material-icons text-[18px]">playlist_add</span></button>
                         }
                       </div>
@@ -101,8 +103,8 @@ const PAGE_SIZE = 10;
     }
 
     @if (viewing(); as v) {
-      <app-modal [title]="v.hit.title ?? 'Bản ghi MARC'" widthClass="max-w-3xl" (closed)="viewing.set(null)">
-        <div class="text-xs text-gray-500 mb-2">{{ v.server.serverName }} · {{ v.server.recordSyntax }} · bản ghi {{ v.hit.position }}</div>
+      <app-modal [title]="v.hit.title ?? 'Z3950_PAGE.MARC_RECORD'" widthClass="max-w-3xl" (closed)="viewing.set(null)">
+        <div class="text-xs text-gray-500 mb-2">{{ v.server.serverName }} · {{ v.server.recordSyntax }} · {{ 'Z3950_PAGE.RECORD_N' | translate: { n: v.hit.position } }}</div>
         <div class="overflow-x-auto max-h-[60vh]">
           <table class="w-full text-xs font-mono">
             <tbody>
@@ -121,9 +123,9 @@ const PAGE_SIZE = 10;
           </table>
         </div>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="viewing.set(null)">Đóng</button>
+          <button type="button" class="btn-secondary" (click)="viewing.set(null)">{{ 'COMMON.CLOSE' | translate }}</button>
           @if (session.can('CATALOG_BIBS:add')) {
-            <button type="button" class="btn-primary" (click)="catalogue(v.hit, v.server)"><span class="material-icons text-[18px]">playlist_add</span> Biên mục từ bản ghi này</button>
+            <button type="button" class="btn-primary" (click)="catalogue(v.hit, v.server)"><span class="material-icons text-[18px]">playlist_add</span> {{ 'Z3950_PAGE.CATALOGUE' | translate }}</button>
           }
         </ng-container>
       </app-modal>
@@ -135,15 +137,16 @@ export class Z3950Search implements OnInit {
   private readonly router = inject(Router);
   private readonly drafts = inject(MarcDrafts);
   private readonly toastr = inject(ToastrService);
+  private readonly language = inject(Language);
   protected readonly session = inject(Session);
 
   protected readonly fields: { key: keyof Z3950SearchRequest; label: string; placeholder: string }[] = [
-    { key: 'title', label: 'Nhan đề', placeholder: 'VD: Harry Potter' },
-    { key: 'author', label: 'Tác giả', placeholder: 'VD: Rowling' },
-    { key: 'isbn', label: 'ISBN', placeholder: 'VD: 9780747532699' },
-    { key: 'publisher', label: 'Nhà xuất bản', placeholder: '' },
-    { key: 'keyword', label: 'Từ khoá', placeholder: '' },
-    { key: 'subject', label: 'Chủ đề', placeholder: '' },
+    { key: 'title', label: 'Z3950_PAGE.F_TITLE', placeholder: 'Z3950_PAGE.F_TITLE_EG' },
+    { key: 'author', label: 'Z3950_PAGE.F_AUTHOR', placeholder: 'Z3950_PAGE.F_AUTHOR_EG' },
+    { key: 'isbn', label: 'ISBN', placeholder: 'Z3950_PAGE.F_ISBN_EG' },
+    { key: 'publisher', label: 'Z3950_PAGE.F_PUBLISHER', placeholder: '' },
+    { key: 'keyword', label: 'Z3950_PAGE.F_KEYWORD', placeholder: '' },
+    { key: 'subject', label: 'Z3950_PAGE.F_SUBJECT', placeholder: '' },
   ];
   protected readonly servers = signal<Z3950ServerOption[]>([]);
   protected readonly chosen = signal(new Set<string>());
@@ -182,11 +185,11 @@ export class Z3950Search implements OnInit {
   protected async search(): Promise<void> {
     const terms = Object.fromEntries(this.fields.map((f) => [f.key, this.query[f.key]?.trim() || null]));
     if (!Object.values(terms).some((v) => v)) {
-      this.toastr.warning('Nhập ít nhất một điều kiện tìm.');
+      this.toastr.warning('Z3950_PAGE.NEED_TERM');
       return;
     }
     if (!this.chosen().size) {
-      this.toastr.warning('Chọn ít nhất một thư viện.');
+      this.toastr.warning('Z3950_PAGE.NEED_SERVER');
       return;
     }
     this.lastQuery = terms;
@@ -215,7 +218,7 @@ export class Z3950Search implements OnInit {
 
   /** Nạp bản ghi vào màn biên mục mới: bỏ 001/003/005 của thư viện nguồn (hệ thống tự sinh MFN, mã đơn vị, thời điểm). */
   protected catalogue(hit: Z3950Hit, server: Z3950ServerResult): void {
-    if (server.recordSyntax === 'UNIMARC' && !confirm('Bản ghi UNIMARC sẽ không tự chuyển sang MARC21 — vẫn nạp để biên mục tay?')) return;
+    if (server.recordSyntax === 'UNIMARC' && !confirm(this.language.t('Z3950_PAGE.UNIMARC_CONFIRM'))) return;
     const fields = hit.record.fields.filter((f) => !['001', '003', '005'].includes(f.tag)).map((f) => structuredClone(f));
     this.drafts.set({ leader: hit.record.leader, fields, source: server.serverName });
     this.viewing.set(null);

@@ -1,15 +1,16 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Session } from '../core/session';
 
 /** Thông tin cá nhân — tài khoản đang đăng nhập (chỉ xem; sửa hồ sơ do quản trị đơn vị làm ở Cán bộ quản lý thư viện). */
 @Component({
   selector: 'app-profile',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe],
   template: `
     <div class="mb-5">
-      <h4 class="page-title">Thông tin cá nhân</h4>
-      <p class="text-sm text-gray-500 mt-1">Tài khoản đang đăng nhập</p>
+      <h4 class="page-title">{{ 'PAGE_TITLE.PROFILE' | translate }}</h4>
+      <p class="text-sm text-gray-500 mt-1">{{ 'PROFILE_PAGE.SUBTITLE' | translate }}</p>
     </div>
 
     @if (session.me(); as me) {
@@ -22,16 +23,16 @@ import { Session } from '../core/session';
           </div>
         </div>
         <dl class="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-y-4 text-sm">
-          <dt class="text-gray-500">Đơn vị</dt>
-          <dd class="sm:col-span-2 font-medium text-gray-800">{{ session.isSystem() ? 'Quản trị nền tảng' : session.features()?.name + ' (' + session.features()?.code + ')' }}</dd>
-          <dt class="text-gray-500">Quyền</dt>
+          <dt class="text-gray-500">{{ 'PROFILE_PAGE.TENANT' | translate }}</dt>
+          <dd class="sm:col-span-2 font-medium text-gray-800">{{ session.isSystem() ? ('PROFILE_PAGE.PLATFORM_ADMIN' | translate) : session.features()?.name + ' (' + session.features()?.code + ')' }}</dd>
+          <dt class="text-gray-500">{{ 'PROFILE_PAGE.PERMISSIONS' | translate }}</dt>
           <dd class="sm:col-span-2 text-gray-800">
-            @if (me.permissions.includes('*')) { <span class="badge-info">Toàn quyền</span> }
-            @else { {{ me.permissions.length }} quyền }
+            @if (me.permissions.includes('*')) { <span class="badge-info">{{ 'PROFILE_PAGE.ALL_PERMISSIONS' | translate }}</span> }
+            @else { {{ 'PROFILE_PAGE.N_PERMISSIONS' | translate: { count: me.permissions.length } }} }
           </dd>
         </dl>
         <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
-          <a routerLink="/change-password" class="btn-primary"><span class="material-icons text-[18px]">lock_reset</span>Đổi mật khẩu</a>
+          <a routerLink="/change-password" class="btn-primary"><span class="material-icons text-[18px]">lock_reset</span>{{ 'CHANGE_PASSWORD.TITLE' | translate }}</a>
         </div>
       </div>
     }

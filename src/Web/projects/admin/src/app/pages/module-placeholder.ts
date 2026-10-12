@@ -11,11 +11,11 @@ import { MODULE_NAMES, Session } from '../core/session';
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
       @if (licensed()) {
         <span class="material-icons text-5xl text-blue-300 mb-3">construction</span>
-        <p class="text-gray-700 font-medium">Phân hệ đang được xây dựng trên nền tảng mới.</p>
-        <p class="text-sm text-gray-500 mt-1">Các chức năng sẽ xuất hiện tại đây khi phân hệ được chuyển xong.</p>
+        <p class="text-gray-700 font-medium">{{ 'MODULE_PLACEHOLDER.BUILDING' | translate }}</p>
+        <p class="text-sm text-gray-500 mt-1">{{ 'MODULE_PLACEHOLDER.COMING' | translate }}</p>
       } @else {
         <span class="material-icons text-5xl text-red-300 mb-3">lock</span>
-        <p class="text-gray-700 font-medium">Đơn vị chưa mua phân hệ này.</p>
+        <p class="text-gray-700 font-medium">{{ 'MODULE_PLACEHOLDER.NOT_LICENSED' | translate }}</p>
       }
     </div>
   `,

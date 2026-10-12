@@ -12,18 +12,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APPS = {
   opac: { src: 'projects/opac/src/app', i18n: 'projects/opac/public/i18n', strict: ['projects/opac/src/app'] },
-  // Admin chuyển dần từng màn (docs: GĐ C) — liệt kê thư mục/file đã chuyển xong.
+  // Admin đã chuyển hết (GĐ C): mọi file — chuỗi dữ liệu (không phải chữ giao diện) đánh dấu i18n-data.
   admin: {
     src: 'projects/admin/src/app', i18n: 'projects/admin/public/i18n',
-    strict: [
-      'projects/admin/src/app/layout', 'projects/admin/src/app/core/i18n.ts',
-      'projects/admin/src/app/shared/crud-page.ts', 'projects/admin/src/app/shared/import-dialog.ts', 'projects/admin/src/app/shared/toastr.ts',
-      'projects/admin/src/app/shared/ui.ts', 'projects/admin/src/app/shared/zip.ts',
-      'projects/admin/src/app/pages/patron/readers.ts', 'projects/admin/src/app/pages/patron/reader-',
-      'projects/admin/src/app/pages/system', 'projects/admin/src/app/pages/tenant', 'projects/admin/src/app/pages/patron',
-      'projects/admin/src/app/pages/audit-logs.ts', 'projects/admin/src/app/pages/notification', 'projects/admin/src/app/pages/catalog',
-      'projects/admin/src/app/pages/holdings', 'projects/admin/src/app/shared', 'projects/admin/src/app/pages/circulation',
-    ],
+    strict: ['projects/admin/src/app'],
   },
 };
 const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_', 'TENANT_ADMIN.STATE_', 'TENANT_ADMIN.STEP_', 'TENANT_ADMIN.PACKAGE_', 'ROLE.ACTION_'];

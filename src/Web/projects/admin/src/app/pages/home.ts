@@ -5,7 +5,8 @@ import { Api, TenantSummary } from '../core/api';
 import { MODULE_NAMES, Session } from '../core/session';
 import { TenantStatusBadge } from './system/tenant-status';
 
-interface Stat { label: string; value: string | number; icon: string; color: string; link?: string; }
+/** label: khoá dịch; valueKey: value cũng là khoá dịch ("Toàn quyền", "Hoạt động"). */
+interface Stat { label: string; value: string | number; valueKey?: boolean; icon: string; color: string; link?: string; }
 
 /** Bảng điều khiển — thẻ số liệu và lối tắt kiểu dashboard admin cũ (số liệu nghiệp vụ có khi các phân hệ được port). */
 @Component({
@@ -13,8 +14,8 @@ interface Stat { label: string; value: string | number; icon: string; color: str
   imports: [RouterLink, TenantStatusBadge, TranslatePipe],
   template: `
     <div class="mb-5">
-      <h4 class="page-title">Bảng điều khiển</h4>
-      <p class="text-sm text-gray-500 mt-1">Xin chào, {{ session.me()?.fullName }}</p>
+      <h4 class="page-title">{{ 'PAGE_TITLE.HOME' | translate }}</h4>
+      <p class="text-sm text-gray-500 mt-1">{{ 'HOME_PAGE.HELLO' | translate: { name: session.me()?.fullName } }}</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
@@ -24,8 +25,8 @@ interface Stat { label: string; value: string | number; icon: string; color: str
             <span class="material-icons">{{ s.icon }}</span>
           </div>
           <div class="min-w-0">
-            <div class="text-2xl font-bold text-gray-800 truncate">{{ s.value }}</div>
-            <div class="text-sm text-gray-500">{{ s.label }}</div>
+            <div class="text-2xl font-bold text-gray-800 truncate">{{ s.valueKey ? ($any(s.value) | translate) : s.value }}</div>
+            <div class="text-sm text-gray-500">{{ s.label | translate }}</div>
           </div>
         </a>
       }
@@ -34,11 +35,11 @@ interface Stat { label: string; value: string | number; icon: string; color: str
     @if (session.isSystem()) {
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h5 class="font-bold text-gray-800">Danh sách đơn vị</h5>
-          <a routerLink="/tenant" class="text-sm text-blue-600 hover:underline">Xem tất cả</a>
+          <h5 class="font-bold text-gray-800">{{ 'HOME_PAGE.TENANTS' | translate }}</h5>
+          <a routerLink="/tenant" class="text-sm text-blue-600 hover:underline">{{ 'HOME_PAGE.VIEW_ALL' | translate }}</a>
         </div>
         <table class="w-full text-left border-collapse">
-          <thead><tr><th class="th">Mã</th><th class="th">Tên đơn vị</th><th class="th w-40">Trạng thái</th></tr></thead>
+          <thead><tr><th class="th">{{ 'COMMON.CODE' | translate }}</th><th class="th">{{ 'TENANT_ADMIN.NAME' | translate }}</th><th class="th w-40">{{ 'COMMON.STATUS' | translate }}</th></tr></thead>
           <tbody>
             @for (t of tenants(); track t.publicId) {
               <tr class="hover:bg-gray-50/50">
@@ -47,14 +48,14 @@ interface Stat { label: string; value: string | number; icon: string; color: str
                 <td class="td"><app-tenant-status [status]="t.status" /></td>
               </tr>
             } @empty {
-              <tr><td colspan="3" class="py-8 text-center text-gray-500 text-sm">Chưa có đơn vị nào.</td></tr>
+              <tr><td colspan="3" class="py-8 text-center text-gray-500 text-sm">{{ 'HOME_PAGE.NO_TENANTS' | translate }}</td></tr>
             }
           </tbody>
         </table>
       </div>
     } @else {
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h5 class="font-bold text-gray-800 mb-4">Phân hệ đơn vị đã mua</h5>
+        <h5 class="font-bold text-gray-800 mb-4">{{ 'HOME_PAGE.MODULES' | translate }}</h5>
         @if (modules().length) {
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             @for (m of modules(); track m.code) {
@@ -65,7 +66,7 @@ interface Stat { label: string; value: string | number; icon: string; color: str
             }
           </div>
         } @else {
-          <p class="text-sm text-gray-500">Đơn vị chưa mua phân hệ nào. Liên hệ quản trị nền tảng.</p>
+          <p class="text-sm text-gray-500">{{ 'HOME_PAGE.NO_MODULES' | translate }}</p>
         }
       </div>
     }
@@ -84,18 +85,19 @@ export class Home implements OnInit {
       const c = this.counts();
       const n = (key: string): number | string => (c ? c[key] : '…');
       return [
-        { label: 'Đơn vị', value: n('all'), icon: 'business', color: 'bg-blue-50 text-blue-600', link: '/tenant' },
-        { label: 'Đang hoạt động', value: n('Active'), icon: 'check_circle', color: 'bg-emerald-50 text-emerald-600' },
-        { label: 'Đang khởi tạo', value: n('Provisioning'), icon: 'hourglass_top', color: 'bg-amber-50 text-amber-600' },
-        { label: 'Tạm ngưng / khởi tạo lỗi', value: c ? c['Suspended'] + c['ProvisioningFailed'] : '…', icon: 'block', color: 'bg-red-50 text-red-600' },
+        { label: 'HOME_PAGE.STAT_TENANTS', value: n('all'), icon: 'business', color: 'bg-blue-50 text-blue-600', link: '/tenant' },
+        { label: 'HOME_PAGE.STAT_ACTIVE', value: n('Active'), icon: 'check_circle', color: 'bg-emerald-50 text-emerald-600' },
+        { label: 'HOME_PAGE.STAT_PROVISIONING', value: n('Provisioning'), icon: 'hourglass_top', color: 'bg-amber-50 text-amber-600' },
+        { label: 'HOME_PAGE.STAT_PROBLEM', value: c ? c['Suspended'] + c['ProvisioningFailed'] : '…', icon: 'block', color: 'bg-red-50 text-red-600' },
       ];
     }
     const f = this.session.features();
     return [
-      { label: 'Đơn vị', value: f?.code ?? '', icon: 'corporate_fare', color: 'bg-blue-50 text-blue-600' },
-      { label: 'Phân hệ đã mua', value: f?.modules.length ?? 0, icon: 'apps', color: 'bg-emerald-50 text-emerald-600' },
-      { label: 'Quyền của bạn', value: this.session.me()?.permissions.includes('*') ? 'Toàn quyền' : (this.session.me()?.permissions.length ?? 0), icon: 'verified_user', color: 'bg-purple-50 text-purple-600' },
-      { label: 'Trạng thái', value: f?.status === 'Active' ? 'Hoạt động' : (f?.status ?? ''), icon: 'monitor_heart', color: 'bg-amber-50 text-amber-600' },
+      { label: 'HOME_PAGE.STAT_TENANT', value: f?.code ?? '', icon: 'corporate_fare', color: 'bg-blue-50 text-blue-600' },
+      { label: 'HOME_PAGE.STAT_MODULES', value: f?.modules.length ?? 0, icon: 'apps', color: 'bg-emerald-50 text-emerald-600' },
+      { label: 'HOME_PAGE.STAT_PERMISSIONS', value: this.session.me()?.permissions.includes('*') ? 'HOME_PAGE.ALL_PERMISSIONS' : (this.session.me()?.permissions.length ?? 0),
+        valueKey: !!this.session.me()?.permissions.includes('*'), icon: 'verified_user', color: 'bg-purple-50 text-purple-600' },
+      { label: 'COMMON.STATUS', value: f?.status === 'Active' ? 'HOME_PAGE.ACTIVE' : (f?.status ?? ''), valueKey: f?.status === 'Active', icon: 'monitor_heart', color: 'bg-amber-50 text-amber-600' },
     ];
   });
 

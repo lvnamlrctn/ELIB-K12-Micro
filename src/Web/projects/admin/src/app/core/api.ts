@@ -318,7 +318,7 @@ export interface ReaderImportJob {
 async function putToStorage(uploadUrl: string, file: File): Promise<void> {
   const response = await fetch(uploadUrl, { method: 'PUT', body: file, credentials: 'omit' });
   if (!response.ok) {
-    throw new HttpErrorResponse({ status: response.status, error: { detail: `Không tải được file lên kho (lỗi ${response.status}).` } });
+    throw new HttpErrorResponse({ status: response.status, error: { code: 'UPLOAD_FAILED', detail: `Upload failed (${response.status}).` } });
   }
 }
 
@@ -368,12 +368,12 @@ export function errorMessage(error: unknown): string {
   if (error instanceof HttpErrorResponse) {
     const body = error.error as { detail?: string; title?: string; code?: string } | null;
     if (body?.detail) return body.detail;
-    if (error.status === 0) return 'Không kết nối được máy chủ.';
-    if (error.status === 403) return 'Bạn không có quyền thực hiện chức năng này.';
-    return body?.title ?? `Lỗi ${error.status}`;
+    if (error.status === 0) return 'Không kết nối được máy chủ.'; // i18n-data: dự phòng khi từ điển chưa nạp
+    if (error.status === 403) return 'Bạn không có quyền thực hiện chức năng này.'; // i18n-data: dự phòng
+    return body?.title ?? `HTTP ${error.status}`;
   }
   if (error instanceof Error && error.message) return error.message;
-  return 'Đã xảy ra lỗi không xác định.';
+  return 'Đã xảy ra lỗi không xác định.'; // i18n-data: dự phòng khi từ điển chưa nạp
 }
 
 /**
