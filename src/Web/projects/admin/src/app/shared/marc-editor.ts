@@ -1,5 +1,6 @@
 import { Component, computed, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
 
 /**
@@ -9,7 +10,7 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
  */
 @Component({
   selector: 'app-marc-editor',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   template: `
     <div class="space-y-2.5">
       @for (f of fields(); track $index; let i = $index) {
@@ -17,45 +18,45 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
         <div class="border border-gray-200 rounded-lg p-3 bg-white" [class.border-amber-300]="repeatedWrongly(f, i)">
           <div class="flex items-center gap-2 flex-wrap">
             <input class="input !w-16 !py-1 font-mono font-bold text-center" maxlength="3" placeholder="Tag" [(ngModel)]="f.tag"
-                   [disabled]="isSystem(f.tag)" (ngModelChange)="touch()" [attr.aria-label]="'Nhãn trường ' + (i + 1)" />
+                   [disabled]="isSystem(f.tag)" (ngModelChange)="touch()" [attr.aria-label]="'MARC_EDITOR.TAG_N' | translate: { n: i + 1 }" />
             @if (!isControl(f.tag)) {
               <input class="input !w-10 !py-1 font-mono text-center" maxlength="1" placeholder="#" [(ngModel)]="f.ind1"
-                     [title]="def?.ind1 ?? 'Chỉ thị 1'" [attr.aria-label]="'Chỉ thị 1 trường ' + f.tag" />
+                     [title]="def?.ind1 ?? ('MARC_EDITOR.IND1' | translate)" [attr.aria-label]="'MARC_EDITOR.IND1_OF' | translate: { tag: f.tag }" />
               <input class="input !w-10 !py-1 font-mono text-center" maxlength="1" placeholder="#" [(ngModel)]="f.ind2"
-                     [title]="def?.ind2 ?? 'Chỉ thị 2'" [attr.aria-label]="'Chỉ thị 2 trường ' + f.tag" />
+                     [title]="def?.ind2 ?? ('MARC_EDITOR.IND2' | translate)" [attr.aria-label]="'MARC_EDITOR.IND2_OF' | translate: { tag: f.tag }" />
             }
-            <span class="text-sm font-semibold text-blue-700 truncate">{{ def?.name ?? (f.tag.length === 3 ? 'Trường ngoài từ điển' : '') }}</span>
-            @if (repeatedWrongly(f, i)) { <span class="text-xs text-amber-600">Trường này không lặp</span> }
+            <span class="text-sm font-semibold text-blue-700 truncate">{{ def?.name ?? (f.tag.length === 3 ? ('MARC_EDITOR.UNKNOWN_FIELD' | translate) : '') }}</span>
+            @if (repeatedWrongly(f, i)) { <span class="text-xs text-amber-600">{{ 'MARC_EDITOR.NOT_REPEATABLE' | translate }}</span> }
             <div class="ml-auto flex items-center gap-1">
               @if (template()) {
-                <button type="button" class="icon-btn text-gray-500 hover:bg-gray-100" title="Lên" [disabled]="i === 0" (click)="move(i, -1)"><span class="material-icons text-[18px]">arrow_upward</span></button>
-                <button type="button" class="icon-btn text-gray-500 hover:bg-gray-100" title="Xuống" [disabled]="i === fields().length - 1" (click)="move(i, 1)"><span class="material-icons text-[18px]">arrow_downward</span></button>
+                <button type="button" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'MARC_EDITOR.UP' | translate" [disabled]="i === 0" (click)="move(i, -1)"><span class="material-icons text-[18px]">arrow_upward</span></button>
+                <button type="button" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'MARC_EDITOR.DOWN' | translate" [disabled]="i === fields().length - 1" (click)="move(i, 1)"><span class="material-icons text-[18px]">arrow_downward</span></button>
               }
               @if (!isControl(f.tag)) {
-                <select #pick class="input !w-auto !py-1 text-xs" (change)="addSubfield(f, pick.value); pick.value = ''" [attr.aria-label]="'Thêm trường con cho ' + f.tag">
-                  <option value="">+ trường con</option>
+                <select #pick class="input !w-auto !py-1 text-xs" (change)="addSubfield(f, pick.value); pick.value = ''" [attr.aria-label]="'MARC_EDITOR.ADD_SUBFIELD_FOR' | translate: { tag: f.tag }">
+                  <option value="">{{ 'MARC_EDITOR.ADD_SUBFIELD' | translate }}</option>
                   @for (s of def?.subfields ?? []; track s.code) { <option [value]="s.code">\${{ s.code }} {{ s.name }}</option> }
-                  <option value="?">Mã khác…</option>
+                  <option value="?">{{ 'MARC_EDITOR.OTHER_CODE' | translate }}</option>
                 </select>
               }
               @if (!isSystem(f.tag)) {
-                <button type="button" class="icon-btn text-red-500 hover:bg-red-50" title="Xoá trường" (click)="remove(i)"><span class="material-icons text-[18px]">close</span></button>
+                <button type="button" class="icon-btn text-red-500 hover:bg-red-50" [title]="'MARC_EDITOR.REMOVE_FIELD' | translate" (click)="remove(i)"><span class="material-icons text-[18px]">close</span></button>
               }
             </div>
           </div>
 
           @if (isControl(f.tag)) {
             <input class="input mt-2 font-mono text-[13px]" [(ngModel)]="f.value" [disabled]="isSystem(f.tag)"
-                   [placeholder]="isSystem(f.tag) ? 'Hệ thống tự sinh' : (template() ? 'Giá trị mặc định' : 'Giá trị')" [attr.aria-label]="'Giá trị trường ' + f.tag" />
+                   [placeholder]="(isSystem(f.tag) ? 'MARC_EDITOR.SYSTEM_GENERATED' : (template() ? 'MARC_EDITOR.DEFAULT_VALUE' : 'MARC_EDITOR.VALUE')) | translate" [attr.aria-label]="'MARC_EDITOR.VALUE_OF' | translate: { tag: f.tag }" />
           } @else {
             <div class="mt-2 space-y-1.5 pl-2 sm:pl-6">
               @for (s of f.subfields ?? []; track $index; let j = $index) {
                 <div class="flex items-center gap-2">
                   <span class="text-gray-400 font-mono text-sm">$</span>
-                  <input class="input !w-10 !py-1 font-mono text-center" maxlength="1" [(ngModel)]="s.code" [attr.aria-label]="'Mã trường con ' + f.tag" />
-                  <input class="input !py-1 flex-1" [(ngModel)]="s.value" [placeholder]="subName(def, s.code) ?? (template() ? 'Giá trị mặc định' : 'Giá trị')"
+                  <input class="input !w-10 !py-1 font-mono text-center" maxlength="1" [(ngModel)]="s.code" [attr.aria-label]="'MARC_EDITOR.SUBFIELD_CODE_OF' | translate: { tag: f.tag }" />
+                  <input class="input !py-1 flex-1" [(ngModel)]="s.value" [placeholder]="subName(def, s.code) ?? ((template() ? 'MARC_EDITOR.DEFAULT_VALUE' : 'MARC_EDITOR.VALUE') | translate)"
                          [title]="subName(def, s.code) ?? ''" [attr.aria-label]="f.tag + ' $' + s.code + ' ' + (subName(def, s.code) ?? '')" />
-                  <button type="button" class="icon-btn text-red-400 hover:bg-red-50" title="Xoá trường con" (click)="removeSubfield(f, j)"><span class="material-icons text-[16px]">remove</span></button>
+                  <button type="button" class="icon-btn text-red-400 hover:bg-red-50" [title]="'MARC_EDITOR.REMOVE_SUBFIELD' | translate" (click)="removeSubfield(f, j)"><span class="material-icons text-[16px]">remove</span></button>
                 </div>
               }
             </div>
@@ -66,8 +67,8 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
       @if (picking()) {
         <div class="border border-blue-200 rounded-lg p-3 bg-blue-50/40">
           <div class="flex gap-2">
-            <input class="input" placeholder="Tìm theo nhãn hoặc tên trường (VD 650, chủ đề)..." [(ngModel)]="filter" aria-label="Tìm trường MARC" />
-            <button type="button" class="btn-secondary !py-1.5" (click)="picking.set(false)">Đóng</button>
+            <input class="input" [placeholder]="'MARC_EDITOR.FIND_PH' | translate" [(ngModel)]="filter" [attr.aria-label]="'MARC_EDITOR.FIND_LABEL' | translate" />
+            <button type="button" class="btn-secondary !py-1.5" (click)="picking.set(false)">{{ 'COMMON.CLOSE' | translate }}</button>
           </div>
           <div class="max-h-64 overflow-y-auto mt-2 grid grid-cols-1 md:grid-cols-2 gap-1">
             @for (d of filtered(); track d.tag) {
@@ -75,13 +76,13 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
                 <span class="font-mono font-bold text-blue-700">{{ d.tag }}</span><span class="text-gray-700 truncate">{{ d.name }}</span>
               </button>
             }
-            <button type="button" class="text-left px-2 py-1.5 rounded hover:bg-blue-100 text-sm text-blue-600" (click)="addField(null)">Trường khác (tự nhập nhãn)…</button>
+            <button type="button" class="text-left px-2 py-1.5 rounded hover:bg-blue-100 text-sm text-blue-600" (click)="addField(null)">{{ 'MARC_EDITOR.OTHER_FIELD' | translate }}</button>
           </div>
         </div>
       } @else {
         <button type="button" (click)="picking.set(true); filter = ''"
                 class="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-1">
-          <span class="material-icons text-[18px]">add</span> Thêm trường
+          <span class="material-icons text-[18px]">add</span> {{ 'MARC_EDITOR.ADD_FIELD' | translate }}
         </button>
       }
     </div>

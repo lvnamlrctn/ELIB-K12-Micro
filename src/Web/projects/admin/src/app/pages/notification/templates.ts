@@ -2,41 +2,41 @@ import { CrudConfig } from '../../shared/crud-page';
 
 /** Mẫu email của đơn vị — mã do service nghiệp vụ dùng khi gửi tin nên không đổi được; biến dạng {{ ten_bien }}. */
 export const EMAIL_TEMPLATES: CrudConfig = {
-  title: 'Mẫu email',
+  title: 'EMAIL_TEMPLATE.TITLE',
   resource: 'email-templates',
   service: 'notification',
   perm: 'NOTIFICATION_TEMPLATES',
-  searchLabel: 'Mã / tên / tiêu đề',
-  searchPlaceholder: 'Nhập mã, tên hoặc tiêu đề mẫu...',
+  searchLabel: 'EMAIL_TEMPLATE.SEARCH_LABEL',
+  searchPlaceholder: 'EMAIL_TEMPLATE.SEARCH_PH',
   hasStatus: true,
   modalWidth: 'max-w-3xl',
   columns: [
-    { key: 'code', label: 'Mã mẫu', type: 'mono', width: '200px' },
-    { key: 'name', label: 'Tên mẫu' },
-    { key: 'subject', label: 'Tiêu đề thư' },
+    { key: 'code', label: 'EMAIL_TEMPLATE.CODE', type: 'mono', width: '200px' },
+    { key: 'name', label: 'EMAIL_TEMPLATE.NAME' },
+    { key: 'subject', label: 'EMAIL_TEMPLATE.SUBJECT' },
   ],
   fields: [
     {
-      key: 'code', label: 'Mã mẫu', type: 'text', required: true, lockOnEdit: true, half: true, placeholder: 'VD: LOAN_DUE_SOON',
-      hint: 'Chữ in hoa, số, dấu gạch dưới. Không đổi được sau khi tạo.',
+      key: 'code', label: 'EMAIL_TEMPLATE.CODE', type: 'text', required: true, lockOnEdit: true, half: true, placeholder: 'EMAIL_TEMPLATE.CODE_EG',
+      hint: 'EMAIL_TEMPLATE.CODE_HINT',
     },
-    { key: 'name', label: 'Tên mẫu', type: 'text', required: true, half: true },
-    { key: 'subject', label: 'Tiêu đề thư', type: 'text', required: true, hint: 'Có thể dùng biến, ví dụ {{ tenant_name }}.' },
+    { key: 'name', label: 'EMAIL_TEMPLATE.NAME', type: 'text', required: true, half: true },
+    { key: 'subject', label: 'EMAIL_TEMPLATE.SUBJECT', type: 'text', required: true, hint: 'EMAIL_TEMPLATE.SUBJECT_HINT' },
     {
-      key: 'body', label: 'Nội dung (HTML)', type: 'textarea', required: true,
-      hint: 'Biến dạng {{ ten_bien }}: {{ tenant_name }} luôn có; LOGIN_OTP có thêm {{ full_name }}, {{ otp }}, {{ minutes }}. Giá trị biến được mã hoá HTML.',
+      key: 'body', label: 'EMAIL_TEMPLATE.BODY', type: 'textarea', required: true,
+      hint: 'EMAIL_TEMPLATE.BODY_HINT',
     },
-    { key: 'status', label: 'Trạng thái', type: 'status', hint: 'Tắt mẫu = không gửi thư cho mã này.' },
+    { key: 'status', label: 'COMMON.STATUS', type: 'status', hint: 'EMAIL_TEMPLATE.STATUS_HINT' },
   ],
-  badge: (item) => (item['isBuiltIn'] ? 'Mặc định' : null),
+  badge: (item) => (item['isBuiltIn'] ? 'EMAIL_TEMPLATE.BUILT_IN' : null),
   toolbar: [
     {
-      label: 'Khôi phục mẫu mặc định',
+      label: 'EMAIL_TEMPLATE.RESTORE',
       icon: 'settings_backup_restore',
       action: 'add',
       run: async (api) => {
         const { added } = await api.restoreEmailTemplates();
-        return added ? `Đã thêm ${added} mẫu mặc định` : 'Đã có đủ mẫu mặc định';
+        return added ? { key: 'EMAIL_TEMPLATE.RESTORED', params: { count: added } } : 'EMAIL_TEMPLATE.RESTORE_NOTHING';
       },
     },
   ],

@@ -106,11 +106,11 @@ export interface Store {
 }
 /** Trạng thái bản sách (mã monolith): I chưa xếp giá, R sẵn sàng, L mất, S thanh lý, X xuất kho. */
 export const ITEM_STATUSES: { code: string; name: string; badge: string }[] = [
-  { code: 'I', name: 'Chưa xếp giá', badge: 'badge-off' },
-  { code: 'R', name: 'Sẵn sàng', badge: 'badge-on' },
-  { code: 'L', name: 'Mất', badge: 'badge-off' },
-  { code: 'S', name: 'Đã thanh lý', badge: 'badge-off' },
-  { code: 'X', name: 'Xuất kho', badge: 'badge-off' },
+  { code: 'I', name: 'ITEM_STATUS.I', badge: 'badge-off' },
+  { code: 'R', name: 'ITEM_STATUS.R', badge: 'badge-on' },
+  { code: 'L', name: 'ITEM_STATUS.L', badge: 'badge-off' },
+  { code: 'S', name: 'ITEM_STATUS.S', badge: 'badge-off' },
+  { code: 'X', name: 'ITEM_STATUS.X', badge: 'badge-off' },
 ];
 export interface Item {
   id: number; publicId: string; barcode: string; mfn: number; bibPublicId: string; title: string | null; author: string | null;

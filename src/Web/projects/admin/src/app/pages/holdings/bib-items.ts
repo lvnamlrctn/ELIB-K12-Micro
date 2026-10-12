@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, Item, ItemSearch, NextBarcode, Store, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
@@ -14,31 +15,31 @@ const PREFIX_KEY = 'elib.items.prefix';
  */
 @Component({
   selector: 'app-bib-items',
-  imports: [FormsModule, ConfirmDelete],
+  imports: [FormsModule, ConfirmDelete, TranslatePipe],
   template: `
     <div class="px-5 py-4 border-t border-gray-100">
       <div class="flex items-center gap-2 mb-3">
-        <h5 class="font-semibold text-gray-800">Đăng ký cá biệt</h5>
-        <span class="text-sm text-gray-500">{{ items().length }} bản</span>
+        <h5 class="font-semibold text-gray-800">{{ 'BIB_ITEMS.TITLE' | translate }}</h5>
+        <span class="text-sm text-gray-500">{{ 'BIB_ITEMS.COUNT' | translate: { count: items().length } }}</span>
       </div>
 
       @if (canEdit()) {
         <div class="grid grid-cols-2 md:grid-cols-6 gap-3 items-end bg-gray-50 rounded-lg p-3 mb-3">
           <div>
-            <label for="bi-prefix" class="form-label">Tiền tố</label>
+            <label for="bi-prefix" class="form-label">{{ 'BIB_ITEMS.PREFIX' | translate }}</label>
             <input id="bi-prefix" class="input font-mono uppercase" maxlength="20" [(ngModel)]="prefix" (change)="preview()" placeholder="VD: VV" />
           </div>
           <div>
-            <label for="bi-digits" class="form-label">Số chữ số</label>
+            <label for="bi-digits" class="form-label">{{ 'BIB_ITEMS.DIGITS' | translate }}</label>
             <input id="bi-digits" type="number" min="1" max="18" class="input" [(ngModel)]="digits" (change)="preview()" />
           </div>
           <div>
-            <label for="bi-qty" class="form-label">Số bản</label>
+            <label for="bi-qty" class="form-label">{{ 'BIB_ITEMS.QUANTITY' | translate }}</label>
             <input id="bi-qty" type="number" min="1" max="1000" class="input" [(ngModel)]="quantity" />
           </div>
           <div>
-            <label for="bi-start" class="form-label">Bắt đầu từ số</label>
-            <input id="bi-start" type="number" min="1" class="input" [(ngModel)]="startNumber" [placeholder]="next()?.number?.toString() ?? 'Tự động'" />
+            <label for="bi-start" class="form-label">{{ 'BIB_ITEMS.START' | translate }}</label>
+            <input id="bi-start" type="number" min="1" class="input" [(ngModel)]="startNumber" [placeholder]="next()?.number?.toString() ?? ('BIB_ITEMS.AUTO' | translate)" />
           </div>
           <div>
             <label for="bi-store" class="form-label">Kho</label>
@@ -48,13 +49,13 @@ const PREFIX_KEY = 'elib.items.prefix';
             </select>
           </div>
           <button type="button" class="btn-primary justify-center" [disabled]="busy() || !(quantity > 0)" (click)="register()">
-            <span class="material-icons text-[18px]">playlist_add</span> Đăng ký
+            <span class="material-icons text-[18px]">playlist_add</span> {{ 'BIB_ITEMS.REGISTER' | translate }}
           </button>
           <p class="col-span-2 md:col-span-6 text-xs text-gray-500">
-            @if (next(); as n) { Mã tiếp theo: <b class="font-mono">{{ startNumber ? format(startNumber) : n.barcode }}</b>. }
-            Hoặc nhập tay một mã:
-            <input class="input !inline-block !w-40 !py-1 font-mono ml-1" aria-label="Số ĐKCB nhập tay" [(ngModel)]="single" (keydown.enter)="addSingle()" placeholder="Số ĐKCB" />
-            <button type="button" class="text-blue-600 hover:underline ml-2" [disabled]="busy() || !single.trim()" (click)="addSingle()">Thêm</button>
+            @if (next(); as n) { {{ 'BIB_ITEMS.NEXT_CODE' | translate }} <b class="font-mono">{{ startNumber ? format(startNumber) : n.barcode }}</b>. }
+            {{ 'BIB_ITEMS.OR_MANUAL' | translate }}
+            <input class="input !inline-block !w-40 !py-1 font-mono ml-1" [attr.aria-label]="'BIB_ITEMS.MANUAL_LABEL' | translate" [(ngModel)]="single" (keydown.enter)="addSingle()" [placeholder]="'BIB_ITEMS.BARCODE' | translate" />
+            <button type="button" class="text-blue-600 hover:underline ml-2" [disabled]="busy() || !single.trim()" (click)="addSingle()">{{ 'BIB_ITEMS.ADD' | translate }}</button>
           </p>
         </div>
       }
@@ -65,20 +66,20 @@ const PREFIX_KEY = 'elib.items.prefix';
             <span class="inline-flex items-center gap-1.5 border border-gray-200 rounded-lg pl-2.5 pr-1 py-1 text-sm bg-white">
               <span class="font-mono">{{ it.barcode }}</span>
               <span class="text-[11px] text-gray-400">{{ it.storeCode ?? '' }}</span>
-              <span [class]="status(it.status, it.onLoan).badge + ' !text-[10px]'">{{ status(it.status, it.onLoan).name }}</span>
+              <span [class]="status(it.status, it.onLoan).badge + ' !text-[10px]'">{{ status(it.status, it.onLoan).name | translate }}</span>
               @if (session.can('CATALOG_BIBS:delete')) {
-                <button type="button" class="icon-btn !w-6 !h-6 text-gray-400 hover:text-red-600" [title]="'Xoá ' + it.barcode" (click)="deleting.set(it)">
+                <button type="button" class="icon-btn !w-6 !h-6 text-gray-400 hover:text-red-600" [title]="'BIB_ITEMS.DELETE_TIP' | translate: { barcode: it.barcode }" (click)="deleting.set(it)">
                   <span class="material-icons text-[16px]">close</span></button>
               }
             </span>
           }
         </div>
       } @else {
-        <p class="text-sm text-gray-500">Chưa có bản sách nào.</p>
+        <p class="text-sm text-gray-500">{{ 'BIB_ITEMS.EMPTY' | translate }}</p>
       }
     </div>
     @if (deleting(); as it) {
-      <app-confirm-delete [busy]="busy()" [message]="'Xoá ĐKCB ' + it.barcode + '?'" (confirmed)="remove(it)" (cancelled)="deleting.set(null)" />
+      <app-confirm-delete [busy]="busy()" message="BIB_ITEMS.DELETE_CONFIRM" [messageParams]="{ barcode: it.barcode }" (confirmed)="remove(it)" (cancelled)="deleting.set(null)" />
     }
   `,
 })
@@ -140,7 +141,8 @@ export class BibItems implements OnInit {
       });
       savePrefix(this.prefix.trim());
       this.startNumber = null;
-      this.toastr.success(`Đã đăng ký ${created.length} ĐKCB: ${created[0].barcode}${created.length > 1 ? ' – ' + created[created.length - 1].barcode : ''}.`);
+      this.toastr.success(created.length > 1 ? 'BIB_ITEMS.REGISTERED_RANGE' : 'BIB_ITEMS.REGISTERED_ONE',
+        { count: created.length, first: created[0].barcode, last: created[created.length - 1].barcode });
     });
   }
 
@@ -150,7 +152,7 @@ export class BibItems implements OnInit {
     await this.run(async () => {
       await this.api.crud<Item>('items', 'holdings').add({ mfn: this.mfn(), barcode, storeId: this.storeId });
       this.single = '';
-      this.toastr.success(`Đã thêm ĐKCB ${barcode}.`);
+      this.toastr.success('BIB_ITEMS.ADDED', { barcode });
     });
   }
 
@@ -158,7 +160,7 @@ export class BibItems implements OnInit {
     await this.run(async () => {
       await this.api.crud<Item>('items', 'holdings').delete(it.publicId);
       this.deleting.set(null);
-      this.toastr.success(`Đã xoá ĐKCB ${it.barcode}.`);
+      this.toastr.success('BIB_ITEMS.DELETED', { barcode: it.barcode });
     });
   }
 

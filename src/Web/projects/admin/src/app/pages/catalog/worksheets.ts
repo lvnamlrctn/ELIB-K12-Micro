@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, BibType, CrudClient, MarcField, MarcFieldDef, Worksheet, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
@@ -11,20 +12,20 @@ interface WorksheetForm { publicId: string | null; name: string; bibTypeId: numb
 /** Biểu mẫu biên mục (monolith: /admin/worksheets + worksheet-detail, quyền WORKSHEETS) — danh sách trường dựng sẵn cho màn biên mục. */
 @Component({
   selector: 'app-worksheets',
-  imports: [FormsModule, Loading, Modal, ConfirmDelete, MarcEditor],
+  imports: [FormsModule, Loading, Modal, ConfirmDelete, MarcEditor, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Biểu mẫu biên mục</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'WORKSHEET_PAGE.TITLE' | translate }}</h4></div>
 
     <div class="panel flex gap-3 items-end flex-wrap">
       <div class="w-64">
-        <label for="ws-type" class="field-label">Loại biểu ghi</label>
+        <label for="ws-type" class="field-label">{{ 'BIBS_PAGE.RECORD_TYPE' | translate }}</label>
         <select id="ws-type" class="input" [(ngModel)]="typeFilter" (change)="load()">
-          <option [ngValue]="null">Tất cả</option>
+          <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
           @for (t of types(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
         </select>
       </div>
       @if (can('add')) {
-        <button class="btn-add ml-auto" (click)="open(null)"><span class="material-icons text-[18px]">add</span> Thêm biểu mẫu</button>
+        <button class="btn-add ml-auto" (click)="open(null)"><span class="material-icons text-[18px]">add</span> {{ 'WORKSHEET_PAGE.ADD' | translate }}</button>
       }
     </div>
 
@@ -32,7 +33,7 @@ interface WorksheetForm { publicId: string | null; name: string; bibTypeId: numb
       @if (loading()) { <app-loading /> }
       <table class="w-full text-left border-collapse">
         <thead><tr>
-          <th class="th">Tên biểu mẫu</th><th class="th w-56">Loại biểu ghi</th><th class="th">Các trường</th><th class="th w-28 !text-center">Thao tác</th>
+          <th class="th">{{ 'WORKSHEET_PAGE.NAME' | translate }}</th><th class="th w-56">{{ 'BIBS_PAGE.RECORD_TYPE' | translate }}</th><th class="th">{{ 'WORKSHEET_PAGE.FIELDS' | translate }}</th><th class="th w-28 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
         </tr></thead>
         <tbody>
           @for (w of items(); track w.publicId) {
@@ -43,41 +44,41 @@ interface WorksheetForm { publicId: string | null; name: string; bibTypeId: numb
               <td class="td">
                 <div class="flex items-center justify-center gap-1.5">
                   @if (can('edit')) {
-                    <button (click)="open(w)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa"><span class="material-icons text-[18px]">edit</span></button>
+                    <button (click)="open(w)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[18px]">edit</span></button>
                   }
                   @if (can('delete')) {
-                    <button (click)="deleting.set(w)" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" title="Xoá"><span class="material-icons text-[18px]">delete</span></button>
+                    <button (click)="deleting.set(w)" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[18px]">delete</span></button>
                   }
                 </div>
               </td>
             </tr>
           } @empty {
-            <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : 'Chưa có biểu mẫu nào' }}</td></tr>
+            <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('WORKSHEET_PAGE.EMPTY' | translate) }}</td></tr>
           }
         </tbody>
       </table>
     </div>
 
     @if (form(); as f) {
-      <app-modal [title]="f.publicId ? 'Sửa biểu mẫu' : 'Thêm biểu mẫu'" widthClass="max-w-4xl" (closed)="form.set(null)">
+      <app-modal [title]="f.publicId ? 'WORKSHEET_PAGE.EDIT' : 'WORKSHEET_PAGE.ADD'" widthClass="max-w-4xl" (closed)="form.set(null)">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div><label class="form-label" for="ws-name">Tên biểu mẫu <span class="text-red-500">*</span></label>
-            <input id="ws-name" class="input" [(ngModel)]="f.name" placeholder="VD: Sách tham khảo" /></div>
-          <div><label class="form-label" for="ws-btype">Loại biểu ghi</label>
+          <div><label class="form-label" for="ws-name">{{ 'WORKSHEET_PAGE.NAME' | translate }} <span class="text-red-500">*</span></label>
+            <input id="ws-name" class="input" [(ngModel)]="f.name" [placeholder]="'WORKSHEET_PAGE.NAME_EG' | translate" /></div>
+          <div><label class="form-label" for="ws-btype">{{ 'BIBS_PAGE.RECORD_TYPE' | translate }}</label>
             <select id="ws-btype" class="input" [(ngModel)]="f.bibTypeId"><option [ngValue]="null">—</option>
               @for (t of types(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }</select></div>
         </div>
-        <p class="text-xs text-gray-500 mb-3">Giá trị nhập ở đây là giá trị mặc định khi biên mục (VD 041$a = vie). Trường con để trống vẫn được giữ trong biểu mẫu.</p>
+        <p class="text-xs text-gray-500 mb-3">{{ 'WORKSHEET_PAGE.DEFAULTS_HINT' | translate }}</p>
         <app-marc-editor [(fields)]="f.fields" [defs]="defs()" [template]="true" />
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="form.set(null)">Huỷ</button>
-          <button type="button" class="btn-primary" [disabled]="saving()" (click)="save(f)"><span class="material-icons text-[16px]">save</span>{{ f.publicId ? 'Cập nhật' : 'Lưu' }}</button>
+          <button type="button" class="btn-secondary" (click)="form.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-primary" [disabled]="saving()" (click)="save(f)"><span class="material-icons text-[16px]">save</span>{{ (f.publicId ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}</button>
         </ng-container>
       </app-modal>
     }
 
     @if (deleting(); as w) {
-      <app-confirm-delete [busy]="saving()" [message]="'Xoá biểu mẫu ' + w.name + '?'" (confirmed)="remove(w)" (cancelled)="deleting.set(null)" />
+      <app-confirm-delete [busy]="saving()" message="WORKSHEET_PAGE.DELETE_CONFIRM" [messageParams]="{ name: w.name }" (confirmed)="remove(w)" (cancelled)="deleting.set(null)" />
     }
   `,
 })
@@ -123,7 +124,7 @@ export class Worksheets implements OnInit {
 
   protected async save(f: WorksheetForm): Promise<void> {
     if (!f.name.trim()) {
-      this.toastr.warning('Vui lòng nhập tên biểu mẫu.');
+      this.toastr.warning('WORKSHEET_PAGE.NAME_REQUIRED');
       return;
     }
     this.saving.set(true);
@@ -131,7 +132,7 @@ export class Worksheets implements OnInit {
       const body = { name: f.name, bibTypeId: f.bibTypeId, fields: f.fields };
       if (f.publicId) await this.client.update(f.publicId, body);
       else await this.client.add(body);
-      this.toastr.success(f.publicId ? 'Đã cập nhật biểu mẫu.' : 'Đã thêm biểu mẫu.');
+      this.toastr.success(f.publicId ? 'WORKSHEET_PAGE.UPDATED' : 'WORKSHEET_PAGE.ADDED');
       this.form.set(null);
       await this.load();
     } catch (e) {
@@ -145,7 +146,7 @@ export class Worksheets implements OnInit {
     this.saving.set(true);
     try {
       await this.client.delete(w.publicId);
-      this.toastr.success('Đã xoá biểu mẫu.');
+      this.toastr.success('WORKSHEET_PAGE.DELETED');
       this.deleting.set(null);
       await this.load();
     } catch (e) {

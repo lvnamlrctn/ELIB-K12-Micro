@@ -1,5 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, Bib, errorMessage } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
 
@@ -10,41 +11,41 @@ import { ToastrService } from '../../shared/toastr';
  */
 @Component({
   selector: 'app-bib-cover',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   template: `
     <div class="px-5 py-4 border-t border-gray-100 flex gap-4 items-start flex-wrap">
       @if (preview() ?? bib().coverUrl; as url) {
-        <img [src]="url" alt="Ảnh bìa" referrerpolicy="no-referrer" class="w-24 h-32 object-cover rounded border border-gray-200 bg-gray-50" />
+        <img [src]="url" [alt]="'BIB_COVER.ALT' | translate" referrerpolicy="no-referrer" class="w-24 h-32 object-cover rounded border border-gray-200 bg-gray-50" />
       } @else {
         <div class="w-24 h-32 rounded border border-dashed border-gray-300 text-gray-400 flex flex-col items-center justify-center text-xs">
-          <span class="material-icons">image</span>Chưa có bìa</div>
+          <span class="material-icons">image</span>{{ 'BIB_COVER.NONE' | translate }}</div>
       }
       <div class="flex-1 min-w-[260px] space-y-2">
-        <div class="font-medium text-gray-800">Ảnh bìa</div>
+        <div class="font-medium text-gray-800">{{ 'BIB_COVER.TITLE' | translate }}</div>
         @if (preview(); as url) {
-          <div class="text-sm text-gray-600">Ảnh tìm được theo ISBN — kiểm tra đúng sách rồi bấm dùng.</div>
+          <div class="text-sm text-gray-600">{{ 'BIB_COVER.FOUND_HINT' | translate }}</div>
           <div class="flex gap-2">
-            <button type="button" class="btn-primary !py-1.5" [disabled]="busy()" (click)="save(url)">Dùng ảnh này</button>
-            <button type="button" class="btn-secondary !py-1.5" (click)="preview.set(null)">Bỏ qua</button>
+            <button type="button" class="btn-primary !py-1.5" [disabled]="busy()" (click)="save(url)">{{ 'BIB_COVER.USE' | translate }}</button>
+            <button type="button" class="btn-secondary !py-1.5" (click)="preview.set(null)">{{ 'BIB_COVER.SKIP' | translate }}</button>
           </div>
         } @else if (editable()) {
           <div class="flex gap-2 flex-wrap">
             <label class="btn-secondary !py-1.5 cursor-pointer" [class.opacity-50]="busy()">
-              <span class="material-icons text-[18px]">upload</span> Tải ảnh lên
+              <span class="material-icons text-[18px]">upload</span> {{ 'BIB_COVER.UPLOAD' | translate }}
               <input type="file" class="hidden" accept="image/png,image/jpeg,image/webp" [disabled]="busy()" (change)="upload($event)" />
             </label>
             <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !isbn()" (click)="lookup()"
-                    [title]="isbn() ? 'Tìm ở Google Books, Open Library' : 'Biểu ghi chưa có ISBN (020$a)'">
-              <span class="material-icons text-[18px]">travel_explore</span> Tìm theo ISBN</button>
+                    [title]="(isbn() ? 'BIB_COVER.FIND_TIP' : 'BIB_COVER.NO_ISBN') | translate">
+              <span class="material-icons text-[18px]">travel_explore</span> {{ 'BIB_COVER.FIND' | translate }}</button>
             @if (bib().coverUrl) {
-              <button type="button" class="btn-outline-danger" [disabled]="busy()" (click)="save(null)">Bỏ ảnh bìa</button>
+              <button type="button" class="btn-outline-danger" [disabled]="busy()" (click)="save(null)">{{ 'BIB_COVER.REMOVE' | translate }}</button>
             }
           </div>
           <div class="flex gap-2">
-            <input class="input !py-1.5" placeholder="Hoặc dán đường dẫn ảnh https://..." [(ngModel)]="url" aria-label="Đường dẫn ảnh bìa" />
-            <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !url.trim()" (click)="saveFromUrl()">Lưu</button>
+            <input class="input !py-1.5" [placeholder]="'BIB_COVER.URL_PH' | translate" [(ngModel)]="url" [attr.aria-label]="'BIB_COVER.URL_LABEL' | translate" />
+            <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !url.trim()" (click)="saveFromUrl()">{{ 'COMMON.SAVE' | translate }}</button>
           </div>
-          <div class="text-xs text-gray-500">PNG, JPG hoặc WebP, tối đa 2 MB. Ảnh hiện trên trang tra cứu OPAC.</div>
+          <div class="text-xs text-gray-500">{{ 'BIB_COVER.HINT' | translate }}</div>
         }
       </div>
     </div>
@@ -75,7 +76,7 @@ export class BibCover {
     this.busy.set(true);
     try {
       const uploaded = await this.api.upload('bib-cover', file);
-      if (!uploaded.url) throw new Error('Không nhận được đường dẫn ảnh.');
+      if (!uploaded.url) throw new Error('BIB_COVER.NO_URL');
       await this.save(uploaded.url);
     } catch (e) {
       this.toastr.error(errorMessage(e));
@@ -91,7 +92,7 @@ export class BibCover {
     try {
       const found = await this.api.lookupCover(isbn);
       if (!found.url) {
-        this.toastr.warning(`Không tìm thấy ảnh bìa cho ISBN ${isbn}.`);
+        this.toastr.warning('BIB_COVER.NOT_FOUND', { isbn });
         return;
       }
       const stored = await this.api.importMedia('bib-cover', found.url);
@@ -108,7 +109,7 @@ export class BibCover {
     this.busy.set(true);
     try {
       const stored = await this.api.importMedia('bib-cover', this.url.trim());
-      if (!stored.url) throw new Error('Không nhận được đường dẫn ảnh.');
+      if (!stored.url) throw new Error('BIB_COVER.NO_URL');
       await this.save(stored.url);
     } catch (e) {
       this.toastr.error(errorMessage(e));
@@ -124,7 +125,7 @@ export class BibCover {
       this.preview.set(null);
       this.url = '';
       this.changed.emit(saved);
-      this.toastr.success(url ? 'Đã cập nhật ảnh bìa.' : 'Đã bỏ ảnh bìa.');
+      this.toastr.success(url ? 'BIB_COVER.UPDATED' : 'BIB_COVER.REMOVED');
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

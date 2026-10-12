@@ -1,38 +1,39 @@
-import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudPage, NotificationLog, errorMessage } from '../../core/api';
+import { LDatePipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 
 /** Nhật ký gửi tin — chỉ xem. Không lưu nội dung thư (có thể chứa mã OTP). */
 @Component({
   selector: 'app-notification-logs',
-  imports: [FormsModule, DatePipe, Loading, Paginator],
+  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Nhật ký gửi tin</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'NOTIFICATION_LOG.TITLE' | translate }}</h4></div>
 
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div>
-          <label for="kw" class="field-label">Người nhận / tiêu đề</label>
-          <input id="kw" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" placeholder="Nhập email hoặc tiêu đề..." />
+          <label for="kw" class="field-label">{{ 'NOTIFICATION_LOG.SEARCH_LABEL' | translate }}</label>
+          <input id="kw" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" [placeholder]="'NOTIFICATION_LOG.SEARCH_PH' | translate" />
         </div>
         <div>
-          <label for="st" class="field-label">Kết quả</label>
+          <label for="st" class="field-label">{{ 'NOTIFICATION_LOG.RESULT' | translate }}</label>
           <select id="st" class="input" [(ngModel)]="status" (change)="search()">
-            <option [ngValue]="null">Tất cả</option>
-            <option [ngValue]="1">Đã gửi</option>
-            <option [ngValue]="2">Lỗi</option>
-            <option [ngValue]="3">Bỏ qua</option>
+            <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+            <option [ngValue]="1">{{ 'NOTIFICATION_LOG.SENT' | translate }}</option>
+            <option [ngValue]="2">{{ 'NOTIFICATION_LOG.FAILED' | translate }}</option>
+            <option [ngValue]="3">{{ 'NOTIFICATION_LOG.SKIPPED' | translate }}</option>
           </select>
         </div>
         <div>
-          <label for="tpl" class="field-label">Mã mẫu</label>
+          <label for="tpl" class="field-label">{{ 'NOTIFICATION_LOG.TEMPLATE_CODE' | translate }}</label>
           <input id="tpl" class="input font-mono" [(ngModel)]="templateCode" (keydown.enter)="search()" placeholder="VD: LOGIN_OTP" />
         </div>
         <div class="flex items-end">
-          <button (click)="search()" class="btn-primary w-full"><span class="material-icons text-[18px]">search</span> Tìm kiếm</button>
+          <button (click)="search()" class="btn-primary w-full"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
         </div>
       </div>
     </div>
@@ -43,18 +44,18 @@ import { Loading, Paginator } from '../../shared/ui';
         <table class="w-full text-left border-collapse">
           <thead>
             <tr>
-              <th class="th w-44">Thời gian</th>
-              <th class="th w-36">Mẫu</th>
-              <th class="th">Người nhận</th>
-              <th class="th">Tiêu đề</th>
-              <th class="th w-32 !text-center">Kết quả</th>
-              <th class="th w-32">Máy chủ</th>
+              <th class="th w-44">{{ 'NOTIFICATION_LOG.TIME' | translate }}</th>
+              <th class="th w-36">{{ 'NOTIFICATION_LOG.TEMPLATE' | translate }}</th>
+              <th class="th">{{ 'NOTIFICATION_LOG.RECIPIENT' | translate }}</th>
+              <th class="th">{{ 'NOTIFICATION_LOG.SUBJECT' | translate }}</th>
+              <th class="th w-32 !text-center">{{ 'NOTIFICATION_LOG.RESULT' | translate }}</th>
+              <th class="th w-32">{{ 'NOTIFICATION_LOG.SERVER' | translate }}</th>
             </tr>
           </thead>
           <tbody>
             @for (row of page()?.items ?? []; track row.publicId) {
               <tr class="hover:bg-gray-50/50">
-                <td class="td text-gray-500 whitespace-nowrap">{{ row.createdAt | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+                <td class="td text-gray-500 whitespace-nowrap">{{ row.createdAt | ldate: 'dd/MM/yyyy HH:mm:ss' }}</td>
                 <td class="td"><span class="font-mono text-[13px]">{{ row.templateCode }}</span></td>
                 <td class="td break-all">{{ row.recipient ?? '—' }}</td>
                 <td class="td">
@@ -63,15 +64,15 @@ import { Loading, Paginator } from '../../shared/ui';
                 </td>
                 <td class="td text-center">
                   @switch (row.status) {
-                    @case ('Sent') { <span class="badge-on">Đã gửi</span> }
-                    @case ('Failed') { <span class="badge-danger">Lỗi</span> }
-                    @default { <span class="badge-off">Bỏ qua</span> }
+                    @case ('Sent') { <span class="badge-on">{{ 'NOTIFICATION_LOG.SENT' | translate }}</span> }
+                    @case ('Failed') { <span class="badge-danger">{{ 'NOTIFICATION_LOG.FAILED' | translate }}</span> }
+                    @default { <span class="badge-off">{{ 'NOTIFICATION_LOG.SKIPPED' | translate }}</span> }
                   }
                 </td>
-                <td class="td text-gray-500 text-xs">{{ row.viaPlatform ? 'Nền tảng' : 'Của đơn vị' }}</td>
+                <td class="td text-gray-500 text-xs">{{ (row.viaPlatform ? 'NOTIFICATION_LOG.VIA_PLATFORM' : 'NOTIFICATION_LOG.VIA_TENANT') | translate }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : 'Chưa có thư nào' }}</td></tr>
+              <tr><td colspan="6" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : ('NOTIFICATION_LOG.EMPTY' | translate) }}</td></tr>
             }
           </tbody>
         </table>

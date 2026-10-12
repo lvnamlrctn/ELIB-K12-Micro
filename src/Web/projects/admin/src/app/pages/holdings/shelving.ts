@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudPage, Item, ItemSearch, ShelveResult, Store, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
@@ -11,30 +12,30 @@ import { Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-shelving',
-  imports: [FormsModule, Loading, Paginator],
+  imports: [FormsModule, Loading, Paginator, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Xếp giá</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'SHELVING_PAGE.TITLE' | translate }}</h4></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <div class="panel !mb-0 lg:col-span-1">
-        <label for="sh-codes" class="form-label">Quét hoặc dán số ĐKCB (mỗi dòng một mã)</label>
+        <label for="sh-codes" class="form-label">{{ 'SHELVING_PAGE.CODES' | translate }}</label>
         <textarea id="sh-codes" rows="8" class="input font-mono text-[13px]" [(ngModel)]="codes" placeholder="VV000001&#10;VV000002"></textarea>
-        <label for="sh-store" class="form-label mt-3">Chuyển vào kho</label>
+        <label for="sh-store" class="form-label mt-3">{{ 'SHELVING_PAGE.MOVE_TO' | translate }}</label>
         <select id="sh-store" class="input" [(ngModel)]="storeId">
-          <option [ngValue]="null">Giữ kho hiện tại</option>
+          <option [ngValue]="null">{{ 'SHELVING_PAGE.KEEP_STORE' | translate }}</option>
           @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }
         </select>
         @if (can()) {
           <button type="button" class="btn-primary w-full justify-center mt-4" [disabled]="busy() || (!codeList().length && !selected().size)" (click)="shelve()">
             <span class="material-icons text-[18px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'shelves' }}</span>
-            Xếp giá {{ codeList().length + selected().size }} bản
+            {{ 'SHELVING_PAGE.SHELVE_N' | translate: { count: codeList().length + selected().size } }}
           </button>
         }
         @if (result(); as r) {
           <div class="mt-4 text-sm space-y-2">
-            <div class="alert-success !block">Đã xếp giá <b>{{ r.shelved }}</b> bản.</div>
-            @if (r.skipped.length) { <div class="alert-error !block">Không ở trạng thái chưa xếp giá: <span class="font-mono text-xs">{{ r.skipped.join(', ') }}</span></div> }
-            @if (r.notFound.length) { <div class="alert-error !block">Không có ĐKCB: <span class="font-mono text-xs">{{ r.notFound.join(', ') }}</span></div> }
+            <div class="alert-success !block" [innerHTML]="'SHELVING_PAGE.SHELVED' | translate: { count: r.shelved }"></div>
+            @if (r.skipped.length) { <div class="alert-error !block">{{ 'SHELVING_PAGE.NOT_PENDING' | translate }} <span class="font-mono text-xs">{{ r.skipped.join(', ') }}</span></div> }
+            @if (r.notFound.length) { <div class="alert-error !block">{{ 'SHELVING_PAGE.NOT_FOUND' | translate }} <span class="font-mono text-xs">{{ r.notFound.join(', ') }}</span></div> }
           </div>
         }
       </div>
@@ -42,28 +43,28 @@ import { Loading, Paginator } from '../../shared/ui';
       <div class="lg:col-span-2">
         <div class="panel flex flex-wrap gap-3 items-end">
           <div class="flex-1 min-w-[200px]">
-            <label for="sh-kw" class="field-label">Bản sách chưa xếp giá — số ĐKCB / nhan đề</label>
+            <label for="sh-kw" class="field-label">{{ 'SHELVING_PAGE.PENDING_SEARCH' | translate }}</label>
             <input id="sh-kw" class="input" [(ngModel)]="search.keyword" (keydown.enter)="find()" />
           </div>
-          <button (click)="find()" class="btn-primary"><span class="material-icons text-[18px]">search</span> Tìm</button>
+          <button (click)="find()" class="btn-primary"><span class="material-icons text-[18px]">search</span> {{ 'SHELVING_PAGE.FIND' | translate }}</button>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
           @if (loading()) { <app-loading /> }
           <table class="w-full text-left border-collapse">
             <thead><tr>
-              <th class="th w-10 !text-center"><input type="checkbox" class="rounded border-gray-300" aria-label="Chọn tất cả" [checked]="allSelected()" (change)="toggleAll()" /></th>
-              <th class="th w-36">Số ĐKCB</th><th class="th">Nhan đề</th><th class="th w-40">Kho</th>
+              <th class="th w-10 !text-center"><input type="checkbox" class="rounded border-gray-300" [attr.aria-label]="'SHELVING_PAGE.SELECT_ALL' | translate" [checked]="allSelected()" (change)="toggleAll()" /></th>
+              <th class="th w-36">{{ 'ITEMS_PAGE.BARCODE' | translate }}</th><th class="th">{{ 'ITEMS_PAGE.TITLE_COL' | translate }}</th><th class="th w-40">{{ 'ITEMS_PAGE.STORE' | translate }}</th>
             </tr></thead>
             <tbody>
               @for (it of page()?.items ?? []; track it.publicId) {
                 <tr class="hover:bg-gray-50/50 cursor-pointer" (click)="toggle(it)">
-                  <td class="td text-center"><input type="checkbox" class="rounded border-gray-300" [attr.aria-label]="'Chọn ' + it.barcode" [checked]="selected().has(it.publicId)" (click)="$event.stopPropagation()" (change)="toggle(it)" /></td>
+                  <td class="td text-center"><input type="checkbox" class="rounded border-gray-300" [attr.aria-label]="'SHELVING_PAGE.SELECT_ONE' | translate: { barcode: it.barcode }" [checked]="selected().has(it.publicId)" (click)="$event.stopPropagation()" (change)="toggle(it)" /></td>
                   <td class="td font-mono text-[13px]">{{ it.barcode }}</td>
                   <td class="td">{{ it.title ?? '—' }} <span class="text-[11px] text-gray-400">MFN {{ it.mfn }}</span></td>
                   <td class="td">{{ it.storeCode ?? '—' }}</td>
                 </tr>
               } @empty {
-                <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : 'Không còn bản sách nào chưa xếp giá' }}</td></tr>
+                <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('SHELVING_PAGE.EMPTY' | translate) }}</td></tr>
               }
             </tbody>
           </table>
@@ -138,7 +139,7 @@ export class Shelving implements OnInit {
     try {
       const r = await this.api.shelveItems({ ids: [...this.selected()], barcodes: this.codeList(), storeId: this.storeId });
       this.result.set(r);
-      if (r.shelved > 0) this.toastr.success(`Đã xếp giá ${r.shelved} bản.`);
+      if (r.shelved > 0) this.toastr.success('SHELVING_PAGE.DONE', { count: r.shelved });
       this.codes = '';
       this.selected.set(new Set());
       await this.load();

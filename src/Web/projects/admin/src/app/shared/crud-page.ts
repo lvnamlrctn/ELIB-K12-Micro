@@ -42,6 +42,9 @@ export interface CrudField {
 }
 
 /** Cấu hình một màn danh mục — truyền qua data của route. */
+/** Thông báo sau thao tác: khoá dịch, hoặc khoá kèm tham số. */
+export type CrudMessage = string | { key: string; params?: Record<string, unknown> };
+
 export interface CrudConfig {
   title: string;
   /** Tài nguyên dưới /api/admin/<service>/ */
@@ -73,7 +76,7 @@ export interface CrudRowAction {
   /** Hành động quyền cần có trên module của màn. */
   action: string;
   /** Trả về thông báo kết quả (ném lỗi = báo lỗi). */
-  run: (api: Api, row: Record<string, unknown> & { publicId: string }) => Promise<string>;
+  run: (api: Api, row: Record<string, unknown> & { publicId: string }) => Promise<CrudMessage>;
 }
 
 export interface CrudToolbarAction {
@@ -82,7 +85,7 @@ export interface CrudToolbarAction {
   /** Hành động quyền cần có trên module của màn (add/edit…). */
   action: string;
   /** Trả về thông báo thành công; danh sách tải lại sau khi chạy. */
-  run: (api: Api) => Promise<string>;
+  run: (api: Api) => Promise<CrudMessage>;
 }
 
 type Row = Record<string, unknown> & { publicId: string; id: number };
@@ -446,10 +449,15 @@ export class CrudPage implements OnInit {
     }
   }
 
+  private notify(m: CrudMessage): void {
+    if (typeof m === 'string') this.toastr.success(m);
+    else this.toastr.success(m.key, m.params);
+  }
+
   protected async runRowAction(action: CrudRowAction, row: Row): Promise<void> {
     this.busyRow.set(row.publicId);
     try {
-      this.toastr.success(await action.run(this.api, row));
+      this.notify(await action.run(this.api, row));
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
@@ -471,7 +479,7 @@ export class CrudPage implements OnInit {
   protected async runTool(tool: CrudToolbarAction): Promise<void> {
     this.saving.set(true);
     try {
-      this.toastr.success(await tool.run(this.api));
+      this.notify(await tool.run(this.api));
       await this.load();
     } catch (e) {
       this.toastr.error(errorMessage(e));

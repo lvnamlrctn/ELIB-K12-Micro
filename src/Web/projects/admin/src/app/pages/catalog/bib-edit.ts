@@ -1,7 +1,9 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Router, RouterLink } from '@angular/router';
 import { Api, Bib, BibType, CrudClient, IsbnMatch, MarcField, MarcFieldDef, MarcPreviewRecord, STATUS_ACTIVE, Worksheet, errorMessage } from '../../core/api';
+import { Language } from '../../core/i18n';
 import { MarcDrafts } from '../../core/marc-draft';
 import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
@@ -22,17 +24,17 @@ const BLANK_FIELDS: MarcField[] = [
 /** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover],
+  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
-      <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" title="Quay lại"><span class="material-icons">arrow_back</span></a>
-      <h4 class="page-title">{{ bib() ? 'Sửa biểu ghi' : 'Biên mục mới' }}</h4>
+      <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'BIB_EDITOR.BACK' | translate"><span class="material-icons">arrow_back</span></a>
+      <h4 class="page-title">{{ (bib() ? 'BIB_EDITOR.EDIT_TITLE' : 'BIB_EDITOR.NEW_TITLE') | translate }}</h4>
       @if (bib(); as b) { <span class="text-sm text-gray-500">MFN <b class="font-mono">{{ b.mfn }}</b> · {{ b.title }}</span> }
       @if (canSave()) {
         @if (!bib() && hasSearch()) {
           <a routerLink="/z3950-search" class="btn-secondary ml-auto"><span class="material-icons text-[18px]">travel_explore</span> Tra Z39.50</a>
         }
-        <button type="button" class="btn-secondary" [class.ml-auto]="bib() || !hasSearch()" (click)="picking.set(true)"><span class="material-icons text-[18px]">upload_file</span> Nạp từ file MARC</button>
+        <button type="button" class="btn-secondary" [class.ml-auto]="bib() || !hasSearch()" (click)="picking.set(true)"><span class="material-icons text-[18px]">upload_file</span> {{ 'BIB_EDITOR.LOAD_MARC' | translate }}</button>
       }
     </div>
 
@@ -40,28 +42,28 @@ const BLANK_FIELDS: MarcField[] = [
       @if (loading()) { <app-loading /> }
       <div class="px-5 py-4 border-b border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label for="be-type" class="form-label">Loại biểu ghi</label>
+          <label for="be-type" class="form-label">{{ 'BIB_EDITOR.RECORD_TYPE' | translate }}</label>
           <select id="be-type" class="input" [(ngModel)]="bibTypeId" (ngModelChange)="onTypeChange()">
             <option [ngValue]="null">—</option>
             @for (t of types(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
           </select>
         </div>
         <div>
-          <label for="be-ws" class="form-label">Biểu mẫu biên mục</label>
+          <label for="be-ws" class="form-label">{{ 'BIB_EDITOR.WORKSHEET' | translate }}</label>
           <select id="be-ws" class="input" [ngModel]="worksheetId()" (ngModelChange)="applyWorksheet($event)">
             <option [ngValue]="null">—</option>
             @for (w of worksheets(); track w.id) { <option [ngValue]="w.id">{{ w.name }}</option> }
           </select>
         </div>
         <div>
-          <label for="be-status" class="form-label">Hiển thị trên OPAC</label>
+          <label for="be-status" class="form-label">{{ 'BIB_EDITOR.OPAC_VISIBLE' | translate }}</label>
           <select id="be-status" class="input" [(ngModel)]="status">
-            <option [ngValue]="2">Hiện</option><option [ngValue]="1">Ẩn</option>
+            <option [ngValue]="2">{{ 'BIB_EDITOR.SHOWN' | translate }}</option><option [ngValue]="1">{{ 'BIB_EDITOR.HIDDEN' | translate }}</option>
           </select>
         </div>
         <div>
           <label for="be-leader" class="form-label">Leader</label>
-          <input id="be-leader" class="input font-mono text-[13px]" maxlength="24" [(ngModel)]="leader" placeholder="Tự sinh theo loại biểu ghi" />
+          <input id="be-leader" class="input font-mono text-[13px]" maxlength="24" [(ngModel)]="leader" [placeholder]="'BIB_EDITOR.LEADER_PH' | translate" />
         </div>
       </div>
 
@@ -71,11 +73,11 @@ const BLANK_FIELDS: MarcField[] = [
 
       @if (dupes().length) {
         <div class="mx-5 mt-4 alert-error !block">
-          <div class="font-medium mb-1">ISBN này đã có ở {{ dupes().length }} biểu ghi khác:</div>
+          <div class="font-medium mb-1">{{ 'BIB_EDITOR.ISBN_DUPES' | translate: { count: dupes().length } }}</div>
           <ul class="list-disc pl-5 text-sm">
             @for (d of dupes(); track d.publicId) { <li><a [routerLink]="['/catalog-bibs', d.mfn]" class="underline">MFN {{ d.mfn }}</a> — {{ d.title }}</li> }
           </ul>
-          <button type="button" class="btn-secondary !py-1 !px-3 mt-2" (click)="save(true)">Vẫn lưu biểu ghi mới</button>
+          <button type="button" class="btn-secondary !py-1 !px-3 mt-2" (click)="save(true)">{{ 'BIB_EDITOR.SAVE_ANYWAY' | translate }}</button>
         </div>
       }
 
@@ -85,10 +87,10 @@ const BLANK_FIELDS: MarcField[] = [
       }
 
       <div class="flex gap-3 px-5 py-4 border-t border-gray-100">
-        <a routerLink="/catalog-bibs" class="btn-secondary">Huỷ</a>
+        <a routerLink="/catalog-bibs" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</a>
         @if (canSave()) {
           <button type="button" class="btn-primary ml-auto" [disabled]="saving()" (click)="save(false)">
-            <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> Lưu biểu ghi
+            <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> {{ 'BIB_EDITOR.SAVE' | translate }}
           </button>
         }
       </div>
@@ -105,6 +107,7 @@ export class BibEdit implements OnInit {
   private readonly router = inject(Router);
   protected readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly language = inject(Language);
   private readonly drafts = inject(MarcDrafts);
   private readonly client: CrudClient<Bib> = this.api.crud<Bib>('bibs', 'catalog');
 
@@ -149,7 +152,7 @@ export class BibEdit implements OnInit {
           // Bản ghi sao từ Z39.50: giữ Leader/06–07 của nguồn để loại biểu ghi khớp, MFN/003/005 hệ thống tự sinh khi lưu.
           this.leader = draft.leader.trim().length === 24 ? draft.leader : '';
           this.fields.set(structuredClone(draft.fields));
-          this.toastr.success(`Đã nạp bản ghi từ ${draft.source} — kiểm tra, sửa rồi bấm Lưu biểu ghi.`);
+          this.toastr.success('BIB_EDITOR.DRAFT_LOADED', { source: draft.source });
         } else if (first) this.useWorksheet(first);
         else this.fields.set(structuredClone(BLANK_FIELDS));
       }
@@ -186,7 +189,7 @@ export class BibEdit implements OnInit {
       this.worksheetId.set(null);
       return;
     }
-    if (this.hasData() && !confirm('Áp biểu mẫu sẽ thay các trường đang nhập. Tiếp tục?')) {
+    if (this.hasData() && !confirm(this.language.t('BIB_EDITOR.APPLY_WORKSHEET_CONFIRM'))) {
       this.worksheetId.set(this.worksheetId());
       return;
     }
@@ -207,7 +210,8 @@ export class BibEdit implements OnInit {
       const body = { bibTypeId: this.bibTypeId, worksheetId: this.worksheetId(), leader: this.leader.trim() || null, fields: this.fields(), status: this.status };
       const current = this.bib();
       const saved = current ? await this.client.update(current.publicId, body) : await this.client.add(body);
-      this.toastr.success(isNew ? `Đã lưu biểu ghi MFN ${saved.mfn}.` : 'Đã cập nhật biểu ghi.');
+      if (isNew) this.toastr.success('BIB_EDITOR.SAVED_NEW', { mfn: saved.mfn });
+      else this.toastr.success('BIB_EDITOR.UPDATED');
       if (isNew) {
         await this.router.navigate(['/catalog-bibs', saved.mfn], { replaceUrl: true });
       }
@@ -232,7 +236,7 @@ export class BibEdit implements OnInit {
     this.leader = r.leader;
     this.fields.set(structuredClone(r.fields));
     this.dupes.set([]);
-    this.toastr.success(`Đã nạp ${r.fields.length} trường từ file — kiểm tra rồi bấm Lưu biểu ghi.`);
+    this.toastr.success('BIB_EDITOR.FIELDS_LOADED', { count: r.fields.length });
   }
 
   private hasData(): boolean {

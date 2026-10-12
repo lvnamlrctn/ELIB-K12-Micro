@@ -1,37 +1,15 @@
-import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, AuditLog, CrudPage, errorMessage } from '../core/api';
+import { LDatePipe } from '../core/i18n';
 import { ToastrService } from '../shared/toastr';
 import { Loading, Paginator } from '../shared/ui';
 
-/** Tên tiếng Việt của mã thao tác trong nhật ký (mã lạ hiện nguyên văn). */
-const ACTION_LABELS: Record<string, string> = {
-  ADD: 'Thêm mới',
-  UPDATE: 'Sửa',
-  DELETE: 'Xoá',
-  CHANGE_STATUS: 'Đổi trạng thái',
-  LOGIN: 'Đăng nhập',
-  LOGIN_FAILED: 'Đăng nhập thất bại',
-  PASSWORD_CHANGE: 'Đổi mật khẩu',
-  USER_CREATE: 'Tạo tài khoản',
-  USER_UPDATE: 'Sửa tài khoản',
-  USER_ROLES: 'Gán vai trò',
-  USER_RESET_PASSWORD: 'Đặt lại mật khẩu',
-  USER_UNLOCK: 'Mở khoá tài khoản',
-  ROLE_CREATE: 'Tạo vai trò',
-  ROLE_UPDATE: 'Sửa vai trò',
-  ROLE_DELETE: 'Xoá vai trò',
-  IMPERSONATION_STARTED: 'Quản trị nền tảng vào xem',
-  TENANT_CREATE: 'Tạo đơn vị',
-  TENANT_UPDATE: 'Sửa đơn vị',
-  TENANT_SUSPEND: 'Tạm ngưng đơn vị',
-  TENANT_ACTIVATE: 'Kích hoạt đơn vị',
-  TENANT_LICENSES: 'Cập nhật phân hệ',
-  TENANT_PROVISION_RETRY: 'Khởi tạo lại đơn vị',
-  TENANT_RESYNC: 'Đồng bộ đơn vị',
-  TENANT_ADMIN_CREATE: 'Tạo quản trị đơn vị',
-};
+/** Mã thao tác có tên dịch (AUDIT.ACTION.<mã>); mã lạ hiện nguyên văn. */
+const KNOWN_ACTIONS = new Set([
+  'ADD', 'UPDATE', 'DELETE', 'CHANGE_STATUS', 'IMPORT', 'LOGIN', 'LOGIN_FAILED', 'PASSWORD_CHANGE', 'USER_CREATE', 'USER_UPDATE', 'USER_ROLES', 'USER_RESET_PASSWORD', 'USER_UNLOCK', 'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE', 'IMPERSONATION_STARTED', 'TENANT_CREATE', 'TENANT_UPDATE', 'TENANT_SUSPEND', 'TENANT_ACTIVATE', 'TENANT_LICENSES', 'TENANT_PROVISION_RETRY', 'TENANT_RESYNC', 'TENANT_ADMIN_CREATE',
+]);
 
 const DANGER = new Set(['DELETE', 'LOGIN_FAILED', 'ROLE_DELETE', 'TENANT_SUSPEND', 'USER_RESET_PASSWORD']);
 const WARN = new Set(['IMPERSONATION_STARTED', 'USER_ROLES', 'ROLE_UPDATE', 'ROLE_CREATE', 'TENANT_LICENSES', 'PASSWORD_CHANGE']);
@@ -42,39 +20,39 @@ const WARN = new Set(['IMPERSONATION_STARTED', 'USER_ROLES', 'ROLE_UPDATE', 'ROL
  */
 @Component({
   selector: 'app-audit-logs',
-  imports: [FormsModule, DatePipe, Loading, Paginator],
+  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5">
-      <h4 class="page-title">{{ platform() ? 'Nhật ký nền tảng' : 'Nhật ký hệ thống' }}</h4>
+      <h4 class="page-title">{{ (platform() ? 'AUDIT.TITLE_PLATFORM' : 'AUDIT.TITLE_TENANT') | translate }}</h4>
       <p class="text-sm text-gray-500 mt-1">
-        {{ platform() ? 'Thao tác của quản trị nền tảng: đơn vị, phân hệ, đăng nhập, vào xem đơn vị' : 'Đăng nhập và thao tác thêm/sửa/xoá của cán bộ trong đơn vị' }}
+        {{ (platform() ? 'AUDIT.SUB_PLATFORM' : 'AUDIT.SUB_TENANT') | translate }}
       </p>
     </div>
 
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div class="xl:col-span-2">
-          <label for="kw" class="field-label">Nội dung / người thực hiện / IP</label>
-          <input id="kw" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" placeholder="Nhập từ khoá..." />
+          <label for="kw" class="field-label">{{ 'AUDIT.SEARCH_LABEL' | translate }}</label>
+          <input id="kw" class="input" [(ngModel)]="keyword" (keydown.enter)="search()" [placeholder]="'AUDIT.SEARCH_PH' | translate" />
         </div>
         <div>
-          <label for="act" class="field-label">Thao tác</label>
+          <label for="act" class="field-label">{{ 'AUDIT.ACTION_LABEL' | translate }}</label>
           <select id="act" class="input" [(ngModel)]="action" (change)="search()">
-            <option [ngValue]="null">Tất cả</option>
-            @for (a of actions(); track a) { <option [ngValue]="a">{{ label(a) }}</option> }
+            <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+            @for (a of actions(); track a) { <option [ngValue]="a">{{ label(a) | translate }}</option> }
           </select>
         </div>
         <div>
-          <label for="from" class="field-label">Từ ngày</label>
+          <label for="from" class="field-label">{{ 'AUDIT.FROM' | translate }}</label>
           <input id="from" type="date" class="input" [(ngModel)]="from" (change)="search()" />
         </div>
         <div>
-          <label for="to" class="field-label">Đến ngày</label>
+          <label for="to" class="field-label">{{ 'AUDIT.TO' | translate }}</label>
           <input id="to" type="date" class="input" [(ngModel)]="to" (change)="search()" />
         </div>
       </div>
       <div class="flex justify-end mt-4">
-        <button (click)="search()" class="btn-primary"><span class="material-icons text-[18px]">search</span> Tìm kiếm</button>
+        <button (click)="search()" class="btn-primary"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
       </div>
     </div>
 
@@ -84,27 +62,27 @@ const WARN = new Set(['IMPERSONATION_STARTED', 'USER_ROLES', 'ROLE_UPDATE', 'ROL
         <table class="w-full text-left border-collapse min-w-[900px]">
           <thead>
             <tr>
-              <th class="th w-44">Thời gian</th>
-              <th class="th w-56">Người thực hiện</th>
-              <th class="th w-44">Thao tác</th>
-              <th class="th">Nội dung</th>
-              @if (platform()) { <th class="th w-48">Đơn vị</th> }
+              <th class="th w-44">{{ 'AUDIT.TIME' | translate }}</th>
+              <th class="th w-56">{{ 'AUDIT.ACTOR' | translate }}</th>
+              <th class="th w-44">{{ 'AUDIT.ACTION_LABEL' | translate }}</th>
+              <th class="th">{{ 'AUDIT.CONTENT' | translate }}</th>
+              @if (platform()) { <th class="th w-48">{{ 'AUDIT.TENANT' | translate }}</th> }
               <th class="th w-36">IP</th>
             </tr>
           </thead>
           <tbody>
             @for (row of page()?.items ?? []; track row.publicId) {
               <tr class="hover:bg-gray-50/50 align-top">
-                <td class="td text-gray-500 whitespace-nowrap">{{ row.occurredAt | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
-                <td class="td">{{ row.actorName || (row.actorKind === 'system' ? 'Hệ thống' : '—') }}</td>
-                <td class="td"><span [class]="badge(row.action)">{{ label(row.action) }}</span></td>
+                <td class="td text-gray-500 whitespace-nowrap">{{ row.occurredAt | ldate: 'dd/MM/yyyy HH:mm:ss' }}</td>
+                <td class="td">{{ row.actorName || (row.actorKind === 'system' ? ('AUDIT.SYSTEM' | translate) : '—') }}</td>
+                <td class="td"><span [class]="badge(row.action)">{{ label(row.action) | translate }}</span></td>
                 <td class="td"><div class="line-clamp-3 break-words" [title]="row.summary ?? ''">{{ row.summary || '—' }}</div>
                   <div class="text-[11px] text-gray-400 mt-0.5">{{ row.service }} · {{ row.entityType }}</div></td>
                 @if (platform()) { <td class="td">{{ row.tenantName || '—' }}</td> }
                 <td class="td font-mono text-[12px] text-gray-500">{{ row.ipAddress || '—' }}</td>
               </tr>
             } @empty {
-              <tr><td [attr.colspan]="platform() ? 6 : 5" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : 'Không có dữ liệu' }}</td></tr>
+              <tr><td [attr.colspan]="platform() ? 6 : 5" class="py-8 px-4 text-center text-gray-500">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -146,7 +124,7 @@ export class AuditLogs implements OnInit {
   }
 
   protected label(action: string): string {
-    return ACTION_LABELS[action] ?? action;
+    return KNOWN_ACTIONS.has(action) ? `AUDIT.ACTION.${action}` : action;
   }
 
   protected badge(action: string): string {
