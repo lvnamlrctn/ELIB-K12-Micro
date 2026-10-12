@@ -90,7 +90,7 @@ public sealed record ReaderExportRequest(ReaderSearch? Search, IReadOnlyList<str
 /// Bạn đọc (monolith: ReaderController). Ngoài 8 endpoint chuẩn: Lock/Unlock, CheckExist, BulkUpdate, ImportTemplate/Import.
 /// Mọi thay đổi phát <see cref="ReaderChanged"/> (outbox, cùng transaction) cho bản sao ở các service khác.
 /// </summary>
-public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock,
+public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock,
     ITenantReferences references)
     : CrudResource<ReaderResource, Reader, ReaderSearch, ReaderRequest, ReaderDto>(db), ICrudImportable<ReaderRequest>
 {
@@ -375,13 +375,23 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
         new("email", "Email"),
         new("phone", "Điện thoại", false, null, "Phone", "So dien thoai"),
         new("address", "Địa chỉ", false, null, "Address"),
-        new("citizenid", "Số CCCD", false, null, "CitizenId", "CCCD"),
+        new("citizenid", "Số CCCD", false, null, "CitizenId", "CCCD", "So can cuoc", "Can cuoc cong dan", "So can cuoc cong dan"),
         new("carduid", "UID thẻ", false, "Mã chip/RFID của thẻ; không trùng.", "CardUid", "UID"),
         new("issuedate", "Ngày cấp thẻ", false, "Bỏ trống = hôm nay.", "IssueDate", "Ngay cap"),
         new("expiredate", "Ngày hết hạn", false, "Bỏ trống = 1 năm sau ngày cấp.", "ExpireDate", "Han the"),
     ];
 
-    public ReaderRequest MapImportRow(CrudImportRow row)
+    public ReaderRequest MapImportRow(CrudImportRow row) => WithImportDefaults(MapImportRowRaw(row));
+
+    /// <summary>Ngày cấp trống = hôm nay, hạn trống = 1 năm sau ngày cấp (chỉ khi thêm mới — ghi đè thì ô trống giữ giá trị cũ).</summary>
+    private ReaderRequest WithImportDefaults(ReaderRequest r)
+    {
+        var issue = r.IssueDate ?? Today();
+        return r with { IssueDate = issue, ExpireDate = r.ExpireDate ?? issue.AddYears(1) };
+    }
+
+    /// <summary>Dòng Excel → request, ô trống giữ null (không điền mặc định).</summary>
+    private static ReaderRequest MapImportRowRaw(CrudImportRow row)
     {
         var (lastName, firstName) = (row.Get("lastname"), row.Get("firstname"));
         if (firstName is null && row.Get("fullname") is { } full)
@@ -389,13 +399,12 @@ public sealed class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher
             var parts = full.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             (lastName, firstName) = (parts.Length > 1 ? string.Join(' ', parts[..^1]) : null, parts[^1]);
         }
-        var issue = row.Date("issuedate", "Ngày cấp thẻ") ?? Today();
         return new ReaderRequest(
             row.Required("cardno", "Số thẻ"), lastName,
             firstName ?? throw new BusinessRuleException("IMPORT_VALUE_REQUIRED", "Thiếu Tên (hoặc Họ và tên)."),
             CitizenId: row.Get("citizenid"), CardUid: row.Get("carduid"), Email: row.Get("email"), Phone: row.Get("phone"), Address: row.Get("address"),
             BirthDate: row.Date("birthdate", "Ngày sinh"), Sex: ParseSex(row.Get("sex")),
-            IssueDate: issue, ExpireDate: row.Date("expiredate", "Ngày hết hạn") ?? issue.AddYears(1),
+            IssueDate: row.Date("issuedate", "Ngày cấp thẻ"), ExpireDate: row.Date("expiredate", "Ngày hết hạn"),
             ReaderTypeName: row.Get("readertype"), ClassName: row.Get("class"), CourseName: row.Get("course"),
             OrgName: row.Get("org"), EthnicityName: row.Get("ethnicity"), DegreeName: row.Get("degree"), AcademicTitleName: row.Get("academictitle"));
     }

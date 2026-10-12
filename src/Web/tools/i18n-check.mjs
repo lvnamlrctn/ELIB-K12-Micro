@@ -23,7 +23,7 @@ const APPS = {
     ],
   },
 };
-const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_'];
+const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_'];
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const KEY = /['"`]((?:[A-Z][A-Z0-9_]*)(?:\.[A-Z0-9_]+)+)['"`]/g;
 
@@ -80,7 +80,7 @@ for (const [app, cfg] of Object.entries(APPS)) {
     }
   }
 
-  const missing = [...used].filter(([k]) => !vi.has(k) && !DYNAMIC.some((d) => k === d.slice(0, -1)));
+  const missing = [...used].filter(([k]) => !vi.has(k) && !DYNAMIC.some((d) => k === d || k === d.slice(0, -1)));
   if (listApp) {
     for (const [k, f] of missing) console.log(`${k}\t${f}`);
     continue;

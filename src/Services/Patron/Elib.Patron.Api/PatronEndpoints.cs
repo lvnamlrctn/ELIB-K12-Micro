@@ -1,7 +1,11 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Tenancy;
+using System.Text.Json;
+using Elib.BuildingBlocks.Domain;
 using Elib.Patron.Application;
+using Elib.Patron.Domain;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Elib.Patron.Api;
 
@@ -42,9 +46,44 @@ public static class PatronEndpoints
             using (tenant.Use(tenantId))
                 return await r.CurrentStateAsync(publicId, ct) is { } state ? Results.Ok(state) : Results.NotFound();
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        // Nhập Excel nâng cao (ELIB-LRC: Import/Columns + Import với mapping/overwrite/preview/background): đọc cột → xem trước → chạy nền.
+        readers.MapPost("/Import/Columns", [Permission("READERS", "add")] async (IFormFile file, ReaderImportService s, CancellationToken ct) =>
+            s.Inspect(await ReadFileAsync(file, ct))).DisableAntiforgery();
+        readers.MapPost("/Import/Jobs", [Permission("READERS", "add")] async (IFormFile file, [FromForm] string options, ReaderImportService s,
+            CancellationToken ct) =>
+        {
+            ReaderImportOptions parsed;
+            try
+            {
+                parsed = JsonSerializer.Deserialize<ReaderImportOptions>(options, ReaderImportService.Json)
+                    ?? throw new BusinessRuleException("IMPORT_OPTIONS_INVALID", "Thiếu tuỳ chọn nhập.");
+            }
+            catch (JsonException)
+            {
+                throw new BusinessRuleException("IMPORT_OPTIONS_INVALID", "Tuỳ chọn nhập không hợp lệ.");
+            }
+            return await s.PreviewAsync(file.FileName, (await ReadFileAsync(file, ct)).ToArray(), parsed, ct);
+        }).DisableAntiforgery();
+        readers.MapGet("/Import/Jobs/{id:guid}", [Permission("READERS", "add")] (Guid id, ReaderImportService s, CancellationToken ct) => s.GetAsync(id, ct));
+        readers.MapPost("/Import/Jobs/{id:guid}/Start", [Permission("READERS", "add")] (Guid id, ReaderImportService s, CancellationToken ct) => s.StartAsync(id, ct));
+        readers.MapGet("/Import/Jobs/{id:guid}/Errors", [Permission("READERS", "add")] async (Guid id, ReaderImportService s, CancellationToken ct) =>
+        {
+            var (bytes, name) = await s.ErrorFileAsync(id, ct);
+            return Results.File(bytes, CrudExcel.ContentType, name);
+        });
         readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
         readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
             => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));
         return app;
+    }
+
+    private static async Task<MemoryStream> ReadFileAsync(IFormFile file, CancellationToken ct)
+    {
+        if (file.Length is 0 or > ReaderImportJob.MaxFileBytes)
+            throw new BusinessRuleException("IMPORT_FILE_SIZE", $"File rỗng hoặc lớn hơn {ReaderImportJob.MaxFileBytes / 1024 / 1024} MB.");
+        var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer, ct);
+        buffer.Position = 0;
+        return buffer;
     }
 }

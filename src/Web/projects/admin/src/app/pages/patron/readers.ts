@@ -6,11 +6,11 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudClient, CrudPage, Reader, ReaderAccount, ReaderSearch, errorMessage } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
-import { ImportDialog } from '../../shared/import-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
 import { ReaderFormDialog } from './reader-form';
+import { ReaderImport } from './reader-import';
 import { ReaderPassword, accountLabel } from './reader-password';
 import { MAX_PRINT, PRINT_KEY } from './reader-print';
 import { ReaderExport, ReaderPhotos } from './reader-tools';
@@ -48,7 +48,7 @@ const VIEW_KEY = 'elib.readers.view';
  */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, NgTemplateOutlet, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ImportDialog,
+  imports: [FormsModule, NgTemplateOutlet, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport,
     ReaderExport, ReaderPhotos, ReaderPassword, ReaderFormDialog],
   providers: [ReaderCatalogs],
   template: `
@@ -339,7 +339,7 @@ const VIEW_KEY = 'elib.readers.view';
     }
 
     @if (importing()) {
-      <app-import-dialog title="MENU.READERS" resource="readers" service="patron" (closed)="importing.set(false)" (imported)="find()" />
+      <app-reader-import (closed)="importing.set(false)" (imported)="find()" />
     }
   `,
 })

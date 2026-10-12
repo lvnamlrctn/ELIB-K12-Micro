@@ -28,14 +28,20 @@ public sealed class CrudImportRow(int number, IReadOnlyDictionary<string, string
             ? value
             : throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Cột \"{header}\" phải là số nguyên (đang là \"{text}\").");
 
-    /// <summary>Ô kiểu ngày của Excel (đọc thành yyyy-MM-dd) hoặc chữ dạng dd/MM/yyyy, d/M/yyyy, yyyy-MM-dd như người dùng gõ.</summary>
-    public DateOnly? Date(string key, string header) => Get(key) is not { } text
-        ? null
-        : DateOnly.TryParseExact(text, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var value)
-            ? value
-            : throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Cột \"{header}\" phải là ngày dạng dd/MM/yyyy (đang là \"{text}\").");
+    /// <summary>
+    /// Ô kiểu ngày của Excel (đọc thành yyyy-MM-dd) hoặc chữ dạng dd/MM/yyyy, d/M/yyyy, yyyy-MM-dd, yyyyMMdd như người dùng gõ; số serial của
+    /// Excel (ô ngày bị lưu dạng số, như file xuất từ ELIB-LRC) cũng nhận.
+    /// </summary>
+    public DateOnly? Date(string key, string header)
+    {
+        if (Get(key) is not { } text) return null;
+        if (DateOnly.TryParseExact(text, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var value)) return value;
+        if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var serial) && serial is > 1 and < 2958466)
+            return DateOnly.FromDateTime(DateTime.FromOADate(serial));
+        throw new BusinessRuleException("IMPORT_VALUE_INVALID", $"Cột \"{header}\" phải là ngày dạng dd/MM/yyyy (đang là \"{text}\").");
+    }
 
-    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "dd.MM.yyyy"];
+    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "dd.MM.yyyy", "yyyyMMdd"];
 }
 
 /// <summary>Danh mục cho phép nhập từ Excel (thay action Import của từng controller monolith). Resource cài interface này thì có thêm 2 endpoint.</summary>

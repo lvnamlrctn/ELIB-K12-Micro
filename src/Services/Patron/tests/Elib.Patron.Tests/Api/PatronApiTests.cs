@@ -324,6 +324,102 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Advanced_import_maps_columns_previews_runs_in_background_and_returns_error_file()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        _factory.References[(tenantId, "orgs")] = [new(41, "Khoa Lý")];
+        await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("IM-001", "Cũ", "An", Phone: "0900000001", Address: "Giữ nguyên",
+            IssueDate: new DateOnly(2026, 1, 1), ExpireDate: new DateOnly(2027, 1, 1))));
+
+        // File kiểu ELIB-LRC: 2 dòng tiêu đề phụ phía trên, cột tự đặt tên → ghép cột thủ công cho cột lạ.
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.AddWorksheet("DS");
+        sheet.Cell(1, 1).Value = "DANH SÁCH BẠN ĐỌC";
+        string[] header = ["STT", "Ma the", "Ho dem", "Ten", "Ngay sinh", "Lop hoc", "Khoa hoc", "Don vi", "Dien thoai"];
+        for (var i = 0; i < header.Length; i++) sheet.Cell(3, i + 1).Value = header[i];
+        object[][] rows =
+        [
+            ["1", "IM-001", "", "An Mới", "", "", "", "Khoa Lý", ""],      // ghi đè: ô trống giữ cũ
+            ["2", "IM-002", "Lê", "Bình", "20100305", "10A9", "K-2026", "", ""], // lớp/khoá mới → tự tạo; ngày yyyyMMdd
+            ["3", "IM-003", "Phạm", "Chi", "31/02/2010", "", "", "", ""],   // ngày sai
+            ["4", "IM-002", "Lê", "Bình 2", "", "", "", "", ""],            // trùng trong file
+            ["5", "IM-005", "Hồ", "Duy", "", "", "", "Khoa Hoá", ""],       // đơn vị không có
+        ];
+        for (var r = 0; r < rows.Length; r++)
+            for (var col = 0; col < rows[r].Length; col++) sheet.Cell(r + 4, col + 1).Value = rows[r][col].ToString();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        var bytes = stream.ToArray();
+
+        MultipartFormDataContent FileForm(params (string Name, string Value)[] fields)
+        {
+            var form = new MultipartFormDataContent { { new ByteArrayContent(bytes), "file", "lrc-ds.xlsx" } };
+            foreach (var (name, value) in fields) form.Add(new StringContent(value), name);
+            return form;
+        }
+
+        var columns = await Read<ImportColumnsDto>(await staff.PostAsync(U("/api/readers/Import/Columns"), FileForm()));
+        Assert.Equal(3, columns.HeaderRow);
+        Assert.Equal(5, columns.DataRows);
+        Assert.Equal((2, 3, 4, 5, 8, 9), (columns.Suggested["cardno"], columns.Suggested["lastname"], columns.Suggested["firstname"],
+            columns.Suggested["birthdate"], columns.Suggested["org"], columns.Suggested["phone"]));
+        Assert.False(columns.Suggested.ContainsKey("class"));
+
+        var mapping = new Dictionary<string, int>(columns.Suggested) { ["class"] = 6, ["course"] = 7 };
+        async Task<ReaderImportJobDto> Preview(bool overwrite, bool autoCreate) =>
+            await Read<ReaderImportJobDto>(await staff.PostAsync(U("/api/readers/Import/Jobs"), FileForm(("options",
+                JsonSerializer.Serialize(new ReaderImportOptions(columns.HeaderRow, mapping, overwrite, null, autoCreate), Json)))));
+
+        var strict = await Preview(overwrite: false, autoCreate: false);
+        Assert.Equal((5, 0, 0, 5), (strict.Total, strict.ToCreate, strict.ToUpdate, strict.ErrorCount));
+        Assert.Contains(strict.Errors, e => e.Row == 4 && e.Message.Contains("Ghi đè", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.BadRequest, (await staff.PostAsync(U($"/api/readers/Import/Jobs/{strict.Id}/Start"), null)).StatusCode);
+
+        var job = await Preview(overwrite: true, autoCreate: true);
+        Assert.Equal(("Ready", 5, 1, 1, 3), (job.Status, job.Total, job.ToCreate, job.ToUpdate, job.ErrorCount));
+        Assert.Equal([6, 7, 8], job.Errors.Select(e => e.Row));
+        Assert.True(job.HasErrorFile);
+        Assert.Empty((await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { CardNo = "IM-002" }, Json))).Items);
+
+        // Đơn vị khác không thấy lượt nhập.
+        Assert.Equal(HttpStatusCode.NotFound, (await Staff(tenantId + 1000).GetAsync(U($"/api/readers/Import/Jobs/{job.Id}"))).StatusCode);
+
+        Assert.Equal("Queued", (await Read<ReaderImportJobDto>(await staff.PostAsync(U($"/api/readers/Import/Jobs/{job.Id}/Start"), null))).Status);
+        Assert.Equal(HttpStatusCode.Conflict, (await staff.PostAsync(U($"/api/readers/Import/Jobs/{job.Id}/Start"), null)).StatusCode);
+        var done = await PatronApiFactory.WaitForAsync(async () =>
+        {
+            var current = await Read<ReaderImportJobDto>(await staff.GetAsync(U($"/api/readers/Import/Jobs/{job.Id}")));
+            return current.Status is "Done" or "Failed" ? current : null;
+        }, "lượt nhập chạy xong");
+        Assert.Equal(("Done", 5, 1, 1, 3), (done.Status, done.Processed, done.Created, done.Updated, done.Failed));
+
+        var all = (await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch(), Json))).Items;
+        var an = Assert.Single(all, r => r.CardNo == "IM-001");
+        Assert.Equal(("Cũ", "An Mới", "0900000001", "Giữ nguyên", 41L, new DateOnly(2027, 1, 1)),
+            (an.LastName, an.FirstName, an.Phone, an.Address, an.OrgId, an.ExpireDate));
+        var binh = Assert.Single(all, r => r.CardNo == "IM-002");
+        Assert.Equal(new DateOnly(2010, 3, 5), binh.BirthDate);
+        Assert.NotNull(binh.ClassId);
+        Assert.NotNull(binh.CourseId);
+        Assert.Equal(binh.IssueDate!.Value.AddYears(1), binh.ExpireDate);
+        Assert.Contains(_factory.PublishedOf<ReaderChanged>(), e => e.TenantId == tenantId && e.CardNo == "IM-002");
+
+        // File "Dòng cần sửa": số dòng gốc + cột gốc + cột Lỗi, đúng các dòng lỗi.
+        var errors = await staff.GetAsync(U($"/api/readers/Import/Jobs/{job.Id}/Errors"));
+        Assert.Equal(HttpStatusCode.OK, errors.StatusCode);
+        using var errorBook = new XLWorkbook(new MemoryStream(await errors.Content.ReadAsByteArrayAsync()));
+        var errorSheet = errorBook.Worksheet(1);
+        Assert.Equal(("Dòng", "Ma the"), (errorSheet.Cell(1, 1).GetString(), errorSheet.Cell(1, 3).GetString()));
+        Assert.Equal(["6IM-003", "7IM-002", "8IM-005"], Enumerable.Range(2, 3).Select(r => errorSheet.Cell(r, 1).GetString() + errorSheet.Cell(r, 3).GetString()));
+        Assert.Contains("Khoa Hoá", errorSheet.Row(4).CellsUsed().Last().GetString(), StringComparison.Ordinal);
+
+        // Không có quyền thêm bạn đọc → không xem được cột/lượt nhập.
+        var viewer = Staff(tenantId, "READERS:view");
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(U($"/api/readers/Import/Jobs/{job.Id}"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Photos_are_set_per_reader_and_in_bulk_by_card_number()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

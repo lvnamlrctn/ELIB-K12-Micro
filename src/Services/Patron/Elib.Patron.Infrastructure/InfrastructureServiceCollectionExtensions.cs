@@ -37,6 +37,7 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddHttpMessageHandler<ServiceTokenHandler>();
         services.AddScoped<ITenantReferences, HttpTenantReferences>();
+        services.AddHostedService<ReaderImportWorker>();
         services.AddElibMessaging<PatronDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<PatronDbContext>();

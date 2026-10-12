@@ -12,6 +12,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<CourseResource>();
         services.AddCrudResource<ReaderGroupResource>();
         services.AddCrudResource<ReaderResource>();
+        services.AddScoped<ReaderImportService>();
+        services.AddSingleton<IReaderImportDispatcher, ReaderImportDispatcher>();
         return services;
     }
 }

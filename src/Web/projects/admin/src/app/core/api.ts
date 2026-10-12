@@ -283,6 +283,22 @@ export class ImportClient {
   }
 }
 
+// ── Nhập bạn đọc nâng cao (patron: Import/Columns → Import/Jobs xem trước → Start chạy nền) ──
+export interface ReaderImportHeader { index: number; title: string; }
+export interface ReaderImportField { key: string; header: string; required: boolean; note: string | null; }
+export interface ReaderImportColumns {
+  headerRow: number; headers: ReaderImportHeader[]; suggested: Record<string, number>; fields: ReaderImportField[]; dataRows: number;
+}
+export interface ReaderImportOptions {
+  headerRow: number; columns: Record<string, number>; overwrite: boolean; readerTypeId: number | null; autoCreateRefs: boolean;
+}
+export type ReaderImportStatus = 'Ready' | 'Queued' | 'Running' | 'Done' | 'Failed';
+export interface ReaderImportJob {
+  id: string; status: ReaderImportStatus; fileName: string; total: number; toCreate: number; toUpdate: number; errorCount: number;
+  processed: number; created: number; updated: number; failed: number; hasErrorFile: boolean; message: string | null;
+  errors: ImportError[]; createdAt: string; finishedAt: string | null;
+}
+
 /** PUT nội dung file vào URL ký sẵn của MinIO — dùng fetch (không qua HttpClient) để không gắn Authorization: chữ ký nằm trong URL. */
 async function putToStorage(uploadUrl: string, file: File): Promise<void> {
   const response = await fetch(uploadUrl, { method: 'PUT', body: file, credentials: 'omit' });
@@ -431,6 +447,17 @@ export class Api {
   unlockReader(publicId: string) { return this.post<Reader>(`/api/admin/patron/readers/Unlock/${publicId}`); }
   /** Link xem nhiều file (ảnh thẻ) một lần — tối đa 100; file không thuộc đơn vị/chưa xong bị bỏ qua. */
   fileUrls(ids: string[]) { return this.post<{ id: string; url: string; expiresAt: string | null }[]>('/api/admin/media/files/urls', { ids }); }
+  readerImportColumns(file: File) { return this.post<ReaderImportColumns>('/api/admin/patron/readers/Import/Columns', fileForm(file)); }
+  previewReaderImport(file: File, options: ReaderImportOptions) {
+    const form = fileForm(file);
+    form.append('options', JSON.stringify(options));
+    return this.post<ReaderImportJob>('/api/admin/patron/readers/Import/Jobs', form);
+  }
+  readerImportJob(id: string) { return this.get<ReaderImportJob>(`/api/admin/patron/readers/Import/Jobs/${id}`); }
+  startReaderImport(id: string) { return this.post<ReaderImportJob>(`/api/admin/patron/readers/Import/Jobs/${id}/Start`); }
+  readerImportErrors(id: string) {
+    return blobRequest(firstValueFrom(this.http.get(`/api/admin/patron/readers/Import/Jobs/${id}/Errors`, { responseType: 'blob' })));
+  }
   bulkUpdateReaders(body: ReaderBulkUpdate) { return this.put<{ updatedCount: number }>('/api/admin/patron/readers/BulkUpdate', body); }
   /** Mật khẩu OPAC của bạn đọc nằm ở identity; useCardNo = mật khẩu mặc định là số thẻ. */
   readerAccounts(readerIds: string[]) { return this.post<ReaderAccount[]>('/api/admin/identity/reader-accounts/Status', { readerIds }); }
