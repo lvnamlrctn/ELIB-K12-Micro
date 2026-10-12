@@ -1,16 +1,17 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, PermissionModule, Role, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal } from '../../shared/ui';
 
-const ADMIN_ROLE = 'Quản trị đơn vị';
+const ADMIN_ROLE = 'Quản trị đơn vị'; // i18n-data: tên vai trò dựng sẵn do identity tạo
 const ACTIONS = [
-  { key: 'view', label: 'Xem' },
-  { key: 'add', label: 'Thêm mới' },
-  { key: 'edit', label: 'Sửa' },
-  { key: 'delete', label: 'Xoá' },
+  { key: 'view', label: 'ROLE.ACTION_view' },
+  { key: 'add', label: 'ROLE.ACTION_add' },
+  { key: 'edit', label: 'ROLE.ACTION_edit' },
+  { key: 'delete', label: 'ROLE.ACTION_delete' },
 ] as const;
 
 /** Một dòng của bảng phân quyền: tiêu đề nhóm (theo menu) hoặc một module quyền. */
@@ -29,17 +30,17 @@ interface MatrixRow {
  */
 @Component({
   selector: 'app-roles',
-  imports: [FormsModule, Loading, Modal, ConfirmDelete],
+  imports: [FormsModule, Loading, Modal, ConfirmDelete, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Phân quyền</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'ROLE.PAGE_TITLE' | translate }}</h4></div>
 
     <div class="panel flex gap-3 items-center justify-between flex-wrap">
       <div class="flex gap-2">
         @if (session.can('ROLE:add')) {
-          <button (click)="openRole(null)" class="btn-add"><span class="material-icons text-[18px]">add</span> Thêm vai trò</button>
+          <button (click)="openRole(null)" class="btn-add"><span class="material-icons text-[18px]">add</span> {{ 'ROLE.ADD_ROLE' | translate }}</button>
         }
       </div>
-      <span class="text-sm text-gray-500">{{ roles().length }} vai trò</span>
+      <span class="text-sm text-gray-500">{{ 'ROLE.COUNT' | translate: { count: roles().length } }}</span>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -48,10 +49,10 @@ interface MatrixRow {
         <table class="w-full text-left border-collapse">
           <thead>
             <tr>
-              <th class="th">Tên vai trò</th>
-              <th class="th">Mô tả</th>
-              <th class="th w-40">Quyền</th>
-              <th class="th w-36 !text-center">Thao tác</th>
+              <th class="th">{{ 'ROLE.ROLE_NAME' | translate }}</th>
+              <th class="th">{{ 'COMMON.DESCRIPTION' | translate }}</th>
+              <th class="th w-40">{{ 'ROLE.PERMISSIONS' | translate }}</th>
+              <th class="th w-36 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -59,26 +60,26 @@ interface MatrixRow {
               <tr class="hover:bg-gray-50/50 transition-colors">
                 <td class="td font-medium text-gray-800">
                   <span class="material-icons text-[18px] align-middle mr-1.5 text-blue-500">admin_panel_settings</span>{{ r.name }}
-                  @if (r.isBuiltIn) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Mặc định</span> }
+                  @if (r.isBuiltIn) { <span class="ml-2 text-[11px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{{ 'ROLE.BUILT_IN' | translate }}</span> }
                 </td>
                 <td class="td text-gray-500">{{ r.description || '—' }}</td>
                 <td class="td">
-                  @if (r.permissions.includes('*')) { <span class="badge-info">Toàn quyền</span> }
-                  @else if (r.permissions.length) { <span class="badge-on">{{ r.permissions.length }} quyền</span> }
-                  @else { <span class="badge-off">Chưa có quyền</span> }
+                  @if (r.permissions.includes('*')) { <span class="badge-info">{{ 'ROLE.ALL_PERMISSIONS' | translate }}</span> }
+                  @else if (r.permissions.length) { <span class="badge-on">{{ 'ROLE.N_PERMISSIONS' | translate: { count: r.permissions.length } }}</span> }
+                  @else { <span class="badge-off">{{ 'ROLE.NO_PERMISSIONS' | translate }}</span> }
                 </td>
                 <td class="td">
                   <div class="flex items-center justify-center space-x-2">
-                    <button (click)="openMatrix(r)" class="icon-btn bg-teal-50 text-teal-600 hover:bg-teal-100" title="Phân quyền">
+                    <button (click)="openMatrix(r)" class="icon-btn bg-teal-50 text-teal-600 hover:bg-teal-100" [title]="'ROLE.PAGE_TITLE' | translate">
                       <span class="material-icons text-[18px]">security</span>
                     </button>
                     @if (session.can('ROLE:edit')) {
-                      <button (click)="openRole(r)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" title="Sửa">
+                      <button (click)="openRole(r)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate">
                         <span class="material-icons text-[18px]">edit</span>
                       </button>
                     }
                     @if (session.can('ROLE:delete') && !r.isBuiltIn) {
-                      <button (click)="deleting.set(r)" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" title="Xoá">
+                      <button (click)="deleting.set(r)" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" [title]="'COMMON.DELETE' | translate">
                         <span class="material-icons text-[18px]">delete</span>
                       </button>
                     }
@@ -86,7 +87,7 @@ interface MatrixRow {
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : 'Không có dữ liệu' }}</td></tr>
+              <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -94,40 +95,40 @@ interface MatrixRow {
     </div>
 
     @if (editing(); as e) {
-      <app-modal [title]="e.publicId ? 'Cập nhật vai trò' : 'Thêm mới vai trò'" (closed)="editing.set(null)">
+      <app-modal [title]="e.publicId ? 'ROLE.EDIT_ROLE_TITLE' : 'ROLE.ADD_ROLE_TITLE'" (closed)="editing.set(null)">
         <form id="role-form" (ngSubmit)="saveRole()" class="space-y-4">
           <div>
-            <label class="form-label" for="r-name">Tên vai trò <span class="text-red-500">*</span></label>
-            <input id="r-name" name="name" class="input" [(ngModel)]="e.name" [disabled]="e.locked" placeholder="VD: Thủ thư lưu thông" />
+            <label class="form-label" for="r-name">{{ 'ROLE.ROLE_NAME' | translate }} <span class="text-red-500">*</span></label>
+            <input id="r-name" name="name" class="input" [(ngModel)]="e.name" [disabled]="e.locked" [placeholder]="'ROLE.ROLE_NAME_PH' | translate" />
           </div>
           <div>
-            <label class="form-label" for="r-desc">Mô tả</label>
+            <label class="form-label" for="r-desc">{{ 'COMMON.DESCRIPTION' | translate }}</label>
             <textarea id="r-desc" name="description" rows="3" class="input" [(ngModel)]="e.description"></textarea>
           </div>
-          @if (!e.publicId) { <p class="text-xs text-gray-500">Sau khi tạo, bấm nút <b>Phân quyền</b> để chọn quyền cho vai trò.</p> }
+          @if (!e.publicId) { <p class="text-xs text-gray-500" [innerHTML]="'ROLE.AFTER_CREATE_HINT' | translate"></p> }
         </form>
         <ng-container footer>
-          <button type="button" (click)="editing.set(null)" class="btn-secondary">Huỷ</button>
+          <button type="button" (click)="editing.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="submit" form="role-form" [disabled]="saving()" class="btn-primary">
-            <span class="material-icons text-[16px]">save</span>{{ e.publicId ? 'Cập nhật' : 'Lưu' }}
+            <span class="material-icons text-[16px]">save</span>{{ (e.publicId ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}
           </button>
         </ng-container>
       </app-modal>
     }
 
     @if (matrixRole(); as role) {
-      <app-modal [title]="'Phân quyền — ' + role.name" widthClass="max-w-4xl" (closed)="matrixRole.set(null)">
+      <app-modal [title]="'ROLE.MATRIX_TITLE' | translate: { name: role.name }" widthClass="max-w-4xl" (closed)="matrixRole.set(null)">
         @if (role.permissions.includes('*')) {
-          <div class="alert-info">Vai trò <b>{{ role.name }}</b> có toàn quyền trong đơn vị — không chỉnh được.</div>
+          <div class="alert-info" [innerHTML]="'ROLE.ADMIN_LOCKED' | translate: { name: role.name }"></div>
         } @else if (!canEditMatrix()) {
-          <div class="alert-info">Bạn chỉ có quyền xem phân quyền.</div>
+          <div class="alert-info">{{ 'ROLE.VIEW_ONLY' | translate }}</div>
         }
         <div class="border border-gray-100 rounded-lg overflow-auto max-h-[60vh] relative">
           @if (catalogLoading()) { <app-loading /> }
           <table class="w-full text-sm border-collapse min-w-[640px]">
             <thead class="sticky top-0 z-10">
               <tr class="bg-teal-600 text-white">
-                <th class="py-3 px-4 text-left font-medium">Chức năng</th>
+                <th class="py-3 px-4 text-left font-medium">{{ 'ROLE.FUNCTION' | translate }}</th>
                 @for (a of actions; track a.key) { <th class="py-3 px-2 text-center font-medium w-24">{{ a.label }}</th> }
               </tr>
             </thead>
@@ -150,7 +151,7 @@ interface MatrixRow {
                         <button type="button" (click)="toggle(row, a.key)" [disabled]="!canEditMatrix()"
                                 class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 disabled:cursor-default disabled:opacity-70"
                                 [class]="isOn(row, a.key) ? (a.key === 'delete' ? 'bg-red-400' : 'bg-teal-500') : 'bg-gray-200'"
-                                [title]="a.label + (row.module ? '' : ' — cả nhóm')">
+                                [title]="row.module ? (a.label | translate) : ('ROLE.WHOLE_GROUP' | translate: { action: (a.label | translate) })">
                           <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
                                 [class]="isOn(row, a.key) ? 'translate-x-4' : 'translate-x-0.5'"></span>
                         </button>
@@ -161,17 +162,17 @@ interface MatrixRow {
                   }
                 </tr>
               } @empty {
-                <tr><td colspan="5" class="py-12 text-center text-gray-400">{{ catalogLoading() ? '' : 'Không có dữ liệu module' }}</td></tr>
+                <tr><td colspan="5" class="py-12 text-center text-gray-400">{{ catalogLoading() ? '' : ('ROLE.NO_MODULES' | translate) }}</td></tr>
               }
             </tbody>
           </table>
         </div>
         <ng-container footer>
-          <span class="mr-auto text-sm text-gray-500">{{ granted().size }} quyền được chọn</span>
-          <button type="button" (click)="matrixRole.set(null)" class="btn-secondary">{{ canEditMatrix() ? 'Huỷ' : 'Đóng' }}</button>
+          <span class="mr-auto text-sm text-gray-500">{{ 'ROLE.SELECTED_N' | translate: { count: granted().size } }}</span>
+          <button type="button" (click)="matrixRole.set(null)" class="btn-secondary">{{ (canEditMatrix() ? 'COMMON.CANCEL' : 'COMMON.CLOSE') | translate }}</button>
           @if (canEditMatrix()) {
             <button type="button" (click)="saveMatrix()" [disabled]="saving()" class="btn-primary !bg-teal-600 hover:!bg-teal-700">
-              <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span>Lưu phân quyền
+              <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span>{{ 'ROLE.SAVE_MATRIX' | translate }}
             </button>
           }
         </ng-container>
@@ -179,7 +180,7 @@ interface MatrixRow {
     }
 
     @if (deleting(); as d) {
-      <app-confirm-delete [busy]="saving()" [message]="'Xoá vai trò \\'' + d.name + '\\'? Người dùng đang có vai trò này sẽ mất các quyền tương ứng.'"
+      <app-confirm-delete [busy]="saving()" message="ROLE.DELETE_CONFIRM" [messageParams]="{ name: d.name }"
                           (confirmed)="deleteRole(d)" (cancelled)="deleting.set(null)" />
     }
   `,
@@ -220,7 +221,7 @@ export class Roles implements OnInit {
     const e = this.editing();
     if (!e) return;
     if (!e.name.trim()) {
-      this.toastr.warning('Vui lòng nhập tên vai trò.');
+      this.toastr.warning('ROLE.NAME_REQUIRED');
       return;
     }
     this.saving.set(true);
@@ -231,7 +232,7 @@ export class Roles implements OnInit {
       } else {
         await this.api.createRole({ name: e.name, description: e.description, permissions: [] });
       }
-      this.toastr.success(e.publicId ? 'Cập nhật thành công' : 'Thêm mới thành công');
+      this.toastr.success(e.publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');
       this.editing.set(null);
       await this.load();
     } catch (err) {
@@ -245,7 +246,7 @@ export class Roles implements OnInit {
     this.saving.set(true);
     try {
       await this.api.deleteRole(role.publicId);
-      this.toastr.success('Xoá thành công');
+      this.toastr.success('COMMON.DELETE_SUCCESS');
       this.deleting.set(null);
       await this.load();
     } catch (err) {
@@ -301,7 +302,7 @@ export class Roles implements OnInit {
     this.saving.set(true);
     try {
       await this.api.updateRole(role.publicId, { name: role.name, description: role.description, permissions: [...this.granted()].sort() });
-      this.toastr.success('Đã lưu phân quyền');
+      this.toastr.success('ROLE.MATRIX_SAVED');
       this.matrixRole.set(null);
       await this.load();
     } catch (err) {

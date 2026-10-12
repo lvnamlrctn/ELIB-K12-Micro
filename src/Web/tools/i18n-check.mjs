@@ -20,10 +20,11 @@ const APPS = {
       'projects/admin/src/app/shared/crud-page.ts', 'projects/admin/src/app/shared/import-dialog.ts', 'projects/admin/src/app/shared/toastr.ts',
       'projects/admin/src/app/shared/ui.ts', 'projects/admin/src/app/shared/zip.ts',
       'projects/admin/src/app/pages/patron/readers.ts', 'projects/admin/src/app/pages/patron/reader-',
+      'projects/admin/src/app/pages/system', 'projects/admin/src/app/pages/tenant', 'projects/admin/src/app/pages/patron',
     ],
   },
 };
-const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_'];
+const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_', 'TENANT_ADMIN.STATE_', 'TENANT_ADMIN.STEP_', 'TENANT_ADMIN.PACKAGE_', 'ROLE.ACTION_'];
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const KEY = /['"`]((?:[A-Z][A-Z0-9_]*)(?:\.[A-Z0-9_]+)+)['"`]/g;
 
@@ -43,9 +44,12 @@ function flatten(obj, prefix = '', out = new Map()) {
   return out;
 }
 
-/** Bỏ chú thích (TS và HTML trong template) để không báo chữ có dấu trong comment (giữ nguyên chuỗi). */
+/**
+ * Bỏ chú thích (TS và HTML trong template) để không báo chữ có dấu trong comment (giữ nguyên chuỗi).
+ * Dòng có chú thích "i18n-data" là dữ liệu (tên vai trò dựng sẵn, nhãn MARC từ API…) — không phải chữ giao diện, bỏ qua.
+ */
 function stripComments(code) {
-  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  return code.split('\n').map((l) => (l.includes('i18n-data') ? '' : l)).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 }
 
 const listApp = process.argv[2] === '--list' ? process.argv[3] : null;

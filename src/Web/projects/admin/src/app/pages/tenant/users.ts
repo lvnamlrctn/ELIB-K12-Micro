@@ -1,7 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, PagedResult, Role, User, errorMessage } from '../../core/api';
+import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Modal, Paginator } from '../../shared/ui';
@@ -9,19 +10,19 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
 /** Cán bộ quản lý thư viện (người dùng nhân viên của đơn vị) — giao diện như pages/admin/system/user của admin cũ. */
 @Component({
   selector: 'app-users',
-  imports: [FormsModule, DatePipe, Paginator, Modal, Loading],
+  imports: [FormsModule, LDatePipe, Paginator, Modal, Loading, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Cán bộ quản lý thư viện</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'USER_MGT.PAGE_TITLE' | translate }}</h4></div>
 
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div class="xl:col-span-2">
-          <label for="kw" class="field-label">Tên đăng nhập / họ tên</label>
-          <input id="kw" class="input" [(ngModel)]="search" (keydown.enter)="load(1)" placeholder="Nhập tên đăng nhập, họ tên..." />
+          <label for="kw" class="field-label">{{ 'USER_MGT.SEARCH_LABEL' | translate }}</label>
+          <input id="kw" class="input" [(ngModel)]="search" (keydown.enter)="load(1)" [placeholder]="'USER_MGT.SEARCH_PH2' | translate" />
         </div>
         <div class="hidden xl:block"></div>
         <div class="flex items-end">
-          <button (click)="load(1)" class="btn-primary w-full"><span class="material-icons text-[18px]">search</span> Tìm kiếm</button>
+          <button (click)="load(1)" class="btn-primary w-full"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
         </div>
       </div>
     </div>
@@ -29,10 +30,10 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
     <div class="panel flex gap-3 items-center justify-between flex-wrap">
       <div class="flex gap-2">
         @if (session.can('USER:add')) {
-          <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">person_add</span> Thêm mới</button>
+          <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">person_add</span> {{ 'COMMON.ADD_BTN' | translate }}</button>
         }
       </div>
-      <span class="text-sm text-gray-500">{{ result()?.total ?? 0 }} tài khoản</span>
+      <span class="text-sm text-gray-500">{{ 'USER_MGT.COUNT' | translate: { count: result()?.total ?? 0 } }}</span>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -42,12 +43,12 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
           <thead>
             <tr>
               <th class="th w-16 !text-center">ID</th>
-              <th class="th">Tên đăng nhập</th>
-              <th class="th">Họ tên</th>
-              <th class="th">Email / Điện thoại</th>
-              <th class="th">Vai trò</th>
-              <th class="th w-36 !text-center">Trạng thái</th>
-              <th class="th w-44">Đăng nhập gần nhất</th>
+              <th class="th">{{ 'USER_MGT.USER_NAME' | translate }}</th>
+              <th class="th">{{ 'USER_MGT.FULL_NAME2' | translate }}</th>
+              <th class="th">{{ 'USER_MGT.CONTACT' | translate }}</th>
+              <th class="th">{{ 'USER_MGT.ROLES' | translate }}</th>
+              <th class="th w-36 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
+              <th class="th w-44">{{ 'USER_MGT.LAST_LOGIN' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -62,14 +63,14 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
                   @empty { <span class="text-gray-300">—</span> }
                 </td>
                 <td class="td text-center">
-                  @if (!u.isActive) { <span class="badge-danger">Vô hiệu hoá</span> }
-                  @else if (u.lockedOut) { <span class="badge-warn">Tạm khoá</span> }
-                  @else { <span class="badge-on"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Hoạt động</span> }
+                  @if (!u.isActive) { <span class="badge-danger">{{ 'USER_MGT.DISABLED' | translate }}</span> }
+                  @else if (u.lockedOut) { <span class="badge-warn">{{ 'USER_MGT.LOCKED_OUT' | translate }}</span> }
+                  @else { <span class="badge-on"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>{{ 'COMMON.ACTIVE' | translate }}</span> }
                 </td>
-                <td class="td text-gray-500">{{ u.lastLoginAt ? (u.lastLoginAt | date: 'dd/MM/yyyy HH:mm') : '—' }}</td>
+                <td class="td text-gray-500">{{ u.lastLoginAt ? (u.lastLoginAt | ldate: 'dd/MM/yyyy HH:mm') : '—' }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="7" class="py-8 text-center text-gray-500">{{ loading() ? '' : 'Không có dữ liệu' }}</td></tr>
+              <tr><td colspan="7" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -80,19 +81,19 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
     </div>
 
     @if (form(); as f) {
-      <app-modal title="Thêm cán bộ quản lý" widthClass="max-w-2xl" (closed)="form.set(null)">
+      <app-modal title="USER_MGT.ADD_STAFF" widthClass="max-w-2xl" (closed)="form.set(null)">
         <form id="user-form" (ngSubmit)="create()" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label class="form-label" for="u">Tên đăng nhập <span class="text-red-500">*</span></label><input id="u" name="u" class="input" [(ngModel)]="f.userName" required autocomplete="off" /></div>
-          <div><label class="form-label" for="n">Họ tên <span class="text-red-500">*</span></label><input id="n" name="n" class="input" [(ngModel)]="f.fullName" required /></div>
+          <div><label class="form-label" for="u">{{ 'USER_MGT.USER_NAME' | translate }} <span class="text-red-500">*</span></label><input id="u" name="u" class="input" [(ngModel)]="f.userName" required autocomplete="off" /></div>
+          <div><label class="form-label" for="n">{{ 'USER_MGT.FULL_NAME2' | translate }} <span class="text-red-500">*</span></label><input id="n" name="n" class="input" [(ngModel)]="f.fullName" required /></div>
           <div><label class="form-label" for="e">Email</label><input id="e" name="e" type="email" class="input" [(ngModel)]="f.email" /></div>
-          <div><label class="form-label" for="ph">Điện thoại</label><input id="ph" name="ph" class="input" [(ngModel)]="f.phone" /></div>
+          <div><label class="form-label" for="ph">{{ 'USER_MGT.PHONE2' | translate }}</label><input id="ph" name="ph" class="input" [(ngModel)]="f.phone" /></div>
           <div class="sm:col-span-2">
-            <label class="form-label" for="p">Mật khẩu tạm <span class="text-red-500">*</span></label>
+            <label class="form-label" for="p">{{ 'USER_MGT.TEMP_PASSWORD' | translate }} <span class="text-red-500">*</span></label>
             <input id="p" name="p" type="password" autocomplete="new-password" class="input" [(ngModel)]="f.password" required />
-            <p class="text-xs text-gray-500 mt-1">Người dùng phải đổi mật khẩu ở lần đăng nhập đầu tiên.</p>
+            <p class="text-xs text-gray-500 mt-1">{{ 'USER_MGT.TEMP_PASSWORD_HINT' | translate }}</p>
           </div>
           <div class="sm:col-span-2">
-            <span class="form-label">Vai trò</span>
+            <span class="form-label">{{ 'USER_MGT.ROLES' | translate }}</span>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               @for (r of roles(); track r.publicId) {
                 <label class="flex items-center gap-2 text-sm text-gray-700 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer">
@@ -100,14 +101,14 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
                   {{ r.name }}
                 </label>
               } @empty {
-                <p class="text-sm text-gray-500">Không có quyền xem vai trò.</p>
+                <p class="text-sm text-gray-500">{{ 'USER_MGT.NO_ROLE_VIEW' | translate }}</p>
               }
             </div>
           </div>
         </form>
         <ng-container footer>
-          <button type="button" (click)="form.set(null)" class="btn-secondary">Huỷ</button>
-          <button type="submit" form="user-form" [disabled]="busy()" class="btn-primary"><span class="material-icons text-[16px]">save</span> Lưu</button>
+          <button type="button" (click)="form.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="submit" form="user-form" [disabled]="busy()" class="btn-primary"><span class="material-icons text-[16px]">save</span> {{ 'COMMON.SAVE' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -162,7 +163,7 @@ export class Users implements OnInit {
     this.busy.set(true);
     try {
       const user = await this.api.createUser({ ...f, email: f.email || null, phone: f.phone || null });
-      this.toastr.success(`Đã tạo tài khoản "${user.userName}".`);
+      this.toastr.success('USER_MGT.CREATED', { user: user.userName });
       this.form.set(null);
       await this.load(1);
     } catch (e) {

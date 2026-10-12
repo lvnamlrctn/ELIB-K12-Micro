@@ -1,6 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, OrgNode, STATUS_ACTIVE, errorMessage } from '../../core/api';
+import { Language } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ImportDialog } from '../../shared/import-dialog';
@@ -24,28 +26,28 @@ interface OrgForm {
 /** Phòng ban (cơ cấu tổ chức dạng cây) — giao diện như pages/admin/system/org của admin cũ. */
 @Component({
   selector: 'app-orgs',
-  imports: [FormsModule, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
+  imports: [FormsModule, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">Phòng ban</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'ORG.PAGE_TITLE' | translate }}</h4></div>
 
     <div class="panel">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
         <div class="xl:col-span-2">
-          <input type="text" class="input" [(ngModel)]="keyword" (keydown.enter)="load()" placeholder="Tìm theo tên phòng ban, nhấn Enter..." />
+          <input type="text" class="input" [(ngModel)]="keyword" (keydown.enter)="load()" [placeholder]="'ORG.SEARCH_ENTER' | translate" />
         </div>
         <div class="flex gap-2">
           <button (click)="setAll(true)" class="btn flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3">
-            <span class="material-icons text-[16px]">unfold_more</span>Mở rộng
+            <span class="material-icons text-[16px]">unfold_more</span>{{ 'ORG.EXPAND_ALL' | translate }}
           </button>
           <button (click)="setAll(false)" class="btn flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3">
-            <span class="material-icons text-[16px]">unfold_less</span>Thu gọn
+            <span class="material-icons text-[16px]">unfold_less</span>{{ 'ORG.COLLAPSE_ALL' | translate }}
           </button>
         </div>
         @if (can('add')) {
           <div class="flex gap-2">
-            <button (click)="openCreate(null)" class="btn-add flex-1 !py-2"><span class="material-icons text-[16px]">add</span>Thêm phòng ban gốc</button>
-            <button (click)="importing.set(true)" class="btn-secondary !py-2 !px-3 bg-white" title="Nhập danh sách phòng ban từ Excel">
-              <span class="material-icons text-[16px]">upload_file</span>Nhập Excel
+            <button (click)="openCreate(null)" class="btn-add flex-1 !py-2"><span class="material-icons text-[16px]">add</span>{{ 'ORG.ADD_ROOT' | translate }}</button>
+            <button (click)="importing.set(true)" class="btn-secondary !py-2 !px-3 bg-white" [title]="'ORG.IMPORT_TIP' | translate">
+              <span class="material-icons text-[16px]">upload_file</span>{{ 'COMMON.IMPORT_EXCEL' | translate }}
             </button>
           </div>
         }
@@ -58,12 +60,12 @@ interface OrgForm {
         <table class="w-full text-left border-collapse min-w-[760px]">
           <thead>
             <tr>
-              <th class="th">Tên phòng ban</th>
-              <th class="th w-24 !text-center">Cấp</th>
-              <th class="th w-24 !text-center">Thứ tự</th>
-              <th class="th w-36 !text-center">Trạng thái</th>
-              <th class="th w-24 !text-center">Đơn vị con</th>
-              <th class="th w-32 !text-center">Thao tác</th>
+              <th class="th">{{ 'ORG.NAME' | translate }}</th>
+              <th class="th w-24 !text-center">{{ 'ORG.LEVEL' | translate }}</th>
+              <th class="th w-24 !text-center">{{ 'ORG.ORDER' | translate }}</th>
+              <th class="th w-36 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
+              <th class="th w-24 !text-center">{{ 'ORG.SUB_UNITS' | translate }}</th>
+              <th class="th w-32 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -89,11 +91,11 @@ interface OrgForm {
                 <td class="py-2.5 px-4 text-center">
                   <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                         [class]="row.depth === 0 ? 'bg-blue-100 text-blue-700' : row.depth === 1 ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'">
-                    Cấp {{ n.level }}
+                    {{ 'ORG.LEVEL_N' | translate: { level: n.level } }}
                   </span>
                 </td>
                 <td class="py-2.5 px-4 text-center text-sm text-gray-600">{{ n.sortOrder }}</td>
-                <td class="py-2.5 px-4 text-center"><app-status-badge [status]="n.status" inactiveText="Ẩn" /></td>
+                <td class="py-2.5 px-4 text-center"><app-status-badge [status]="n.status" inactiveText="ORG.STATUS_HIDDEN" /></td>
                 <td class="py-2.5 px-4 text-center">
                   @if (n.childCount > 0) {
                     <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{{ n.childCount }}</span>
@@ -104,17 +106,17 @@ interface OrgForm {
                 <td class="py-2.5 px-4">
                   <div class="flex items-center justify-center gap-1">
                     @if (can('add')) {
-                      <button (click)="openCreate(n)" class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center" title="Thêm phòng ban con">
+                      <button (click)="openCreate(n)" class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center" [title]="'ORG.ADD_CHILD' | translate">
                         <span class="material-icons text-[15px] leading-none">add</span>
                       </button>
                     }
                     @if (can('edit')) {
-                      <button (click)="openEdit(n)" class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center" title="Sửa">
+                      <button (click)="openEdit(n)" class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center" [title]="'COMMON.EDIT' | translate">
                         <span class="material-icons text-[15px] leading-none">edit</span>
                       </button>
                     }
                     @if (can('delete')) {
-                      <button (click)="deleting.set(n)" class="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center" title="Xoá">
+                      <button (click)="deleting.set(n)" class="w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center" [title]="'COMMON.DELETE' | translate">
                         <span class="material-icons text-[15px] leading-none">delete</span>
                       </button>
                     }
@@ -125,7 +127,7 @@ interface OrgForm {
               <tr>
                 <td colspan="6" class="py-14 text-center text-gray-500 text-sm">
                   <span class="material-icons text-4xl text-gray-300 mb-2 block">corporate_fare</span>
-                  {{ loading() ? '' : 'Không có dữ liệu' }}
+                  {{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}
                 </td>
               </tr>
             }
@@ -135,55 +137,55 @@ interface OrgForm {
     </div>
 
     @if (form(); as f) {
-      <app-modal [title]="f.publicId ? 'Cập nhật phòng ban' : 'Thêm phòng ban'" widthClass="max-w-xl" (closed)="form.set(null)">
+      <app-modal [title]="f.publicId ? 'ORG.EDIT_TITLE' : 'ORG.ADD_TITLE'" widthClass="max-w-xl" (closed)="form.set(null)">
         <form id="org-form" (ngSubmit)="save()" class="space-y-4">
           <div>
-            <label class="form-label" for="parent">Phòng ban cha</label>
+            <label class="form-label" for="parent">{{ 'ORG.PARENT' | translate }}</label>
             <select id="parent" name="parent" size="6" class="input !p-2 h-32" [(ngModel)]="f.parentId">
-              <option [ngValue]="null">— Gốc (không có cha) —</option>
+              <option [ngValue]="null">{{ 'ORG.ROOT_NO_PARENT' | translate }}</option>
               @for (opt of parentOptions(); track opt.id) {
                 <option [ngValue]="opt.id" [disabled]="opt.blocked">{{ opt.label }}</option>
               }
             </select>
           </div>
           <div>
-            <label class="form-label" for="name">Tên phòng ban <span class="text-red-500">*</span></label>
+            <label class="form-label" for="name">{{ 'ORG.NAME' | translate }} <span class="text-red-500">*</span></label>
             <input id="name" name="name" class="input" [(ngModel)]="f.name" required />
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="form-label" for="order">Thứ tự</label>
+              <label class="form-label" for="order">{{ 'ORG.ORDER' | translate }}</label>
               <input id="order" name="order" type="number" class="input" [(ngModel)]="f.sortOrder" />
             </div>
             <div>
-              <label class="form-label" for="status">Trạng thái</label>
+              <label class="form-label" for="status">{{ 'COMMON.STATUS' | translate }}</label>
               <select id="status" name="status" class="input" [(ngModel)]="f.status">
-                <option [ngValue]="2">Hoạt động</option>
-                <option [ngValue]="1">Ẩn</option>
+                <option [ngValue]="2">{{ 'ORG.STATUS_ACTIVE' | translate }}</option>
+                <option [ngValue]="1">{{ 'ORG.STATUS_HIDDEN' | translate }}</option>
               </select>
             </div>
           </div>
           <div>
-            <label class="form-label" for="link">Liên kết</label>
-            <input id="link" name="link" class="input" [(ngModel)]="f.link" placeholder="Tuỳ chọn" />
+            <label class="form-label" for="link">{{ 'ORG.LINK' | translate }}</label>
+            <input id="link" name="link" class="input" [(ngModel)]="f.link" [placeholder]="'ORG.OPTIONAL' | translate" />
           </div>
         </form>
         <ng-container footer>
-          <button type="button" (click)="form.set(null)" class="btn-secondary">Huỷ</button>
+          <button type="button" (click)="form.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="submit" form="org-form" [disabled]="saving()" class="btn-primary">
-            <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> Lưu
+            <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> {{ 'COMMON.SAVE' | translate }}
           </button>
         </ng-container>
       </app-modal>
     }
 
     @if (importing()) {
-      <app-import-dialog title="Phòng ban" resource="orgs" (closed)="importing.set(false)" (imported)="load()" />
+      <app-import-dialog title="ORG.IMPORT_NAME" resource="orgs" (closed)="importing.set(false)" (imported)="load()" />
     }
 
     @if (deleting(); as d) {
-      <app-confirm-delete [busy]="saving()" [message]="'Xoá phòng ban “' + d.name + '”?'"
-                          [warning]="d.children.length ? 'Phòng ban này có ' + d.childCount + ' đơn vị con — toàn bộ nhánh sẽ bị xoá.' : null"
+      <app-confirm-delete [busy]="saving()" message="ORG.DELETE_CONFIRM" [messageParams]="{ name: d.name }"
+                          [warning]="d.children.length ? language.t('ORG.DELETE_BRANCH_WARNING', { count: d.childCount }) : null"
                           (confirmed)="doDelete(d)" (cancelled)="deleting.set(null)" />
     }
   `,
@@ -192,6 +194,7 @@ export class Orgs implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  protected readonly language = inject(Language);
   private readonly client = this.api.crud<OrgNode>('orgs');
 
   protected keyword = '';
@@ -270,7 +273,7 @@ export class Orgs implements OnInit {
     const f = this.form();
     if (!f) return;
     if (!f.name.trim()) {
-      this.toastr.warning('Vui lòng nhập tên phòng ban.');
+      this.toastr.warning('ORG.NAME_REQUIRED');
       return;
     }
     this.saving.set(true);
@@ -278,7 +281,7 @@ export class Orgs implements OnInit {
       const body = { name: f.name, parentId: f.parentId, sortOrder: f.sortOrder, status: f.status, link: f.link || null };
       if (f.publicId) await this.client.update(f.publicId, body);
       else await this.client.add(body);
-      this.toastr.success(f.publicId ? 'Cập nhật thành công' : 'Thêm mới thành công');
+      this.toastr.success(f.publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');
       this.form.set(null);
       await this.load();
     } catch (e) {
@@ -293,7 +296,7 @@ export class Orgs implements OnInit {
     try {
       if (n.children.length) await this.api.deleteOrgWithChildren(n.publicId);
       else await this.client.delete(n.publicId);
-      this.toastr.success('Xoá thành công');
+      this.toastr.success('COMMON.DELETE_SUCCESS');
       this.deleting.set(null);
       await this.load();
     } catch (e) {

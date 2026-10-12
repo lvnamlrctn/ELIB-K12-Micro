@@ -2,23 +2,23 @@ import { CrudConfig } from '../../shared/crud-page';
 import { named } from '../tenant/catalogs';
 
 /** Tham số bạn đọc của service patron — đường dẫn như admin cũ (/admin/reader-types, /admin/academic-classes, /admin/courses). */
-export const READER_TYPES = named('Loại bạn đọc', 'reader-types', 'READER_TYPES', 'Tên loại bạn đọc', 'VD: Học sinh, Giáo viên...', 'patron');
-export const CLASSES = named('Lớp', 'classes', 'CLASSES', 'Tên lớp', 'VD: 6A1', 'patron');
-export const COURSES = named('Khoá', 'courses', 'COURSES', 'Tên khoá', 'VD: 2025-2029', 'patron');
+export const READER_TYPES = named('READER_TYPE', 'reader-types', 'READER_TYPES', 'patron');
+export const CLASSES = named('ACADEMIC_CLASS', 'classes', 'CLASSES', 'patron');
+export const COURSES = named('COURSE', 'courses', 'COURSES', 'patron');
 
 export const READER_GROUPS: CrudConfig = {
-  title: 'Nhóm bạn đọc',
+  title: 'READER_GROUP_CAT.TITLE',
   resource: 'reader-groups',
   service: 'patron',
   perm: 'GROUPREADER',
-  searchLabel: 'Tên / mã nhóm',
-  searchPlaceholder: 'Nhập tên hoặc mã nhóm...',
+  searchLabel: 'READER_GROUP_CAT.SEARCH_LABEL',
+  searchPlaceholder: 'READER_GROUP_CAT.SEARCH_PH',
   columns: [
-    { key: 'code', label: 'Mã nhóm', type: 'mono', width: '160px' },
-    { key: 'name', label: 'Tên nhóm' },
+    { key: 'code', label: 'READER_GROUP_CAT.CODE', type: 'mono', width: '160px' },
+    { key: 'name', label: 'READER_GROUP_CAT.NAME' },
   ],
   fields: [
-    { key: 'name', label: 'Tên nhóm', type: 'text', required: true, placeholder: 'VD: CLB Đọc sách' },
-    { key: 'code', label: 'Mã nhóm', type: 'text', placeholder: 'Tuỳ chọn, không trùng', hint: 'Chữ in hoa, tối đa 50 ký tự.' },
+    { key: 'name', label: 'READER_GROUP_CAT.NAME', type: 'text', required: true, placeholder: 'READER_GROUP_CAT.NAME_EG' },
+    { key: 'code', label: 'READER_GROUP_CAT.CODE', type: 'text', placeholder: 'READER_GROUP_CAT.CODE_PH', hint: 'READER_GROUP_CAT.CODE_HINT' },
   ],
 };

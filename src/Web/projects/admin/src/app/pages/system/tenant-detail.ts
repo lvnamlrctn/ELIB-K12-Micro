@@ -1,22 +1,20 @@
 import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Api, ModuleDef, Tenant, errorMessage } from '../../core/api';
+import { LDatePipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ModulePicker } from './module-picker';
 import { TenantStatusBadge } from './tenant-status';
 
-const STEP_LABELS: Record<string, [string, string]> = {
-  Pending: ['Đang chờ', 'badge-warn'],
-  Succeeded: ['Hoàn tất', 'badge-on'],
-  Failed: ['Lỗi', 'badge-danger'],
-};
+/** Nhãn bước khởi tạo: khoá dịch TENANT_ADMIN.STEP_<trạng thái>. */
+const STEP_CSS: Record<string, string> = { Pending: 'badge-warn', Succeeded: 'badge-on', Failed: 'badge-danger' };
 
 @Component({
   selector: 'app-tenant-detail',
-  imports: [FormsModule, RouterLink, DatePipe, ModulePicker, TenantStatusBadge, Modal],
+  imports: [FormsModule, RouterLink, LDatePipe, ModulePicker, TenantStatusBadge, Modal, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/tenant" class="icon-btn bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"><span class="material-icons text-[18px]">arrow_back</span></a>
@@ -26,19 +24,19 @@ const STEP_LABELS: Record<string, [string, string]> = {
         <span class="flex-1"></span>
         @if (t.status === 'Active') {
           <button class="btn-secondary !py-2 bg-white" (click)="viewReason.set('')" [disabled]="busy()"
-                  title="Mở app quản trị của đơn vị với quyền chỉ đọc (30 phút, ghi nhật ký)">
-            <span class="material-icons text-[18px]">visibility</span>Vào xem đơn vị
+                  [title]="'TENANT_ADMIN.VIEW_TENANT_TIP' | translate">
+            <span class="material-icons text-[18px]">visibility</span>{{ 'TENANT_ADMIN.VIEW_TENANT' | translate }}
           </button>
-          <button class="btn-outline-danger !py-2" (click)="suspendReason.set('')" [disabled]="busy()"><span class="material-icons text-[18px]">block</span>Tạm ngưng</button>
+          <button class="btn-outline-danger !py-2" (click)="suspendReason.set('')" [disabled]="busy()"><span class="material-icons text-[18px]">block</span>{{ 'TENANT_ADMIN.SUSPEND' | translate }}</button>
         }
         @if (t.status === 'Suspended') {
-          <button class="btn-primary" (click)="run(api.activateTenant(t.publicId), 'Đã kích hoạt lại đơn vị.')" [disabled]="busy()"><span class="material-icons text-[18px]">play_circle</span>Kích hoạt lại</button>
+          <button class="btn-primary" (click)="run(api.activateTenant(t.publicId), 'TENANT_ADMIN.REACTIVATED')" [disabled]="busy()"><span class="material-icons text-[18px]">play_circle</span>{{ 'TENANT_ADMIN.REACTIVATE' | translate }}</button>
         }
         @if (t.status === 'ProvisioningFailed') {
-          <button class="btn-primary" (click)="run(api.retryProvisioning(t.publicId), 'Đang khởi tạo lại.')" [disabled]="busy()"><span class="material-icons text-[18px]">replay</span>Khởi tạo lại</button>
+          <button class="btn-primary" (click)="run(api.retryProvisioning(t.publicId), 'TENANT_ADMIN.RETRYING')" [disabled]="busy()"><span class="material-icons text-[18px]">replay</span>{{ 'TENANT_ADMIN.RETRY' | translate }}</button>
         }
       } @else {
-        <h4 class="page-title">Đơn vị</h4>
+        <h4 class="page-title">{{ 'TENANT_ADMIN.TITLE' | translate }}</h4>
       }
     </div>
 
@@ -46,23 +44,23 @@ const STEP_LABELS: Record<string, [string, string]> = {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div class="xl:col-span-2 space-y-5">
           <section class="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">Thông tin đơn vị</div>
+            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">{{ 'TENANT_ADMIN.INFO' | translate }}</div>
             <dl class="p-6 grid grid-cols-1 sm:grid-cols-3 gap-y-3 text-sm">
-              <dt class="text-gray-500">Mã đơn vị</dt><dd class="sm:col-span-2 font-mono font-medium">{{ t.code }}</dd>
-              <dt class="text-gray-500">Địa chỉ quản trị</dt>
+              <dt class="text-gray-500">{{ 'TENANT_ADMIN.CODE' | translate }}</dt><dd class="sm:col-span-2 font-mono font-medium">{{ t.code }}</dd>
+              <dt class="text-gray-500">{{ 'TENANT_ADMIN.ADMIN_URL' | translate }}</dt>
               <dd class="sm:col-span-2"><a [href]="adminUrl(t)" target="_blank" rel="noopener" class="text-blue-600 hover:underline break-all">{{ adminUrl(t) }}</a></dd>
-              <dt class="text-gray-500">Múi giờ</dt><dd class="sm:col-span-2">{{ t.timeZone }}</dd>
-              <dt class="text-gray-500">Phiên bản dữ liệu</dt><dd class="sm:col-span-2">{{ t.version }}</dd>
+              <dt class="text-gray-500">{{ 'TENANT_ADMIN.TIME_ZONE' | translate }}</dt><dd class="sm:col-span-2">{{ t.timeZone }}</dd>
+              <dt class="text-gray-500">{{ 'TENANT_ADMIN.DATA_VERSION' | translate }}</dt><dd class="sm:col-span-2">{{ t.version }}</dd>
             </dl>
           </section>
 
           <section class="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">Nhận diện</div>
+            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">{{ 'TENANT_ADMIN.BRANDING' | translate }}</div>
             <div class="p-6 flex flex-col sm:flex-row gap-6">
               <div class="shrink-0">
                 <div class="w-28 h-28 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
                   @if (logoUrl(); as url) {
-                    <img [src]="url" alt="Logo đơn vị" class="max-w-full max-h-full object-contain" />
+                    <img [src]="url" [alt]="'TENANT_ADMIN.LOGO_ALT' | translate" class="max-w-full max-h-full object-contain" />
                   } @else {
                     <span class="material-icons text-gray-300 text-[40px]">image</span>
                   }
@@ -70,10 +68,10 @@ const STEP_LABELS: Record<string, [string, string]> = {
                 <input #logoInput type="file" accept="image/png,image/jpeg,image/webp" class="hidden" (change)="uploadLogo(t, logoInput)" />
                 <div class="flex gap-1 mt-2">
                   <button type="button" class="btn-secondary bg-white !py-1 !px-2 text-xs" (click)="logoInput.click()" [disabled]="busy()">
-                    <span class="material-icons text-[16px]">upload</span>Chọn ảnh
+                    <span class="material-icons text-[16px]">upload</span>{{ 'TENANT_ADMIN.CHOOSE_IMAGE' | translate }}
                   </button>
                   @if (logoUrl()) {
-                    <button type="button" class="icon-btn text-red-600 hover:bg-red-50" title="Bỏ logo" (click)="logoUrl.set(null)" [disabled]="busy()">
+                    <button type="button" class="icon-btn text-red-600 hover:bg-red-50" [title]="'TENANT_ADMIN.REMOVE_LOGO' | translate" (click)="logoUrl.set(null)" [disabled]="busy()">
                       <span class="material-icons text-[18px]">delete</span>
                     </button>
                   }
@@ -81,108 +79,105 @@ const STEP_LABELS: Record<string, [string, string]> = {
               </div>
               <div class="flex-1 space-y-3">
                 <div>
-                  <label class="form-label" for="logo-text">Tên ngắn</label>
+                  <label class="form-label" for="logo-text">{{ 'TENANT_ADMIN.SHORT_NAME' | translate }}</label>
                   <input id="logo-text" class="input" maxlength="50" [(ngModel)]="logoText" [placeholder]="t.name" />
-                  <p class="text-xs text-gray-500 mt-1">Hiện cạnh logo và khi cài OPAC như ứng dụng trên điện thoại. Bỏ trống = tên đơn vị.</p>
+                  <p class="text-xs text-gray-500 mt-1">{{ 'TENANT_ADMIN.SHORT_NAME_HINT' | translate }}</p>
                 </div>
-                <p class="text-xs text-gray-500">Logo: PNG, JPG hoặc WEBP, tối đa 2 MB, nên là ảnh vuông nền trong suốt.</p>
+                <p class="text-xs text-gray-500">{{ 'TENANT_ADMIN.LOGO_HINT' | translate }}</p>
               </div>
             </div>
             <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
-              <button class="btn-primary" (click)="saveBranding(t)" [disabled]="busy()"><span class="material-icons text-[18px]">save</span>Lưu nhận diện</button>
+              <button class="btn-primary" (click)="saveBranding(t)" [disabled]="busy()"><span class="material-icons text-[18px]">save</span>{{ 'TENANT_ADMIN.SAVE_BRANDING' | translate }}</button>
             </div>
           </section>
 
           <section class="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">Phân hệ đã bán</div>
+            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">{{ 'TENANT_ADMIN.MODULES' | translate }}</div>
             <div class="p-6">
               <app-module-picker [modules]="modules()" [(selected)]="selected" />
             </div>
             <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
-              <button class="btn-primary" (click)="saveLicenses(t)" [disabled]="busy()"><span class="material-icons text-[18px]">save</span>Lưu phân hệ</button>
+              <button class="btn-primary" (click)="saveLicenses(t)" [disabled]="busy()"><span class="material-icons text-[18px]">save</span>{{ 'TENANT_ADMIN.SAVE_MODULES' | translate }}</button>
             </div>
           </section>
         </div>
 
         <div class="space-y-5">
           <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">Khởi tạo đơn vị</div>
+            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">{{ 'TENANT_ADMIN.PROVISIONING' | translate }}</div>
             <table class="w-full text-left border-collapse">
               <tbody>
                 @for (s of t.provisioningSteps; track s.service) {
                   <tr>
                     <td class="td font-mono text-[13px]">{{ s.service }}</td>
-                    <td class="td"><span [class]="stepLabel(s.status)[1]">{{ stepLabel(s.status)[0] }}</span></td>
-                    <td class="td text-xs text-gray-500">{{ s.updatedAt | date: 'dd/MM HH:mm:ss' }}</td>
+                    <td class="td"><span [class]="stepCss(s.status)">{{ 'TENANT_ADMIN.STEP_' + s.status | translate }}</span></td>
+                    <td class="td text-xs text-gray-500">{{ s.updatedAt | ldate: 'dd/MM HH:mm:ss' }}</td>
                   </tr>
                   @if (s.error) { <tr><td colspan="3" class="px-4 pb-3 text-xs text-red-600">{{ s.error }}</td></tr> }
                 } @empty {
-                  <tr><td class="py-6 text-center text-sm text-gray-500">Không có bước nào.</td></tr>
+                  <tr><td class="py-6 text-center text-sm text-gray-500">{{ 'TENANT_ADMIN.NO_STEPS' | translate }}</td></tr>
                 }
               </tbody>
             </table>
             @if (t.provisioningError) { <div class="m-4 alert-error">{{ t.provisioningError }}</div> }
             <div class="bg-gray-50 px-6 py-3 border-t border-gray-100 flex flex-wrap gap-2 justify-end">
               <button class="btn-secondary bg-white !py-1.5" (click)="resync(t)" [disabled]="busy()"
-                      title="Gửi lại thông tin đơn vị và phân hệ cho mọi service — dùng khi nền tảng có service mới hoặc dữ liệu bị lệch">
-                <span class="material-icons text-[18px]">sync</span>Đồng bộ lại sang các service
+                      [title]="'TENANT_ADMIN.RESYNC_TIP' | translate">
+                <span class="material-icons text-[18px]">sync</span>{{ 'TENANT_ADMIN.RESYNC' | translate }}
               </button>
-              <button class="btn-secondary bg-white !py-1.5" (click)="seedDefaults(t)" [disabled]="busy()" title="Chép bổ sung danh mục và tham số mặc định còn thiếu">
-                <span class="material-icons text-[18px]">playlist_add</span>Bổ sung danh mục mặc định
+              <button class="btn-secondary bg-white !py-1.5" (click)="seedDefaults(t)" [disabled]="busy()" [title]="'TENANT_ADMIN.SEED_TIP' | translate">
+                <span class="material-icons text-[18px]">playlist_add</span>{{ 'TENANT_ADMIN.SEED' | translate }}
               </button>
             </div>
           </section>
 
           <section class="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">Quản trị viên đầu tiên</div>
+            <div class="px-6 py-4 border-b border-gray-100 font-bold text-gray-800">{{ 'TENANT_ADMIN.FIRST_ADMIN' | translate }}</div>
             @if (t.status !== 'Active') {
-              <p class="p-6 text-sm text-gray-500">Đơn vị phải ở trạng thái Hoạt động mới tạo được quản trị viên.</p>
+              <p class="p-6 text-sm text-gray-500">{{ 'TENANT_ADMIN.FIRST_ADMIN_INACTIVE' | translate }}</p>
             } @else {
               <form (ngSubmit)="createAdmin(t)" class="p-6 space-y-4">
-                <div><label class="form-label" for="u">Tên đăng nhập <span class="text-red-500">*</span></label><input id="u" name="u" class="input" [(ngModel)]="admin.userName" required autocomplete="off" /></div>
-                <div><label class="form-label" for="n">Họ tên <span class="text-red-500">*</span></label><input id="n" name="n" class="input" [(ngModel)]="admin.fullName" required /></div>
+                <div><label class="form-label" for="u">{{ 'TENANT_ADMIN.USER_NAME' | translate }} <span class="text-red-500">*</span></label><input id="u" name="u" class="input" [(ngModel)]="admin.userName" required autocomplete="off" /></div>
+                <div><label class="form-label" for="n">{{ 'TENANT_ADMIN.FULL_NAME' | translate }} <span class="text-red-500">*</span></label><input id="n" name="n" class="input" [(ngModel)]="admin.fullName" required /></div>
                 <div><label class="form-label" for="e">Email</label><input id="e" name="e" type="email" class="input" [(ngModel)]="admin.email" /></div>
                 <div>
-                  <label class="form-label" for="p">Mật khẩu tạm <span class="text-red-500">*</span></label>
+                  <label class="form-label" for="p">{{ 'TENANT_ADMIN.TEMP_PASSWORD' | translate }} <span class="text-red-500">*</span></label>
                   <input id="p" name="p" type="password" autocomplete="new-password" class="input" [(ngModel)]="admin.password" required />
-                  <p class="text-xs text-gray-500 mt-1">Người dùng phải đổi ở lần đăng nhập đầu.</p>
+                  <p class="text-xs text-gray-500 mt-1">{{ 'TENANT_ADMIN.TEMP_PASSWORD_HINT' | translate }}</p>
                 </div>
-                <button type="submit" class="btn-primary w-full" [disabled]="busy()"><span class="material-icons text-[18px]">person_add</span>Tạo quản trị viên</button>
+                <button type="submit" class="btn-primary w-full" [disabled]="busy()"><span class="material-icons text-[18px]">person_add</span>{{ 'TENANT_ADMIN.CREATE_ADMIN' | translate }}</button>
               </form>
             }
           </section>
         </div>
       </div>
     } @else {
-      <p class="text-gray-500">Đang tải…</p>
+      <p class="text-gray-500">{{ 'COMMON.LOADING' | translate }}</p>
     }
 
     @if (viewReason() !== null) {
-      <app-modal title="Vào xem đơn vị (chỉ đọc)" (closed)="viewReason.set(null)">
-        <p class="text-sm text-gray-600 mb-3">
-          Mở app quản trị của đơn vị trong tab mới với quyền <b>chỉ xem</b> (không thêm/sửa/xoá được), tối đa 30 phút.
-          Lần xem và lý do được ghi vào nhật ký của đơn vị.
-        </p>
-        <label class="form-label" for="view-reason">Lý do <span class="text-red-500">*</span></label>
+      <app-modal title="TENANT_ADMIN.VIEW_TITLE" (closed)="viewReason.set(null)">
+        <p class="text-sm text-gray-600 mb-3" [innerHTML]="'TENANT_ADMIN.VIEW_TEXT' | translate"></p>
+        <label class="form-label" for="view-reason">{{ 'TENANT_ADMIN.REASON' | translate }} <span class="text-red-500">*</span></label>
         <textarea id="view-reason" rows="3" class="input" [ngModel]="viewReason()" (ngModelChange)="viewReason.set($event)"
-                  placeholder="VD: hỗ trợ trường kiểm tra cấu hình email theo yêu cầu ngày 09/10"></textarea>
+                  [placeholder]="'TENANT_ADMIN.VIEW_REASON_PH' | translate"></textarea>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="viewReason.set(null)">Huỷ</button>
+          <button type="button" class="btn-secondary" (click)="viewReason.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="button" class="btn-primary" [disabled]="busy() || (viewReason() ?? '').trim().length < 5" (click)="impersonate()">
-            <span class="material-icons text-[18px]">open_in_new</span>Mở app của đơn vị
+            <span class="material-icons text-[18px]">open_in_new</span>{{ 'TENANT_ADMIN.OPEN_TENANT_APP' | translate }}
           </button>
         </ng-container>
       </app-modal>
     }
 
     @if (suspendReason() !== null) {
-      <app-modal title="Tạm ngưng đơn vị" (closed)="suspendReason.set(null)">
-        <label class="form-label" for="reason">Lý do tạm ngưng</label>
-        <textarea id="reason" rows="3" class="input" [ngModel]="suspendReason()" (ngModelChange)="suspendReason.set($event)" placeholder="VD: hết hạn hợp đồng"></textarea>
-        <p class="text-xs text-gray-500 mt-2">Người dùng của đơn vị sẽ không đăng nhập được cho tới khi kích hoạt lại.</p>
+      <app-modal title="TENANT_ADMIN.SUSPEND_TITLE" (closed)="suspendReason.set(null)">
+        <label class="form-label" for="reason">{{ 'TENANT_ADMIN.SUSPEND_REASON' | translate }}</label>
+        <textarea id="reason" rows="3" class="input" [ngModel]="suspendReason()" (ngModelChange)="suspendReason.set($event)" [placeholder]="'TENANT_ADMIN.SUSPEND_REASON_PH' | translate"></textarea>
+        <p class="text-xs text-gray-500 mt-2">{{ 'TENANT_ADMIN.SUSPEND_HINT' | translate }}</p>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="suspendReason.set(null)">Huỷ</button>
-          <button type="button" class="btn-danger" [disabled]="busy()" (click)="suspend()"><span class="material-icons text-[18px]">block</span>Tạm ngưng</button>
+          <button type="button" class="btn-secondary" (click)="suspendReason.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-danger" [disabled]="busy()" (click)="suspend()"><span class="material-icons text-[18px]">block</span>{{ 'TENANT_ADMIN.SUSPEND' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -228,8 +223,8 @@ export class TenantDetail implements OnInit, OnDestroy {
     clearInterval(this.timer);
   }
 
-  protected stepLabel(status: string): [string, string] {
-    return STEP_LABELS[status] ?? [status, 'badge-off'];
+  protected stepCss(status: string): string {
+    return STEP_CSS[status] ?? 'badge-off';
   }
 
   protected adminUrl(t: Tenant): string {
@@ -254,7 +249,7 @@ export class TenantDetail implements OnInit, OnDestroy {
   protected async suspend(): Promise<void> {
     const t = this.tenant();
     if (!t) return;
-    await this.run(this.api.suspendTenant(t.publicId, this.suspendReason() ?? ''), 'Đã tạm ngưng đơn vị.');
+    await this.run(this.api.suspendTenant(t.publicId, this.suspendReason() ?? ''), 'TENANT_ADMIN.SUSPENDED');
     this.suspendReason.set(null);
   }
 
@@ -265,7 +260,7 @@ export class TenantDetail implements OnInit, OnDestroy {
       const l = current.get(code);
       return l ? { moduleCode: code, status: l.status, validFrom: l.validFrom, validTo: l.validTo } : { moduleCode: code };
     });
-    return this.run(this.api.setLicenses(t.publicId, licenses), 'Đã lưu phân hệ.');
+    return this.run(this.api.setLicenses(t.publicId, licenses), 'TENANT_ADMIN.MODULES_SAVED');
   }
 
   protected async uploadLogo(t: Tenant, input: HTMLInputElement): Promise<void> {
@@ -273,14 +268,14 @@ export class TenantDetail implements OnInit, OnDestroy {
     input.value = ''; // chọn lại cùng file vẫn kích hoạt change
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      this.toastr.error('Logo tối đa 2 MB.');
+      this.toastr.error('TENANT_ADMIN.LOGO_TOO_BIG');
       return;
     }
     this.busy.set(true);
     try {
       const uploaded = await this.api.uploadForTenant(t.id, 'tenant-logo', file);
       this.logoUrl.set(uploaded.url);
-      this.toastr.success('Đã tải ảnh lên — bấm "Lưu nhận diện" để áp dụng.');
+      this.toastr.success('TENANT_ADMIN.LOGO_UPLOADED');
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
@@ -289,18 +284,19 @@ export class TenantDetail implements OnInit, OnDestroy {
   }
 
   protected saveBranding(t: Tenant): Promise<void> {
-    return this.run(this.api.setTenantBranding(t.publicId, { logoText: this.logoText.trim() || null, logoUrl: this.logoUrl() }), 'Đã lưu nhận diện đơn vị.');
+    return this.run(this.api.setTenantBranding(t.publicId, { logoText: this.logoText.trim() || null, logoUrl: this.logoUrl() }), 'TENANT_ADMIN.BRANDING_SAVED');
   }
 
   protected resync(t: Tenant): Promise<void> {
-    return this.run(this.api.resyncTenant(t.publicId), 'Đã gửi lại thông tin đơn vị cho các service.');
+    return this.run(this.api.resyncTenant(t.publicId), 'TENANT_ADMIN.RESYNCED');
   }
 
   protected async seedDefaults(t: Tenant): Promise<void> {
     this.busy.set(true);
     try {
       const { added } = await this.api.seedTenantDefaults(t.publicId);
-      this.toastr.success(added ? `Đã bổ sung ${added} mục mặc định.` : 'Danh mục mặc định đã đủ.');
+      if (added) this.toastr.success('TENANT_ADMIN.SEEDED', { count: added });
+      else this.toastr.success('TENANT_ADMIN.SEED_NOTHING');
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
@@ -313,7 +309,7 @@ export class TenantDetail implements OnInit, OnDestroy {
     try {
       const user = await this.api.createTenantAdmin(t.id, { ...this.admin, email: this.admin.email || null });
       this.admin = { userName: '', fullName: '', email: '', password: '' };
-      this.toastr.success(`Đã tạo quản trị viên "${user.userName}". Đăng nhập tại ${this.adminUrl(t)}`);
+      this.toastr.success('TENANT_ADMIN.ADMIN_CREATED', { user: user.userName, url: this.adminUrl(t) });
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
