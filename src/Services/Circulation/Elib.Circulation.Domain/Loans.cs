@@ -51,9 +51,17 @@ public sealed class Loan : TenantEntity
         {
             ReaderPublicId = reader.ReaderPublicId, CardNo = reader.CardNo,
             ItemPublicId = item.ItemPublicId, Barcode = item.Barcode, Mfn = item.Mfn, StoreId = item.StoreId,
-            CircPlaceId = circPlaceId, LoanedAt = now, DueAt = now.AddDays(loanDays), LoanedBy = staffId,
+            CircPlaceId = circPlaceId, LoanedAt = now, DueAt = loanDays > 0 ? now.AddDays(loanDays) : EndOfLocalDay(now), LoanedBy = staffId,
         };
     }
+
+    /// <summary>
+    /// Mượn đọc tại chỗ: hạn trả là 23:59:59 ngày mượn (giờ Việt Nam) — trong ngày chưa tính quá hạn, sang ngày sau thì quá hạn 1 ngày.
+    /// </summary>
+    public static Loan OpenReadingRoom(PatronReplica reader, ItemReplica item, long circPlaceId, DateTimeOffset now, long? staffId) =>
+        Open(reader, item, circPlaceId, now, 0, staffId);
+
+    public static DateTimeOffset EndOfLocalDay(DateTimeOffset at) => VietnamStart(LocalDate(at).AddDays(1)).AddSeconds(-1);
 
     public void Return(DateTimeOffset now, long? circPlaceId, long? staffId)
     {

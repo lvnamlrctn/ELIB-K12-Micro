@@ -2,32 +2,6 @@ import { CrudConfig } from '../../shared/crud-page';
 
 type Named = { publicId: string; id: number; name: string; code?: string };
 
-/** Điểm lưu thông (monolith: /admin/circ-places, quyền CIRC_PLACES) — quầy mượn trả và các kho được mượn tại quầy. */
-export const CIRC_PLACES: CrudConfig = {
-  title: 'CIRC_CAT.PLACE_TITLE',
-  resource: 'circ-places',
-  service: 'circulation',
-  perm: 'CIRC_PLACES',
-  searchLabel: 'CIRC_CAT.PLACE_SEARCH_LABEL',
-  searchPlaceholder: 'CIRC_CAT.PLACE_SEARCH_PH',
-  columns: [
-    { key: 'code', label: 'COMMON.CODE', type: 'mono', width: '120px' },
-    { key: 'name', label: 'CIRC_CAT.PLACE_NAME' },
-    { key: 'storeIds', label: 'CIRC_CAT.PLACE_STORES', type: 'lookup' },
-  ],
-  fields: [
-    { key: 'code', label: 'COMMON.CODE', type: 'text', required: true, placeholder: 'CIRC_CAT.PLACE_CODE_EG', half: true },
-    { key: 'name', label: 'CIRC_CAT.PLACE_NAME', type: 'text', required: true, placeholder: 'CIRC_CAT.PLACE_NAME_EG', half: true },
-    {
-      key: 'storeIds', label: 'CIRC_CAT.PLACE_STORES_FULL', type: 'multiselect', emptyLabel: 'CIRC_CAT.ALL_STORES',
-      hint: 'CIRC_CAT.PLACE_STORES_HINT',
-      optionsFrom: async (api) => (await api.crud<Named>('stores', 'holdings').searchAll()).map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` })),
-    },
-  ],
-  defaults: { storeIds: [] },
-  modalWidth: 'max-w-lg',
-};
-
 /** Chính sách lưu thông (monolith: /admin/circ-policies, quyền CIRC_POLICIES) theo loại bạn đọc × điểm lưu thông. */
 export const LOAN_POLICIES: CrudConfig = {
   title: 'CIRC_CAT.POLICY_TITLE',

@@ -3,34 +3,102 @@ using Elib.BuildingBlocks.Domain;
 namespace Elib.Circulation.Domain;
 
 /// <summary>
-/// Điểm lưu thông (monolith: CircPlace + CircPlaceStore, quyền CIRC_PLACES) — quầy mượn trả. <see cref="StoreIds"/>: kho (holdings)
-/// được mượn tại điểm này; rỗng = mọi kho.
+/// Điểm lưu thông (ELIB-LRC: CircPlace + CircPlaceStore + CircPlaceReaderType, quyền CIRC_PLACES) — quầy mượn trả.
+/// <see cref="StoreIds"/>: kho (holdings) được mượn tại điểm này; <see cref="ReaderTypeIds"/>: loại bạn đọc được phục vụ (patron);
+/// rỗng = mọi kho / mọi loại. Id kho và loại bạn đọc là id trong đơn vị — bảng có RLS theo đơn vị như mọi bảng của service.
 /// </summary>
 public sealed class CircPlace : TenantEntity
 {
+    /// <summary>Mượn về (mặc định).</summary>
+    public const int KindBorrow = 1;
+
+    /// <summary>Đọc tại chỗ (LRC: Cir_Type "Đọc") — hạn trả là cuối ngày mượn, không gia hạn.</summary>
+    public const int KindReadingRoom = 2;
+
+    public const int MaxCodeLength = 20;
+    public const int MaxNameLength = 250;
+    public const int MaxNoteLength = 500;
+
     private CircPlace() { }
 
     public string Code { get; private set; } = "";
     public string Name { get; private set; } = "";
     public List<long> StoreIds { get; private set; } = [];
+    public List<long> ReaderTypeIds { get; private set; } = [];
 
-    public static CircPlace Create(string code, string name, IEnumerable<long>? storeIds)
+    /// <summary><see cref="KindBorrow"/> hoặc <see cref="KindReadingRoom"/> (LRC: Cir_Type).</summary>
+    public int Kind { get; private set; } = KindBorrow;
+
+    /// <summary>Số tài liệu một bạn đọc được mượn cùng lúc tại điểm này (LRC: Limit_Book — chỉ lưu, ở đây áp thật); null = không giới hạn riêng.</summary>
+    public int? MaxLoans { get; private set; }
+
+    /// <summary>Giờ làm việc theo thứ (LRC: Work_Session dạng "T2_6:00-23:59;…") — hiển thị cho cán bộ, không chặn mượn ngoài giờ.</summary>
+    public List<WorkSession> WorkSessions { get; private set; } = [];
+
+    public string? Note { get; private set; }
+
+    public static CircPlace Create(string code, string name, IEnumerable<long>? storeIds) =>
+        Create(code, name, storeIds, null, KindBorrow, null, null, null);
+
+    public static CircPlace Create(string code, string name, IEnumerable<long>? storeIds, IEnumerable<long>? readerTypeIds, int kind, int? maxLoans,
+        IEnumerable<WorkSession>? workSessions, string? note)
     {
         var place = new CircPlace();
-        place.Update(code, name, storeIds);
+        place.Update(code, name, storeIds, readerTypeIds, kind, maxLoans, workSessions, note);
         return place;
     }
 
-    public void Update(string code, string name, IEnumerable<long>? storeIds)
+    public void Update(string code, string name, IEnumerable<long>? storeIds, IEnumerable<long>? readerTypeIds, int kind, int? maxLoans,
+        IEnumerable<WorkSession>? workSessions, string? note)
     {
         var c = (code ?? "").Trim().ToUpperInvariant();
-        Code = c.Length is > 0 and <= 20 ? c : throw new BusinessRuleException("CODE_INVALID", "Mã điểm lưu thông bắt buộc, tối đa 20 ký tự.");
+        Code = c.Length is > 0 and <= MaxCodeLength ? c : throw new BusinessRuleException("CODE_INVALID", $"Mã điểm lưu thông bắt buộc, tối đa {MaxCodeLength} ký tự.");
         var n = (name ?? "").Trim();
-        Name = n.Length is > 0 and <= 250 ? n : throw new BusinessRuleException("NAME_INVALID", "Tên điểm lưu thông bắt buộc, tối đa 250 ký tự.");
-        StoreIds = [.. (storeIds ?? []).Where(id => id > 0).Distinct().Order()];
+        Name = n.Length is > 0 and <= MaxNameLength ? n : throw new BusinessRuleException("NAME_INVALID", $"Tên điểm lưu thông bắt buộc, tối đa {MaxNameLength} ký tự.");
+        StoreIds = Ids(storeIds);
+        ReaderTypeIds = Ids(readerTypeIds);
+        Kind = kind is KindBorrow or KindReadingRoom ? kind : throw new BusinessRuleException("CIRC_PLACE_KIND_INVALID", "Loại điểm lưu thông là Mượn về hoặc Đọc tại chỗ.");
+        MaxLoans = maxLoans is null or (>= 0 and <= 1000) ? maxLoans : throw new BusinessRuleException("MAX_LOANS_INVALID", "Giới hạn tài liệu tại điểm từ 0 đến 1000.");
+        WorkSessions = WorkSession.Normalize(workSessions);
+        var t = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        Note = t is null || t.Length <= MaxNoteLength ? t : throw new BusinessRuleException("NOTE_TOO_LONG", $"Ghi chú tối đa {MaxNoteLength} ký tự.");
     }
 
+    public bool IsReadingRoom => Kind == KindReadingRoom;
+
     public bool Allows(long? storeId) => StoreIds.Count == 0 || (storeId is { } id && StoreIds.Contains(id));
+
+    /// <summary>Loại bạn đọc được phục vụ tại điểm (rỗng = mọi loại; bạn đọc chưa có loại chỉ được phục vụ khi điểm không giới hạn).</summary>
+    public bool Serves(long? readerTypeId) => ReaderTypeIds.Count == 0 || (readerTypeId is { } id && ReaderTypeIds.Contains(id));
+
+    private static List<long> Ids(IEnumerable<long>? ids) => [.. (ids ?? []).Where(id => id > 0).Distinct().Order()];
+}
+
+/// <summary>Một khung giờ làm việc của điểm lưu thông. <see cref="Day"/>: 1 = thứ Hai … 7 = Chủ nhật; giờ "HH:mm".</summary>
+public sealed class WorkSession
+{
+    public int Day { get; set; }
+    public string From { get; set; } = "";
+    public string To { get; set; } = "";
+
+    public static List<WorkSession> Normalize(IEnumerable<WorkSession>? sessions)
+    {
+        var list = new List<WorkSession>();
+        foreach (var s in sessions ?? [])
+        {
+            ArgumentNullException.ThrowIfNull(s);
+            if (s.Day is < 1 or > 7) throw new BusinessRuleException("WORK_SESSION_INVALID", "Thứ trong giờ làm việc từ thứ Hai đến Chủ nhật.");
+            if (!TimeOnly.TryParseExact(s.From?.Trim(), "H:mm", out var from) || !TimeOnly.TryParseExact(s.To?.Trim(), "H:mm", out var to) || to <= from)
+                throw new BusinessRuleException("WORK_SESSION_INVALID", "Giờ làm việc dạng HH:mm, giờ kết thúc sau giờ bắt đầu.");
+            list.Add(new WorkSession { Day = s.Day, From = from.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), To = to.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) });
+        }
+        if (list.Count > 21) throw new BusinessRuleException("WORK_SESSION_INVALID", "Tối đa 3 khung giờ mỗi ngày.");
+        var sorted = list.OrderBy(s => s.Day).ThenBy(s => s.From, StringComparer.Ordinal).ToList();
+        for (var i = 1; i < sorted.Count; i++)
+            if (sorted[i].Day == sorted[i - 1].Day && string.CompareOrdinal(sorted[i].From, sorted[i - 1].To) < 0)
+                throw new BusinessRuleException("WORK_SESSION_OVERLAP", "Các khung giờ làm việc trong cùng một ngày không được chồng nhau.");
+        return sorted;
+    }
 }
 
 /// <summary>
@@ -104,6 +172,20 @@ public sealed class LoanPolicy : TenantEntity
         RenewFromToday = renewFromToday;
         MaxHolds = maxHolds is null or >= 0 ? maxHolds : throw new BusinessRuleException("MAX_HOLDS_INVALID", "Số đặt mượn không được âm.");
         HoldDays = holdDays is >= 1 and <= 30 ? holdDays : throw new BusinessRuleException("HOLD_DAYS_INVALID", "Số ngày giữ sách từ 1 đến 30.");
+    }
+
+    /// <summary>
+    /// Chính sách riêng cho (loại bạn đọc, điểm lưu thông) chép từ chính sách đang áp dụng cho cặp đó — ELIB-LRC tự tạo một dòng PolicyCirc
+    /// cho mỗi loại bạn đọc gán vào điểm để cấu hình ngay; ở đây chép số liệu để việc gán không làm đổi luật đang chạy.
+    /// </summary>
+    public static LoanPolicy CopyFor(long readerTypeId, long circPlaceId, LoanPolicy basis)
+    {
+        ArgumentNullException.ThrowIfNull(basis);
+        var policy = Create(readerTypeId, circPlaceId, basis.LoanDays, basis.MaxLoans, basis.MaxRenewals, basis.RenewDays, basis.FinePerDay,
+            basis.RenewFromToday, basis.MaxHolds, basis.HoldDays);
+        policy.SetFees(basis.TechFee, basis.ShippingFee);
+        policy.SetBibTypeRules(basis.BibTypeRules);
+        return policy;
     }
 
     public void SetFees(decimal techFee, decimal shippingFee)

@@ -6,11 +6,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Circulation.Application;
 
-public sealed record CircPlaceRequest(string Code, string Name, IReadOnlyList<long>? StoreIds = null);
+public sealed record CircPlaceRequest(string Code, string Name, IReadOnlyList<long>? StoreIds = null, IReadOnlyList<long>? ReaderTypeIds = null,
+    int Kind = CircPlace.KindBorrow, int? MaxLoans = null, IReadOnlyList<WorkSession>? WorkSessions = null, string? Note = null);
 
-public sealed record CircPlaceDto(long Id, Guid PublicId, string Code, string Name, IReadOnlyList<long> StoreIds, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+public sealed record CircPlaceDto(long Id, Guid PublicId, string Code, string Name, IReadOnlyList<long> StoreIds, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
+    IReadOnlyList<long>? ReaderTypeIds = null, int Kind = CircPlace.KindBorrow, int? MaxLoans = null, IReadOnlyList<WorkSession>? WorkSessions = null,
+    string? Note = null);
 
-/// <summary>Điểm lưu thông (monolith: CircPlaceController, quyền CIRC_PLACES). Mã không trùng; còn chính sách riêng thì không xoá được.</summary>
+/// <summary>
+/// Điểm lưu thông (ELIB-LRC: CircPlaceController + GetMapping/ReplaceStoreMapping/ReplaceReaderTypeMapping, quyền CIRC_PLACES). Mã không trùng
+/// trong đơn vị. Kho và loại bạn đọc gửi cùng request thay hai lệnh thay mapping riêng của LRC. Mỗi loại bạn đọc mới gán vào điểm có sẵn một
+/// chính sách riêng (loại × điểm) chép từ chính sách đang áp dụng, để mở ra cấu hình ngay như LRC. Xoá điểm thì xoá luôn chính sách riêng
+/// của điểm; còn trạm SIP2 dùng điểm thì không xoá được.
+/// </summary>
 public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlaceResource, CircPlace, CrudSearch, CircPlaceRequest, CircPlaceDto>(db)
 {
     public const string DefaultCode = "QUAY";
@@ -20,11 +28,55 @@ public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlac
     protected override string? Describe(CircPlace entity) => $"{entity.Code} — {entity.Name}";
 
     protected override Expression<Func<CircPlace, CircPlaceDto>> Projection =>
-        x => new CircPlaceDto(x.Id, x.PublicId, x.Code, x.Name, x.StoreIds, x.CreatedAt, x.UpdatedAt);
+        x => new CircPlaceDto(x.Id, x.PublicId, x.Code, x.Name, x.StoreIds, x.CreatedAt, x.UpdatedAt, x.ReaderTypeIds, x.Kind, x.MaxLoans, x.WorkSessions, x.Note);
 
-    protected override CircPlace Create(CircPlaceRequest request) => CircPlace.Create(request.Code, request.Name, request.StoreIds);
+    protected override CircPlace Create(CircPlaceRequest request) => CircPlace.Create(request.Code, request.Name, request.StoreIds, request.ReaderTypeIds,
+        request.Kind, request.MaxLoans, request.WorkSessions, request.Note);
 
-    protected override void Update(CircPlace entity, CircPlaceRequest request) => entity.Update(request.Code, request.Name, request.StoreIds);
+    protected override void Update(CircPlace entity, CircPlaceRequest request) => entity.Update(request.Code, request.Name, request.StoreIds, request.ReaderTypeIds,
+        request.Kind, request.MaxLoans, request.WorkSessions, request.Note);
+
+    /// <summary>Thêm điểm: lưu trước để có id rồi tạo chính sách cho loại bạn đọc đã gán — cùng một transaction.</summary>
+    public override async Task<CircPlaceDto> AddAsync(CircPlaceRequest request, CancellationToken ct)
+    {
+        var entity = await CreateAsync(request, ct);
+        await ValidateAsync(entity, ct);
+        var strategy = Db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async token =>
+        {
+            await using var transaction = await Db.Database.BeginTransactionAsync(token);
+            if (Set.Entry(entity).State == EntityState.Detached) Set.Add(entity);
+            await AuditAsync(entity, CrudChange.Added, token);
+            await Db.SaveChangesAsync(token);
+            await EnsurePoliciesAsync(entity, token);
+            await Db.SaveChangesAsync(token);
+            await transaction.CommitAsync(token);
+        }, ct);
+        return ToDto(entity);
+    }
+
+    protected override async Task OnSavingAsync(CircPlace entity, CrudChange change, CancellationToken ct)
+    {
+        if (change == CrudChange.Updated) await EnsurePoliciesAsync(entity, ct);
+        if (change == CrudChange.Deleted)
+        {
+            // Chính sách riêng của điểm không còn ý nghĩa khi điểm bị xoá (interceptor chuyển thành xoá mềm, lượt mượn cũ giữ CircPlaceId).
+            var own = await Db.Set<LoanPolicy>().Where(p => p.CircPlaceId == entity.Id).ToListAsync(ct);
+            Db.Set<LoanPolicy>().RemoveRange(own);
+        }
+    }
+
+    /// <summary>Loại bạn đọc đã gán mà chưa có chính sách riêng tại điểm → tạo, chép từ chính sách đang áp cho cặp đó. Không đụng chính sách đã có.</summary>
+    private async Task EnsurePoliciesAsync(CircPlace place, CancellationToken ct)
+    {
+        if (place.ReaderTypeIds.Count == 0) return;
+        var policies = await Db.Set<LoanPolicy>().AsNoTracking().ToListAsync(ct);
+        foreach (var readerTypeId in place.ReaderTypeIds)
+        {
+            if (policies.Any(p => p.CircPlaceId == place.Id && p.ReaderTypeId == readerTypeId)) continue;
+            Db.Set<LoanPolicy>().Add(LoanPolicy.CopyFor(readerTypeId, place.Id, LoanPolicyResource.Resolve(policies, readerTypeId, place.Id)));
+        }
+    }
 
     protected override IQueryable<CircPlace> Filter(IQueryable<CircPlace> query, CrudSearch search)
     {
@@ -44,8 +96,8 @@ public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlac
 
     protected override async Task EnsureDeletableAsync(CircPlace entity, CancellationToken ct)
     {
-        if (await Db.Set<LoanPolicy>().AnyAsync(p => p.CircPlaceId == entity.Id, ct))
-            throw new ConflictException("CIRC_PLACE_IN_USE", $"Điểm {entity.Code} còn chính sách lưu thông riêng — xoá chính sách trước.");
+        if (await Db.Set<Sip2Station>().AnyAsync(s => s.CircPlaceId == entity.Id, ct))
+            throw new ConflictException("CIRC_PLACE_IN_USE", $"Điểm {entity.Code} đang có trạm tự phục vụ SIP2 — chuyển trạm sang điểm khác trước.");
     }
 
     /// <summary>Đơn vị mới: một quầy mượn trả để dùng được ngay.</summary>

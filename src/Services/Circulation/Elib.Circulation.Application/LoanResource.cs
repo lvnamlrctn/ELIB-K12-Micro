@@ -138,12 +138,13 @@ public sealed class LoanResource(
         var policy = await PolicyAsync(reader, request.CircPlaceId, ct);
         var loans = await OpenLoansAsync(reader, ct);
         var now = clock.GetUtcNow();
-        var block = BlockReason(reader, loans.Any(l => l.DueAt < now));
+        var place = request.CircPlaceId is { } placeId ? await Db.Set<CircPlace>().AsNoTracking().FirstOrDefaultAsync(p => p.Id == placeId, ct) : null;
+        var block = BlockReason(reader, loans.Any(l => l.DueAt < now)) ?? (place is null ? null : NotServedReason(reader, place));
         var unpaid = (await Db.Set<FineTicket>().AsNoTracking().Where(t => t.ReaderPublicId == reader.ReaderPublicId)
             .Select(t => t.Remaining).ToListAsync(ct)).Where(r => r > 0).Sum();
         return new ReaderPanel(reader.ReaderPublicId, reader.CardNo, reader.FullName, reader.ReaderTypeName, reader.ClassName, reader.CourseName,
             reader.PhotoId, reader.ExpireDate, reader.Status != IHasStatus.Active, IsExpired(reader), loans.Any(l => l.DueAt < now),
-            block is null, block, policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans, unpaid,
+            block is null, block, place?.IsReadingRoom == true ? 0 : policy.LoanDays, policy.MaxLoans, policy.MaxRenewals, loans, unpaid,
             await holdList.ActiveForAsync(reader.ReaderPublicId, ct));
     }
 
@@ -166,13 +167,23 @@ public sealed class LoanResource(
         var open = await Set.Where(x => x.ReaderPublicId == reader.ReaderPublicId && x.ReturnedAt == null).Select(x => x.DueAt).ToListAsync(ct);
         if (BlockReason(reader, open.Any(d => d < now)) is { } block)
             throw new BusinessRuleException("READER_CANNOT_BORROW", block);
+        if (NotServedReason(reader, place) is { } notServed)
+            throw new BusinessRuleException("READER_TYPE_NOT_SERVED", notServed);
         var policy = await PolicyAsync(reader, place.Id, ct);
         var typeCounts = await OpenTypeCountsAsync(reader, policy, ct);
+        var atPlace = place.MaxLoans is null ? 0 : await Set.CountAsync(x => x.ReaderPublicId == reader.ReaderPublicId && x.ReturnedAt == null && x.CircPlaceId == place.Id, ct);
 
         var lines = new List<CheckoutLine>();
         var created = new List<Loan>();
         foreach (var barcode in barcodes)
         {
+            if (place.MaxLoans is { } placeMax && atPlace + created.Count >= placeMax)
+            {
+                lines.Add(new CheckoutLine(barcode, false, placeMax == 0
+                    ? $"Điểm {place.Name} không cho mượn tài liệu."
+                    : $"Bạn đọc đã mượn đủ {placeMax} tài liệu tại {place.Name}.", null));
+                continue;
+            }
             var (loan, message) = await TryCheckoutAsync(reader, barcode, place, policy, open.Count + created.Count, typeCounts, now, ct);
             if (loan is not null) created.Add(loan);
             lines.Add(new CheckoutLine(barcode, loan is not null, message, null));
@@ -225,6 +236,8 @@ public sealed class LoanResource(
         ArgumentNullException.ThrowIfNull(request);
         var reason = RequireReason(request.Reason, "gia hạn");
         var loan = await Set.FirstOrDefaultAsync(x => x.PublicId == request.LoanId, ct) ?? throw new NotFoundException(EntityName, request.LoanId);
+        if (loan.CircPlaceId is { } placeId && await Db.Set<CircPlace>().AsNoTracking().AnyAsync(p => p.Id == placeId && p.Kind == CircPlace.KindReadingRoom, ct))
+            throw new BusinessRuleException("RENEW_READING_ROOM", "Tài liệu mượn đọc tại chỗ không gia hạn được.");
         var reader = await Db.Set<PatronReplica>().AsNoTracking().FirstOrDefaultAsync(r => r.ReaderPublicId == loan.ReaderPublicId, ct);
         var policy = await PolicyAsync(reader, loan.CircPlaceId, ct);
         var oldDue = loan.DueAt;
@@ -330,7 +343,9 @@ public sealed class LoanResource(
                 ? "Chính sách không cho mượn nhóm tài liệu này."
                 : $"Bạn đọc đã mượn đủ {typeMax} tài liệu thuộc nhóm này theo chính sách.");
 
-        var loan = Loan.Open(reader, item, place.Id, now, policy.LoanDaysFor(bibType), actor.Id);
+        var loan = place.IsReadingRoom
+            ? Loan.OpenReadingRoom(reader, item, place.Id, now, actor.Id)
+            : Loan.Open(reader, item, place.Id, now, policy.LoanDaysFor(bibType), actor.Id);
         if (bibType is { } counted) typeCounts[counted] = typeCounts.GetValueOrDefault(counted) + 1;
         Set.Add(loan);
         await holds.FulfilAsync(reader, item, ct);
@@ -347,6 +362,10 @@ public sealed class LoanResource(
         : IsExpired(reader) ? $"Thẻ bạn đọc đã hết hạn ngày {reader.ExpireDate:dd/MM/yyyy}."
         : hasOverdue ? "Bạn đọc đang có tài liệu quá hạn, phải trả trước khi mượn thêm."
         : null;
+
+    private static string? NotServedReason(PatronReplica reader, CircPlace place) =>
+        place.Serves(reader.ReaderTypeId) ? null
+        : $"{(reader.ReaderTypeName is { Length: > 0 } type ? $"Loại bạn đọc {type}" : "Bạn đọc chưa có loại bạn đọc nên")} không được phục vụ tại {place.Name}.";
 
     private bool IsExpired(PatronReplica reader) => reader.ExpireDate is { } expire && expire < Loan.LocalDate(clock.GetUtcNow());
 

@@ -9,7 +9,7 @@ import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/ca
 import { BIB_TYPES, DIC_AUTHORS, DIC_CLASSES, DIC_KEYWORDS, DIC_PUBLISHERS, ISBD_CONFIGS } from './pages/catalog/catalogs';
 import { Z3950_SERVERS } from './pages/search/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
-import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
+import { FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -74,7 +74,7 @@ export const routes: Routes = [
       catalog('stores', STORES),
       { path: 'books', loadComponent: () => import('./pages/holdings/items').then((m) => m.Items), canActivate: [tenantGuard, permissionGuard('DOC_SEARCH')], title: 'ITEMS_PAGE.TITLE' },
       { path: 'shelving', loadComponent: () => import('./pages/holdings/shelving').then((m) => m.Shelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], title: 'SHELVING_PAGE.TITLE' },
-      catalog('circ-places', CIRC_PLACES),
+      { path: 'circ-places', loadComponent: () => import('./pages/circulation/circ-places').then((m) => m.CircPlaces), canActivate: [tenantGuard, permissionGuard('CIRC_PLACES')], title: 'CIRC_PLACE_PAGE.TITLE' },
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),
       catalog('sip2-stations', SIP2_STATIONS),

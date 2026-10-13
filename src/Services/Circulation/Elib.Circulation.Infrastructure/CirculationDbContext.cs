@@ -20,7 +20,11 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
         {
             e.ToTable("circ_places");
             e.Property(x => x.Code).HasMaxLength(20);
-            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Name).HasMaxLength(CircPlace.MaxNameLength);
+            e.Property(x => x.Note).HasMaxLength(CircPlace.MaxNoteLength);
+            e.Property(x => x.Kind).HasDefaultValue(CircPlace.KindBorrow);
+            e.Ignore(x => x.IsReadingRoom);
+            e.OwnsMany(x => x.WorkSessions, w => w.ToJson("work_sessions"));
             e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         });
 

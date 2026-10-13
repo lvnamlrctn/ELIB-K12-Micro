@@ -24,7 +24,7 @@ const PLACE_KEY = 'elib.circulation.place';
       <div class="ml-auto flex items-center gap-2">
         <label for="bw-place" class="text-sm text-gray-600">{{ 'BORROW_PAGE.PLACE' | translate }}</label>
         <select id="bw-place" class="input !w-64" [ngModel]="placeId()" (ngModelChange)="choosePlace($event)">
-          @for (p of places(); track p.id) { <option [ngValue]="p.id">{{ p.code }} — {{ p.name }}</option> }
+          @for (p of places(); track p.id) { <option [ngValue]="p.id">{{ p.code }} — {{ p.name }}@if (p.kind === 2) { ({{ 'CIRC_PLACE_PAGE.KIND_READING' | translate }}) }</option> }
         </select>
       </div>
     </div>

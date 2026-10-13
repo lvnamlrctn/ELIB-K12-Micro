@@ -212,15 +212,35 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("kind");
+
+                    b.Property<int?>("MaxLoans")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_loans");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uuid")
                         .HasColumnName("public_id");
+
+                    b.PrimitiveCollection<List<long>>("ReaderTypeIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]")
+                        .HasColumnName("reader_type_ids");
 
                     b.PrimitiveCollection<List<long>>("StoreIds")
                         .IsRequired()
@@ -1699,6 +1719,40 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_module_replicas_tenant_replicas_tenant_id");
+                });
+
+            modelBuilder.Entity("Elib.Circulation.Domain.CircPlace", b =>
+                {
+                    b.OwnsMany("Elib.Circulation.Domain.WorkSession", "WorkSessions", b1 =>
+                        {
+                            b1.Property<long>("CircPlaceId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<int>("Day");
+
+                            b1.Property<string>("From")
+                                .IsRequired();
+
+                            b1.Property<string>("To")
+                                .IsRequired();
+
+                            b1.HasKey("CircPlaceId", "__synthesizedOrdinal")
+                                .HasName("pk_circ_places");
+
+                            b1.ToTable("circ_places");
+
+                            b1
+                                .ToJson("work_sessions")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CircPlaceId")
+                                .HasConstraintName("fk_circ_places_circ_places_circ_place_id");
+                        });
+
+                    b.Navigation("WorkSessions");
                 });
 
             modelBuilder.Entity("Elib.Circulation.Domain.FineLine", b =>

@@ -126,7 +126,20 @@ export interface NextBarcode { prefix: string; number: number; barcode: string; 
 export interface ShelveResult { shelved: number; notFound: string[]; skipped: string[]; }
 
 // ── Lưu thông (service circulation) ──
-export interface CircPlace { id: number; publicId: string; code: string; name: string; storeIds: number[]; }
+/** Khung giờ làm việc của điểm lưu thông: day 1 = thứ Hai … 7 = Chủ nhật, giờ "HH:mm". */
+export interface WorkSession { day: number; from: string; to: string; }
+/** kind: 1 = mượn về, 2 = đọc tại chỗ (hạn trả cuối ngày, không gia hạn). readerTypeIds/storeIds rỗng = mọi loại/mọi kho. */
+export interface CircPlace {
+  id: number; publicId: string; code: string; name: string; storeIds: number[]; readerTypeIds: number[]; kind: number;
+  maxLoans: number | null; workSessions: WorkSession[]; note: string | null;
+}
+export interface BibTypeRule { bibTypeId: number; loanDays: number | null; maxLoans: number | null; maxRenewals: number | null; maxHolds: number | null; }
+/** Chính sách lưu thông theo loại bạn đọc × điểm lưu thông (null = mọi loại / mọi điểm). */
+export interface LoanPolicy {
+  id: number; publicId: string; readerTypeId: number | null; circPlaceId: number | null; loanDays: number; maxLoans: number | null;
+  maxRenewals: number | null; renewDays: number; finePerDay: number; renewFromToday: boolean; maxHolds: number | null; holdDays: number;
+  techFee: number; shippingFee: number; bibTypeRules: BibTypeRule[] | null;
+}
 export interface Loan {
   id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; itemPublicId: string; barcode: string;
   mfn: number; title: string | null; author: string | null; circPlaceId: number | null; storeName: string | null; loanedAt: string; dueAt: string;
