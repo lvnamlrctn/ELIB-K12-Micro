@@ -264,7 +264,7 @@ public sealed record CirculationJobResult(int DueSoon, int Overdue, int ExpiredH
 /// nhắc sách sắp đến hạn (còn 1–2 ngày), báo quá hạn (một lần, chỉ lượt quá hạn trong 7 ngày gần nhất), huỷ giữ chỗ hết hạn và
 /// chuyển bản cho người kế tiếp, giữ bản trống (bản mới xếp giá, lần giữ bị lỡ) cho đặt mượn đang chờ. Mỗi lượt chỉ nhắc một lần.
 /// </summary>
-public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, HoldAllocator queue, TimeProvider clock)
+public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, HoldAllocator queue, Sip2.Sip2LogQueries sip2Logs, TimeProvider clock)
 {
     public const int OverdueLookbackDays = 7;
     private const int Batch = 500;
@@ -285,6 +285,7 @@ public sealed class CirculationJobs(ICrudDbContext db, ReaderNotifier notifier, 
             CirculationTemplates.Overdue, l => l.MarkOverdueNotified(today), "loan-overdue", ct);
         var expired = await ExpireHoldsAsync(now, ct);
         var assigned = await AssignWaitingAsync(ct);
+        await sip2Logs.PurgeAsync(now, ct);
         return new CirculationJobResult(dueSoon, overdue, expired, assigned);
     }
 

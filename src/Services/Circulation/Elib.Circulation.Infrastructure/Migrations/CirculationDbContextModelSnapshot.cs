@@ -1285,6 +1285,194 @@ namespace Elib.Circulation.Infrastructure.Migrations
                     b.ToTable("photocopies", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Circulation.Domain.Sip2Log", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Command")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("command");
+
+                    b.Property<int>("ElapsedMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("elapsed_ms");
+
+                    b.Property<bool>("Ok")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ok");
+
+                    b.Property<string>("RemoteIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("remote_ip");
+
+                    b.Property<string>("Request")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("request");
+
+                    b.Property<string>("Response")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("response");
+
+                    b.Property<long>("StationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("station_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sip2_logs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sip2_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "At")
+                        .HasDatabaseName("ix_sip2_logs_tenant_id_at");
+
+                    b.HasIndex("TenantId", "StationId", "At")
+                        .HasDatabaseName("ix_sip2_logs_tenant_id_station_id_at");
+
+                    b.ToTable("sip2_logs", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Circulation.Domain.Sip2Station", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AsciiOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ascii_only");
+
+                    b.Property<long>("CircPlaceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("circ_place_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("LoginId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("login_id");
+
+                    b.Property<string>("LoginKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("login_key");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<bool>("RequirePatronPassword")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_patron_password");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sip2_stations");
+
+                    b.HasIndex("CircPlaceId")
+                        .HasDatabaseName("ix_sip2_stations_circ_place_id");
+
+                    b.HasIndex("LoginKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sip2_stations_login_key")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sip2_stations_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sip2_stations_tenant_id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sip2_stations_tenant_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("sip2_stations", (string)null);
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")
@@ -1563,6 +1751,16 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         });
 
                     b.Navigation("BibTypeRules");
+                });
+
+            modelBuilder.Entity("Elib.Circulation.Domain.Sip2Station", b =>
+                {
+                    b.HasOne("Elib.Circulation.Domain.CircPlace", null)
+                        .WithMany()
+                        .HasForeignKey("CircPlaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sip2_stations_circ_places_circ_place_id");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

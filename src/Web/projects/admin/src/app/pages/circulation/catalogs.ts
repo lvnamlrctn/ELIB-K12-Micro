@@ -120,6 +120,42 @@ export const FINE_REASONS: CrudConfig = {
   modalWidth: 'max-w-lg',
 };
 
+/**
+ * Trạm tự phục vụ SIP2 (quyền SIP2LOG): máy mượn trả tự động / cổng an ninh nối vào cổng SIP2 của nền tảng, đăng nhập bằng tài khoản
+ * riêng (duy nhất toàn nền tảng) — giao dịch tính cho điểm lưu thông của trạm.
+ */
+export const SIP2_STATIONS: CrudConfig = {
+  title: 'SIP2.STATION_TITLE',
+  resource: 'sip2-stations',
+  service: 'circulation',
+  perm: 'SIP2LOG',
+  searchLabel: 'SIP2.STATION_SEARCH',
+  searchPlaceholder: 'SIP2.STATION_SEARCH_PH',
+  columns: [
+    { key: 'code', label: 'COMMON.CODE', type: 'mono', width: '100px' },
+    { key: 'name', label: 'SIP2.STATION_NAME' },
+    { key: 'loginId', label: 'SIP2.LOGIN_ID', type: 'mono', width: '180px' },
+    { key: 'circPlaceId', label: 'CIRC_CAT.PLACE', type: 'lookup', width: '180px' },
+    { key: 'enabled', label: 'SIP2.ENABLED', type: 'bool', width: '90px' },
+    { key: 'lastSeenAt', label: 'SIP2.LAST_SEEN', type: 'date', width: '120px' },
+  ],
+  fields: [
+    { key: 'code', label: 'COMMON.CODE', type: 'text', required: true, placeholder: 'SIP2.STATION_CODE_EG', half: true },
+    { key: 'name', label: 'SIP2.STATION_NAME', type: 'text', required: true, placeholder: 'SIP2.STATION_NAME_EG', half: true },
+    { key: 'loginId', label: 'SIP2.LOGIN_ID', type: 'text', required: true, placeholder: 'SIP2.LOGIN_ID_EG', half: true, hint: 'SIP2.LOGIN_ID_HINT' },
+    { key: 'password', label: 'SIP2.PASSWORD', type: 'password', half: true, hint: 'SIP2.PASSWORD_HINT' },
+    {
+      key: 'circPlaceId', label: 'CIRC_CAT.PLACE', type: 'select', required: true,
+      optionsFrom: async (api) => (await api.crud<Named>('circ-places', 'circulation').searchAll()).map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` })),
+    },
+    { key: 'requirePatronPassword', label: 'SIP2.REQUIRE_PATRON_PASSWORD', type: 'checkbox' },
+    { key: 'asciiOnly', label: 'SIP2.ASCII_ONLY', type: 'checkbox' },
+    { key: 'enabled', label: 'SIP2.ENABLED', type: 'checkbox' },
+  ],
+  defaults: { requirePatronPassword: false, asciiOnly: false, enabled: true, password: '' },
+  modalWidth: 'max-w-lg',
+};
+
 /** Photo copy tài liệu (monolith: /admin/photocopy, quyền C_PHOTO). Thành tiền = số trang × số bản × đơn giá, tính ở server. */
 export const PHOTOCOPIES: CrudConfig = {
   title: 'CIRC_CAT.PHOTO_TITLE',

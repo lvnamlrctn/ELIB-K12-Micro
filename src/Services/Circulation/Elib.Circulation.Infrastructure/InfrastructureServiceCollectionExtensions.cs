@@ -41,6 +41,11 @@ public static class InfrastructureServiceCollectionExtensions
             x.AddConsumer<BibChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
+        // Cổng SIP2 cho trạm tự phục vụ (tắt mặc định — Sip2__Enabled=true); mật khẩu bạn đọc (AD) hỏi identity.
+        services.Configure<Sip2Options>(configuration.GetSection(Sip2Options.SectionName));
+        services.AddScoped<Application.Sip2.IReaderPasswordChecker, HttpReaderPasswordChecker>();
+        services.AddSingleton<Sip2Listener>();
+        services.AddHostedService(sp => sp.GetRequiredService<Sip2Listener>());
         services.AddSingleton<CirculationJobScheduler>();
         services.AddHostedService(sp => sp.GetRequiredService<CirculationJobScheduler>());
         services.AddHealthChecks().AddDbContextCheck<CirculationDbContext>("db", tags: [ElibHealthTags.Ready]);

@@ -9,7 +9,7 @@ import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/ca
 import { BIB_TYPES } from './pages/catalog/catalogs';
 import { Z3950_SERVERS } from './pages/search/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
-import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES } from './pages/circulation/catalogs';
+import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
@@ -77,6 +77,8 @@ export const routes: Routes = [
       catalog('circ-places', CIRC_PLACES),
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),
+      catalog('sip2-stations', SIP2_STATIONS),
+      { path: 'sip2-logs', loadComponent: () => import('./pages/circulation/sip2-logs').then((m) => m.Sip2Logs), canActivate: [tenantGuard, permissionGuard('SIP2LOG')], title: 'SIP2.LOG_TITLE' },
       catalog('photocopy', PHOTOCOPIES),
       { path: 'circulation-report', loadComponent: () => import('./pages/circulation/reports').then((m) => m.CirculationReports), canActivate: [tenantGuard, permissionGuard('CIRC_REPORT')], title: 'CIRC_REPORT_PAGE.TITLE' },
       { path: 'request-books', loadComponent: () => import('./pages/circulation/holds').then((m) => m.Holds), canActivate: [tenantGuard, permissionGuard('REQUEST_BOOKS')], title: 'HOLDS_PAGE.TITLE' },

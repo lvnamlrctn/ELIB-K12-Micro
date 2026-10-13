@@ -104,6 +104,8 @@ export class Menu {
           { title: 'MENU.FINE_REASONS', icon: 'rule_folder', link: '/cfine-types', perm: 'FINE_REASONS' },
           { title: 'MENU.CIRC_POLICIES', icon: 'rule', link: '/circ-policies', perm: 'CIRC_POLICIES' },
           { title: 'MENU.CIRC_PLACES', icon: 'place', link: '/circ-places', perm: 'CIRC_PLACES' },
+          { title: 'MENU.SIP2_STATIONS', icon: 'point_of_sale', link: '/sip2-stations', perm: 'SIP2LOG' },
+          { title: 'MENU.SIP2_LOGS', icon: 'receipt_long', link: '/sip2-logs', perm: 'SIP2LOG' },
         ],
       },
       {

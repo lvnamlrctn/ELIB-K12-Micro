@@ -306,7 +306,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                               @for (sf of f.rowFields ?? []; track sf.key) {
                                 <td class="px-1.5 py-1">
                                   @if (sf.type === 'select') {
-                                    <select class="input py-1" [name]="f.key + '-' + i + '-' + sf.key" [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate">
+                                    <select class="input py-1 min-w-[10rem]" [name]="f.key + '-' + i + '-' + sf.key" [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate">
                                       @for (o of rowOptions(f, sf); track o.value) { <option [ngValue]="o.value">{{ o.label | translate }}</option> }
                                     </select>
                                   } @else {

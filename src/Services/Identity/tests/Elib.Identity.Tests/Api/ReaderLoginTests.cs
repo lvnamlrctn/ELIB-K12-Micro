@@ -316,6 +316,29 @@ public sealed partial class ReaderLoginTests(IdentityApiFactory factory) : IClas
         Assert.Contains("must not be your card number", await same.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Kiosk_password_check_is_service_only_and_counts_towards_the_lockout()
+    {
+        var tenantId = await NewTenantAsync();
+        await ReaderAsync(tenantId, "SIP-01", "Matkhau2026");
+        var service = factory.CreateClient().WithClaims(TestClaims.Service);
+        async Task<string?> Check(string card, string password) =>
+            (await (await service.PostAsJsonAsync(U($"/internal/tenants/{tenantId}/reader-accounts/check"), new ReaderPasswordCheckRequest(card, password)))
+                .Content.ReadFromJsonAsync<ReaderPasswordCheckResult>())?.Result;
+
+        Assert.Equal("valid", await Check("sip-01", "Matkhau2026"));
+        Assert.Equal("no-patron", await Check("KHONG-CO", "x"));
+        for (var i = 1; i < Elib.Identity.Domain.Credentials.MaxFailedAttempts; i++) Assert.Equal("invalid", await Check("SIP-01", "sai" + i));
+        Assert.Equal("locked-out", await Check("SIP-01", "sai cuoi"));
+        Assert.Equal("locked-out", await Check("SIP-01", "Matkhau2026")); // đang khoá tạm: mật khẩu đúng cũng không qua
+        Assert.Contains(factory.Published.OfType<AuditRecorded>(), a => a.TenantId == tenantId && a.Action == "READER_LOGIN_FAILED"
+            && a.Summary!.Contains("SIP2", StringComparison.Ordinal));
+
+        var staff = factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, _admins[tenantId]));
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync(U($"/internal/tenants/{tenantId}/reader-accounts/check"),
+            new ReaderPasswordCheckRequest("SIP-01", "Matkhau2026"))).StatusCode);
+    }
+
     [GeneratedRegex("name=\"__RequestVerificationToken\" value=\"([^\"]+)\"")]
     private static partial Regex AntiforgeryField();
 }

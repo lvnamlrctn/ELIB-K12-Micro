@@ -40,7 +40,7 @@ Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư 
   - không có mật khẩu sysadmin: python3 e2e_gd0.py --tenant-only  (bỏ bước 1–3 và phần cần quản trị nền tảng)
 Bước 4 gọi gateway qua 127.0.0.1:<GATEWAY_PORT> với Host của đơn vị (chưa có DNS wildcard), coi như đi qua nginx https.
 """
-import base64, hashlib, html, http.cookiejar, io, json, os, re, secrets, sys, time, urllib.error, urllib.parse, urllib.request, uuid, zipfile
+import base64, hashlib, html, http.cookiejar, io, json, os, re, secrets, socket, sys, time, urllib.error, urllib.parse, urllib.request, uuid, zipfile
 from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -202,6 +202,34 @@ def xlsx(rows):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for name, content in files.items(): z.writestr(name, content)
     return buf.getvalue()
+
+
+class Sip2Kiosk:
+    """Trạm SIP2 tối giản (socket thuần, không dùng code C#): thêm AY + AZ checksum, đọc một dòng trả lời, kiểm tra checksum."""
+
+    def __init__(self, port):
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=15)
+        self.seq = 0
+
+    def send(self, body):
+        self.seq = (self.seq + 1) % 10
+        data = f"{body}AY{self.seq}AZ".encode()
+        self.sock.sendall(data + ("%04X" % ((-sum(data)) & 0xFFFF)).encode() + b"\r")
+        reply = b""
+        while not reply.endswith(b"\r"):
+            chunk = self.sock.recv(4096)
+            if not chunk: break
+            reply += chunk
+        reply = reply.rstrip(b"\r")
+        ok = len(reply) > 6 and ("%04X" % ((-sum(reply[:-4])) & 0xFFFF)) == reply[-4:].decode()
+        return reply.decode("utf-8"), ok
+
+    @staticmethod
+    def field(reply, tag):
+        return next((p[2:] for p in reply.split("|") if p.startswith(tag)), None)
+
+    def close(self):
+        self.sock.close()
 
 
 def multipart_fields(files, fields):
@@ -1023,7 +1051,39 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, h, body = tb.request("POST", f"{L}/loans/Export", token=token, json_body={"cardNo": lcard}, binary=True)
     expect(s == 200 and body[:2] == b"PK", "xuất Excel lịch sử lưu thông", str(s))
 
-    tb.request("POST", f"{L}/loans/Return", token=token, json_body={"barcode": f"{lprefix}002"})
+    print("19b. Trạm tự phục vụ SIP2 (cổng TCP của circulation)")
+    login, kpass = f"e2e-{tag}", "Kiosk#" + secrets.token_hex(4)
+    s, _, body = tb.request("POST", f"{L}/sip2-stations/Add", token=token, json_body={
+        "code": "E2E", "name": "Trạm E2E", "loginId": login, "password": kpass, "circPlaceId": quay["id"]})
+    station = json.loads(body) if s == 201 else {}
+    expect(station.get("hasPassword") and "pbkdf2" not in body, "khai báo trạm SIP2 (mật khẩu chỉ lưu dạng băm)", body[:200])
+    kiosk = Sip2Kiosk(int(ENV.get("SIP2_PORT", "16001")))
+    now = time.strftime("%Y%m%d    %H%M%S", time.gmtime(time.time() + 7 * 3600))
+    r, ok = kiosk.send(f"9300CN{login}|COsai-mat-khau|")
+    expect(ok and r.startswith("940"), "đăng nhập trạm sai mật khẩu → 940", r)
+    r, ok = kiosk.send(f"9300CN{login}|CO{kpass}|")
+    expect(ok and r.startswith("941"), "đăng nhập trạm → 941", r)
+    r, ok = kiosk.send("9900802.00")
+    expect(ok and r.startswith("98YYYY") and Sip2Kiosk.field(r, "AM") == "Trạm E2E", "99 → 98 online, tên trạm (UTF-8, checksum đúng)", r)
+    r, ok = kiosk.send(f"63000{now}          AO|AA{hcard}|")
+    expect(ok and Sip2Kiosk.field(r, "AE") == "Đỗ Đặt" and Sip2Kiosk.field(r, "AU") == f"{lprefix}002", "63 thông tin bạn đọc: họ tên, tài liệu đang mượn", r)
+    r, ok = kiosk.send(f"17{now}AO|AB{lprefix}002|")
+    expect(ok and r[2:4] == "04" and Sip2Kiosk.field(r, "AJ") == f"Hoàng tử bé {tag}", "17 thông tin tài liệu: đang mượn, nhan đề", r)
+    r, ok = kiosk.send(f"09N{now}{now}AP|AO|AB{lprefix}002|")
+    expect(ok and r.startswith("101") and Sip2Kiosk.field(r, "AA") == hcard, "09 trả tại trạm", r)
+    r, ok = kiosk.send(f"11NN{now}{now}AO|AA{hcard}|AB{lprefix}002|")
+    expect(ok and r.startswith("121") and Sip2Kiosk.field(r, "AH"), "11 mượn tại trạm (hạn trả theo chính sách)", r)
+    r, ok = kiosk.send(f"09N{now}{now}AP|AO|AB{lprefix}002|")
+    expect(ok and r.startswith("101"), "09 trả lại (dọn)", r)
+    kiosk.close()
+    s, _, body = tb.request("POST", f"{L}/sip2-stations/Logs", token=token, json_body={"stationId": station.get("id"), "pageSize": 50})
+    logs = json.loads(body)["items"] if s == 200 else []
+    expect(len(logs) >= 7 and any(l["command"] == "93" and "CO***" in l["request"] for l in logs) and kpass not in body,
+           f"nhật ký SIP2: {len(logs)} giao dịch, mật khẩu trạm đã che", body[:300])
+    find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"thẻ {hcard}")
+    s, _, _ = tb.request("DELETE", f"{L}/sip2-stations/Delete/{station.get('publicId')}", token=token)
+    expect(s == 204, "dọn trạm SIP2 thử")
+
     tb.request("DELETE", f"{L}/photocopies/Delete/{photo.get('publicId')}", token=token)
     tb.request("DELETE", f"{P}/readers/Delete/{hreader['publicId']}", token=token)
     for i in litems:

@@ -6,6 +6,7 @@ using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Patron;
 using Elib.Circulation.Application;
+using Elib.Circulation.Application.Sip2;
 using Elib.Circulation.Infrastructure;
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
@@ -34,6 +35,9 @@ public sealed class CirculationApiFactory : WebApplicationFactory<Program>
 
     public FakeReplicaSources Sources { get; } = new();
 
+    /// <summary>Mật khẩu OPAC của bạn đọc theo (đơn vị, số thẻ) — thay identity khi trạm SIP2 bắt nhập mật khẩu.</summary>
+    public FakeReaderPasswords ReaderPasswords { get; } = new();
+
     /// <summary>Đồng hồ của service — test tua tới để có lượt quá hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
 
@@ -47,6 +51,9 @@ public sealed class CirculationApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Messaging:UseOutbox", "false");
         builder.UseSetting("Auth:Authority", "https://identity.test");
         builder.UseSetting("Tenancy:GatewaySigningKey", "test-gateway-key-0123456789abcdef");
+        builder.UseSetting("Sip2:Enabled", "true");
+        builder.UseSetting("Sip2:Address", "127.0.0.1");
+        builder.UseSetting("Sip2:Port", "0");
 
         builder.ConfigureTestServices(services =>
         {
@@ -65,6 +72,8 @@ public sealed class CirculationApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<TimeProvider>(Clock);
             services.RemoveAll<IReplicaSources>();
             services.AddSingleton<IReplicaSources>(Sources);
+            services.RemoveAll<IReaderPasswordChecker>();
+            services.AddSingleton<IReaderPasswordChecker>(ReaderPasswords);
         });
     }
 
@@ -170,4 +179,14 @@ public sealed class TestClock(DateTimeOffset start) : TimeProvider
     public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref _ticks), TimeSpan.Zero);
 
     public void Advance(TimeSpan by) => Interlocked.Add(ref _ticks, by.Ticks);
+}
+
+public sealed class FakeReaderPasswords : IReaderPasswordChecker
+{
+    public ConcurrentDictionary<(long TenantId, string CardNo), string> Passwords { get; } = new();
+
+    public Task<string> CheckAsync(long tenantId, string cardNo, string? password, CancellationToken ct) =>
+        Task.FromResult(Passwords.TryGetValue((tenantId, cardNo.Trim().ToUpperInvariant()), out var expected)
+            ? expected == password ? "valid" : "invalid"
+            : "no-patron");
 }

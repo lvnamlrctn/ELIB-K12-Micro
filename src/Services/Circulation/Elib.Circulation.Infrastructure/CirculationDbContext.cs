@@ -89,6 +89,31 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.Mfn });
         });
 
+        modelBuilder.Entity<Sip2Station>(e =>
+        {
+            e.ToTable("sip2_stations");
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.LoginId).HasMaxLength(Sip2Station.MaxLoginLength);
+            e.Property(x => x.LoginKey).HasMaxLength(Sip2Station.MaxLoginLength);
+            e.Property(x => x.PasswordHash).HasMaxLength(200);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+            // Tài khoản trạm duy nhất trên toàn nền tảng — một cổng SIP2 cho mọi đơn vị.
+            e.HasIndex(x => x.LoginKey).IsUnique().HasFilter("is_deleted = false");
+            e.HasOne<CircPlace>().WithMany().HasForeignKey(x => x.CircPlaceId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Sip2Log>(e =>
+        {
+            e.ToTable("sip2_logs");
+            e.Property(x => x.Command).HasMaxLength(2);
+            e.Property(x => x.Request).HasMaxLength(Sip2Log.MaxMessageLength);
+            e.Property(x => x.Response).HasMaxLength(Sip2Log.MaxMessageLength);
+            e.Property(x => x.RemoteIp).HasMaxLength(64);
+            e.HasIndex(x => new { x.TenantId, x.At });
+            e.HasIndex(x => new { x.TenantId, x.StationId, x.At });
+        });
+
         modelBuilder.Entity<FineReason>(e =>
         {
             e.ToTable("fine_reasons");

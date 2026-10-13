@@ -17,6 +17,18 @@ public sealed record ReaderLoginResult(ReaderIdentity? Identity, LoginError? Err
 public sealed record ReaderMeDto(Guid ReaderPublicId, string CardNo, string FullName, string? Email, DateOnly? ExpireDate,
     bool MustChangePassword, DateTimeOffset? LastLoginAt);
 
+/// <summary>Kiểm tra mật khẩu bạn đọc ở trạm tự phục vụ (SIP2, trường AD) — circulation gọi qua /internal.</summary>
+public sealed record ReaderPasswordCheckRequest(string? CardNo, string? Password);
+
+/// <summary>valid | invalid | no-patron | locked-out — không trả thông tin nào khác về tài khoản.</summary>
+public sealed record ReaderPasswordCheckResult(string Result)
+{
+    public const string Valid = "valid";
+    public const string Invalid = "invalid";
+    public const string NoPatron = "no-patron";
+    public const string LockedOut = "locked-out";
+}
+
 public sealed record ReaderChangePasswordRequest(string? CurrentPassword, string NewPassword);
 
 /// <summary>
@@ -69,6 +81,42 @@ public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, I
             Who(who));
         await db.SaveChangesAsync(ct);
         return new ReaderLoginResult(who, null);
+    }
+
+    /// <summary>
+    /// Mật khẩu bạn đọc nhập ở trạm tự phục vụ (SIP2). Cùng luật với đăng nhập OPAC: sai nhiều lần thì khoá tạm, ghi nhật ký lần sai;
+    /// đúng thì xoá đếm sai. Không kiểm tra trạng thái thẻ (circulation tự chặn mượn khi thẻ khoá).
+    /// </summary>
+    public async Task<ReaderPasswordCheckResult> CheckAsync(long tenantId, string? cardNo, string? password, CancellationToken ct)
+    {
+        password ??= "";
+        var key = (cardNo ?? "").Trim();
+        using var scope = tenant.Use(tenantId);
+        var account = key.Length == 0 ? null : await FindAsync(key, ct);
+        var now = clock.GetUtcNow();
+        if (account is null)
+        {
+            hasher.Verify(password, DummyHash());
+            return new ReaderPasswordCheckResult(ReaderPasswordCheckResult.NoPatron);
+        }
+        if (account.Credentials.IsLockedOut(now))
+        {
+            hasher.Verify(password, DummyHash());
+            return new ReaderPasswordCheckResult(ReaderPasswordCheckResult.LockedOut);
+        }
+        if (!account.VerifyPassword(password, hasher.Verify))
+        {
+            if (!account.CardNoPassword && account.Credentials.PasswordHash.Length == 0) hasher.Verify(password, DummyHash());
+            account.Credentials.RecordFailure(now);
+            var name = key.Length > 100 ? key[..100] : key;
+            await audit.TenantAsync(tenantId, "READER_LOGIN_FAILED", "Reader", account.ReaderPublicId.ToString(),
+                $"Bạn đọc nhập sai mật khẩu ở trạm tự phục vụ (SIP2) '{name}'", ct, new IdentityAudit.Who(null, name));
+            await db.SaveChangesAsync(ct);
+            return new ReaderPasswordCheckResult(account.Credentials.IsLockedOut(now) ? ReaderPasswordCheckResult.LockedOut : ReaderPasswordCheckResult.Invalid);
+        }
+        account.Credentials.RecordSuccess(now);
+        await db.SaveChangesAsync(ct);
+        return new ReaderPasswordCheckResult(ReaderPasswordCheckResult.Valid);
     }
 
     /// <summary>Tải lại bạn đọc khi phát/làm mới token: còn hồ sơ, thẻ đang hoạt động, đơn vị Active. Null = từ chối.</summary>

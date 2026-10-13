@@ -2,6 +2,7 @@ using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Circulation.Application;
+using Elib.Circulation.Application.Sip2;
 using Elib.Contracts.Events.Circulation;
 using Elib.Contracts.Events.Platform;
 
@@ -10,7 +11,7 @@ namespace Elib.Circulation.Api;
 /// <summary>
 /// Lưu thông (gateway: /api/admin/circulation/** → /api/**, cần license CIRCULATION). Mã quyền giữ như monolith:
 /// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt),
-/// REQUEST_BOOKS (đặt mượn), C_PHOTO (sao chụp), CIRC_REPORT (báo cáo lưu thông).
+/// REQUEST_BOOKS (đặt mượn), C_PHOTO (sao chụp), CIRC_REPORT (báo cáo lưu thông), SIP2LOG (trạm tự phục vụ SIP2 + nhật ký giao dịch).
 /// </summary>
 public static class CirculationEndpoints
 {
@@ -25,6 +26,10 @@ public static class CirculationEndpoints
         api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")
             .MapPost("/AddDefaults", [Permission("FINE_REASONS", "add")] async (FineReasonResource r, CancellationToken ct)
                 => new { Added = await r.AddDefaultsAsync(ct) });
+
+        // Trạm tự phục vụ SIP2: 8 endpoint chuẩn + nhật ký giao dịch.
+        api.MapCrud<Sip2StationResource>("/sip2-stations", "SIP2LOG").WithTags("Sip2Stations")
+            .MapPost("/Logs", [Permission("SIP2LOG", "view")] (Sip2LogSearch search, Sip2LogQueries q, CancellationToken ct) => q.SearchAsync(search, ct));
 
         // Nội bộ: search dựng chỉ mục lần đầu lấy các lượt đang mượn (không qua gateway, chỉ service token).
         app.MapGet("/internal/tenants/{tenantId:long}/loans/open", async (long tenantId, long? after, int? take, ITenantContext tenant, LoanResource r, CancellationToken ct) =>

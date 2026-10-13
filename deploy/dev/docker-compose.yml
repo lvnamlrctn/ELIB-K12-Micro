@@ -348,6 +348,10 @@ services:
       Patron__Url: http://patron:8080
       Holdings__Url: http://holdings:8080
       Catalog__Url: http://catalog:8080
+      Sip2__Enabled: "true"
+    # Cổng SIP2 cho trạm tự phục vụ (TCP). DEV chỉ mở trên loopback cho e2e — máy dùng chung; mở ra ngoài khi có trạm thật (SIP2_BIND=0.0.0.0).
+    ports:
+      - "${SIP2_BIND:-127.0.0.1}:${SIP2_PORT:-16001}:6001"
 
   # GĐ1: tra cứu OPAC — chỉ mục PostgreSQL (pg_trgm) từ BibChanged/ItemChanged/LoanChanged; dựng lại từ /internal của service gốc.
   search:

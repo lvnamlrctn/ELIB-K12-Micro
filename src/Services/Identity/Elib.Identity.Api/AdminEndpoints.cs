@@ -101,6 +101,11 @@ public static class AdminEndpoints
                 => (await q.GetEffectiveAsync(tenantId, userId, ct)).Order(StringComparer.Ordinal).ToArray())
             .RequireAuthorization(new RequireServiceCallerAttribute()).WithTags("Internal");
 
+        // Mật khẩu bạn đọc nhập ở trạm tự phục vụ SIP2 (circulation) — chỉ token service.
+        app.MapPost("/internal/tenants/{tenantId:long}/reader-accounts/check",
+                (long tenantId, ReaderPasswordCheckRequest request, ReaderSignInService s, CancellationToken ct) => s.CheckAsync(tenantId, request.CardNo, request.Password, ct))
+            .RequireAuthorization(new RequireServiceCallerAttribute()).WithTags("Internal");
+
         return app;
     }
 }

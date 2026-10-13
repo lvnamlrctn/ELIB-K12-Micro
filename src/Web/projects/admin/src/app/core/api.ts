@@ -250,6 +250,12 @@ export interface EmailSettingsInput {
   fromAddress: string; fromName: string | null; status: number;
 }
 export interface EmailTemplate { id: number; publicId: string; code: string; name: string; subject: string; body: string; status: number; isBuiltIn: boolean; }
+/** Nhật ký giao dịch SIP2 — request/response đã che mật khẩu. */
+export interface Sip2Log {
+  id: number; stationId: number; stationCode: string | null; command: string; request: string; response: string; ok: boolean;
+  elapsedMs: number; remoteIp: string | null; at: string;
+}
+
 export interface NotificationLog {
   id: number; publicId: string; createdAt: string; channel: string; templateCode: string; recipient: string | null;
   subject: string | null; status: NotificationStatus; error: string | null; viaPlatform: boolean;
@@ -598,6 +604,9 @@ export class Api {
   deleteEmailSettings() { return firstValueFrom(this.http.delete<void>('/api/admin/notification/email-settings')); }
   sendTestEmail(to: string) { return this.post<NotificationLog>('/api/admin/notification/email-settings/test', { to }); }
   restoreEmailTemplates() { return this.post<{ added: number }>('/api/admin/notification/email-templates/RestoreDefaults'); }
+  sip2Logs(body: CrudSearch & { command?: string | null; failed?: boolean | null; from?: string | null; to?: string | null }) {
+    return this.post<CrudPage<Sip2Log>>('/api/admin/circulation/sip2-stations/Logs', body);
+  }
   notificationLogs(body: CrudSearch & { templateCode?: string | null }) {
     return this.post<CrudPage<NotificationLog>>('/api/admin/notification/notification-logs/Search', body);
   }
