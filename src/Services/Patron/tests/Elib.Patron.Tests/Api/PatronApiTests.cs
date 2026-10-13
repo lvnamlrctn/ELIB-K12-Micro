@@ -370,7 +370,7 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         var mapping = new Dictionary<string, int>(columns.Suggested) { ["class"] = 6, ["course"] = 7 };
         async Task<ReaderImportJobDto> Preview(bool overwrite, bool autoCreate) =>
             await Read<ReaderImportJobDto>(await staff.PostAsync(U("/api/readers/Import/Jobs"), FileForm(("options",
-                JsonSerializer.Serialize(new ReaderImportOptions(columns.HeaderRow, mapping, overwrite, null, autoCreate), Json)))));
+                JsonSerializer.Serialize(new ReaderImportOptions(columns.HeaderRow, mapping, overwrite, null, autoCreate, OpacCardNoPassword: true), Json)))));
 
         var strict = await Preview(overwrite: false, autoCreate: false);
         Assert.Equal((5, 0, 0, 5), (strict.Total, strict.ToCreate, strict.ToUpdate, strict.ErrorCount));
@@ -404,7 +404,11 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         Assert.NotNull(binh.ClassId);
         Assert.NotNull(binh.CourseId);
         Assert.Equal(binh.IssueDate!.Value.AddYears(1), binh.ExpireDate);
-        Assert.Contains(_factory.PublishedOf<ReaderChanged>(), e => e.TenantId == tenantId && e.CardNo == "IM-002");
+        // Mật khẩu OPAC = số thẻ chỉ cho bạn đọc mới (identity đặt theo cờ trong event); bạn đọc cập nhật giữ mật khẩu cũ.
+        Assert.Contains(_factory.PublishedOf<ReaderChanged>(), e => e.TenantId == tenantId && e.CardNo == "IM-002" && e.InitialCardNoPassword);
+        Assert.DoesNotContain(_factory.PublishedOf<ReaderChanged>(), e => e.TenantId == tenantId && e.CardNo == "IM-001" && e.InitialCardNoPassword);
+        Assert.Contains(_factory.PublishedOf<AuditRecorded>(), a => a.TenantId == tenantId && a.Action == "IMPORT" && a.Actor?.Kind == "staff"
+            && (a.Summary ?? "").Contains("mật khẩu OPAC", StringComparison.Ordinal));
 
         // File "Dòng cần sửa": số dòng gốc + cột gốc + cột Lỗi, đúng các dòng lỗi.
         var errors = await staff.GetAsync(U($"/api/readers/Import/Jobs/{job.Id}/Errors"));

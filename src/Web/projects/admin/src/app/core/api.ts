@@ -306,7 +306,11 @@ export interface ReaderImportColumns {
 }
 export interface ReaderImportOptions {
   headerRow: number; columns: Record<string, number>; overwrite: boolean; readerTypeId: number | null; autoCreateRefs: boolean;
+  /** Bạn đọc mới đăng nhập OPAC bằng mật khẩu = số thẻ (bắt đổi ở lần đầu). */
+  opacCardNoPassword: boolean;
 }
+/** failed/errors: bạn đọc bỏ qua vì vi phạm quy tắc (ví dụ hạn thẻ trước ngày cấp). */
+export interface ReaderBatchResult { count: number; failed: number; errors: string[] | null; jobId: string | null; }
 export type ReaderImportStatus = 'Ready' | 'Queued' | 'Running' | 'Done' | 'Failed';
 export interface ReaderImportJob {
   id: string; status: ReaderImportStatus; fileName: string; total: number; toCreate: number; toUpdate: number; errorCount: number;
@@ -480,7 +484,11 @@ export class Api {
     return blobRequest(firstValueFrom(this.http.get(`/api/admin/patron/readers/Import/Jobs/${id}/Errors`, { responseType: 'blob' })));
   }
   previewReaderSelection(search: ReaderSearch) { return this.post<ReaderSelectionPreview>('/api/admin/patron/readers/Batch/Preview', search); }
-  batchUpdateReaders(body: ReaderBatchUpdate) { return this.put<{ count: number }>('/api/admin/patron/readers/BatchUpdate', body); }
+  /** Trên 2.000 bạn đọc (theo bộ lọc): server chạy nền và trả jobId — theo dõi bằng readerBatchJob. */
+  batchUpdateReaders(body: ReaderBatchUpdate, reason?: string | null) {
+    return firstValueFrom(this.http.put<ReaderBatchResult>('/api/admin/patron/readers/BatchUpdate', body, { headers: reasonHeader(reason) }));
+  }
+  readerBatchJob(id: string) { return this.get<ReaderImportJob>(`/api/admin/patron/readers/Batch/Jobs/${id}`); }
   bulkDeleteReaders(publicIds: string[]) { return this.post<{ count: number }>('/api/admin/patron/readers/BulkDelete', { publicIds }); }
   changeReaderGroups(selection: ReaderSelection, groupId: number, add: boolean) {
     return this.put<{ count: number }>('/api/admin/patron/readers/Groups', { selection, groupId, add });

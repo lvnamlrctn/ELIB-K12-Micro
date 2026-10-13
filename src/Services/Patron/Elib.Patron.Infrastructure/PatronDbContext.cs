@@ -66,6 +66,7 @@ public sealed class PatronDbContext(DbContextOptions<PatronDbContext> options, I
         {
             e.ToTable("reader_import_jobs");
             e.Property(j => j.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(j => j.Kind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(ReaderJobKind.Import).HasSentinel(ReaderJobKind.Import);
             e.Property(j => j.FileName).HasMaxLength(255);
             e.Property(j => j.Message).HasMaxLength(1000);
             e.HasIndex(j => new { j.TenantId, j.Status });

@@ -115,6 +115,32 @@ public sealed class ReaderAccountTests(IdentityApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task Imported_reader_flag_sets_card_number_password_only_when_the_account_has_none()
+    {
+        var tenantId = await NewTenantAsync();
+        var hasher = factory.Services.GetRequiredService<IPasswordHasher>();
+        var fresh = Guid.NewGuid();
+        await PublishAsync(Reader(tenantId, fresh, "NK-01") with { InitialCardNoPassword = true });
+        var account = (await AccountAsync(tenantId, fresh))!;
+        Assert.Equal((true, true), (account.CardNoPassword, account.Credentials.MustChangePassword));
+        Assert.True(account.VerifyPassword("nk-01", hasher.Verify));
+
+        // Đã có mật khẩu riêng → cờ không ghi đè.
+        var existing = Guid.NewGuid();
+        await PublishAsync(Reader(tenantId, existing, "NK-02"));
+        await Read<ReaderAccountDto>(await Admin(tenantId).PutAsJsonAsync(U($"/api/reader-accounts/{existing}/password"), new SetReaderPasswordRequest("rieng2026", false)));
+        await PublishAsync(Reader(tenantId, existing, "NK-02", version: 2) with { InitialCardNoPassword = true });
+        account = (await AccountAsync(tenantId, existing))!;
+        Assert.False(account.CardNoPassword);
+        Assert.True(account.VerifyPassword("rieng2026", hasher.Verify));
+
+        // Không có cờ → chưa có mật khẩu như cũ.
+        var plain = Guid.NewGuid();
+        await PublishAsync(Reader(tenantId, plain, "NK-03"));
+        Assert.False((await AccountAsync(tenantId, plain))!.HasPassword);
+    }
+
+    [Fact]
     public async Task Profile_follows_reader_events_by_version_and_deleted_reader_cannot_get_password()
     {
         var tenantId = await NewTenantAsync();

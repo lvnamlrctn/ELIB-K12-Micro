@@ -548,6 +548,14 @@ namespace Elib.Patron.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Import")
+                        .HasColumnName("kind");
+
                     b.Property<string>("Message")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -557,6 +565,10 @@ namespace Elib.Patron.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("options_json");
+
+                    b.Property<string>("OriginJson")
+                        .HasColumnType("text")
+                        .HasColumnName("origin_json");
 
                     b.Property<int>("Processed")
                         .HasColumnType("integer")

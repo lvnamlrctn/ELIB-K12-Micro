@@ -3,10 +3,14 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events.Patron;
 using Elib.Contracts.Events.Platform;
 using Elib.Patron.Application;
+using Elib.Patron.Domain;
+using Elib.Patron.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Elib.Patron.Tests.Api;
 
@@ -165,5 +169,60 @@ public sealed class ReaderBatchTests : IClassFixture<PatronApiFactory>, IAsyncLi
         Assert.Contains(_factory.PublishedOf<AuditRecorded>(), l => l.EntityId == b.PublicId.ToString() && l.Action == "DELETE");
         // Số thẻ đã xoá dùng lại được.
         await AddReader(staff, new ReaderRequest("D1", null, "Một mới"));
+    }
+
+    [Fact]
+    public async Task Batch_update_over_the_sync_limit_runs_in_background_as_the_user_with_reason_and_skips_invalid_readers()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        var c6 = await AddNamed(staff, "classes", "6B");
+        var c7 = await AddNamed(staff, "classes", "7B");
+        var total = ReaderResource.MaxBulk + 5;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            using var _ = scope.ServiceProvider.GetRequiredService<ITenantContext>().Use(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<PatronDbContext>();
+            db.AddRange(Enumerable.Range(1, total).Select(i => Reader.Create(new ReaderData(
+                $"BG{i:00000}", null, "Bạn " + i, null, null, null, null, null, null, null, null, c6.Id, null, null, null, null, null,
+                i == 7 ? new DateOnly(2027, 1, 1) : new DateOnly(2025, 9, 1), null))));
+            await db.SaveChangesAsync();
+        }
+
+        var filter = new ReaderSearch { ClassId = c6.Id };
+        var preview = await Read<ReaderSelectionPreview>(await staff.PostAsJsonAsync(U("/api/readers/Batch/Preview"), filter, Json));
+        Assert.Equal(total, preview.Count);
+        var request = new HttpRequestMessage(HttpMethod.Put, U("/api/readers/BatchUpdate"))
+        {
+            Content = JsonContent.Create(new ReaderBatchUpdateRequest(new ReaderSelection(Search: filter, Token: preview.Token), ClassId: c7.Id,
+                ExpireDate: new DateOnly(2026, 6, 30)), options: Json),
+        };
+        request.Headers.Add(CrudDiff.ReasonHeader, Uri.EscapeDataString("Chuyển lớp cả khối"));
+        var queued = await Read<ReaderBatchResult>(await staff.SendAsync(request));
+        Assert.Equal(total, queued.Count);
+        Assert.NotNull(queued.JobId);
+
+        var done = await PatronApiFactory.WaitForAsync(async () =>
+        {
+            var current = await Read<ReaderImportJobDto>(await staff.GetAsync(U($"/api/readers/Batch/Jobs/{queued.JobId}")));
+            return current.Status is "Done" or "Failed" ? current : null;
+        }, "sửa hàng loạt chạy nền xong");
+        Assert.Equal(("Done", total, total - 1, 1), (done.Status, done.Processed, done.Updated, done.Failed));
+        Assert.Contains("BG00007", Assert.Single(done.Errors).Message, StringComparison.Ordinal);
+        Assert.Equal(total - 1, (await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"),
+            new ReaderSearch { ClassId = c7.Id, PageSize = 1 }, Json))).TotalCount);
+
+        // Nhật ký/lịch sử ghi dưới tên người bấm, kèm lý do sửa — dù worker không có request HTTP.
+        var first = (await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { CardNo = "BG00001" }, Json))).Items[0];
+        var log = Assert.Single(_factory.PublishedOf<AuditRecorded>(), a => a.TenantId == tenantId && a.EntityId == first.PublicId.ToString() && a.Action == "UPDATE");
+        Assert.Equal("staff", log.Actor?.Kind);
+        Assert.NotNull(log.Actor?.Id);
+        Assert.Equal("Chuyển lớp cả khối", JsonDocument.Parse(log.ChangesJson!).RootElement.GetProperty("_reason").GetString());
+        Assert.Contains(_factory.PublishedOf<ReaderChanged>(), e => e.ReaderPublicId == first.PublicId && e.ClassId == c7.Id && e.Actor?.Kind == "staff");
+
+        // Lượt sửa hàng loạt không lẫn với lượt nhập; cần quyền sửa; đơn vị khác không thấy.
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync(U($"/api/readers/Import/Jobs/{queued.JobId}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId, "READERS:view").GetAsync(U($"/api/readers/Batch/Jobs/{queued.JobId}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Staff(tenantId + 500).GetAsync(U($"/api/readers/Batch/Jobs/{queued.JobId}"))).StatusCode);
     }
 }

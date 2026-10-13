@@ -29,19 +29,49 @@ public sealed class CrudAuditOptions
     public string ServiceName { get; set; } = "";
 }
 
+/// <summary>Người thao tác của một việc chạy nền: lưu lúc cán bộ bấm chạy, worker đặt lại để nhật ký/event ghi đúng người, lý do, IP.</summary>
+public sealed record CrudAuditOrigin(long? ActorId, string ActorKind, string? ActorName, string? Reason, string? IpAddress);
+
+/// <summary>
+/// Ngữ cảnh nhật ký trong một scope. Request HTTP: lấy từ token/header. Worker (không có HttpContext): <see cref="RunAs"/> với
+/// <see cref="CrudAuditOrigin"/> đã lưu — đặt luôn <see cref="CurrentActor"/> cho event.
+/// </summary>
+public sealed class CrudAuditContext(IHttpContextAccessor http, ICurrentActor actor, CurrentActor actorSetter)
+{
+    public CrudAuditOrigin? Origin { get; private set; }
+
+    /// <summary>Người thao tác hiện tại — để lưu kèm việc chạy nền.</summary>
+    public CrudAuditOrigin Capture()
+    {
+        if (Origin is not null) return Origin;
+        var ctx = http.HttpContext;
+        return new CrudAuditOrigin(actor.Id, actor.Kind, AuditActor.Name(ctx), CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString()),
+            ctx?.Connection.RemoteIpAddress?.ToString());
+    }
+
+    public void RunAs(CrudAuditOrigin origin)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        Origin = origin;
+        actorSetter.Set(origin.ActorId, origin.ActorKind);
+    }
+}
+
 /// <summary>
 /// Phát <see cref="AuditRecorded"/> cho service audit (thay UserLog ghi trực tiếp của monolith). Gọi TRƯỚC SaveChanges nên event
 /// nằm trong outbox cùng transaction với dữ liệu — thao tác lỗi thì không có nhật ký.
-/// Ngữ cảnh hệ thống (không có đơn vị) không ghi ở đây. Lý do sửa lấy từ header X-Change-Reason (mã hoá URL), ghi vào ChangesJson.
+/// Ngữ cảnh hệ thống (không có đơn vị) không ghi ở đây. Lý do sửa lấy từ header X-Change-Reason (mã hoá URL), ghi vào ChangesJson; chạy nền thì lấy từ <see cref="CrudAuditContext"/>.
 /// </summary>
 public sealed class PublishingCrudAuditSink(
-    IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, IHttpContextAccessor http, IOptions<CrudAuditOptions> options)
+    IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, IHttpContextAccessor http, IOptions<CrudAuditOptions> options,
+    CrudAuditContext? context = null)
     : ICrudAuditSink
 {
     public Task RecordAsync(CrudAuditEntry entry, CancellationToken cancellationToken)
     {
         if (tenant.TenantId is not { } tenantId) return Task.CompletedTask;
         var ctx = http.HttpContext;
+        var origin = ctx is null ? context?.Origin : null;
         var (action, verb) = entry.Change switch
         {
             CrudChange.Added => ("ADD", "Thêm"),
@@ -54,14 +84,14 @@ public sealed class PublishingCrudAuditSink(
         {
             TenantId = tenantId,
             Actor = new EventActor(actor.Id, actor.Kind),
-            ActorName = AuditActor.Name(ctx),
+            ActorName = origin is null ? AuditActor.Name(ctx) : origin.ActorName,
             Service = options.Value.ServiceName,
             Action = action,
             EntityType = entry.EntityType,
             EntityId = entry.PublicId.ToString(),
             Summary = $"{verb} {entry.EntityName.ToLowerInvariant()}" + (string.IsNullOrWhiteSpace(entry.Label) ? "" : $": {entry.Label}"),
-            ChangesJson = CrudDiff.ToJson(entry.Changes, CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString())),
-            IpAddress = ctx?.Connection.RemoteIpAddress?.ToString(),
+            ChangesJson = CrudDiff.ToJson(entry.Changes, origin is null ? CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString()) : origin.Reason),
+            IpAddress = origin is null ? ctx?.Connection.RemoteIpAddress?.ToString() : origin.IpAddress,
             CorrelationId = ctx?.TraceIdentifier,
         }, cancellationToken);
     }

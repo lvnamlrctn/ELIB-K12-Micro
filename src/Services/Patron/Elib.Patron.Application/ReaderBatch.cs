@@ -31,12 +31,20 @@ public sealed record ReaderGroupSetRequest(IReadOnlyList<long> GroupIds);
 
 public sealed record ReaderBulkDeleteRequest(IReadOnlyList<Guid> PublicIds);
 
-public sealed record ReaderBatchResult(int Count);
+/// <summary>
+/// <see cref="Count"/>: số bạn đọc đã đổi (chạy nền: số sẽ đổi); <see cref="Failed"/>/<see cref="Errors"/>: bạn đọc bỏ qua vì vi phạm quy tắc
+/// (ví dụ hạn thẻ trước ngày cấp); <see cref="JobId"/>: có khi chạy nền — theo dõi ở readers/Batch/Jobs/{id}.
+/// </summary>
+public sealed record ReaderBatchResult(int Count, int Failed = 0, IReadOnlyList<string>? Errors = null, Guid? JobId = null);
+
+public sealed record ReaderChunkResult(int Count, int Failed, IReadOnlyList<string> Errors);
 
 public sealed partial class ReaderResource
 {
-    /// <summary>Theo bộ lọc: tối đa 10.000 bạn đọc mỗi lần (ghi theo lô 500, mỗi lô một transaction).</summary>
+    /// <summary>Theo bộ lọc: nhóm tối đa 10.000 bạn đọc mỗi lần; sửa hàng loạt tới <see cref="MaxBackgroundBatch"/> (trên <see cref="MaxBulk"/> thì chạy nền).</summary>
     public const int MaxBatch = 10_000;
+
+    public const int MaxBackgroundBatch = 100_000;
 
     private const int BatchChunk = 500;
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);
@@ -77,7 +85,9 @@ public sealed partial class ReaderResource
     }
 
     /// <summary>Id nội bộ của bạn đọc được chọn.</summary>
-    private async Task<List<long>> SelectIdsAsync(ReaderSelection selection, CancellationToken ct)
+    private Task<List<long>> SelectIdsAsync(ReaderSelection selection, CancellationToken ct) => SelectIdsAsync(selection, MaxBatch, ct);
+
+    private async Task<List<long>> SelectIdsAsync(ReaderSelection selection, int max, CancellationToken ct)
     {
         if (selection.PublicIds is { Count: > 0 } publicIds)
         {
@@ -88,15 +98,38 @@ public sealed partial class ReaderResource
         if (selection.Search is not { } search)
             throw new BusinessRuleException("READER_BULK_SIZE", $"Chọn từ 1 đến {MaxBulk} bạn đọc mỗi lần.");
         VerifyToken(search, selection.Token);
-        var found = await Query(search).Select(x => x.Id).Take(MaxBatch + 1).ToListAsync(ct);
-        if (found.Count > MaxBatch)
-            throw new BusinessRuleException("READER_BATCH_TOO_MANY", $"Bộ lọc khớp hơn {MaxBatch:N0} bạn đọc — thu hẹp bộ lọc rồi làm từng phần.");
+        var found = await Query(search).Select(x => x.Id).Take(max + 1).ToListAsync(ct);
+        if (found.Count > max)
+            throw new BusinessRuleException("READER_BATCH_TOO_MANY", $"Bộ lọc khớp hơn {max:N0} bạn đọc — thu hẹp bộ lọc rồi làm từng phần.");
         return found;
     }
 
     // ── Sửa hàng loạt ──
 
+    /// <summary>
+    /// ≤ <see cref="MaxBulk"/> bạn đọc: sửa ngay. Nhiều hơn (chỉ khi chọn theo bộ lọc, tới <see cref="MaxBackgroundBatch"/>): tạo lượt chạy nền
+    /// (<see cref="ReaderJobKind.BatchUpdate"/>) — worker tìm lại theo bộ lọc lúc chạy và ghi dưới tên người bấm.
+    /// </summary>
     public async Task<ReaderBatchResult> BatchUpdateAsync(ReaderBatchUpdateRequest r, CancellationToken ct)
+    {
+        await ValidateBatchAsync(r, ct);
+        var ids = await SelectIdsAsync(r.Selection, MaxBackgroundBatch, ct);
+        if (ids.Count <= MaxBulk)
+        {
+            var done = await ApplyBatchAsync(r, ids, ct);
+            return new ReaderBatchResult(done.Count, done.Failed, done.Errors);
+        }
+        var job = ReaderImportJob.QueueBatchUpdate(
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Sửa hàng loạt {ids.Count} bạn đọc"),
+            JsonSerializer.Serialize(r with { Selection = r.Selection with { Token = null } }, SearchJson), ids.Count,
+            JsonSerializer.Serialize(auditContext?.Capture(), SearchJson));
+        Db.Set<ReaderImportJob>().Add(job);
+        await Db.SaveChangesAsync(ct);
+        jobs?.Enqueue(tenant.RequireTenantId(), job.Id);
+        return new ReaderBatchResult(ids.Count, JobId: job.PublicId);
+    }
+
+    private async Task ValidateBatchAsync(ReaderBatchUpdateRequest r, CancellationToken ct)
     {
         if (r is { ReaderTypeId: null, ClassId: null, CourseId: null, OrgId: null, IssueDate: null, ExpireDate: null, Status: null })
             throw new BusinessRuleException("READER_BULK_EMPTY", "Chưa chọn trường cần sửa.");
@@ -104,32 +137,57 @@ public sealed partial class ReaderResource
         await EnsureExistsAsync<SchoolClass>(r.ClassId, "Lớp", ct);
         await EnsureExistsAsync<Course>(r.CourseId, "Khoá", ct);
         if (r.OrgId is { } orgId) (await ReferencesAsync(ReferenceKinds.Orgs, ct)).Resolve(orgId.ToString(System.Globalization.CultureInfo.InvariantCulture), "Đơn vị");
-        var ids = await SelectIdsAsync(r.Selection, ct);
-        return new ReaderBatchResult(await ForEachChunkAsync(ids, reader =>
+    }
+
+    /// <summary>Worker: id bạn đọc khớp bộ lọc lúc chạy (đã xác nhận ở request — không kiểm lại mã xem trước).</summary>
+    public async Task<List<long>> MatchBatchAsync(ReaderBatchUpdateRequest r, CancellationToken ct)
+    {
+        await ValidateBatchAsync(r, ct);
+        return r.Selection.Search is { } search
+            ? await Query(search).Select(x => x.Id).OrderBy(id => id).Take(MaxBackgroundBatch).ToListAsync(ct)
+            : await SelectIdsAsync(r.Selection, ct);
+    }
+
+    /// <summary>Sửa đúng các bạn đọc <paramref name="ids"/> (worker gọi theo từng lô).</summary>
+    public Task<ReaderChunkResult> ApplyBatchAsync(ReaderBatchUpdateRequest r, IReadOnlyList<long> ids, CancellationToken ct) =>
+        ForEachChunkAsync(ids, reader =>
         {
             reader.ApplyBulk(r.ReaderTypeId, r.ClassId, r.CourseId, r.IssueDate, r.ExpireDate, r.OrgId);
             if (r.Status is { } status && status != reader.Status) reader.ChangeStatus(status);
-        }, CrudChange.Updated, ct));
-    }
+        }, CrudChange.Updated, ct);
 
-    /// <summary>Ghi theo lô: mỗi bạn đọc một event + một dòng nhật ký có diff; mỗi lô một SaveChanges rồi xả bộ theo dõi.</summary>
-    private async Task<int> ForEachChunkAsync(List<long> ids, Action<Reader> change, CrudChange kind, CancellationToken ct)
+    /// <summary>
+    /// Ghi theo lô: mỗi bạn đọc một event + một dòng nhật ký có diff; mỗi lô một SaveChanges rồi xả bộ theo dõi. Bạn đọc vi phạm quy tắc
+    /// (ví dụ hạn thẻ trước ngày cấp) thì bỏ qua, không làm hỏng cả lô.
+    /// </summary>
+    private async Task<ReaderChunkResult> ForEachChunkAsync(IReadOnlyList<long> ids, Action<Reader> change, CrudChange kind, CancellationToken ct)
     {
+        var context = (DbContext)Db;
         var count = 0;
+        var errors = new List<string>();
         foreach (var chunk in ids.Chunk(BatchChunk))
         {
             foreach (var reader in await Set.Where(x => chunk.Contains(x.Id)).ToListAsync(ct))
             {
                 var before = ToDto(reader);
-                change(reader);
+                try
+                {
+                    change(reader);
+                }
+                catch (BusinessRuleException ex)
+                {
+                    context.Entry(reader).State = EntityState.Detached;
+                    errors.Add($"{reader.CardNo}: {ex.Message}");
+                    continue;
+                }
                 await PublishAsync(reader, deleted: kind == CrudChange.Deleted, ct);
                 await AuditAsync(reader, kind, ct, kind == CrudChange.Deleted ? null : Diff(before, reader));
                 count++;
             }
             await Db.SaveChangesAsync(ct);
-            ((DbContext)Db).ChangeTracker.Clear();
+            context.ChangeTracker.Clear();
         }
-        return count;
+        return new ReaderChunkResult(count, errors.Count, [.. errors.Take(MaxImportErrors)]);
     }
 
     // ── Xoá nhiều ──
@@ -138,7 +196,8 @@ public sealed partial class ReaderResource
     {
         var ids = await SelectIdsAsync(new ReaderSelection(request.PublicIds), ct);
         if (ids.Count == 0) throw new BusinessRuleException("READER_BULK_SIZE", $"Chọn từ 1 đến {MaxBulk} bạn đọc mỗi lần.");
-        return new ReaderBatchResult(await ForEachChunkAsync(ids, reader => Set.Remove(reader), CrudChange.Deleted, ct)); // interceptor: xoá mềm
+        var deleted = await ForEachChunkAsync(ids, reader => Set.Remove(reader), CrudChange.Deleted, ct); // interceptor: xoá mềm
+        return new ReaderBatchResult(deleted.Count);
     }
 
     // ── Nhóm ──

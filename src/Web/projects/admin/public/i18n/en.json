@@ -1642,7 +1642,9 @@
     "BACK": "Back",
     "NEXT": "Next",
     "PREVIEW": "Preview",
-    "RUN": "Run import"
+    "RUN": "Run import",
+    "OPAC_CARDNO": "OPAC password = card number for new readers",
+    "OPAC_CARDNO_HINT": "New readers sign in to the OPAC with their card number and must change the password on first sign-in. Existing passwords are kept."
   },
   "READER_BATCH": {
     "EDIT": "Batch edit",
@@ -1665,7 +1667,9 @@
     "GROUP_REMOVED": "Removed {{count}} readers from the group.",
     "DELETE_SELECTED": "Delete selected ({{count}})",
     "DELETE_CONFIRM": "Delete {{count}} selected readers? Deleted readers can no longer borrow.",
-    "DELETED": "Deleted {{count}} readers."
+    "DELETED": "Deleted {{count}} readers.",
+    "BACKGROUND": "Updating {{count}} readers in the background — you can close this dialog, the job keeps running.",
+    "SKIPPED": "{{count}} readers skipped:"
   },
   "READER_HISTORY": {
     "OPEN": "Change history",

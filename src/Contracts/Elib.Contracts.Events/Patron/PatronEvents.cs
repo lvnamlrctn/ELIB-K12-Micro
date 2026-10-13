@@ -34,4 +34,10 @@ public sealed record ReaderChanged : IntegrationEvent
     public DateOnly? ExpireDate { get; init; }
     public bool Deleted { get; init; }
     public long Version { get; init; }
+
+    /// <summary>
+    /// Bạn đọc vừa tạo khi nhập Excel có chọn "mật khẩu OPAC = số thẻ": identity đặt mật khẩu mặc định là số thẻ (bắt đổi ở lần đăng nhập
+    /// đầu) nếu tài khoản chưa có mật khẩu. Không mang mật khẩu nào.
+    /// </summary>
+    public bool InitialCardNoPassword { get; init; }
 }

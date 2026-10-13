@@ -12,9 +12,16 @@ public enum ReaderImportStatus
     Failed = 5,
 }
 
+/// <summary>Import: nhập Excel; BatchUpdate: sửa hàng loạt theo bộ lọc khớp nhiều hơn số bạn đọc sửa ngay trong request.</summary>
+public enum ReaderJobKind
+{
+    Import = 1,
+    BatchUpdate = 2,
+}
+
 /// <summary>
 /// Một lượt nhập bạn đọc từ Excel chạy nền (ELIB-LRC: Reader/Import với previewOnly/previewToken/background). Giữ file gốc và tuỳ chọn
-/// để chạy lại đúng như bản xem trước; file "Dòng cần sửa" (xlsx) cho người dùng tải về sửa rồi nhập lại. Dọn sau <see cref="Retention"/>.
+/// để chạy lại đúng như bản xem trước; cũng dùng cho sửa hàng loạt chạy nền (<see cref="ReaderJobKind.BatchUpdate"/>, không có file); file "Dòng cần sửa" (xlsx) cho người dùng tải về sửa rồi nhập lại. Dọn sau <see cref="Retention"/>.
 /// </summary>
 public sealed class ReaderImportJob : TenantEntity
 {
@@ -44,6 +51,23 @@ public sealed class ReaderImportJob : TenantEntity
         };
     }
 
+    /// <summary>Sửa hàng loạt chạy nền: vào hàng đợi ngay (đã xem trước + xác nhận ở request). <paramref name="optionsJson"/>: yêu cầu sửa.</summary>
+    public static ReaderImportJob QueueBatchUpdate(string label, string optionsJson, int total, string originJson) => new()
+    {
+        Kind = ReaderJobKind.BatchUpdate,
+        Status = ReaderImportStatus.Queued,
+        FileName = Cut(label, 255),
+        OptionsJson = optionsJson,
+        Total = total,
+        ToUpdate = total,
+        OriginJson = originJson,
+    };
+
+    public ReaderJobKind Kind { get; private set; } = ReaderJobKind.Import;
+
+    /// <summary>Người bấm chạy (id, tên, lý do sửa, IP) — worker ghi nhật ký/event dưới tên người này.</summary>
+    public string? OriginJson { get; private set; }
+
     public ReaderImportStatus Status { get; private set; }
     public string FileName { get; private set; } = "";
     public byte[] File { get; private set; } = [];
@@ -70,11 +94,12 @@ public sealed class ReaderImportJob : TenantEntity
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? FinishedAt { get; private set; }
 
-    public void Queue()
+    public void Queue(string originJson)
     {
         if (Status != ReaderImportStatus.Ready)
             throw new ConflictException("IMPORT_JOB_STATE", "Lượt nhập này đã chạy hoặc đang chạy.");
         Status = ReaderImportStatus.Queued;
+        OriginJson = originJson;
     }
 
     public void Start(DateTimeOffset now)

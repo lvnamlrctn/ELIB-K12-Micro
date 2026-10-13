@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -64,6 +65,12 @@ public sealed class ServiceTokenProvider(IHttpClientFactory httpClients, IOption
         }
     }
 
+    /// <summary>Bỏ token đang giữ (nơi nhận trả 401 — ví dụ identity khởi động lại với khoá ký mới) để lần sau xin token mới.</summary>
+    public void Invalidate(string token)
+    {
+        if (_token == token) _token = null;
+    }
+
     public void Dispose() => _lock.Dispose();
 
     private sealed record TokenResponse(
@@ -71,13 +78,35 @@ public sealed class ServiceTokenProvider(IHttpClientFactory httpClients, IOption
         [property: JsonPropertyName("expires_in")] int ExpiresIn);
 }
 
-/// <summary>Gắn service token vào mọi request của HttpClient gọi service nội bộ.</summary>
+/// <summary>
+/// Gắn service token vào mọi request của HttpClient gọi service nội bộ. Bị 401 thì xin token mới và gửi lại một lần — token đang giữ có
+/// thể ký bằng khoá cũ (identity khởi động lại với khoá tạm ở môi trường dev) dù chưa hết hạn.
+/// </summary>
 public sealed class ServiceTokenHandler(ServiceTokenProvider tokens) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
-        return await base.SendAsync(request, cancellationToken);
+        if (request.Content is not null) await request.Content.LoadIntoBufferAsync(cancellationToken); // để gửi lại được
+        var token = await tokens.GetTokenAsync(cancellationToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await base.SendAsync(request, cancellationToken);
+        if (response.StatusCode != HttpStatusCode.Unauthorized) return response;
+
+        tokens.Invalidate(token);
+        var fresh = await tokens.GetTokenAsync(cancellationToken);
+        if (fresh == token) return response;
+        response.Dispose();
+        using var retry = Clone(request);
+        retry.Headers.Authorization = new AuthenticationHeaderValue("Bearer", fresh);
+        return await base.SendAsync(retry, cancellationToken);
+    }
+
+    private static HttpRequestMessage Clone(HttpRequestMessage request)
+    {
+        var copy = new HttpRequestMessage(request.Method, request.RequestUri) { Content = request.Content, Version = request.Version, VersionPolicy = request.VersionPolicy };
+        foreach (var header in request.Headers) copy.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        foreach (var option in request.Options) ((IDictionary<string, object?>)copy.Options)[option.Key] = option.Value;
+        return copy;
     }
 }
 

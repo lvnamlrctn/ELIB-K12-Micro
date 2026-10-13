@@ -682,7 +682,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(s == 200 and json.loads(body)["totalCount"] == 0, "đã dọn bạn đọc thử")
 
     print("15b. Nhập Excel nâng cao kiểu ELIB-LRC (ghép cột, xem trước, chạy nền)")
-    lrc_class, n_rows = f"E2E-LRC-{tag}", 1200
+    lrc_class, n_rows = f"E2E-LRC-{tag}", 2100  # > 2.000: sửa hàng loạt theo bộ lọc đi nhánh chạy nền
     rows = [["DANH SÁCH BẠN ĐỌC (xuất từ ELIB-LRC)"], [], ["STT", "Ma the", "Ho dem", "Ten", "Ngay sinh", "Gioi tinh", "Lop hoc"]]
     rows += [[str(i), f"L{tag}-{i:04}", "Nguyễn Văn", f"Thử {i}", f"2012{(i % 12) + 1:02}{(i % 28) + 1:02}", "2" if i % 2 else "1", lrc_class]
              for i in range(1, n_rows + 1)]
@@ -693,7 +693,8 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     sug = cols.get("suggested", {})
     expect(cols.get("headerRow") == 3 and cols.get("dataRows") == n_rows + 2 and sug.get("cardno") == 2 and sug.get("lastname") == 3 and "class" not in sug,
            f"đọc cột: tiêu đề ở dòng {cols.get('headerRow')}, {cols.get('dataRows')} dòng, gợi ý {len(sug)} cột", body)
-    options = json.dumps({"headerRow": 3, "columns": {**sug, "class": 7}, "overwrite": False, "readerTypeId": rtype["id"], "autoCreateRefs": True})
+    options = json.dumps({"headerRow": 3, "columns": {**sug, "class": 7}, "overwrite": False, "readerTypeId": rtype["id"], "autoCreateRefs": True,
+                          "opacCardNoPassword": True})
     s, _, body = tb.request("POST", f"{P}/readers/Import/Jobs", token=token, raw=multipart_fields([("file", "lrc.xlsx", lrc, XLSX)], {"options": options}))
     job = json.loads(body) if s == 200 else {}
     expect(job.get("status") == "Ready" and job.get("toCreate") == n_rows and job.get("errorCount") == 2 and job.get("hasErrorFile"),
@@ -713,6 +714,16 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     lrc_filter = {"cardNoContains": f"L{tag}-"}
     s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={**lrc_filter, "pageSize": 1})
     expect(s == 200 and json.loads(body)["totalCount"] == n_rows, "bạn đọc nhập được tìm thấy (lớp tự tạo, loại bạn đọc cho cả file)", body)
+    s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={**lrc_filter, "pageSize": 20})
+    sample = [r["publicId"] for r in json.loads(body)["items"]] if s == 200 else []
+    accounts = []
+    for _ in range(20):  # identity nhận ReaderChanged qua event
+        s, _, body = tb.request("POST", "/api/admin/identity/reader-accounts/Status", token=token, json_body={"readerIds": sample})
+        accounts = json.loads(body) if s == 200 else []
+        if accounts and all(a["cardNoPassword"] for a in accounts): break
+        time.sleep(1)
+    expect(len(accounts) == 20 and all(a["cardNoPassword"] and a["mustChangePassword"] for a in accounts),
+           "bạn đọc mới nhập có mật khẩu OPAC = số thẻ (identity theo cờ trong event, bắt đổi lần đầu)", json.dumps(accounts)[:300])
 
     print("15c. Thao tác hàng loạt theo bộ lọc, nhóm, lịch sử thay đổi")
     s, _, body = tb.request("POST", f"{P}/readers/Batch/Preview", token=token, json_body=lrc_filter)
@@ -723,8 +734,18 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     expect(s == 400 and "READER_BATCH_TOKEN_MISMATCH" in body, "mã xem trước không dùng được cho bộ lọc khác", body)
     t0 = time.time()
     s, _, body = tb.request("PUT", f"{P}/readers/BatchUpdate", token=token,
-                            json_body={"selection": {"search": lrc_filter, "token": preview.get("token")}, "expireDate": "2029-06-30"})
-    expect(s == 200 and json.loads(body)["count"] == n_rows, f"sửa hạn thẻ {n_rows} bạn đọc theo bộ lọc ({time.time() - t0:.1f} giây)", body)
+                            json_body={"selection": {"search": lrc_filter, "token": preview.get("token")}, "expireDate": "2029-06-30"},
+                            headers={"X-Change-Reason": urllib.parse.quote("Gia hạn thẻ E2E")})
+    queued = json.loads(body) if s == 200 else {}
+    expect(queued.get("count") == n_rows and queued.get("jobId"), f"sửa hạn thẻ {n_rows} bạn đọc theo bộ lọc → chạy nền", body)
+    bjob = {}
+    while time.time() - t0 < 300:
+        s, _, body = tb.request("GET", f"{P}/readers/Batch/Jobs/{queued.get('jobId')}", token=token)
+        bjob = json.loads(body) if s == 200 else bjob
+        if bjob.get("status") in ("Done", "Failed"): break
+        time.sleep(2)
+    expect(bjob.get("status") == "Done" and bjob.get("updated") == n_rows and bjob.get("failed") == 0,
+           f"sửa hàng loạt chạy nền xong sau {time.time() - t0:.0f} giây: {bjob.get('updated')} bạn đọc", json.dumps(bjob)[:300])
     s, _, body = tb.request("POST", f"{P}/reader-groups/Add", token=token, json_body={"name": f"E2E nhóm {tag}", "code": f"E2E{tag}"})
     group = json.loads(body) if s == 201 else {}
     expect(s == 201, "tạo nhóm bạn đọc", body)
@@ -753,11 +774,14 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
            and any(x.get("changes") and "expireDate" in x["changes"] for x in hist),
            f"lịch sử thay đổi: {len(hist)} dòng, có sửa hàng loạt hạn thẻ và điện thoại cũ → mới kèm lý do", json.dumps(hist)[:300])
     ids = []
-    for page_no in (1, 2, 3):
+    for page_no in range(1, n_rows // 500 + 2):
         s, _, body = tb.request("POST", f"{P}/readers/Search", token=token, json_body={**lrc_filter, "pageSize": 500, "pageIndex": page_no})
         ids += [r["publicId"] for r in json.loads(body)["items"]] if s == 200 else []
-    s, _, body = tb.request("POST", f"{P}/readers/BulkDelete", token=token, json_body={"publicIds": ids})
-    expect(s == 200 and json.loads(body)["count"] == n_rows, f"xoá nhiều {len(ids)} bạn đọc đã chọn (dọn dữ liệu thử)", body)
+    removed = 0
+    for i in range(0, len(ids), 2000):  # xoá nhiều: tối đa 2.000 mỗi lần
+        s, _, body = tb.request("POST", f"{P}/readers/BulkDelete", token=token, json_body={"publicIds": ids[i:i + 2000]})
+        removed += json.loads(body)["count"] if s == 200 else 0
+    expect(removed == n_rows, f"xoá nhiều {len(ids)} bạn đọc đã chọn (dọn dữ liệu thử)", body)
     s, _, body = tb.request("DELETE", f"{P}/reader-groups/Delete/{group.get('publicId')}", token=token)
     s2, _, body2 = tb.request("POST", f"{P}/classes/SearchAll", token=token, json_body={"keyword": lrc_class})
     for c in (json.loads(body2) if s2 == 200 else []):

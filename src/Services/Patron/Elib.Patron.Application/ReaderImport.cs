@@ -15,9 +15,10 @@ namespace Elib.Patron.Application;
 /// Tuỳ chọn nhập (ELIB-LRC: mapping, overwrite, readerTypeId, autoCreateRefs). <see cref="Columns"/>: khoá trường → số cột (bắt đầu 1) trong file.
 /// <see cref="ReaderTypeId"/>: loại bạn đọc cho cả file (thay cột Loại bạn đọc). <see cref="Overwrite"/>: số thẻ đã có thì cập nhật, ô trống giữ
 /// giá trị cũ. <see cref="AutoCreateRefs"/>: lớp/khoá chưa có thì tạo mới (đơn vị/dân tộc/trình độ thuộc service tenant — phải có sẵn).
+/// <see cref="OpacCardNoPassword"/>: bạn đọc mới được đăng nhập OPAC bằng mật khẩu = số thẻ (identity đặt qua event, bắt đổi lần đầu).
 /// </summary>
 public sealed record ReaderImportOptions(int HeaderRow, IReadOnlyDictionary<string, int> Columns, bool Overwrite = false, long? ReaderTypeId = null,
-    bool AutoCreateRefs = false);
+    bool AutoCreateRefs = false, bool OpacCardNoPassword = false);
 
 public sealed record ImportHeader(int Index, string Title);
 
@@ -250,7 +251,7 @@ public sealed partial class ReaderResource
             reader.Update(Merge(reader, request));
             await ValidateAsync(reader, ct);
         }
-        await PublishAsync(reader, deleted: false, ct);
+        await PublishAsync(reader, deleted: false, initialCardNoPassword: existing is null && o.OpacCardNoPassword, ct);
         try
         {
             await Db.SaveChangesAsync(ct);
@@ -365,7 +366,8 @@ public sealed class ReaderImportDispatcher : IReaderImportDispatcher
 }
 
 /// <summary>Xem trước (tạo lượt nhập Ready), xem tiến độ, bấm chạy, tải file lỗi — quyền READERS:add.</summary>
-public sealed class ReaderImportService(ReaderResource readers, ICrudDbContext db, ITenantContext tenant, IReaderImportDispatcher queue)
+public sealed class ReaderImportService(ReaderResource readers, ICrudDbContext db, ITenantContext tenant, IReaderImportDispatcher queue,
+    CrudAuditContext audit)
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -386,13 +388,16 @@ public sealed class ReaderImportService(ReaderResource readers, ICrudDbContext d
         return ToDto(job);
     }
 
-    public async Task<ReaderImportJobDto> GetAsync(Guid id, CancellationToken ct) => ToDto(await LoadAsync(id, ct));
+    public async Task<ReaderImportJobDto> GetAsync(Guid id, CancellationToken ct) => ToDto(await LoadAsync(id, ReaderJobKind.Import, ct));
+
+    /// <summary>Tiến độ sửa hàng loạt chạy nền (quyền READERS:edit).</summary>
+    public async Task<ReaderImportJobDto> GetBatchAsync(Guid id, CancellationToken ct) => ToDto(await LoadAsync(id, ReaderJobKind.BatchUpdate, ct));
 
     public async Task<ReaderImportJobDto> StartAsync(Guid id, CancellationToken ct)
     {
-        var job = await LoadAsync(id, ct);
+        var job = await LoadAsync(id, ReaderJobKind.Import, ct);
         if (job.ToCreate + job.ToUpdate == 0) throw new BusinessRuleException("IMPORT_NOTHING_TO_DO", "Không có dòng hợp lệ nào để nhập — sửa file rồi xem trước lại.");
-        job.Queue();
+        job.Queue(JsonSerializer.Serialize(audit.Capture(), Json));
         await db.SaveChangesAsync(ct);
         queue.Enqueue(tenant.RequireTenantId(), job.Id);
         return ToDto(job);
@@ -400,14 +405,14 @@ public sealed class ReaderImportService(ReaderResource readers, ICrudDbContext d
 
     public async Task<(byte[] File, string Name)> ErrorFileAsync(Guid id, CancellationToken ct)
     {
-        var job = await LoadAsync(id, ct);
+        var job = await LoadAsync(id, ReaderJobKind.Import, ct);
         return job.ErrorFile is { Length: > 0 } bytes
             ? (bytes, $"dong-can-sua-{Path.GetFileNameWithoutExtension(job.FileName)}.xlsx")
             : throw new NotFoundException("file dòng lỗi", id);
     }
 
-    private async Task<ReaderImportJob> LoadAsync(Guid id, CancellationToken ct) =>
-        await db.Set<ReaderImportJob>().FirstOrDefaultAsync(j => j.PublicId == id, ct) ?? throw new NotFoundException("lượt nhập", id);
+    private async Task<ReaderImportJob> LoadAsync(Guid id, ReaderJobKind kind, CancellationToken ct) =>
+        await db.Set<ReaderImportJob>().FirstOrDefaultAsync(j => j.PublicId == id && j.Kind == kind, ct) ?? throw new NotFoundException("lượt chạy nền", id);
 
     public static string ErrorsJson(IEnumerable<ReaderImportPlan> failed) =>
         JsonSerializer.Serialize(failed.Take(CrudResource<ReaderResource, Reader, ReaderSearch, ReaderRequest, ReaderDto>.MaxImportErrors)

@@ -89,6 +89,10 @@ const MAX_BYTES = 20 * 1024 * 1024;
                   <input type="checkbox" class="mt-1 rounded border-gray-300" [(ngModel)]="autoCreate" />
                   <span>{{ 'READER_IMPORT.AUTO_CREATE' | translate }}<span class="block text-xs text-gray-500">{{ 'READER_IMPORT.AUTO_CREATE_HINT' | translate }}</span></span>
                 </label>
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                  <input id="ri-opac" type="checkbox" class="mt-1 rounded border-gray-300" [(ngModel)]="opacCardNo" />
+                  <span>{{ 'READER_IMPORT.OPAC_CARDNO' | translate }}<span class="block text-xs text-gray-500">{{ 'READER_IMPORT.OPAC_CARDNO_HINT' | translate }}</span></span>
+                </label>
               </div>
             </div>
           }
@@ -183,6 +187,7 @@ export class ReaderImport {
   protected readonly job = signal<ReaderImportJob | null>(null);
   protected overwrite = false;
   protected autoCreate = false;
+  protected opacCardNo = false;
   protected readerTypeId: number | null = null;
 
   protected readonly running = computed(() => ['Queued', 'Running'].includes(this.job()?.status ?? ''));
@@ -237,6 +242,7 @@ export class ReaderImport {
     await this.run(async () => {
       this.job.set(await this.api.previewReaderImport(file, {
         headerRow: columns.headerRow, columns: mapping, overwrite: this.overwrite, readerTypeId: this.readerTypeId, autoCreateRefs: this.autoCreate,
+        opacCardNoPassword: this.opacCardNo,
       }));
       this.step.set(3);
     });

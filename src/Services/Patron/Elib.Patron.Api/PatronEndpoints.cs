@@ -36,6 +36,8 @@ public static class PatronEndpoints
             => r.PreviewSelectionAsync(search, ct));
         readers.MapPut("/BatchUpdate", [Permission("READERS", "edit")] (ReaderBatchUpdateRequest request, ReaderResource r, CancellationToken ct)
             => r.BatchUpdateAsync(request, ct));
+        readers.MapGet("/Batch/Jobs/{id:guid}", [Permission("READERS", "edit")] (Guid id, ReaderImportService s, CancellationToken ct)
+            => s.GetBatchAsync(id, ct));
         readers.MapPost("/BulkDelete", [Permission("READERS", "delete")] (ReaderBulkDeleteRequest request, ReaderResource r, CancellationToken ct)
             => r.BulkDeleteAsync(request, ct));
         readers.MapPut("/Groups", [Permission("READERS", "edit")] (ReaderGroupsRequest request, ReaderResource r, CancellationToken ct)

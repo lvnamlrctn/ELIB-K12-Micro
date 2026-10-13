@@ -94,7 +94,7 @@ public sealed record ReaderExportRequest(ReaderSearch? Search, IReadOnlyList<str
 /// Mọi thay đổi phát <see cref="ReaderChanged"/> (outbox, cùng transaction) cho bản sao ở các service khác.
 /// </summary>
 public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock,
-    ITenantReferences references)
+    ITenantReferences references, CrudAuditContext? auditContext = null, IReaderImportDispatcher? jobs = null)
     : CrudResource<ReaderResource, Reader, ReaderSearch, ReaderRequest, ReaderDto>(db), ICrudImportable<ReaderRequest>
 {
     public const int MaxBulk = 2000;
@@ -455,10 +455,12 @@ public sealed partial class ReaderResource(ICrudDbContext db, IPublishEndpoint p
             ? await ToEventAsync(reader, deleted: false, ct)
             : null;
 
-    private async Task PublishAsync(Reader reader, bool deleted, CancellationToken ct)
+    private Task PublishAsync(Reader reader, bool deleted, CancellationToken ct) => PublishAsync(reader, deleted, initialCardNoPassword: false, ct);
+
+    private async Task PublishAsync(Reader reader, bool deleted, bool initialCardNoPassword, CancellationToken ct)
     {
         if (reader.PublicId == Guid.Empty) reader.PublicId = Guid.CreateVersion7(); // bạn đọc mới: interceptor chỉ gán khi còn trống
-        await publisher.Publish(await ToEventAsync(reader, deleted, ct), ct);
+        await publisher.Publish(await ToEventAsync(reader, deleted, ct) with { InitialCardNoPassword = initialCardNoPassword }, ct);
     }
 
     private Dictionary<long, string>? _typeNames, _classNames, _courseNames;

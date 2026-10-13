@@ -1642,7 +1642,9 @@
     "BACK": "Quay lại",
     "NEXT": "Tiếp",
     "PREVIEW": "Xem trước",
-    "RUN": "Chạy nhập"
+    "RUN": "Chạy nhập",
+    "OPAC_CARDNO": "Mật khẩu OPAC = số thẻ cho bạn đọc mới",
+    "OPAC_CARDNO_HINT": "Bạn đọc mới đăng nhập OPAC bằng số thẻ và phải đổi mật khẩu ở lần đầu. Bạn đọc đã có mật khẩu giữ nguyên."
   },
   "READER_BATCH": {
     "EDIT": "Sửa hàng loạt",
@@ -1665,7 +1667,9 @@
     "GROUP_REMOVED": "Đã bỏ {{count}} bạn đọc khỏi nhóm.",
     "DELETE_SELECTED": "Xoá đã chọn ({{count}})",
     "DELETE_CONFIRM": "Xoá {{count}} bạn đọc đã chọn? Bạn đọc đã xoá không còn mượn được tài liệu.",
-    "DELETED": "Đã xoá {{count}} bạn đọc."
+    "DELETED": "Đã xoá {{count}} bạn đọc.",
+    "BACKGROUND": "Đang sửa {{count}} bạn đọc ở chế độ chạy nền — có thể đóng hộp thoại, việc vẫn tiếp tục.",
+    "SKIPPED": "Bỏ qua {{count}} bạn đọc:"
   },
   "READER_HISTORY": {
     "OPEN": "Lịch sử thay đổi",

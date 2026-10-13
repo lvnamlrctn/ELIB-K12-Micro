@@ -66,6 +66,7 @@ type Elib.Contracts.Events.Patron.ReaderChanged class : Elib.Contracts.Events.In
   Email : System.String?
   ExpireDate : Nullable<System.DateOnly>
   FullName : System.String required
+  InitialCardNoPassword : System.Boolean
   Phone : System.String?
   PhotoId : Nullable<System.Guid>
   ReaderPublicId : System.Guid required

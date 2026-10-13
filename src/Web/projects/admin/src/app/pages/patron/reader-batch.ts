@@ -1,7 +1,7 @@
-import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Api, ReaderSearch, ReaderSelection, ReaderSelectionPreview, errorMessage } from '../../core/api';
+import { Api, ReaderImportJob, ReaderSearch, ReaderSelection, ReaderSelectionPreview, errorMessage } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
@@ -13,15 +13,44 @@ interface BatchChange {
   issueDate: string; expireDate: string;
 }
 
+/** Kết quả sửa hàng loạt: ngay (≤ 2.000 bạn đọc) hoặc lượt chạy nền đã xong. */
+interface BatchOutcome { updated: number; failed: number; errors: string[]; }
+
 /**
  * Thao tác hàng loạt kiểu ELIB-LRC (BatchUpdate / ReaderInGroup): áp cho bạn đọc đã tích hoặc TOÀN BỘ kết quả lọc hiện tại. Theo bộ lọc thì
- * bấm "Xem trước" để biết số bạn đọc bị ảnh hưởng — server trả mã xác nhận 15 phút gắn với đúng bộ lọc đó.
+ * bấm "Xem trước" để biết số bạn đọc bị ảnh hưởng — server trả mã xác nhận 15 phút gắn với đúng bộ lọc đó. Sửa trên 2.000 bạn đọc thì
+ * server chạy nền: hộp thoại hiện tiến độ tới khi xong; bạn đọc vi phạm quy tắc được bỏ qua và liệt kê.
  */
 @Component({
   selector: 'app-reader-batch',
   imports: [FormsModule, Modal, TranslatePipe],
   template: `
     <app-modal [title]="(mode() === 'update' ? 'READER_BATCH.TITLE_UPDATE' : 'READER_BATCH.TITLE_GROUPS') | translate" widthClass="max-w-2xl" (closed)="closed.emit()">
+      @if (job() || outcome()) {
+        @if (job(); as j) {
+          @if (j.status !== 'Done' && j.status !== 'Failed') {
+            <p class="text-sm text-gray-600 mb-2">{{ 'READER_BATCH.BACKGROUND' | translate: { count: j.total } }}</p>
+            <div class="flex justify-between text-xs text-gray-600 mb-1">
+              <span>{{ ('READER_IMPORT.STATUS_' + j.status) | translate }}</span><span>{{ j.processed }} / {{ j.total }}</span>
+            </div>
+            <div class="h-2 rounded-full bg-gray-100 overflow-hidden" role="progressbar" [attr.aria-valuenow]="percent()" aria-valuemin="0" aria-valuemax="100">
+              <div class="h-full bg-blue-600 transition-all" [style.width.%]="percent()"></div>
+            </div>
+          }
+          @if (j.status === 'Failed') { <div class="alert-error">{{ j.message }}</div> }
+        }
+        @if (outcome(); as o) {
+          <div class="alert-success">{{ 'READER.BULK_DONE' | translate: { count: o.updated } }}</div>
+          @if (o.failed) {
+            <div class="mt-3">
+              <p class="text-sm font-medium text-red-700 mb-1">{{ 'READER_BATCH.SKIPPED' | translate: { count: o.failed } }}</p>
+              <ul class="max-h-56 overflow-y-auto rounded border border-red-100 text-xs text-gray-700 divide-y divide-red-50">
+                @for (e of o.errors; track $index) { <li class="px-2 py-1">{{ e }}</li> }
+              </ul>
+            </div>
+          }
+        }
+      } @else {
       <fieldset class="mb-4">
         <legend class="form-label">{{ 'READER_BATCH.APPLY_TO' | translate }}</legend>
         <div class="flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm">
@@ -54,6 +83,8 @@ interface BatchChange {
               @for (o of c.orgOptions(); track o.id) { <option [ngValue]="o.id">{{ indent(o.depth) }}{{ o.name }}</option> }</select></div>
           <div><label class="form-label" for="b-issue">{{ 'READER.ISSUED_DATE' | translate }}</label><input id="b-issue" type="date" class="input" [(ngModel)]="change.issueDate" /></div>
           <div><label class="form-label" for="b-exp">{{ 'READER.EXPIRED_DATE' | translate }}</label><input id="b-exp" type="date" class="input" [(ngModel)]="change.expireDate" /></div>
+          <div class="sm:col-span-2"><label class="form-label" for="b-reason">{{ 'READER_HISTORY.REASON' | translate }}</label>
+            <input id="b-reason" class="input" maxlength="500" [(ngModel)]="reason" [placeholder]="'READER_HISTORY.REASON_PH' | translate" /></div>
         </div>
       } @else {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -76,8 +107,12 @@ interface BatchChange {
           } @else { {{ 'READER_BATCH.PREVIEW_HINT' | translate }} }
         </div>
       }
+      }
 
       <ng-container footer>
+        @if (job() || outcome()) {
+          <button type="button" class="btn-primary" [disabled]="!finished()" (click)="done.emit()">{{ 'COMMON.CLOSE' | translate }}</button>
+        } @else {
         <button type="button" class="btn-secondary" (click)="closed.emit()">{{ 'COMMON.CANCEL' | translate }}</button>
         @if (scope() === 'filter' && !preview()) {
           <button type="button" class="btn-primary" [disabled]="busy()" (click)="runPreview()">
@@ -85,6 +120,7 @@ interface BatchChange {
         } @else {
           <button type="button" class="btn-primary" [disabled]="busy() || !ready()" (click)="apply()">
             <span class="material-icons text-[16px]">done_all</span> {{ 'READER_BATCH.APPLY' | translate: { count: affected() } }}</button>
+        }
         }
       </ng-container>
     </app-modal>
@@ -110,6 +146,22 @@ export class ReaderBatch implements OnInit {
   protected change: BatchChange = { readerTypeId: null, classId: null, courseId: null, orgId: null, status: null, issueDate: '', expireDate: '' };
   protected groupId: number | null = null;
   protected add = true;
+  protected reason = '';
+  protected readonly job = signal<ReaderImportJob | null>(null);
+  protected readonly outcome = signal<BatchOutcome | null>(null);
+  protected readonly finished = computed(() => {
+    const status = this.job()?.status;
+    return !this.job() || status === 'Done' || status === 'Failed';
+  });
+  protected readonly percent = computed(() => {
+    const j = this.job();
+    return j?.total ? Math.round((j.processed * 100) / j.total) : 0;
+  });
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.timer));
+  }
 
   protected readonly affected = computed(() => this.scope() === 'selected' ? this.selectedIds().length : this.preview()?.count ?? 0);
 
@@ -148,14 +200,44 @@ export class ReaderBatch implements OnInit {
         this.toastr.success(this.add ? 'READER_BATCH.GROUP_ADDED' : 'READER_BATCH.GROUP_REMOVED', { count });
       } else {
         const c = this.change;
-        const { count } = await this.api.batchUpdateReaders({
+        const result = await this.api.batchUpdateReaders({
           selection, readerTypeId: c.readerTypeId, classId: c.classId, courseId: c.courseId, orgId: c.orgId, status: c.status,
           issueDate: c.issueDate || null, expireDate: c.expireDate || null,
-        });
-        this.toastr.success('READER.BULK_DONE', { count });
+        }, this.reason);
+        if (result.jobId) {
+          this.job.set(await this.api.readerBatchJob(result.jobId));
+          this.poll();
+          return;
+        }
+        if (result.failed) {
+          this.outcome.set({ updated: result.count, failed: result.failed, errors: result.errors ?? [] });
+          return;
+        }
+        this.toastr.success('READER.BULK_DONE', { count: result.count });
       }
       this.done.emit();
     }, true);
+  }
+
+  /** Theo dõi lượt chạy nền mỗi giây tới khi xong; xong thì hiện số đã sửa và bạn đọc bị bỏ qua. */
+  private poll(): void {
+    this.timer = setTimeout(async () => {
+      const job = this.job();
+      if (!job) return;
+      try {
+        const current = await this.api.readerBatchJob(job.id);
+        this.job.set(current);
+        if (current.status === 'Done') {
+          this.outcome.set({ updated: current.updated, failed: current.failed, errors: current.errors.map((e) => e.message) });
+          return;
+        }
+        if (current.status === 'Failed') return;
+      } catch (e) {
+        this.toastr.error(errorMessage(e));
+        return;
+      }
+      this.poll();
+    }, 1000);
   }
 
   /** Mã xem trước hết hạn / bộ lọc đổi → xem trước lại. */

@@ -16,6 +16,7 @@ public static class CrudServiceCollectionExtensions
         services.AddScoped<ICrudDbContext>(sp => sp.GetRequiredService<TContext>());
         services.AddHttpContextAccessor();
         services.Configure<CrudAuditOptions>(o => o.ServiceName = serviceName);
+        services.AddScoped<CrudAuditContext>();
         services.AddScoped<ICrudAuditSink, PublishingCrudAuditSink>();
         return services;
     }

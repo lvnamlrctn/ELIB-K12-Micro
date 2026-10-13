@@ -42,6 +42,8 @@ public sealed class ReaderAccountService(IIdentityDb db, ITenantContext tenant, 
         var account = await db.ReaderAccounts.FirstOrDefaultAsync(x => x.ReaderPublicId == e.ReaderPublicId, ct);
         if (account is null) db.ReaderAccounts.Add(account = new ReaderAccount { ReaderPublicId = e.ReaderPublicId });
         account.ApplyProfile(e.Version, e.CardNo, e.FullName, e.Email, e.Status, e.ExpireDate, e.Deleted);
+        // Nhập Excel có chọn "mật khẩu OPAC = số thẻ": chỉ đặt khi chưa có mật khẩu — không ghi đè mật khẩu cán bộ/bạn đọc đã đặt.
+        if (e.InitialCardNoPassword && !account.Deleted && !account.HasPassword) account.UseCardNoPassword();
         return account;
     }
 

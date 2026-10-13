@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.TenantReplica;
@@ -16,11 +17,14 @@ namespace Elib.Patron.Infrastructure;
 /// mới nhất, ghi từng dòng (mỗi dòng một SaveChanges: hồ sơ + event outbox), theo lô 200 dòng với scope/DbContext mới để bộ theo dõi
 /// thay đổi không phình ra. Dòng lỗi bỏ qua và ghi vào file "Dòng cần sửa". Khởi động lại: lượt đang chờ chạy tiếp, lượt đang chạy dở
 /// đánh dấu lỗi (đã ghi dòng nào giữ dòng đó). Lượt nhập cũ hơn 7 ngày xoá hẳn (cả file gốc).
+/// Cùng hàng đợi chạy sửa hàng loạt theo bộ lọc khớp nhiều bạn đọc (<see cref="ReaderJobKind.BatchUpdate"/>, lô 500).
+/// Mỗi scope đặt lại người bấm chạy (<see cref="CrudAuditContext.RunAs"/>) để event/nhật ký/lịch sử thay đổi ghi đúng người, lý do sửa.
 /// </summary>
 public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IReaderImportDispatcher queue, TimeProvider clock,
     ILogger<ReaderImportWorker> logger) : BackgroundService
 {
     public const int BatchSize = 200;
+    public const int BatchChunk = 500;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -61,6 +65,7 @@ public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IRea
         ReaderImportOptions options;
         IReadOnlyList<string> headers;
         List<ReaderImportPlan> plans;
+        CrudAuditOrigin? origin;
         using (var scope = scopes.CreateScope())
         {
             var sp = scope.ServiceProvider;
@@ -68,8 +73,18 @@ public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IRea
             var db = sp.GetRequiredService<PatronDbContext>();
             var job = await db.Set<ReaderImportJob>().FirstOrDefaultAsync(j => j.Id == jobId, ct);
             if (job is not { Status: ReaderImportStatus.Queued }) return;
+            origin = job.OriginJson is { } json ? JsonSerializer.Deserialize<CrudAuditOrigin>(json, ReaderImportService.Json) : null;
+            if (origin is not null) sp.GetRequiredService<CrudAuditContext>().RunAs(origin);
             job.Start(clock.GetUtcNow());
             await db.SaveChangesAsync(ct);
+            if (job.Kind == ReaderJobKind.BatchUpdate)
+            {
+                var request = JsonSerializer.Deserialize<ReaderBatchUpdateRequest>(job.OptionsJson, ReaderImportService.Json)
+                    ?? throw new InvalidOperationException("Yêu cầu sửa hàng loạt hỏng.");
+                var ids = await sp.GetRequiredService<ReaderResource>().MatchBatchAsync(request, ct);
+                await RunBatchUpdateAsync(tenantId, jobId, origin, request, ids, ct);
+                return;
+            }
 
             options = JsonSerializer.Deserialize<ReaderImportOptions>(job.OptionsJson, ReaderImportService.Json)
                 ?? throw new InvalidOperationException("Tuỳ chọn nhập hỏng.");
@@ -85,6 +100,7 @@ public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IRea
             using var scope = scopes.CreateScope();
             var sp = scope.ServiceProvider;
             using var _ = sp.GetRequiredService<ITenantContext>().Use(tenantId);
+            if (origin is not null) sp.GetRequiredService<CrudAuditContext>().RunAs(origin);
             var readers = sp.GetRequiredService<ReaderResource>();
             foreach (var plan in batch)
             {
@@ -109,6 +125,7 @@ public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IRea
         {
             var sp = scope.ServiceProvider;
             using var _ = sp.GetRequiredService<ITenantContext>().Use(tenantId);
+            if (origin is not null) sp.GetRequiredService<CrudAuditContext>().RunAs(origin);
             var db = sp.GetRequiredService<PatronDbContext>();
             var job = await db.Set<ReaderImportJob>().FirstAsync(j => j.Id == jobId, ct);
             failed.Sort((a, b) => a.Row.Number.CompareTo(b.Row.Number));
@@ -116,7 +133,44 @@ public sealed partial class ReaderImportWorker(IServiceScopeFactory scopes, IRea
             job.Finish(clock.GetUtcNow(), failed.Count > 0 ? ReaderWorkbook.ErrorFile(headers, failed) : null, ReaderImportService.ErrorsJson(failed));
             await db.SaveChangesAsync(ct);
             await sp.GetRequiredService<ReaderResource>().RecordImportAuditAsync(
-                $"nhập Excel {job.FileName}: thêm {created}, cập nhật {updated}, lỗi {failed.Count}", ct);
+                $"nhập Excel {job.FileName}: thêm {created}, cập nhật {updated}, lỗi {failed.Count}"
+                + (options.OpacCardNoPassword && created > 0 ? ", mật khẩu OPAC của bạn đọc mới = số thẻ" : ""), ct);
+        }
+    }
+
+    /// <summary>Sửa hàng loạt theo lô <see cref="BatchChunk"/> bạn đọc, mỗi lô một scope; lỗi từng bạn đọc ghi vào danh sách lỗi của lượt.</summary>
+    private async Task RunBatchUpdateAsync(long tenantId, long jobId, CrudAuditOrigin? origin, ReaderBatchUpdateRequest request, List<long> ids,
+        CancellationToken ct)
+    {
+        int processed = 0, updated = 0, failed = 0;
+        var errors = new List<string>();
+        foreach (var chunk in ids.Chunk(BatchChunk))
+        {
+            using var scope = scopes.CreateScope();
+            var sp = scope.ServiceProvider;
+            using var _ = sp.GetRequiredService<ITenantContext>().Use(tenantId);
+            if (origin is not null) sp.GetRequiredService<CrudAuditContext>().RunAs(origin);
+            var done = await sp.GetRequiredService<ReaderResource>().ApplyBatchAsync(request, chunk, ct);
+            processed += chunk.Length;
+            updated += done.Count;
+            failed += chunk.Length - done.Count; // gồm bạn đọc bị xoá giữa chừng
+            errors.AddRange(done.Errors.Take(Math.Max(0, ReaderResource.MaxImportErrors - errors.Count)));
+            var db = sp.GetRequiredService<PatronDbContext>();
+            var job = await db.Set<ReaderImportJob>().FirstAsync(j => j.Id == jobId, ct);
+            job.Progress(processed, 0, updated, failed);
+            await db.SaveChangesAsync(ct);
+        }
+
+        using (var scope = scopes.CreateScope())
+        {
+            var sp = scope.ServiceProvider;
+            using var _ = sp.GetRequiredService<ITenantContext>().Use(tenantId);
+            if (origin is not null) sp.GetRequiredService<CrudAuditContext>().RunAs(origin);
+            var db = sp.GetRequiredService<PatronDbContext>();
+            var job = await db.Set<ReaderImportJob>().FirstAsync(j => j.Id == jobId, ct);
+            job.Progress(processed, 0, updated, failed);
+            job.Finish(clock.GetUtcNow(), null, JsonSerializer.Serialize(errors.Select((e, i) => new CrudImportError(i + 1, e)), ReaderImportService.Json));
+            await db.SaveChangesAsync(ct);
         }
     }
 
