@@ -90,8 +90,12 @@ export interface CrudRowAction {
   title: string;
   /** Hành động quyền cần có trên module của màn. */
   action: string;
+  /** Chỉ hiện ở dòng thoả điều kiện (ví dụ một tham số cụ thể). */
+  show?: (row: Record<string, unknown>) => boolean;
+  /** Ô nhập trước khi chạy (mở hộp thoại nhỏ) — ví dụ tài khoản thử để kiểm tra kết nối. */
+  inputs?: { key: string; label: string; type?: 'text' | 'password' }[];
   /** Trả về thông báo kết quả (ném lỗi = báo lỗi). */
-  run: (api: Api, row: Record<string, unknown> & { publicId: string }) => Promise<CrudMessage>;
+  run: (api: Api, row: Record<string, unknown> & { publicId: string }, values: Record<string, string>) => Promise<CrudMessage>;
 }
 
 export interface CrudToolbarAction {
@@ -217,7 +221,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 <td class="td">
                   <div class="flex items-center justify-center space-x-2">
                     @for (a of c.rowActions ?? []; track a.title) {
-                      @if (can(a.action)) {
+                      @if (can(a.action) && (!a.show || a.show(row))) {
                         <button (click)="runRowAction(a, row); $event.stopPropagation()" [disabled]="busyRow() === row.publicId"
                                 class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="a.title | translate">
                           <span class="material-icons text-[18px]" [class.animate-spin]="busyRow() === row.publicId">{{ busyRow() === row.publicId ? 'autorenew' : a.icon }}</span>
@@ -247,6 +251,24 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
         <app-paginator [total]="p.totalCount" [pageIndex]="pageIndex" [pageSize]="pageSize" (pageChange)="onPage($event)" />
       }
     </div>
+
+    @if (actionDialog(); as d) {
+      <app-modal [title]="d.action.title | translate" widthClass="max-w-md" (closed)="actionDialog.set(null)">
+        <form id="row-action-form" (ngSubmit)="submitRowAction()" class="space-y-4">
+          @for (i of d.action.inputs ?? []; track i.key) {
+            <div>
+              <label class="form-label" [for]="'ra-' + i.key">{{ i.label | translate }}</label>
+              <input [id]="'ra-' + i.key" [name]="i.key" class="input" [type]="i.type ?? 'text'" autocomplete="off" [(ngModel)]="d.values[i.key]" required />
+            </div>
+          }
+        </form>
+        <ng-container footer>
+          <button type="button" class="btn-secondary" (click)="actionDialog.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="submit" form="row-action-form" class="btn-primary" [disabled]="busyRow() !== null">
+            <span class="material-icons text-[16px]">{{ d.action.icon }}</span> {{ d.action.title | translate }}</button>
+        </ng-container>
+      </app-modal>
+    }
 
     @if (editing(); as item) {
       <app-modal [title]="language.t(item.publicId ? 'COMMON.UPDATE_NAMED' : 'COMMON.ADD_NAMED', { name: language.t(c.title) })" [widthClass]="c.modalWidth ?? 'max-w-md'" (closed)="editing.set(null)">
@@ -535,10 +557,24 @@ export class CrudPage implements OnInit {
     else this.toastr.success(m.key, m.params);
   }
 
-  protected async runRowAction(action: CrudRowAction, row: Row): Promise<void> {
+  /** Nút trên dòng có ô nhập: mở hộp thoại, bấm chạy mới gọi run. */
+  protected readonly actionDialog = signal<{ action: CrudRowAction; row: Row; values: Record<string, string> } | null>(null);
+
+  protected async submitRowAction(): Promise<void> {
+    const d = this.actionDialog();
+    if (!d) return;
+    await this.runRowAction(d.action, d.row, d.values);
+  }
+
+  protected async runRowAction(action: CrudRowAction, row: Row, values?: Record<string, string>): Promise<void> {
+    if (action.inputs?.length && !values) {
+      this.actionDialog.set({ action, row, values: {} });
+      return;
+    }
     this.busyRow.set(row.publicId);
     try {
-      this.notify(await action.run(this.api, row));
+      this.notify(await action.run(this.api, row, values ?? {}));
+      this.actionDialog.set(null);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

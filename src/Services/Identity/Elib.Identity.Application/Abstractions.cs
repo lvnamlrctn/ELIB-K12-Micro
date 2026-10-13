@@ -36,6 +36,12 @@ public enum LoginError
     LockedOut,
     AccountDisabled,
     TenantUnavailable,
+
+    /// <summary>Đúng tài khoản LDAP/API của trường nhưng thư viện chưa có hồ sơ bạn đọc khớp.</summary>
+    NoReaderProfile,
+
+    /// <summary>Không kết nối được hệ thống xác thực ngoài (LDAP/API) và đơn vị không cho dùng mật khẩu thư viện thay thế.</summary>
+    ExternalUnavailable,
 }
 
 public sealed record LoginResult(SignInIdentity? Identity, LoginError? Error)

@@ -62,6 +62,7 @@ public static class DefaultTemplates
 {
     public const string TestEmail = "TEST_EMAIL";
     public const string LoginOtp = "LOGIN_OTP";
+    public const string ReaderPasswordReset = "READER_PASSWORD_RESET";
 
     // Lưu thông (circulation gửi theo mã — giữ tên monolith EMAIL_PRINT_*).
     public const string PrintDueSoon = "PRINT_DUE_SOON";
@@ -86,6 +87,13 @@ public static class DefaultTemplates
             <p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ otp }}</p>
             <p>Mã có hiệu lực trong {{ minutes }} phút. Không chia sẻ mã này cho bất kỳ ai.</p>
             <p>Nếu bạn không đăng nhập, hãy đổi mật khẩu ngay.</p>
+            """),
+        new(ReaderPasswordReset, "Đặt lại mật khẩu bạn đọc", "Đặt lại mật khẩu tra cứu — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Thư viện nhận được yêu cầu đặt lại mật khẩu tra cứu (OPAC) cho thẻ <strong>{{ card_no }}</strong>.</p>
+            <p><a href="{{ link }}">Bấm vào đây để đặt mật khẩu mới</a> — link có hiệu lực trong {{ minutes }} phút và chỉ dùng được một lần.</p>
+            <p>Nếu bạn không yêu cầu, hãy bỏ qua thư này; mật khẩu hiện tại vẫn giữ nguyên.</p>
             """),
         new(PrintDueSoon, "Nhắc sách sắp đến hạn trả", "Sách sắp đến hạn trả — {{ tenant_name }}",
             """

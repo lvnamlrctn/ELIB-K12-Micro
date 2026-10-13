@@ -6,6 +6,7 @@
     <PackageReference Include="OpenIddict.AspNetCore" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" />
     <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="Novell.Directory.Ldap.NETStandard" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Elib.Identity.Application\Elib.Identity.Application.csproj" />

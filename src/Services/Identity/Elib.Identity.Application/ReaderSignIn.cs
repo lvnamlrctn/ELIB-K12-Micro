@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Elib.Identity.Application;
 
 /// <summary>Bạn đọc đã xác thực — nguồn để dựng cookie đăng nhập và access token của OPAC.</summary>
-public sealed record ReaderIdentity(long AccountId, long TenantId, Guid ReaderPublicId, string CardNo, string FullName, bool MustChangePassword);
+/// <summary><see cref="External"/>: phiên đăng nhập bằng tài khoản LDAP/API của trường — không dùng/không bắt đổi mật khẩu thư viện.</summary>
+public sealed record ReaderIdentity(long AccountId, long TenantId, Guid ReaderPublicId, string CardNo, string FullName, bool MustChangePassword,
+    bool External = false);
 
 public sealed record ReaderLoginResult(ReaderIdentity? Identity, LoginError? Error)
 {
@@ -36,7 +38,8 @@ public sealed record ReaderChangePasswordRequest(string? CurrentPassword, string
 /// Như nhân viên: không cho biết sai số thẻ hay sai mật khẩu, khoá tạm 15 phút sau 5 lần sai, chỉ báo "thẻ bị khoá" khi mật khẩu đúng.
 /// LDAP/API ngoài (READER_AUTH_CONFIG) chưa làm.
 /// </summary>
-public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, IPasswordHasher hasher, TimeProvider clock, IdentityAudit audit)
+public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, IPasswordHasher hasher, TimeProvider clock, IdentityAudit audit,
+    ILoginPolicySource policies, IExternalReaderAuth external)
 {
     private static string? _dummyHash;
 
@@ -48,8 +51,29 @@ public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, I
         if (replica is null || replica.Status != "Active") return Fail(password, LoginError.TenantUnavailable);
 
         using var scope = tenant.Use(tenantId);
-        var account = key.Length == 0 ? null : await FindAsync(key, ct);
         var now = clock.GetUtcNow();
+
+        // Xác thực qua LDAP/API của trường (READER_AUTH_CONFIG). Thành công → khớp hồ sơ theo số thẻ (hoặc email) hệ thống ngoài trả về;
+        // sai / không kết nối được → tuỳ FallbackToLocal mà thử mật khẩu thư viện (như ELIB-LRC).
+        if (ReaderAuthSettings.Parse((await policies.GetAsync(tenantId, ct)).ReaderAuth) is { IsExternal: true } settings && key.Length > 0)
+        {
+            var ext = await external.AuthenticateAsync(settings, key, password, ct);
+            if (ext.Outcome == ExternalAuthOutcome.Success)
+                return await ExternalLoginAsync(tenantId, key, settings, ext, now, ct);
+            if (!settings.FallbackToLocal)
+            {
+                if (await FindAsync(key, ct) is { } failed)
+                {
+                    failed.Credentials.RecordFailure(now);
+                    await db.SaveChangesAsync(ct);
+                }
+                await RecordFailedAsync(tenantId, key, ext.Outcome == ExternalAuthOutcome.Unavailable
+                    ? $"không kết nối được {settings.Provider}" : $"sai tài khoản {settings.Provider}", ct);
+                return new ReaderLoginResult(null, ext.Outcome == ExternalAuthOutcome.Unavailable ? LoginError.ExternalUnavailable : LoginError.InvalidCredentials);
+            }
+        }
+
+        var account = key.Length == 0 ? null : await FindAsync(key, ct);
         if (account is null)
         {
             await RecordFailedAsync(tenantId, key, "sai số thẻ hoặc mật khẩu", ct);
@@ -79,6 +103,50 @@ public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, I
         var who = ToIdentity(account);
         await audit.TenantAsync(tenantId, "READER_LOGIN", "Reader", account.ReaderPublicId.ToString(), $"Bạn đọc đăng nhập OPAC: {account.CardNo} — {account.FullName}", ct,
             Who(who));
+        await db.SaveChangesAsync(ct);
+        return new ReaderLoginResult(who, null);
+    }
+
+    /// <summary>Đúng tài khoản ngoài → hồ sơ bạn đọc khớp số thẻ/email; thẻ phải đang hoạt động; khoá tạm (sai nhiều lần) vẫn áp dụng.</summary>
+    private async Task<ReaderLoginResult> ExternalLoginAsync(long tenantId, string login, ReaderAuthSettings settings, ExternalAuthResult ext,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        var match = (settings.MatchByEmail ? ext.Email : ext.CardNo ?? login)?.Trim() ?? "";
+        ReaderAccount? account = null;
+        if (match.Length > 0)
+        {
+            if (settings.MatchByEmail)
+            {
+                var email = match.ToLowerInvariant();
+#pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang SQL lower().
+                account = await db.ReaderAccounts.FirstOrDefaultAsync(a => !a.Deleted && a.Email != null && a.Email.ToLower() == email, ct);
+#pragma warning restore CA1862, CA1304, CA1311
+            }
+            else
+            {
+                var cardKey = ReaderAccount.Key(match);
+                account = await db.ReaderAccounts.FirstOrDefaultAsync(a => a.CardKey == cardKey && !a.Deleted, ct);
+            }
+        }
+        if (account is null)
+        {
+            await RecordFailedAsync(tenantId, login, $"đúng tài khoản {settings.Provider} nhưng chưa có hồ sơ bạn đọc khớp", ct);
+            return new ReaderLoginResult(null, LoginError.NoReaderProfile);
+        }
+        if (account.Credentials.IsLockedOut(now))
+        {
+            await RecordFailedAsync(tenantId, login, "tài khoản đang bị khoá tạm", ct);
+            return new ReaderLoginResult(null, LoginError.LockedOut);
+        }
+        if (account.Status != IHasStatus.Active)
+        {
+            await RecordFailedAsync(tenantId, login, "thẻ bạn đọc đang bị khoá", ct);
+            return new ReaderLoginResult(null, LoginError.AccountDisabled);
+        }
+        account.Credentials.RecordSuccess(now);
+        var who = ToIdentity(account) with { MustChangePassword = false, External = true };
+        await audit.TenantAsync(tenantId, "READER_LOGIN", "Reader", account.ReaderPublicId.ToString(),
+            $"Bạn đọc đăng nhập OPAC qua {settings.Provider}: {account.CardNo} — {account.FullName}", ct, Who(who));
         await db.SaveChangesAsync(ct);
         return new ReaderLoginResult(who, null);
     }
@@ -119,16 +187,51 @@ public sealed class ReaderSignInService(IIdentityDb db, ITenantContext tenant, I
         return new ReaderPasswordCheckResult(ReaderPasswordCheckResult.Valid);
     }
 
-    /// <summary>Tải lại bạn đọc khi phát/làm mới token: còn hồ sơ, thẻ đang hoạt động, đơn vị Active. Null = từ chối.</summary>
-    public async Task<ReaderIdentity?> ReloadAsync(long tenantId, long accountId, CancellationToken ct)
+    /// <summary>
+    /// Tải lại bạn đọc khi phát/làm mới token: còn hồ sơ, thẻ đang hoạt động, đơn vị Active. Null = từ chối. <paramref name="external"/>: phiên
+    /// đăng nhập qua LDAP/API — chỉ còn hiệu lực khi đơn vị vẫn bật xác thực ngoài; không cần mật khẩu thư viện, không bắt đổi mật khẩu.
+    /// </summary>
+    public async Task<ReaderIdentity?> ReloadAsync(long tenantId, long accountId, CancellationToken ct, bool external = false)
     {
         var replica = await db.TenantReplicas.AsNoTracking().FirstOrDefaultAsync(t => t.TenantId == tenantId, ct);
         if (replica is null || replica.Status != "Active") return null;
+        if (external && ReaderAuthSettings.Parse((await policies.GetAsync(tenantId, ct)).ReaderAuth) is not { IsExternal: true }) return null;
         using var scope = tenant.Use(tenantId);
         var account = await db.ReaderAccounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == accountId, ct);
-        return account is { Deleted: false, Status: IHasStatus.Active } && account.HasPassword && !account.Credentials.IsLockedOut(clock.GetUtcNow())
-            ? ToIdentity(account)
-            : null;
+        if (account is not { Deleted: false, Status: IHasStatus.Active } || account.Credentials.IsLockedOut(clock.GetUtcNow())) return null;
+        if (external) return ToIdentity(account) with { MustChangePassword = false, External = true };
+        return account.HasPassword ? ToIdentity(account) : null;
+    }
+
+    /// <summary>"Kiểm tra kết nối" xác thực ngoài với cấu hình đang lưu (ELIB-LRC: ReaderAuthTest) — không đăng nhập, không đếm sai.</summary>
+    public async Task<ReaderAuthTestResult> TestExternalAsync(long tenantId, string? login, string? password, CancellationToken ct)
+    {
+        var settings = ReaderAuthSettings.Parse((await policies.GetAsync(tenantId, ct)).ReaderAuth);
+        if (settings is not { IsExternal: true })
+            return new ReaderAuthTestResult(settings?.Provider ?? "Local", "NotConfigured", null, null, false,
+                "Chưa bật xác thực ngoài — tham số READER_AUTH_CONFIG trống, sai JSON, hoặc Provider = Local.");
+        var ext = await external.AuthenticateAsync(settings, (login ?? "").Trim(), password ?? "", ct);
+        var found = false;
+        if (ext.Outcome == ExternalAuthOutcome.Success)
+        {
+            using var scope = tenant.Use(tenantId);
+            var match = (settings.MatchByEmail ? ext.Email : ext.CardNo)?.Trim() ?? "";
+            var cardKey = ReaderAccount.Key(match);
+            var email = match.ToLowerInvariant();
+#pragma warning disable CA1862, CA1304, CA1311
+            found = match.Length > 0 && await db.ReaderAccounts.AnyAsync(a => !a.Deleted
+                && (settings.MatchByEmail ? a.Email != null && a.Email.ToLower() == email : a.CardKey == cardKey), ct);
+#pragma warning restore CA1862, CA1304, CA1311
+        }
+        return new ReaderAuthTestResult(settings.Provider, ext.Outcome.ToString(), ext.CardNo, ext.Email, found, ext.Message);
+    }
+
+    /// <summary>Email trong hồ sơ bạn đọc (gửi OTP đăng nhập) — null nếu chưa có.</summary>
+    public async Task<string?> EmailAsync(long tenantId, long accountId, CancellationToken ct)
+    {
+        using var scope = tenant.Use(tenantId);
+        var email = await db.ReaderAccounts.AsNoTracking().Where(a => a.Id == accountId && !a.Deleted).Select(a => a.Email).FirstOrDefaultAsync(ct);
+        return string.IsNullOrWhiteSpace(email) ? null : email;
     }
 
     public async Task<ReaderMeDto> MeAsync(long tenantId, long accountId, CancellationToken ct)

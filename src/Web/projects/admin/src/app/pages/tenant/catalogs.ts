@@ -73,4 +73,18 @@ export const SYSTEM_PARAMETERS: CrudConfig = {
   ],
   defaults: { type: 'text', isPublic: false },
   badge: (p) => (p['isBuiltIn'] ? 'SYSTEM_PARAMETER.BUILT_IN' : null),
+  rowActions: [
+    {
+      // Xác thực bạn đọc qua LDAP/API của trường (READER_AUTH_CONFIG) — thử với một tài khoản thật, không đăng nhập.
+      icon: 'cable', title: 'SYSTEM_PARAMETER.READER_AUTH_TEST', action: 'edit', show: (p) => p['code'] === 'READER_AUTH_CONFIG',
+      inputs: [{ key: 'login', label: 'SYSTEM_PARAMETER.READER_AUTH_LOGIN' }, { key: 'password', label: 'SYSTEM_PARAMETER.READER_AUTH_PASSWORD', type: 'password' }],
+      run: async (api, _row, v) => {
+        const r = await api.testReaderAuth(v['login'] ?? '', v['password'] ?? '');
+        if (r.outcome === 'Success') {
+          return { key: r.profileFound ? 'SYSTEM_PARAMETER.READER_AUTH_OK' : 'SYSTEM_PARAMETER.READER_AUTH_NO_PROFILE', params: { card: r.cardNo ?? '—', email: r.email ?? '—' } };
+        }
+        throw new Error(r.message ?? r.outcome);
+      },
+    },
+  ],
 };

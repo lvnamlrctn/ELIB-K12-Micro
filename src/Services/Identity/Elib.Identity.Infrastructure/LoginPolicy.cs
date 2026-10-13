@@ -20,7 +20,7 @@ public sealed class SystemLoginOptions
 
 /// <summary>
 /// Tham số đăng nhập của đơn vị đọc từ service tenant (GET /internal/tenants/{id}/parameters?service=identity, service token),
-/// cache 5 phút, xoá ngay khi nhận SystemParameterChanged. Tenant không trả lời → bật CAPTCHA, không bật OTP, không cache.
+/// cache 5 phút, xoá ngay khi nhận SystemParameterChanged. Tenant không trả lời → bật CAPTCHA (cả bạn đọc), không bật OTP, không cache.
 /// </summary>
 public sealed partial class TenantLoginPolicySource(
     IHttpClientFactory httpClients, HybridCache cache, IOptions<IdentityServerOptions> options, ILogger<TenantLoginPolicySource> logger)
@@ -29,6 +29,9 @@ public sealed partial class TenantLoginPolicySource(
     public const string HttpClientName = "elib-tenant";
     private const string CaptchaCode = "ADMIN_LOGIN_CAPTCHA_ENABLED";
     private const string OtpCode = "ADMIN_LOGIN_OTP_ENABLED";
+    private const string ReaderCaptchaCode = "READER_LOGIN_CAPTCHA_ENABLED";
+    private const string ReaderOtpCode = "READER_LOGIN_OTP_ENABLED";
+    private const string ReaderAuthCode = "READER_AUTH_CONFIG";
 
     private static readonly HybridCacheEntryOptions Entry = new() { Expiration = TimeSpan.FromMinutes(5), LocalCacheExpiration = TimeSpan.FromMinutes(1) };
 
@@ -48,7 +51,7 @@ public sealed partial class TenantLoginPolicySource(
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             LogUnavailable(logger, ex, tenantId.Value);
-            return new LoginPolicy(Captcha: true, Otp: false);
+            return new LoginPolicy(Captcha: true, Otp: false, ReaderCaptcha: true);
         }
     }
 
@@ -59,7 +62,10 @@ public sealed partial class TenantLoginPolicySource(
         var values = await httpClients.CreateClient(HttpClientName).GetFromJsonAsync<Dictionary<string, string?>>(
             new Uri($"internal/tenants/{tenantId.ToString(CultureInfo.InvariantCulture)}/parameters?service=identity", UriKind.Relative), ct)
             ?? [];
-        return new LoginPolicy(IsOn(values.GetValueOrDefault(CaptchaCode)), IsOn(values.GetValueOrDefault(OtpCode)));
+        var readerAuth = values.GetValueOrDefault(ReaderAuthCode);
+        return new LoginPolicy(IsOn(values.GetValueOrDefault(CaptchaCode)), IsOn(values.GetValueOrDefault(OtpCode)),
+            IsOn(values.GetValueOrDefault(ReaderCaptchaCode)), IsOn(values.GetValueOrDefault(ReaderOtpCode)),
+            string.IsNullOrWhiteSpace(readerAuth) ? null : readerAuth);
     }
 
     private static bool IsOn(string? value) =>

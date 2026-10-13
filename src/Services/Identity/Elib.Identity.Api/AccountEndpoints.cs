@@ -208,7 +208,7 @@ public static class AccountEndpoints
     internal const string PersonIcon = """<svg viewBox="0 0 24 24"><path d="M12 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z"/></svg>""";
     internal const string LockIcon = """<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.8-2.2-5-5-5S7 3.2 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.7 1.4-3.1 3.1-3.1s3.1 1.4 3.1 3.1v2z"/></svg>""";
     internal const string UnitIcon = """<svg viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10z"/></svg>""";
-    private const string ShieldIcon = """<svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4zm-2 16-4-4 1.4-1.4L10 14.2l6.6-6.6L18 9l-8 8z"/></svg>""";
+    internal const string ShieldIcon = """<svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4zm-2 16-4-4 1.4-1.4L10 14.2l6.6-6.6L18 9l-8 8z"/></svg>""";
     private const string LibraryIcon = """<svg viewBox="0 0 24 24"><path d="M12 11.55C9.64 9.35 6.48 8 3 8v11c3.48 0 6.64 1.35 9 3.55 2.36-2.19 5.52-3.55 9-3.55V8c-3.48 0-6.64 1.35-9 3.55zM12 8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/></svg>""";
 
     private static IResult LoginPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, string returnUrl, string? tenant, TenantReplicaRecord? hostTenant,
@@ -226,17 +226,7 @@ public static class AccountEndpoints
                </div>
                """;
         var refresh = QueryHelpers.AddQueryString("/account/login", new Dictionary<string, string?> { ["returnUrl"] = returnUrl, ["tenant"] = tenant });
-        var captchaBlock = captcha is null
-            ? ""
-            : $"""
-               <div class="field">
-                 <label for="captcha">{e.Encode(t["CAPTCHA"])}</label>
-                 <div class="captcha"><img src="data:image/png;base64,{captcha.PngBase64}" width="{CaptchaImage.Width}" height="{CaptchaImage.Height}" alt="{e.Encode(t["CAPTCHA_ALT"])}">
-                   <a href="{e.Encode(refresh)}">{e.Encode(t["CAPTCHA_REFRESH"])}</a></div>
-                 <div class="box">{ShieldIcon}<input id="captcha" name="captcha" autocomplete="off" maxlength="{CaptchaService.Length}" placeholder="{e.Encode(t.Format("CAPTCHA_PLACEHOLDER", CaptchaService.Length))}" required></div>
-                 <input type="hidden" name="captchaId" value="{e.Encode(captcha.Id)}">
-               </div>
-               """;
+        var captchaBlock = CaptchaBlock(t, captcha, refresh);
         var body = $$"""
             <form method="post" action="/account/login">
               {{(error is null ? "" : $"<div class=\"err\" role=\"alert\">{e.Encode(error)}</div>")}}
@@ -258,7 +248,25 @@ public static class AccountEndpoints
         return Html(ctx, Shell(ctx, t, t["LOGIN_TITLE"], t["LOGIN_SUBTITLE"], body), status);
     }
 
-    private static IResult OtpPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, OtpPending pending, string? error, string? info, int status = 200)
+    /// <summary>Ô CAPTCHA (ảnh + nút đổi mã) — trang đăng nhập nhân viên, bạn đọc, quên mật khẩu.</summary>
+    internal static string CaptchaBlock(IdentityTexts t, CaptchaService.Challenge? captcha, string refreshUrl)
+    {
+        if (captcha is null) return "";
+        var e = VietnameseHtml;
+        return $"""
+            <div class="field">
+              <label for="captcha">{e.Encode(t["CAPTCHA"])}</label>
+              <div class="captcha"><img src="data:image/png;base64,{captcha.PngBase64}" width="{CaptchaImage.Width}" height="{CaptchaImage.Height}" alt="{e.Encode(t["CAPTCHA_ALT"])}">
+                <a href="{e.Encode(refreshUrl)}">{e.Encode(t["CAPTCHA_REFRESH"])}</a></div>
+              <div class="box">{ShieldIcon}<input id="captcha" name="captcha" autocomplete="off" maxlength="{CaptchaService.Length}" placeholder="{e.Encode(t.Format("CAPTCHA_PLACEHOLDER", CaptchaService.Length))}" required></div>
+              <input type="hidden" name="captchaId" value="{e.Encode(captcha.Id)}">
+            </div>
+            """;
+    }
+
+    /// <summary>Trang nhập OTP — nhân viên (/account/otp) hoặc bạn đọc (/account/reader-otp).</summary>
+    internal static IResult OtpPage(HttpContext ctx, IdentityTexts t, IAntiforgery antiforgery, OtpPending pending, string? error, string? info, int status = 200,
+        string basePath = "/account/otp", string loginPath = "/account/login")
     {
         var tokens = antiforgery.GetAndStoreTokens(ctx);
         var e = VietnameseHtml;
@@ -267,7 +275,7 @@ public static class AccountEndpoints
             {{(error is null ? "" : $"<div class=\"err\" role=\"alert\">{e.Encode(error)}</div>")}}
             {{(info is null ? "" : $"<div class=\"ok\" role=\"status\">{e.Encode(info)}</div>")}}
             <p class="sub">{{t.Format("OTP_SENT", e.Encode(pending.MaskedEmail))}}</p>
-            <form method="post" action="/account/otp">
+            <form method="post" action="{{e.Encode(basePath)}}">
               {{token}}
               <div class="field">
                 <label for="code">{{e.Encode(t["OTP_CODE"])}}</label>
@@ -275,10 +283,10 @@ public static class AccountEndpoints
               </div>
               <button type="submit">{{t["OTP_CONFIRM"]}}</button>
             </form>
-            <form method="post" action="/account/otp/resend" class="links">
+            <form method="post" action="{{e.Encode(basePath + "/resend")}}" class="links">
               {{token}}
               <button type="submit" class="link">{{e.Encode(t["OTP_RESEND"])}}</button>
-              <a href="/account/login">{{e.Encode(t["OTP_OTHER_ACCOUNT"])}}</a>
+              <a href="{{e.Encode(loginPath)}}">{{e.Encode(t["OTP_OTHER_ACCOUNT"])}}</a>
             </form>
             """;
         return Html(ctx, Shell(ctx, t, t["OTP_TITLE"], t["OTP_SUBTITLE"], body), status);

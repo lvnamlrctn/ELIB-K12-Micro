@@ -10,7 +10,11 @@ using Microsoft.Extensions.Caching.Distributed;
 namespace Elib.Identity.Application;
 
 /// <summary>Lớp bảo vệ thêm khi nhân viên đăng nhập — theo tham số ADMIN_LOGIN_CAPTCHA_ENABLED / ADMIN_LOGIN_OTP_ENABLED của đơn vị.</summary>
-public sealed record LoginPolicy(bool Captcha, bool Otp)
+/// <summary>
+/// Lớp bảo vệ đăng nhập của đơn vị. <see cref="Captcha"/>/<see cref="Otp"/>: nhân viên (ADMIN_LOGIN_*); <see cref="ReaderCaptcha"/>/<see cref="ReaderOtp"/>:
+/// bạn đọc OPAC (READER_LOGIN_*); <see cref="ReaderAuth"/>: JSON READER_AUTH_CONFIG (xác thực bạn đọc qua LDAP/API ngoài, chứa mật khẩu dịch vụ).
+/// </summary>
+public sealed record LoginPolicy(bool Captcha, bool Otp, bool ReaderCaptcha = false, bool ReaderOtp = false, string? ReaderAuth = null)
 {
     public static readonly LoginPolicy None = new(false, false);
 }
@@ -37,8 +41,8 @@ public enum OtpError
 
 public sealed record OtpPending(string MaskedEmail, int SecondsUntilResend);
 
-/// <summary>Xác thực OTP thành công: người dùng để tải lại và nơi quay về.</summary>
-public sealed record OtpPassed(long? TenantId, long UserId, string ReturnUrl);
+/// <summary>Xác thực OTP thành công: người dùng (nhân viên, hoặc tài khoản bạn đọc khi <see cref="Reader"/>) để tải lại và nơi quay về.</summary>
+public sealed record OtpPassed(long? TenantId, long UserId, string ReturnUrl, bool Reader = false);
 
 /// <summary>
 /// OTP qua email sau khi mật khẩu đúng (monolith: OtpService + AuthService). Mã 6 số, hạn 5 phút, tối đa 5 lần nhập sai,
@@ -53,7 +57,7 @@ public sealed class LoginOtpService(IDistributedCache cache, IPublishEndpoint pu
     public static readonly TimeSpan ResendAfter = TimeSpan.FromSeconds(60);
 
     private sealed record State(long? TenantId, long UserId, string Email, string FullName, string ReturnUrl,
-        string CodeHash, int Attempts, int Sends, DateTimeOffset LastSentAt, DateTimeOffset ExpiresAt);
+        string CodeHash, int Attempts, int Sends, DateTimeOffset LastSentAt, DateTimeOffset ExpiresAt, bool Reader = false);
 
     public static bool Applies(SignInIdentity who) => !string.IsNullOrWhiteSpace(who.Email);
 
@@ -64,6 +68,15 @@ public sealed class LoginOtpService(IDistributedCache cache, IPublishEndpoint pu
         var now = clock.GetUtcNow();
         var state = new State(who.TenantId, who.UserId, who.Email!, who.FullName, returnUrl, "", 0, 0, now, now + Lifetime);
         await SendAsync(id, state, ct);
+        return id;
+    }
+
+    /// <summary>OTP cho bạn đọc OPAC (READER_LOGIN_OTP_ENABLED) — cùng luật mã/hạn/số lần, gửi tới email trong hồ sơ bạn đọc.</summary>
+    public async Task<string> StartReaderAsync(long tenantId, long accountId, string email, string fullName, string returnUrl, CancellationToken ct)
+    {
+        var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        var now = clock.GetUtcNow();
+        await SendAsync(id, new State(tenantId, accountId, email, fullName, returnUrl, "", 0, 0, now, now + Lifetime, Reader: true), ct);
         return id;
     }
 
@@ -78,7 +91,7 @@ public sealed class LoginOtpService(IDistributedCache cache, IPublishEndpoint pu
         if (CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(Hash(id!, normalized)), Encoding.ASCII.GetBytes(state.CodeHash)))
         {
             await cache.RemoveAsync(Key(id!), ct);
-            return (new OtpPassed(state.TenantId, state.UserId, state.ReturnUrl), null);
+            return (new OtpPassed(state.TenantId, state.UserId, state.ReturnUrl, state.Reader), null);
         }
 
         var attempts = state.Attempts + 1;
@@ -108,13 +121,13 @@ public sealed class LoginOtpService(IDistributedCache cache, IPublishEndpoint pu
         var next = state with { CodeHash = Hash(id, code), Sends = state.Sends + 1, LastSentAt = now };
         await SaveAsync(id, next, ct);
 
-        var recipient = new NotificationRecipient(null, state.UserId, state.Email, null, state.FullName);
+        var recipient = new NotificationRecipient(null, state.Reader ? null : state.UserId, state.Email, null, state.FullName);
         var data = new Dictionary<string, string>
         {
             ["otp"] = code,
             ["minutes"] = ((int)Math.Ceiling((state.ExpiresAt - now).TotalMinutes)).ToString(CultureInfo.InvariantCulture),
         };
-        var actor = new EventActor(state.UserId, "staff");
+        var actor = new EventActor(state.UserId, state.Reader ? "reader" : "staff");
         if (state.TenantId is { } tenantId)
         {
             await publisher.Publish(new NotificationRequested

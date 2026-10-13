@@ -65,7 +65,7 @@ public sealed class LoginPolicySourceTests
             ? throw new HttpRequestException("tenant down")
             : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json") });
 
-        Assert.Equal(new LoginPolicy(Captcha: true, Otp: false), await source.GetAsync(9, CancellationToken.None));
+        Assert.Equal(new LoginPolicy(Captcha: true, Otp: false, ReaderCaptcha: true), await source.GetAsync(9, CancellationToken.None));
         fail = false;
         Assert.Equal(LoginPolicy.None, await source.GetAsync(9, CancellationToken.None));
         Assert.Equal(2, tenant.Calls);

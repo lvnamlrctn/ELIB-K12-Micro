@@ -623,7 +623,12 @@
     "SERVICE_EG": "e.g. circulation",
     "PUBLIC_LONG": "Allow OPAC to read without signing in",
     "PUBLIC_HINT": "Built-in parameters: visibility is set by the system. Never enable for parameters holding passwords or keys.",
-    "BUILT_IN": "System"
+    "BUILT_IN": "System",
+    "READER_AUTH_TEST": "Test reader authentication (LDAP/API)",
+    "READER_AUTH_LOGIN": "School account to test",
+    "READER_AUTH_PASSWORD": "Password",
+    "READER_AUTH_OK": "Connected: card {{card}}, email {{email}} — a matching reader record exists.",
+    "READER_AUTH_NO_PROFILE": "Connected (card {{card}}, email {{email}}) but no matching reader record in the library."
   },
   "ROLE": {
     "TITLE": "Role Management",

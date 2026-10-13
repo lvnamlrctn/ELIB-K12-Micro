@@ -92,8 +92,14 @@ internal static class ElibPrincipals
         identity.AddClaim(new Claim(Claims.Name, who.FullName));
         identity.AddClaim(new Claim(ElibClaimTypes.SubjectType, ElibSubjectTypes.Reader));
         identity.AddClaim(new Claim(ElibClaimTypes.TenantId, who.TenantId.ToString(CultureInfo.InvariantCulture)));
+        if (who.External) identity.AddClaim(new Claim(ExternalReaderClaim, "1"));
         return new ClaimsPrincipal(identity);
     }
+
+    /// <summary>Phiên bạn đọc đăng nhập qua LDAP/API của trường (giữ trong cookie và token để lần phát/làm mới token sau vẫn biết).</summary>
+    public const string ExternalReaderClaim = "elib_ext";
+
+    public static bool IsExternalReader(ClaimsPrincipal principal) => principal.FindFirstValue(ExternalReaderClaim) == "1";
 
     public static bool IsReader(ClaimsPrincipal principal) => principal.FindFirstValue(ElibClaimTypes.SubjectType) == ElibSubjectTypes.Reader;
 
@@ -108,6 +114,7 @@ internal static class ElibPrincipals
             .SetClaim(ElibClaimTypes.TenantId, who.TenantId.ToString(CultureInfo.InvariantCulture))
             .SetClaim(ReaderIdClaim, who.ReaderPublicId.ToString())
             .SetClaim(CardNoClaim, who.CardNo);
+        if (who.External) identity.SetClaim(ExternalReaderClaim, "1");
         return Finish(identity, scopes);
     }
 

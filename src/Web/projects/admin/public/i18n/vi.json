@@ -623,7 +623,12 @@
     "SERVICE_EG": "VD: circulation",
     "PUBLIC_LONG": "Cho phép OPAC đọc khi chưa đăng nhập",
     "PUBLIC_HINT": "Tham số có sẵn của hệ thống: phạm vi công khai do hệ thống quy định. Không bật cho tham số chứa mật khẩu/khoá.",
-    "BUILT_IN": "Hệ thống"
+    "BUILT_IN": "Hệ thống",
+    "READER_AUTH_TEST": "Kiểm tra xác thực bạn đọc (LDAP/API)",
+    "READER_AUTH_LOGIN": "Tài khoản của trường để thử",
+    "READER_AUTH_PASSWORD": "Mật khẩu",
+    "READER_AUTH_OK": "Kết nối được: số thẻ {{card}}, email {{email}} — thư viện có hồ sơ bạn đọc khớp.",
+    "READER_AUTH_NO_PROFILE": "Kết nối được (số thẻ {{card}}, email {{email}}) nhưng thư viện chưa có hồ sơ bạn đọc khớp."
   },
   "ROLE": {
     "TITLE": "Quản lý Phân quyền",

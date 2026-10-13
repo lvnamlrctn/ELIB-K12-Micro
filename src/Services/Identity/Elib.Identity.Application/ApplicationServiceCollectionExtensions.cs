@@ -21,6 +21,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ImpersonationService>();
         services.AddSingleton<CaptchaService>();
         services.AddScoped<LoginOtpService>();
+        services.AddScoped<ReaderPasswordResetService>();
         return services;
     }
 }

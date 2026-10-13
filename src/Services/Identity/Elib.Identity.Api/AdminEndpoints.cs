@@ -67,6 +67,10 @@ public static class AdminEndpoints
             ReaderAccountService s, CancellationToken ct) => s.SetPasswordAsync(readerPublicId, request, ct));
         readerAccounts.MapPut("/BulkPassword", [Permission("READERS", "edit")] (BulkReaderPasswordRequest request, ReaderAccountService s, CancellationToken ct)
             => s.BulkSetPasswordAsync(request, ct));
+        // "Kiểm tra kết nối" xác thực bạn đọc qua LDAP/API với tham số READER_AUTH_CONFIG đang lưu (ELIB-LRC: ReaderAuthTest).
+        app.MapPost("/api/reader-auth/Test", [Permission("SYSTEM_PARAMS", "edit")] (ReaderAuthTestRequest request, ITenantContext tenant,
+            ReaderSignInService s, CancellationToken ct) => s.TestExternalAsync(tenant.RequireTenantId(), request.Login, request.Password, ct))
+            .WithTags("ReaderAccounts");
         readerAccounts.MapPost("/{readerPublicId:guid}/unlock", [Permission("READERS", "edit")] (Guid readerPublicId, ReaderAccountService s, CancellationToken ct)
             => s.UnlockAsync(readerPublicId, ct));
 

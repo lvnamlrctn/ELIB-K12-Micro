@@ -679,6 +679,52 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s2, _, _ = rb.request("GET", "/api/me", token=rtoken)
     expect(s == 403 and s2 == 403, "token bạn đọc không dùng được API quản trị (gateway chặn theo loại tài khoản)", f"{s} {s2} {body[:200]}")
 
+    # Quên mật khẩu (luôn có CAPTCHA — e2e chỉ kiểm tra chặn CAPTCHA sai) và OTP email khi bạn đọc đăng nhập (READER_LOGIN_OTP_ENABLED).
+    fb = Browser(GATEWAY, host=host, proto="https")
+    s, _, page = fb.request("GET", "/account/reader-forgot")
+    af, cid = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page), re.search(r'name="captchaId" value="([^"]+)"', page)
+    expect(s == 200 and af and cid, "trang quên mật khẩu bạn đọc (số thẻ + CAPTCHA)", page[:200])
+    s, _, page = fb.request("POST", "/account/reader-forgot", data={"__RequestVerificationToken": html.unescape(af.group(1)), "cardNo": f"{card}-2",
+                                                                   "captchaId": cid.group(1), "captcha": "XXXXX"})
+    expect(s == 400 and "Mã xác nhận" in page, "quên mật khẩu: CAPTCHA sai bị chặn, không gửi thư", f"{s} {page[:200]}")
+
+    def tenant_param(code, value):
+        s, _, body = tb.request("POST", "/api/admin/tenant/system-parameters/Search", token=token, json_body={"keyword": code})
+        prm = next(x for x in json.loads(body)["items"] if x["code"] == code)
+        s, _, body = tb.request("PUT", f"/api/admin/tenant/system-parameters/Update/{prm['publicId']}", token=token,
+                                json_body={"code": code, "value": value, "description": prm["description"], "type": prm["type"]})
+        expect(s == 200, f"{code} = {value}", body)
+
+    ocard, omail = f"OTP{tag.upper()}", f"e2e-reader-otp-{tag}@example.com"
+    s, _, body = tb.request("POST", f"{P}/readers/Add", token=token, json_body={"cardNo": ocard, "lastName": "Thử", "firstName": "Mã OTP", "email": omail})
+    oreader = json.loads(body) if s == 201 else {}
+    s, _, body = tb.request("PUT", f"{RA}/{oreader.get('publicId')}/password", token=token, json_body={"password": None, "useCardNo": True})
+    expect(s == 200, f"bạn đọc {ocard} có email, mật khẩu = số thẻ", body)
+    before, _ = mailpit_latest(omail, wait=0)
+    tenant_param("READER_LOGIN_OTP_ENABLED", "1")
+    try:
+        loc = ""
+        for _ in range(10):  # identity xoá cache tham số khi nhận SystemParameterChanged
+            ob = Browser(GATEWAY, host=host, proto="https")
+            s, _, page = ob.request("GET", "/account/reader-login?returnUrl=%2F")
+            af = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page)
+            s, h, body = ob.request("POST", "/account/reader-login", data={"__RequestVerificationToken": html.unescape(af.group(1)), "cardNo": ocard,
+                                                                          "password": ocard, "returnUrl": "/"})
+            loc = path_of(h.get("Location", ""))
+            if loc == "/account/reader-otp": break
+            time.sleep(1)
+        expect(loc == "/account/reader-otp", "bạn đọc đăng nhập đúng mật khẩu → bước nhập mã OTP", f"{s} {loc}")
+        _, text = mailpit_latest(omail, after_id=before)
+        code = re.search(r"\b(\d{6})\b", text or "")
+        expect(code is not None, f"Mailpit nhận mã OTP gửi tới bạn đọc {omail}", text or "")
+        s, _, page = ob.request("GET", "/account/reader-otp")
+        af = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page)
+        s, h, body = ob.request("POST", "/account/reader-otp", data={"__RequestVerificationToken": html.unescape(af.group(1)), "code": code.group(1)})
+        expect(s == 302 and path_of(h.get("Location", "")) == "/account/reader-password", "đúng mã OTP → bước đổi mật khẩu lần đầu", f"{s} {body[:200]}")
+    finally:
+        tenant_param("READER_LOGIN_OTP_ENABLED", "0")
+    tb.request("DELETE", f"{P}/readers/Delete/{oreader.get('publicId')}", token=token)
+
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/eL9GtQAAAABJRU5ErkJggg==")
     s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,
                             json_body={"purpose": "reader-photo", "fileName": f"{card}.png", "contentType": "image/png", "size": len(png)})

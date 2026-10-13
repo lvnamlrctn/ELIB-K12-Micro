@@ -46,6 +46,9 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
     /// <summary>Bạn đọc ở patron (thay cho gọi /internal của patron) — khi identity chưa nhận event của bạn đọc.</summary>
     public FakeReaderSource Readers { get; } = new();
 
+    /// <summary>LDAP/API của trường — kết quả theo (tên đăng nhập, mật khẩu).</summary>
+    public FakeExternalReaderAuth ExternalAuth { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -89,6 +92,8 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ILoginPolicySource>();
             services.AddSingleton<ILoginPolicySource>(LoginPolicies);
+            services.RemoveAll<IExternalReaderAuth>();
+            services.AddSingleton<IExternalReaderAuth>(ExternalAuth);
             services.RemoveAll<IReaderSource>();
             services.AddSingleton<IReaderSource>(Readers);
 
@@ -192,4 +197,17 @@ public sealed class FakeReaderSource : IReaderSource
 
     public Task<ReaderChanged?> ReaderAsync(long tenantId, Guid readerPublicId, CancellationToken ct) =>
         Task.FromResult(Readers.GetValueOrDefault((tenantId, readerPublicId)));
+}
+
+public sealed class FakeExternalReaderAuth : IExternalReaderAuth
+{
+    public ConcurrentDictionary<(string Login, string Password), ExternalAuthResult> Results { get; } = new();
+
+    /// <summary>Hệ thống ngoài đang "down".</summary>
+    public bool Down { get; set; }
+
+    public Task<ExternalAuthResult> AuthenticateAsync(ReaderAuthSettings settings, string login, string password, CancellationToken ct) =>
+        Task.FromResult(Down
+            ? new ExternalAuthResult(ExternalAuthOutcome.Unavailable, Message: "down")
+            : Results.GetValueOrDefault((login, password), new ExternalAuthResult(ExternalAuthOutcome.InvalidCredentials)));
 }

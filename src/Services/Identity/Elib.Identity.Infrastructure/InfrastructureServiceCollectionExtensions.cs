@@ -104,6 +104,10 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddHttpMessageHandler<ServiceTokenHandler>();
         services.AddScoped<IReaderSource, HttpReaderSource>();
+
+        // Xác thực bạn đọc qua LDAP/API của trường (READER_AUTH_CONFIG của đơn vị) — client HTTP riêng, không gắn service token.
+        services.AddHttpClient(ExternalReaderAuth.HttpClientName);
+        services.AddScoped<IExternalReaderAuth, ExternalReaderAuth>();
         services.Configure<ImpersonationOptions>(configuration.GetSection(ImpersonationOptions.SectionName));
         services.PostConfigure<ImpersonationOptions>(o =>
         {

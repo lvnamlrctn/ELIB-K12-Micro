@@ -604,6 +604,11 @@ export class Api {
   deleteEmailSettings() { return firstValueFrom(this.http.delete<void>('/api/admin/notification/email-settings')); }
   sendTestEmail(to: string) { return this.post<NotificationLog>('/api/admin/notification/email-settings/test', { to }); }
   restoreEmailTemplates() { return this.post<{ added: number }>('/api/admin/notification/email-templates/RestoreDefaults'); }
+  /** Kiểm tra xác thực bạn đọc qua LDAP/API (READER_AUTH_CONFIG) với một tài khoản thử. */
+  testReaderAuth(login: string, password: string) {
+    return this.post<{ provider: string; outcome: string; cardNo: string | null; email: string | null; profileFound: boolean; message: string | null }>(
+      '/api/admin/identity/reader-auth/Test', { login, password });
+  }
   sip2Logs(body: CrudSearch & { command?: string | null; failed?: boolean | null; from?: string | null; to?: string | null }) {
     return this.post<CrudPage<Sip2Log>>('/api/admin/circulation/sip2-stations/Logs', body);
   }

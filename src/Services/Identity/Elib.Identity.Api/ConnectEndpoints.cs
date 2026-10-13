@@ -70,7 +70,7 @@ public static class ConnectEndpoints
 
         var session = await ctx.AuthenticateAsync(IdentityCookie.ReaderScheme);
         var reader = session.Succeeded && ElibPrincipals.ReadSession(session.Principal!) is (long sessionTenant, var accountId) && sessionTenant == hostTenant
-            ? await readers.ReloadAsync(hostTenant, accountId, ct)
+            ? await readers.ReloadAsync(hostTenant, accountId, ct, ElibPrincipals.IsExternalReader(session.Principal!))
             : null;
         if (reader is null || reader.MustChangePassword)
         {
@@ -95,7 +95,7 @@ public static class ConnectEndpoints
             {
                 // Bạn đọc: thẻ bị khoá/xoá, đơn vị tạm ngưng, hoặc thư viện vừa đặt lại mật khẩu → không cấp token mới.
                 return ElibPrincipals.ReadSession(previous) is (long readerTenant, var accountId)
-                       && await readers.ReloadAsync(readerTenant, accountId, ct) is { MustChangePassword: false } reader
+                       && await readers.ReloadAsync(readerTenant, accountId, ct, ElibPrincipals.IsExternalReader(previous)) is { MustChangePassword: false } reader
                     ? Results.SignIn(ElibPrincipals.ForReaderToken(reader, previous.GetScopes()), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)
                     : Results.Forbid(Error(Errors.InvalidGrant, "Tài khoản không còn hiệu lực."), [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
