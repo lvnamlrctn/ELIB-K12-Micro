@@ -83,11 +83,11 @@ public sealed class Loan : TenantEntity
     /// Gia hạn (monolith: Renew). Mặc định (C_RENEW_DATE = 0): hạn mới = hạn cũ + số ngày gia hạn; lượt đã quá hạn thì tính từ hôm
     /// nay để không gia hạn xong vẫn quá hạn. Chính sách "gia hạn tính từ hôm nay" (C_RENEW_DATE = 1): hạn mới = hôm nay + số ngày.
     /// </summary>
-    public void Renew(DateTimeOffset now, LoanPolicy policy)
+    public void Renew(DateTimeOffset now, LoanPolicy policy, long? bibTypeId = null)
     {
         ArgumentNullException.ThrowIfNull(policy);
         if (!IsOpen) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", $"ĐKCB {Barcode} đã trả, không gia hạn được.");
-        if (policy.MaxRenewals is { } max && RenewCount >= max)
+        if ((policy.RuleFor(bibTypeId)?.MaxRenewals ?? policy.MaxRenewals) is { } max && RenewCount >= max)
             throw new BusinessRuleException("RENEW_LIMIT", max == 0
                 ? "Chính sách lưu thông không cho gia hạn."
                 : $"Bạn đọc đã gia hạn đủ số lần cho phép ({max} lần).");
@@ -173,6 +173,13 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public string Title { get; set; } = "";
     public string? Author { get; set; }
     public string? Ddc { get; set; }
+
+    /// <summary>Loại biểu ghi = nhóm tài liệu của chính sách lưu thông.</summary>
+    public long? BibTypeId { get; set; }
+
+    /// <summary>Bản sao đã có loại biểu ghi (bản ghi từ trước khi có cột này thì false — hỏi lại catalog khi cần).</summary>
+    public bool TypeKnown { get; set; }
+
     public bool Deleted { get; set; }
     public long Version { get; set; }
 }

@@ -29,6 +29,9 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.ToTable("loan_policies");
             e.Ignore(x => x.Specificity);
             e.Property(x => x.FinePerDay).HasPrecision(18, 2);
+            e.Property(x => x.TechFee).HasPrecision(18, 2);
+            e.Property(x => x.ShippingFee).HasPrecision(18, 2);
+            e.OwnsMany(x => x.BibTypeRules, b => b.ToJson("bib_type_rules"));
             e.HasIndex(x => new { x.TenantId, x.ReaderTypeId, x.CircPlaceId });
             e.HasOne<CircPlace>().WithMany().HasForeignKey(x => x.CircPlaceId).OnDelete(DeleteBehavior.Restrict);
         });

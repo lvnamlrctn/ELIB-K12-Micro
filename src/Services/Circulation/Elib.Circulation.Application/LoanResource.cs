@@ -167,12 +167,13 @@ public sealed class LoanResource(
         if (BlockReason(reader, open.Any(d => d < now)) is { } block)
             throw new BusinessRuleException("READER_CANNOT_BORROW", block);
         var policy = await PolicyAsync(reader, place.Id, ct);
+        var typeCounts = await OpenTypeCountsAsync(reader, policy, ct);
 
         var lines = new List<CheckoutLine>();
         var created = new List<Loan>();
         foreach (var barcode in barcodes)
         {
-            var (loan, message) = await TryCheckoutAsync(reader, barcode, place, policy, open.Count + created.Count, now, ct);
+            var (loan, message) = await TryCheckoutAsync(reader, barcode, place, policy, open.Count + created.Count, typeCounts, now, ct);
             if (loan is not null) created.Add(loan);
             lines.Add(new CheckoutLine(barcode, loan is not null, message, null));
         }
@@ -228,7 +229,8 @@ public sealed class LoanResource(
         var policy = await PolicyAsync(reader, loan.CircPlaceId, ct);
         var oldDue = loan.DueAt;
         var now = clock.GetUtcNow();
-        loan.Renew(now, policy);
+        long? bibType = policy.BibTypeRules.Count == 0 ? null : (await replicas.BibTypesAsync([loan.Mfn], ct)).GetValueOrDefault(loan.Mfn);
+        loan.Renew(now, policy, bibType);
         Db.Set<LoanRenewal>().Add(new LoanRenewal
         {
             LoanPublicId = loan.PublicId, ReaderPublicId = loan.ReaderPublicId, CircPlaceId = loan.CircPlaceId, RenewedAt = now,
@@ -290,8 +292,18 @@ public sealed class LoanResource(
         ], rows);
     }
 
+    /// <summary>Số tài liệu đang mượn theo nhóm (loại biểu ghi) — chỉ khi chính sách có luật nhóm.</summary>
+    private async Task<Dictionary<long, int>> OpenTypeCountsAsync(PatronReplica reader, LoanPolicy policy, CancellationToken ct)
+    {
+        if (policy.BibTypeRules.Count == 0) return [];
+        var mfns = await Set.Where(x => x.ReaderPublicId == reader.ReaderPublicId && x.ReturnedAt == null).Select(x => x.Mfn).ToListAsync(ct);
+        var types = await replicas.BibTypesAsync(mfns, ct);
+        return mfns.Select(m => types.GetValueOrDefault(m)).OfType<long>().GroupBy(t => t).ToDictionary(g => g.Key, g => g.Count());
+    }
+
     private async Task<(Loan? Loan, string Message)> TryCheckoutAsync(
-        PatronReplica reader, string barcode, CircPlace place, LoanPolicy policy, int openCount, DateTimeOffset now, CancellationToken ct)
+        PatronReplica reader, string barcode, CircPlace place, LoanPolicy policy, int openCount, Dictionary<long, int> typeCounts, DateTimeOffset now,
+        CancellationToken ct)
     {
         var item = await replicas.ItemAsync(barcode, ct);
         if (item is null) return (null, "Mã ĐKCB không tồn tại.");
@@ -312,8 +324,14 @@ public sealed class LoanResource(
             return (null, $"Bạn đọc đã mượn đủ {max} tài liệu theo chính sách.");
         if (await holds.HeldAsync(item.ItemPublicId, ct) is { } held && held.ReaderPublicId != reader.ReaderPublicId)
             return (null, $"Tài liệu đang giữ cho bạn đọc đặt mượn (thẻ {held.CardNo}) đến {ReaderNotifier.Date(held.ExpiresAt!.Value)}.");
+        long? bibType = policy.BibTypeRules.Count == 0 ? null : (await replicas.BibTypesAsync([item.Mfn], ct)).GetValueOrDefault(item.Mfn);
+        if (bibType is { } type && policy.RuleFor(type)?.MaxLoans is { } typeMax && typeCounts.GetValueOrDefault(type) >= typeMax)
+            return (null, typeMax == 0
+                ? "Chính sách không cho mượn nhóm tài liệu này."
+                : $"Bạn đọc đã mượn đủ {typeMax} tài liệu thuộc nhóm này theo chính sách.");
 
-        var loan = Loan.Open(reader, item, place.Id, now, policy.LoanDays, actor.Id);
+        var loan = Loan.Open(reader, item, place.Id, now, policy.LoanDaysFor(bibType), actor.Id);
+        if (bibType is { } counted) typeCounts[counted] = typeCounts.GetValueOrDefault(counted) + 1;
         Set.Add(loan);
         await holds.FulfilAsync(reader, item, ct);
         await PublishAsync(loan, ct);

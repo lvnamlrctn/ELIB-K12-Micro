@@ -126,6 +126,10 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("bib_public_id");
 
+                    b.Property<long?>("BibTypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bib_type_id");
+
                     b.Property<string>("Ddc")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -148,6 +152,10 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("title");
+
+                    b.Property<bool>("TypeKnown")
+                        .HasColumnType("boolean")
+                        .HasColumnName("type_known");
 
                     b.Property<long>("Version")
                         .HasColumnType("bigint")
@@ -957,6 +965,16 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("renew_from_today");
 
+                    b.Property<decimal>("ShippingFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("shipping_fee");
+
+                    b.Property<decimal>("TechFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("tech_fee");
+
                     b.Property<long>("TenantId")
                         .HasColumnType("bigint")
                         .HasColumnName("tenant_id");
@@ -1512,6 +1530,39 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasForeignKey("CircPlaceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_loan_policies_circ_places_circ_place_id");
+
+                    b.OwnsMany("Elib.Circulation.Domain.BibTypeRule", "BibTypeRules", b1 =>
+                        {
+                            b1.Property<long>("LoanPolicyId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<long>("BibTypeId");
+
+                            b1.Property<int?>("LoanDays");
+
+                            b1.Property<int?>("MaxHolds");
+
+                            b1.Property<int?>("MaxLoans");
+
+                            b1.Property<int?>("MaxRenewals");
+
+                            b1.HasKey("LoanPolicyId", "__synthesizedOrdinal")
+                                .HasName("pk_loan_policies");
+
+                            b1.ToTable("loan_policies");
+
+                            b1
+                                .ToJson("bib_type_rules")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LoanPolicyId")
+                                .HasConstraintName("fk_loan_policies_loan_policies_loan_policy_id");
+                        });
+
+                    b.Navigation("BibTypeRules");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

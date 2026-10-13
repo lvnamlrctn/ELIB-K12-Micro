@@ -210,6 +210,17 @@ public sealed class HoldResource(ICrudDbContext db, Replicas replicas, HoldAlloc
             if (active >= max)
                 throw new BusinessRuleException("HOLD_LIMIT", max == 0 ? "Chính sách lưu thông không cho đặt mượn." : $"Bạn đọc đã đặt mượn đủ {max} tài liệu theo chính sách.");
         }
+        if (policy.BibTypeRules.Count > 0 && (await replicas.BibTypesAsync([mfn], ct)).GetValueOrDefault(mfn) is { } type
+            && policy.RuleFor(type)?.MaxHolds is { } typeMax)
+        {
+            var heldMfns = await Set.Where(h => h.ReaderPublicId == reader.ReaderPublicId && (h.Status == HoldStatus.Waiting || h.Status == HoldStatus.Ready))
+                .Select(h => h.Mfn).ToListAsync(ct);
+            var types = await replicas.BibTypesAsync(heldMfns, ct);
+            if (heldMfns.Count(m => types.GetValueOrDefault(m) == type) >= typeMax)
+                throw new BusinessRuleException("HOLD_LIMIT", typeMax == 0
+                    ? "Chính sách không cho đặt mượn nhóm tài liệu này."
+                    : $"Bạn đọc đã đặt mượn đủ {typeMax} tài liệu thuộc nhóm này theo chính sách.");
+        }
 
         var hold = Hold.Place(reader, mfn, request.CircPlaceId, clock.GetUtcNow(), request.Note);
         Set.Add(hold);

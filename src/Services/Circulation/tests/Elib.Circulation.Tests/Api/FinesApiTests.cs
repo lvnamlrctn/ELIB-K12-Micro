@@ -75,7 +75,7 @@ public sealed class FinesApiTests(CirculationApiFactory factory) : CirculationTe
             new SaveFineTicketRequest(FineTicketStatus.Open, 0, 0, Lines: [new FineLineChange(null, "QUAHAN", 1000, "KHONGCO")]), Json);
         Assert.Equal("FINE_REASON_INVALID", (await Error(bad)).Code); // đơn vị chưa có lý do phạt nào
 
-        Assert.Equal(3, (await Read<Dictionary<string, int>>(await staff.PostAsync(U("/api/fine-reasons/AddDefaults"), null)))["added"]);
+        Assert.Equal(5, (await Read<Dictionary<string, int>>(await staff.PostAsync(U("/api/fine-reasons/AddDefaults"), null)))["added"]);
         var reasons = await Read<List<FineReasonDto>>(await staff.PostAsJsonAsync(U("/api/fine-reasons/SearchAll"), new CrudSearch(), Json));
         var overdue = reasons.Single(r => r.Code == "QUAHAN");
         Assert.True(overdue.IsBuiltIn);

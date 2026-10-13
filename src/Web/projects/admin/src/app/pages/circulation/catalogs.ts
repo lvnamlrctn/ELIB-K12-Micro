@@ -61,13 +61,28 @@ export const LOAN_POLICIES: CrudConfig = {
     { key: 'finePerDay', label: 'CIRC_CAT.FINE_PER_DAY_FULL', type: 'number', half: true, hint: 'CIRC_CAT.FINE_PER_DAY_HINT' },
     { key: 'maxHolds', label: 'CIRC_CAT.MAX_HOLDS', type: 'number', half: true, hint: 'CIRC_CAT.HOLD_LIMIT_HINT' },
     { key: 'holdDays', label: 'CIRC_CAT.HOLD_DAYS', type: 'number', required: true, half: true },
+    { key: 'techFee', label: 'CIRC_CAT.TECH_FEE', type: 'number', half: true },
+    { key: 'shippingFee', label: 'CIRC_CAT.SHIPPING_FEE', type: 'number', half: true, hint: 'CIRC_CAT.DOC_FEES_HINT' },
     { key: 'renewFromToday', label: 'CIRC_CAT.RENEW_FROM_TODAY', type: 'checkbox' },
+    {
+      key: 'bibTypeRules', label: 'CIRC_CAT.BIB_TYPE_RULES', type: 'rows', addLabel: 'CIRC_CAT.BIB_TYPE_RULE_ADD', hint: 'CIRC_CAT.BIB_TYPE_RULES_HINT',
+      rowFields: [
+        {
+          key: 'bibTypeId', label: 'CIRC_CAT.BIB_TYPE', type: 'select',
+          optionsFrom: async (api) => (await api.crud<Named>('bib-types', 'catalog').searchAll()).map((t) => ({ value: t.id, label: t.name })),
+        },
+        { key: 'loanDays', label: 'CIRC_CAT.LOAN_DAYS', type: 'number' },
+        { key: 'maxLoans', label: 'CIRC_CAT.MAX_LOANS', type: 'number' },
+        { key: 'maxRenewals', label: 'CIRC_CAT.MAX_RENEWALS', type: 'number' },
+        { key: 'maxHolds', label: 'CIRC_CAT.MAX_HOLDS_SHORT', type: 'number' },
+      ],
+    },
   ],
   defaults: {
     readerTypeId: null, circPlaceId: null, loanDays: 14, maxLoans: null, maxRenewals: null, renewDays: 7, finePerDay: 0, renewFromToday: false,
-    maxHolds: null, holdDays: 2,
+    maxHolds: null, holdDays: 2, techFee: 0, shippingFee: 0, bibTypeRules: [],
   },
-  modalWidth: 'max-w-lg',
+  modalWidth: 'max-w-2xl',
 };
 
 /** Lý do phạt (monolith: /admin/cfine-types, quyền FINE_REASONS). Lý do có trạng thái "Mất" đóng lượt mượn và báo kho mất sách. */

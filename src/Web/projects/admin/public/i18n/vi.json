@@ -102,7 +102,9 @@
     "RECORDS_N": "{{count}} bản ghi",
     "REQUIRED_FIELD": "Vui lòng nhập {{field}}.",
     "STATUS_CHANGED": "Đã đổi trạng thái",
-    "VND": "đ"
+    "VND": "đ",
+    "NO_ROWS": "Chưa có dòng nào.",
+    "ADD_ROW": "Thêm dòng"
   },
   "DATATABLE": {
     "SEARCH": "Tìm kiếm:",
@@ -2218,7 +2220,15 @@
     "FROM_PAGE": "Từ trang",
     "TO_PAGE": "Đến trang",
     "UNIT_PRICE": "Đơn giá / trang (đ)",
-    "PAID_FULL": "Đã thu tiền"
+    "PAID_FULL": "Đã thu tiền",
+    "TECH_FEE": "Phí xử lý kỹ thuật (đ)",
+    "SHIPPING_FEE": "Phí vận chuyển (đ)",
+    "DOC_FEES_HINT": "Cộng một lần vào phiếu phạt khi bạn đọc nợ tài liệu (có dòng mất tài liệu).",
+    "BIB_TYPE_RULES": "Theo nhóm tài liệu",
+    "BIB_TYPE_RULES_HINT": "Luật riêng cho từng loại biểu ghi; ô trống = theo chính sách chung, 0 = không cho phép.",
+    "BIB_TYPE_RULE_ADD": "Thêm nhóm tài liệu",
+    "BIB_TYPE": "Nhóm tài liệu",
+    "MAX_HOLDS_SHORT": "Số đặt mượn"
   },
   "BORROW_PAGE": {
     "TITLE": "Mượn / Trả",

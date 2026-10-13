@@ -23,8 +23,13 @@ export interface CrudField {
   /**
    * 'multiselect': danh sách ô tích, giá trị là mảng (vd các kho được mượn tại điểm lưu thông).
    * 'password': không bao giờ hiện giá trị cũ; để trống khi sửa = giữ nguyên (gửi null).
+   * 'rows': bảng con nhiều dòng (giá trị là mảng object) theo rowFields — vd luật theo nhóm tài liệu của chính sách.
    */
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password';
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password' | 'rows';
+  /** Cột của bảng con ('rows'). */
+  rowFields?: CrudRowField[];
+  /** Nhãn nút thêm dòng của bảng con. */
+  addLabel?: string;
   /** Lựa chọn của ô 'select'. */
   options?: { value: string | number; label: string }[];
   /** Lựa chọn lấy từ API khi mở màn (vd danh sách loại kho); thêm sẵn lựa chọn trống "—". */
@@ -39,6 +44,16 @@ export interface CrudField {
   /** Không sửa được khi bản ghi thoả điều kiện (ví dụ tham số có sẵn của hệ thống). */
   lockWhen?: (item: Row) => boolean;
   half?: boolean;
+}
+
+/** Một cột của bảng con: ô chọn (lựa chọn tĩnh hoặc từ API) hoặc ô số (trống = null). */
+export interface CrudRowField {
+  key: string;
+  label: string;
+  type: 'select' | 'number';
+  options?: { value: string | number; label: string }[];
+  optionsFrom?: (api: Api) => Promise<{ value: string | number; label: string }[]>;
+  emptyLabel?: string;
 }
 
 /** Cấu hình một màn danh mục — truyền qua data của route. */
@@ -276,6 +291,44 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                            [placeholder]="(item.publicId && item['has' + f.key[0].toUpperCase() + f.key.slice(1)] ? 'COMMON.PASSWORD_KEEP' : (f.placeholder ?? '')) | translate"
                            [disabled]="locked(f, item)" />
                   }
+                  @case ('rows') {
+                    <div class="border border-gray-200 rounded-lg overflow-x-auto">
+                      <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-xs text-gray-600">
+                          <tr>
+                            @for (sf of f.rowFields ?? []; track sf.key) { <th class="px-2 py-1.5 text-left font-medium">{{ sf.label | translate }}</th> }
+                            <th class="w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (r of rowsOf(item, f.key); track $index; let i = $index) {
+                            <tr class="border-t border-gray-100">
+                              @for (sf of f.rowFields ?? []; track sf.key) {
+                                <td class="px-1.5 py-1">
+                                  @if (sf.type === 'select') {
+                                    <select class="input py-1" [name]="f.key + '-' + i + '-' + sf.key" [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate">
+                                      @for (o of rowOptions(f, sf); track o.value) { <option [ngValue]="o.value">{{ o.label | translate }}</option> }
+                                    </select>
+                                  } @else {
+                                    <input type="number" min="0" step="1" class="input py-1 min-w-[4.5rem]" [name]="f.key + '-' + i + '-' + sf.key"
+                                           [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate" />
+                                  }
+                                </td>
+                              }
+                              <td class="px-1 text-center">
+                                <button type="button" class="text-gray-400 hover:text-red-600" [attr.aria-label]="'COMMON.DELETE' | translate" (click)="removeRow(item, f.key, i)">
+                                  <span class="material-icons text-[18px] align-middle">close</span></button>
+                              </td>
+                            </tr>
+                          } @empty {
+                            <tr><td [attr.colspan]="(f.rowFields?.length ?? 0) + 1" class="px-2 py-2 text-xs text-gray-400">{{ 'COMMON.NO_ROWS' | translate }}</td></tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    <button type="button" class="text-blue-600 hover:underline text-sm mt-1.5" (click)="addRow(item, f)">
+                      <span class="material-icons text-[16px] align-middle">add</span> {{ (f.addLabel ?? 'COMMON.ADD_ROW') | translate }}</button>
+                  }
                   @case ('status') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]">
                       <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
@@ -353,6 +406,24 @@ export class CrudPage implements OnInit {
     return this.loadedOptions()[field.key] ?? field.options ?? [];
   }
 
+  protected rowsOf(item: Row, key: string): Record<string, unknown>[] {
+    return Array.isArray(item[key]) ? (item[key] as Record<string, unknown>[]) : [];
+  }
+
+  protected rowOptions(field: CrudField, sub: CrudRowField): { value: string | number | null; label: string }[] {
+    return this.loadedOptions()[`${field.key}.${sub.key}`] ?? sub.options ?? [];
+  }
+
+  protected addRow(item: Row, field: CrudField): void {
+    const row: Record<string, unknown> = {};
+    for (const sf of field.rowFields ?? []) row[sf.key] = null;
+    item[field.key] = [...this.rowsOf(item, field.key), row];
+  }
+
+  protected removeRow(item: Row, key: string, index: number): void {
+    item[key] = this.rowsOf(item, key).filter((_, i) => i !== index);
+  }
+
   protected isChecked(item: Row, key: string, value: unknown): boolean {
     return Array.isArray(item[key]) && (item[key] as unknown[]).includes(value);
   }
@@ -376,6 +447,16 @@ export class CrudPage implements OnInit {
         this.loadedOptions.update((all) => ({ ...all, [field.key]: [{ value: null, label: field.emptyLabel ?? '—' }, ...options] }));
       } catch {
         /* thiếu quyền xem danh mục liên quan — ô chọn để trống */
+      }
+    }
+    for (const field of this.config().fields.filter((f) => f.type === 'rows')) {
+      for (const sub of (field.rowFields ?? []).filter((s) => s.optionsFrom)) {
+        try {
+          const options = await sub.optionsFrom!(this.api);
+          this.loadedOptions.update((all) => ({ ...all, [`${field.key}.${sub.key}`]: [{ value: null, label: sub.emptyLabel ?? '—' }, ...options] }));
+        } catch {
+          /* thiếu quyền xem danh mục liên quan */
+        }
       }
     }
   }

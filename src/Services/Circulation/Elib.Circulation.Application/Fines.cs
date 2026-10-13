@@ -95,6 +95,8 @@ public sealed class FineReasonResource(ICrudDbContext db)
             (FineReason.OverdueCode, "Quá hạn", null),
             (FineReason.LostCode, "Mất tài liệu", Loan.LostStatus),
             ("HUHONG", "Hư hỏng tài liệu", null),
+            (FineReason.TechFeeCode, "Xử lý kỹ thuật", null),
+            (FineReason.ShippingFeeCode, "Vận chuyển", null),
         ];
         var existing = await Set.Select(x => x.Code).ToListAsync(ct);
         var missing = defaults.Where(d => !existing.Contains(d.Code)).ToList();
@@ -280,6 +282,7 @@ public sealed class FineTicketResource(
                 ticket.AddLine(reason, reason.Amount, loan, null, null, 0);
             }
         }
+        AddDocumentFees(ticket, reasons, LoanPolicyResource.Resolve(policies, reader.ReaderTypeId, request.CircPlaceId));
         if (ticket.Lines.Count > MaxLines) throw new BusinessRuleException("FINE_LINES_LIMIT", $"Một phiếu phạt tối đa {MaxLines} dòng.");
         if (created || candidates.Count > 0)
         {
@@ -324,6 +327,11 @@ public sealed class FineTicketResource(
                 await AddManualLineAsync(ticket, Reason(change.ReasonCode), change, ct);
             }
         }
+        if (ticket.IsOpen)
+        {
+            var readerType = await Db.Set<PatronReplica>().Where(r => r.ReaderPublicId == ticket.ReaderPublicId).Select(r => r.ReaderTypeId).FirstOrDefaultAsync(ct);
+            AddDocumentFees(ticket, reasons.Values, LoanPolicyResource.Resolve(await Db.Set<LoanPolicy>().AsNoTracking().ToListAsync(ct), readerType, null));
+        }
         if (ticket.Lines.Count > MaxLines) throw new BusinessRuleException("FINE_LINES_LIMIT", $"Một phiếu phạt tối đa {MaxLines} dòng.");
 
         // Dòng lý do "Mất" mà lượt mượn còn mở (kể cả dòng tạo sẵn khi gom phiếu) → đóng lượt, báo holdings — như monolith mỗi lần lưu.
@@ -345,6 +353,22 @@ public sealed class FineTicketResource(
             + (ticket.IsOpen ? "" : ", hoàn thành") + (lostLoans.Count > 0 ? $"; báo mất {string.Join(", ", lostLoans)}" : ""), ct);
         await Db.SaveChangesAsync(ct);
         return await DetailAsync(ticket, null, ct);
+    }
+
+    /// <summary>
+    /// Nợ tài liệu (phiếu có dòng lý do đổi bản sách sang "Mất") → cộng phí xử lý kỹ thuật + vận chuyển của chính sách, MỘT lần cho phiếu
+    /// (ELIB-LRC: ComputeTotal khi OwesDocument). Phí bằng 0, lý do đã bị xoá khỏi danh mục, hoặc phiếu đã có dòng đó → bỏ qua.
+    /// </summary>
+    private static void AddDocumentFees(FineTicket ticket, IEnumerable<FineReason> reasons, LoanPolicy policy)
+    {
+        var all = reasons.ToList();
+        var lost = all.Where(r => r.ItemStatus == Loan.LostStatus).Select(r => r.Id).ToHashSet();
+        if (!ticket.IsOpen || !ticket.Lines.Any(l => lost.Contains(l.ReasonId))) return;
+        foreach (var (code, amount) in new[] { (FineReason.TechFeeCode, policy.TechFee), (FineReason.ShippingFeeCode, policy.ShippingFee) })
+        {
+            if (amount <= 0 || all.FirstOrDefault(r => r.Code == code) is not { } reason || ticket.Lines.Any(l => l.ReasonId == reason.Id)) continue;
+            ticket.AddLine(reason, amount, null, null, null, 0);
+        }
     }
 
     private async Task<FineLine> AddManualLineAsync(FineTicket ticket, FineReason reason, FineLineChange change, CancellationToken ct)

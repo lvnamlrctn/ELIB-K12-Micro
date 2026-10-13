@@ -72,6 +72,17 @@ public sealed class LoanPolicy : TenantEntity
     /// <summary>Số ngày giữ sách cho người đặt (monolith: 48 giờ cố định).</summary>
     public int HoldDays { get; private set; } = DefaultHoldDays;
 
+    /// <summary>
+    /// Phí xử lý kỹ thuật và phí vận chuyển (ELIB-LRC: PolicyCircFine mã XLKY / VANCHUYEN) — cộng một lần vào phiếu phạt khi bạn đọc
+    /// nợ tài liệu (phiếu có dòng "Mất tài liệu").
+    /// </summary>
+    public decimal TechFee { get; private set; }
+
+    public decimal ShippingFee { get; private set; }
+
+    /// <summary>Luật riêng theo nhóm tài liệu = loại biểu ghi (ELIB-LRC: PolicyCircDocGroup); trường trống = theo chính sách chung.</summary>
+    public List<BibTypeRule> BibTypeRules { get; private set; } = [];
+
     public static LoanPolicy Create(long? readerTypeId, long? circPlaceId, int loanDays, int? maxLoans, int? maxRenewals, int renewDays,
         decimal finePerDay = 0, bool renewFromToday = false, int? maxHolds = null, int holdDays = DefaultHoldDays)
     {
@@ -95,8 +106,65 @@ public sealed class LoanPolicy : TenantEntity
         HoldDays = holdDays is >= 1 and <= 30 ? holdDays : throw new BusinessRuleException("HOLD_DAYS_INVALID", "Số ngày giữ sách từ 1 đến 30.");
     }
 
+    public void SetFees(decimal techFee, decimal shippingFee)
+    {
+        TechFee = FineMoney.Validate(techFee, "Phí xử lý kỹ thuật");
+        ShippingFee = FineMoney.Validate(shippingFee, "Phí vận chuyển");
+    }
+
+    public void SetBibTypeRules(IEnumerable<BibTypeRule>? rules)
+    {
+        var list = (rules ?? []).Select(BibTypeRule.Validate).ToList();
+        if (list.Count > BibTypeRule.MaxRules) throw new BusinessRuleException("BIB_TYPE_RULES_TOO_MANY", $"Tối đa {BibTypeRule.MaxRules} nhóm tài liệu mỗi chính sách.");
+        if (list.GroupBy(r => r.BibTypeId).Any(g => g.Count() > 1))
+            throw new BusinessRuleException("BIB_TYPE_RULE_DUPLICATE", "Mỗi nhóm tài liệu chỉ khai báo một lần trong một chính sách.");
+        BibTypeRules = [.. list.OrderBy(r => r.BibTypeId)];
+    }
+
+    /// <summary>Luật của nhóm tài liệu (loại biểu ghi) — null nếu chưa khai báo hoặc chưa biết loại.</summary>
+    public BibTypeRule? RuleFor(long? bibTypeId) => bibTypeId is { } id ? BibTypeRules.FirstOrDefault(r => r.BibTypeId == id) : null;
+
+    /// <summary>Số ngày mượn cho tài liệu thuộc nhóm (luật riêng nếu có).</summary>
+    public int LoanDaysFor(long? bibTypeId) => RuleFor(bibTypeId)?.LoanDays ?? LoanDays;
+
     /// <summary>Độ cụ thể khi chọn chính sách — càng lớn càng ưu tiên.</summary>
     public int Specificity => (ReaderTypeId is null ? 0 : 2) + (CircPlaceId is null ? 0 : 1);
 
     public static LoanPolicy Default { get; } = new();
+}
+
+/// <summary>
+/// Luật theo nhóm tài liệu trong một chính sách (ELIB-LRC: PolicyCircDocGroup — NumberOfBook, NumberOfRenewQty, NumberOfRequest; LRC chỉ
+/// khai báo, ở đây áp thật khi mượn/gia hạn/đặt mượn). <see cref="LoanDays"/> thêm mới: sách tham khảo thường mượn ngắn hơn.
+/// </summary>
+public sealed class BibTypeRule
+{
+    public const int MaxRules = 100;
+
+    public long BibTypeId { get; set; }
+
+    /// <summary>Số ngày mượn; null = theo chính sách.</summary>
+    public int? LoanDays { get; set; }
+
+    /// <summary>Số tài liệu nhóm này được mượn cùng lúc; null = không giới hạn riêng (vẫn tính vào giới hạn chung).</summary>
+    public int? MaxLoans { get; set; }
+
+    /// <summary>Số lần gia hạn; null = theo chính sách.</summary>
+    public int? MaxRenewals { get; set; }
+
+    /// <summary>Số đặt mượn còn hiệu lực cho nhóm này; null = không giới hạn riêng.</summary>
+    public int? MaxHolds { get; set; }
+
+    public static BibTypeRule Validate(BibTypeRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        if (rule.BibTypeId <= 0) throw new BusinessRuleException("BIB_TYPE_REQUIRED", "Chọn nhóm tài liệu (loại biểu ghi).");
+        if (rule.LoanDays is { } d && d is < 1 or > 3650) throw new BusinessRuleException("LOAN_DAYS_INVALID", "Số ngày mượn từ 1 đến 3650.");
+        if (rule.MaxLoans < 0 || rule.MaxRenewals < 0 || rule.MaxHolds < 0)
+            throw new BusinessRuleException("BIB_TYPE_RULE_INVALID", "Số lượng trong luật nhóm tài liệu không được âm.");
+        return new BibTypeRule
+        {
+            BibTypeId = rule.BibTypeId, LoanDays = rule.LoanDays, MaxLoans = rule.MaxLoans, MaxRenewals = rule.MaxRenewals, MaxHolds = rule.MaxHolds,
+        };
+    }
 }

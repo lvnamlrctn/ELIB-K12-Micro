@@ -13,6 +13,11 @@ public sealed class FineReason : TenantEntity
     public const string OverdueCode = "QUAHAN";
     public const string LostCode = "MATTL";
 
+    /// <summary>Phí xử lý kỹ thuật / vận chuyển khi nợ tài liệu (ELIB-LRC: CFineType XLKY, VANCHUYEN) — số tiền lấy từ chính sách.</summary>
+    public const string TechFeeCode = "XLKY";
+
+    public const string ShippingFeeCode = "VANCHUYEN";
+
     private FineReason() { }
 
     public string Code { get; private set; } = "";

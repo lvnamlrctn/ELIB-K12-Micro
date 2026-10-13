@@ -71,8 +71,10 @@ public sealed class Replicas(ICrudDbContext db, IReplicaSources sources, ITenant
         ArgumentNullException.ThrowIfNull(e);
         var r = await db.Set<BibSnapshot>().FirstOrDefaultAsync(x => x.BibPublicId == e.BibPublicId, ct);
         if (r is null) db.Set<BibSnapshot>().Add(r = new BibSnapshot { BibPublicId = e.BibPublicId, Version = -1 });
-        if (e.Version <= r.Version) return r;
+        if (e.Version < r.Version || (e.Version == r.Version && r.TypeKnown)) return r; // cùng bản mà chưa có loại → ghi bổ sung loại
         r.Mfn = e.Mfn;
+        r.BibTypeId = e.BibTypeId;
+        r.TypeKnown = true;
         r.Title = Cut(e.Title, 1000) ?? "";
         r.Author = Cut(e.Author, 500);
         r.Ddc = Cut(e.Ddc, 50);
@@ -111,11 +113,14 @@ public sealed class Replicas(ICrudDbContext db, IReplicaSources sources, ITenant
         return r is { Deleted: false } ? r : null;
     }
 
-    /// <summary>Đảm bảo có nhan đề cho các MFN (hiển thị) — thiếu thì hỏi catalog.</summary>
-    public async Task EnsureBibsAsync(IEnumerable<long> mfns, CancellationToken ct)
+    /// <summary>
+    /// Đảm bảo có nhan đề cho các MFN (hiển thị) — thiếu thì hỏi catalog. <paramref name="needType"/>: cần cả loại biểu ghi (luật nhóm tài
+    /// liệu) — bản sao cũ chưa có loại cũng hỏi lại.
+    /// </summary>
+    public async Task EnsureBibsAsync(IEnumerable<long> mfns, CancellationToken ct, bool needType = false)
     {
         var wanted = mfns.Distinct().ToList();
-        var have = await db.Set<BibSnapshot>().Where(x => wanted.Contains(x.Mfn)).Select(x => x.Mfn).ToListAsync(ct);
+        var have = await db.Set<BibSnapshot>().Where(x => wanted.Contains(x.Mfn) && (!needType || x.TypeKnown)).Select(x => x.Mfn).ToListAsync(ct);
         foreach (var mfn in wanted.Except(have))
         {
             if (await sources.BibAsync(tenant.RequireTenantId(), mfn, ct) is not { } state) continue;
@@ -139,6 +144,22 @@ public sealed class Replicas(ICrudDbContext db, IReplicaSources sources, ITenant
             db.Set<T>().Entry(replica).State = EntityState.Detached;
             return false;
         }
+    }
+
+    /// <summary>Loại biểu ghi theo MFN (để áp luật nhóm tài liệu); catalog không trả lời được thì dùng loại đang có (có thể null).</summary>
+    public async Task<Dictionary<long, long?>> BibTypesAsync(IEnumerable<long> mfns, CancellationToken ct)
+    {
+        var wanted = mfns.Distinct().ToList();
+        try
+        {
+            await EnsureBibsAsync(wanted, ct, needType: true);
+        }
+        catch (HttpRequestException)
+        {
+            // catalog đang down — dùng loại đã biết
+        }
+        return await db.Set<BibSnapshot>().AsNoTracking().Where(x => wanted.Contains(x.Mfn))
+            .GroupBy(x => x.Mfn).Select(g => new { Mfn = g.Key, Type = g.Max(x => x.BibTypeId) }).ToDictionaryAsync(x => x.Mfn, x => x.Type, ct);
     }
 
     private static string? Cut(string? value, int max) => value is null ? null : value.Length <= max ? value : value[..max];

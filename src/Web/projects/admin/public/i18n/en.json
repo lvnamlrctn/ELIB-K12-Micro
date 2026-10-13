@@ -102,7 +102,9 @@
     "RECORDS_N": "Records: {{count}}",
     "REQUIRED_FIELD": "Please enter {{field}}.",
     "STATUS_CHANGED": "Status changed",
-    "VND": "VND"
+    "VND": "VND",
+    "NO_ROWS": "No rows yet.",
+    "ADD_ROW": "Add row"
   },
   "DATATABLE": {
     "SEARCH": "Search:",
@@ -2218,7 +2220,15 @@
     "FROM_PAGE": "From page",
     "TO_PAGE": "To page",
     "UNIT_PRICE": "Price per page (VND)",
-    "PAID_FULL": "Paid"
+    "PAID_FULL": "Paid",
+    "TECH_FEE": "Processing fee",
+    "SHIPPING_FEE": "Shipping fee",
+    "DOC_FEES_HINT": "Added once to the fine ticket when the reader owes a document (has a lost-item line).",
+    "BIB_TYPE_RULES": "By document group",
+    "BIB_TYPE_RULES_HINT": "Specific rules per record type; empty = general policy, 0 = not allowed.",
+    "BIB_TYPE_RULE_ADD": "Add document group",
+    "BIB_TYPE": "Document group",
+    "MAX_HOLDS_SHORT": "Holds"
   },
   "BORROW_PAGE": {
     "TITLE": "Check out / Return",
