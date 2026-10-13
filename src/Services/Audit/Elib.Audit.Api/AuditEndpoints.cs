@@ -10,7 +10,7 @@ namespace Elib.Audit.Api;
 public static class AuditEndpoints
 {
     /// <summary>Loại bản ghi có màn "Lịch sử thay đổi" → mã quyền xem bản ghi đó.</summary>
-    private static readonly (string EntityType, string Module)[] EntityViewModules = [("Reader", "READERS")];
+    private static readonly (string EntityType, string Module)[] EntityViewModules = [("Reader", "READERS"), ("Bib", "CATALOG_BIBS")];
 
     public static IEndpointRouteBuilder MapAuditEndpoints(this IEndpointRouteBuilder app)
     {
@@ -21,6 +21,10 @@ public static class AuditEndpoints
         foreach (var (entityType, module) in EntityViewModules)
             logs.MapGet($"/entity/{entityType}/{{id:guid}}", (Guid id, AuditQueries q, CancellationToken ct) => q.EntityHistoryAsync(entityType, id, ct))
                 .RequireAuthorization(new PermissionAnyAttribute("SYSTEM_LOG:view", $"{module}:view"));
+
+        // Nhật ký biên mục (monolith: LogBienMuc): thao tác trên biểu ghi của service catalog — cán bộ biên mục xem được.
+        logs.MapPost("/catalog/Search", (AuditLogSearch search, AuditQueries q, CancellationToken ct) => q.CatalogSearchAsync(search, ct))
+            .RequireAuthorization(new PermissionAnyAttribute("SYSTEM_LOG:view", "CATALOG_BIBS:view"));
 
         var platform = app.MapGroup("/api/system/audit-logs").WithTags("PlatformAuditLogs").RequireAuthorization(new RequireSystemContextAttribute());
         platform.MapPost("/Search", (PlatformAuditLogSearch search, AuditQueries q, CancellationToken ct) => q.SearchPlatformAsync(search, ct));

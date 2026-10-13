@@ -280,7 +280,9 @@
     "EMAIL_TEMPLATES": "Mẫu email",
     "NOTIFICATION_LOGS": "Nhật ký gửi tin",
     "SIP2_STATIONS": "Trạm tự phục vụ (SIP2)",
-    "SIP2_LOGS": "Nhật ký SIP2"
+    "SIP2_LOGS": "Nhật ký SIP2",
+    "ISBD_CONFIGS": "Cấu hình ISBD",
+    "CATALOG_LOGS": "Nhật ký biên mục"
   },
   "HEADER": {
     "LANG_ALT": "ngôn ngữ",
@@ -1834,7 +1836,9 @@
     "ACTOR": "Người thực hiện",
     "CONTENT": "Nội dung",
     "TENANT": "Đơn vị",
-    "SYSTEM": "Hệ thống"
+    "SYSTEM": "Hệ thống",
+    "TITLE_CATALOG": "Nhật ký biên mục",
+    "SUB_CATALOG": "Thêm, sửa, xoá, nhập biểu ghi — mở biểu ghi để xem chi tiết từng trường đã đổi."
   },
   "EMAIL_SETTINGS": {
     "TITLE": "Cấu hình email",
@@ -2018,7 +2022,10 @@
     "APPLY_WORKSHEET_CONFIRM": "Áp biểu mẫu sẽ thay các trường đang nhập. Tiếp tục?",
     "SAVED_NEW": "Đã lưu biểu ghi MFN {{mfn}}.",
     "UPDATED": "Đã cập nhật biểu ghi.",
-    "FIELDS_LOADED": "Đã nạp {{count}} trường từ file — kiểm tra rồi bấm Lưu biểu ghi."
+    "FIELDS_LOADED": "Đã nạp {{count}} trường từ file — kiểm tra rồi bấm Lưu biểu ghi.",
+    "HISTORY": "Lịch sử biên mục",
+    "REASON": "Lý do sửa",
+    "REASON_PH": "Không bắt buộc — ghi vào lịch sử biên mục"
   },
   "MARC_TOOLS": {
     "IMPORT_TITLE": "Nhập biểu ghi từ file MARC",
@@ -2612,5 +2619,30 @@
     "CMD_65": "Gia hạn tất cả",
     "CMD_35": "Kết thúc phiên",
     "CMD_37": "Nộp phí"
+  },
+  "DICTIONARY": {
+    "AUTHORS": "Từ điển tác giả",
+    "PUBLISHERS": "Từ điển nhà xuất bản",
+    "KEYWORDS": "Từ điển từ khoá",
+    "CLASSES": "Khung phân loại",
+    "SEARCH_LABEL": "Tìm trong từ điển",
+    "SEARCH_PH": "Gõ không dấu cũng được",
+    "VALUE": "Giá trị",
+    "DESCRIPTION": "Diễn giải",
+    "USE_COUNT": "Số biểu ghi dùng",
+    "AUTO_ADDED": "Tự học"
+  },
+  "ISBD_CONFIG": {
+    "TITLE": "Cấu hình ISBD",
+    "SEARCH_LABEL": "Cấu hình theo loại biểu ghi",
+    "BIB_TYPE": "Loại biểu ghi",
+    "RULES": "Quy tắc trình bày",
+    "RULES_HINT": "Theo thứ tự. Dòng để trống trường con = dấu mở/đóng của cả trường; dòng có trường con = dấu mở/đóng quanh giá trị, dấu nối giữa các lần lặp. Loại chưa cấu hình dùng quy tắc ISBD mặc định.",
+    "ADD_RULE": "Thêm quy tắc",
+    "TAG": "Trường",
+    "CODE": "Trường con",
+    "PREFIX": "Mở đầu",
+    "SUFFIX": "Kết thúc",
+    "SEPARATOR": "Nối lặp"
   }
 }

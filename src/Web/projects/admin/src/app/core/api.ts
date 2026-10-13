@@ -620,6 +620,16 @@ export class Api {
   auditLogs(platform: boolean, body: CrudSearch & { action?: string | null; from?: string | null; to?: string | null }) {
     return this.post<CrudPage<AuditLog>>(platform ? '/api/system/audit/audit-logs/Search' : '/api/admin/audit/audit-logs/Search', body);
   }
+  /** Nhật ký biên mục: thao tác trên biểu ghi (quyền CATALOG_BIBS:view hoặc SYSTEM_LOG:view). */
+  catalogLogs(body: CrudSearch & { action?: string | null; from?: string | null; to?: string | null }) {
+    return this.post<CrudPage<AuditLog>>('/api/admin/audit/audit-logs/catalog/Search', body);
+  }
+  /** Gợi ý từ điển biên mục khi gõ (kind: author | publisher | keyword | class). */
+  dictionarySuggest(kind: string, q: string) {
+    return this.get<{ value: string; description: string | null }[]>(`/api/admin/catalog/dictionary/Suggest?kind=${kind}&q=${encodeURIComponent(q)}&take=10`);
+  }
+  bibIsbd(publicId: string) { return this.get<string[]>(`/api/admin/catalog/bibs/Isbd/${publicId}`); }
+  isbdTemplate() { return this.get<Record<string, unknown>[]>('/api/admin/catalog/isbd-configs/Template'); }
   auditActions(platform: boolean) {
     return this.get<string[]>(platform ? '/api/system/audit/audit-logs/actions' : '/api/admin/audit/audit-logs/actions');
   }

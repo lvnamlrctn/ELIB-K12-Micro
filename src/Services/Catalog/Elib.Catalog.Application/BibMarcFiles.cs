@@ -84,8 +84,10 @@ public sealed partial class BibResource
         var today = Today();
 
         var strategy = Db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async token =>
+        var learned = new List<Bib>();
+        var outcome = await strategy.ExecuteAsync(async token =>
         {
+            learned.Clear();
             await using var transaction = await Db.Database.BeginTransactionAsync(token);
             var errors = new List<MarcImportError>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -122,6 +124,7 @@ public sealed partial class BibResource
 
                 Set.Add(bib);
                 batch.Add(bib);
+                learned.Add(bib);
                 imported++;
                 if (batch.Count >= ImportBatchSize) await FlushAsync(batch, token);
             }
@@ -141,6 +144,10 @@ public sealed partial class BibResource
             await transaction.CommitAsync(token);
             return new MarcImportResult(records.Count, imported, skipped, failed, errors);
         }, ct);
+        // Từ điển học từ các biểu ghi vừa nhập (sau khi đã lưu).
+        if (!outcome.Rejected && learner is not null && learned.Count > 0)
+            await learner.LearnAsync([.. learned.SelectMany(b => DictionaryExtractor.Extract(b.Fields))], ct);
+        return outcome;
     }
 
     /// <summary>Xuất biểu ghi ra ISO2709 (.mrc, UTF-8) hoặc MARCXML — kèm 001 (MFN) và 005, để chuyển sang hệ khác hoặc sao lưu.</summary>

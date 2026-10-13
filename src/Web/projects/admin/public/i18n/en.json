@@ -280,7 +280,9 @@
     "EMAIL_TEMPLATES": "Email templates",
     "NOTIFICATION_LOGS": "Notification log",
     "SIP2_STATIONS": "Self-service stations (SIP2)",
-    "SIP2_LOGS": "SIP2 log"
+    "SIP2_LOGS": "SIP2 log",
+    "ISBD_CONFIGS": "ISBD settings",
+    "CATALOG_LOGS": "Cataloguing log"
   },
   "HEADER": {
     "LANG_ALT": "language",
@@ -1834,7 +1836,9 @@
     "ACTOR": "User",
     "CONTENT": "Content",
     "TENANT": "Tenant",
-    "SYSTEM": "System"
+    "SYSTEM": "System",
+    "TITLE_CATALOG": "Cataloguing log",
+    "SUB_CATALOG": "Records added, edited, deleted or imported — open a record to see each changed field."
   },
   "EMAIL_SETTINGS": {
     "TITLE": "Email settings",
@@ -2018,7 +2022,10 @@
     "APPLY_WORKSHEET_CONFIRM": "Applying the worksheet replaces the fields entered. Continue?",
     "SAVED_NEW": "Record MFN {{mfn}} saved.",
     "UPDATED": "Record updated.",
-    "FIELDS_LOADED": "Loaded {{count}} fields from the file — check, then click Save record."
+    "FIELDS_LOADED": "Loaded {{count}} fields from the file — check, then click Save record.",
+    "HISTORY": "Edit history",
+    "REASON": "Reason for change",
+    "REASON_PH": "Optional — recorded in the edit history"
   },
   "MARC_TOOLS": {
     "IMPORT_TITLE": "Import records from a MARC file",
@@ -2612,5 +2619,30 @@
     "CMD_65": "Renew all",
     "CMD_35": "End session",
     "CMD_37": "Fee paid"
+  },
+  "DICTIONARY": {
+    "AUTHORS": "Author dictionary",
+    "PUBLISHERS": "Publisher dictionary",
+    "KEYWORDS": "Keyword dictionary",
+    "CLASSES": "Classification",
+    "SEARCH_LABEL": "Search the dictionary",
+    "SEARCH_PH": "Diacritics optional",
+    "VALUE": "Value",
+    "DESCRIPTION": "Description",
+    "USE_COUNT": "Records using it",
+    "AUTO_ADDED": "Learned"
+  },
+  "ISBD_CONFIG": {
+    "TITLE": "ISBD settings",
+    "SEARCH_LABEL": "Settings per record type",
+    "BIB_TYPE": "Record type",
+    "RULES": "Display rules",
+    "RULES_HINT": "In order. Empty subfield = opening/closing punctuation of the whole field; with a subfield = punctuation around its values and the separator between repeats. Types without settings use the default ISBD rules.",
+    "ADD_RULE": "Add rule",
+    "TAG": "Tag",
+    "CODE": "Subfield",
+    "PREFIX": "Prefix",
+    "SUFFIX": "Suffix",
+    "SEPARATOR": "Repeat separator"
   }
 }

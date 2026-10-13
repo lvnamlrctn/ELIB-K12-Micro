@@ -88,6 +88,12 @@ export class Menu {
           { title: 'MENU.CATALOG_BIBS', icon: 'menu_book', link: '/catalog-bibs', perm: 'CATALOG_BIBS' },
           { title: 'MENU.WORKSHEETS', icon: 'list_alt', link: '/worksheets', perm: 'WORKSHEETS' },
           { title: 'MENU.BIB_TYPES', icon: 'category', link: '/bib-types', perm: 'BIB_TYPES' },
+          { title: 'MENU.DIC_AUTHORS', icon: 'person_search', link: '/dic-authors', perm: 'DIC_AUTHORS' },
+          { title: 'MENU.DIC_PUBLISHERS', icon: 'business', link: '/dic-publishers', perm: 'DIC_PUBLISHERS' },
+          { title: 'MENU.DIC_KEYWORDS', icon: 'sell', link: '/dic-keywords', perm: 'DIC_KEYWORDS' },
+          { title: 'MENU.DIC_CLASSES', icon: 'account_tree', link: '/dic-classes', perm: 'DIC_CLASSES' },
+          { title: 'MENU.ISBD_CONFIGS', icon: 'format_quote', link: '/isbd-configs', perm: 'CONFIG_ISBD' },
+          { title: 'MENU.CATALOG_LOGS', icon: 'history_edu', link: '/catalog-logs', perm: 'CATALOG_BIBS' },
         ],
       },
       {

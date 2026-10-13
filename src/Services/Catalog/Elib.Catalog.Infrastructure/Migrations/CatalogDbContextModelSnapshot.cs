@@ -345,6 +345,170 @@ namespace Elib.Catalog.Infrastructure.Migrations
                     b.ToTable("bib_types", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Catalog.Domain.DictionaryTerm", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AutoAdded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_added");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("UseCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("use_count");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dictionary_terms");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dictionary_terms_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_dictionary_terms_tenant_id");
+
+                    b.HasIndex("TenantId", "Kind", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dictionary_terms_tenant_id_kind_key")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("dictionary_terms", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Catalog.Domain.IsbdConfig", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BibTypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bib_type_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_isbd_configs");
+
+                    b.HasIndex("BibTypeId")
+                        .HasDatabaseName("ix_isbd_configs_bib_type_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_isbd_configs_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_isbd_configs_tenant_id");
+
+                    b.HasIndex("TenantId", "BibTypeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_isbd_configs_tenant_id_bib_type_id")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("isbd_configs", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Catalog.Domain.Worksheet", b =>
                 {
                     b.Property<long>("Id")
@@ -667,6 +831,50 @@ namespace Elib.Catalog.Infrastructure.Migrations
                         .HasForeignKey("WorksheetId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_bibs_worksheets_worksheet_id");
+                });
+
+            modelBuilder.Entity("Elib.Catalog.Domain.IsbdConfig", b =>
+                {
+                    b.HasOne("Elib.Catalog.Domain.BibType", null)
+                        .WithMany()
+                        .HasForeignKey("BibTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_isbd_configs_bib_types_bib_type_id");
+
+                    b.OwnsMany("Elib.Catalog.Domain.IsbdRule", "Rules", b1 =>
+                        {
+                            b1.Property<long>("IsbdConfigId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Code");
+
+                            b1.Property<string>("Prefix");
+
+                            b1.Property<string>("Separator");
+
+                            b1.Property<string>("Suffix");
+
+                            b1.Property<string>("Tag")
+                                .IsRequired();
+
+                            b1.HasKey("IsbdConfigId", "__synthesizedOrdinal")
+                                .HasName("pk_isbd_configs");
+
+                            b1.ToTable("isbd_configs");
+
+                            b1
+                                .ToJson("rules")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("IsbdConfigId")
+                                .HasConstraintName("fk_isbd_configs_isbd_configs_isbd_config_id");
+                        });
+
+                    b.Navigation("Rules");
                 });
 
             modelBuilder.Entity("Elib.Catalog.Domain.Worksheet", b =>

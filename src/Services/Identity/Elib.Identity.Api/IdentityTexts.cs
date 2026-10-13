@@ -79,6 +79,7 @@ public sealed class IdentityTexts
         ["READER_ERR_EXTERNAL"] = ("Hệ thống tài khoản của trường tạm thời không kết nối được. Vui lòng thử lại sau.",
             "The school's account system is temporarily unavailable. Please try again later."),
         ["READER_FORGOT_LINK"] = ("Quên mật khẩu?", "Forgot your password?"),
+        ["READER_FORGOT_CARD"] = ("Số thẻ bạn đọc", "Library card number"),
         ["READER_FORGOT_TITLE"] = ("Quên mật khẩu", "Forgot password"),
         ["READER_FORGOT_SUBTITLE"] = ("Nhập số thẻ — thư viện gửi link đặt lại mật khẩu tới email trong hồ sơ của bạn",
             "Enter your card number — the library will email a reset link to the address on your reader record"),

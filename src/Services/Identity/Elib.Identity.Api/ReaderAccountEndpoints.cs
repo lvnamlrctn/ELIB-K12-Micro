@@ -358,7 +358,7 @@ public static class ReaderAccountEndpoints
                 <input type="hidden" name="{{E.Encode(tokens.FormFieldName)}}" value="{{E.Encode(tokens.RequestToken ?? "")}}">
                 <div class="unit">{{AccountEndpoints.UnitIcon}}<span>{{E.Encode(host.Name)}}</span></div>
                 <div class="field">
-                  <label for="cardNo">{{E.Encode(t["READER_CARD"])}}</label>
+                  <label for="cardNo">{{E.Encode(t["READER_FORGOT_CARD"])}}</label>
                   <div class="box">{{AccountEndpoints.PersonIcon}}<input id="cardNo" name="cardNo" value="{{E.Encode(cardNo ?? "")}}" autocomplete="username" placeholder="{{E.Encode(t["READER_CARD_PLACEHOLDER"])}}" required autofocus></div>
                 </div>
                 {{AccountEndpoints.CaptchaBlock(t, captcha, "/account/reader-forgot")}}

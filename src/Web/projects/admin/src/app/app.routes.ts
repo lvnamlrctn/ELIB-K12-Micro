@@ -6,7 +6,7 @@ import { Home } from './pages/home';
 import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSITIONS, SYSTEM_PARAMETERS } from './pages/tenant/catalogs';
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
-import { BIB_TYPES } from './pages/catalog/catalogs';
+import { BIB_TYPES, DIC_AUTHORS, DIC_CLASSES, DIC_KEYWORDS, DIC_PUBLISHERS, ISBD_CONFIGS } from './pages/catalog/catalogs';
 import { Z3950_SERVERS } from './pages/search/catalogs';
 import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import { CIRC_PLACES, FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
@@ -78,6 +78,15 @@ export const routes: Routes = [
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),
       catalog('sip2-stations', SIP2_STATIONS),
+      catalog('dic-authors', DIC_AUTHORS),
+      catalog('dic-publishers', DIC_PUBLISHERS),
+      catalog('dic-keywords', DIC_KEYWORDS),
+      catalog('dic-classes', DIC_CLASSES),
+      catalog('isbd-configs', ISBD_CONFIGS),
+      {
+        path: 'catalog-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
+        canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], data: { scope: 'catalog' }, title: 'AUDIT.TITLE_CATALOG',
+      },
       { path: 'sip2-logs', loadComponent: () => import('./pages/circulation/sip2-logs').then((m) => m.Sip2Logs), canActivate: [tenantGuard, permissionGuard('SIP2LOG')], title: 'SIP2.LOG_TITLE' },
       catalog('photocopy', PHOTOCOPIES),
       { path: 'circulation-report', loadComponent: () => import('./pages/circulation/reports').then((m) => m.CirculationReports), canActivate: [tenantGuard, permissionGuard('CIRC_REPORT')], title: 'CIRC_REPORT_PAGE.TITLE' },

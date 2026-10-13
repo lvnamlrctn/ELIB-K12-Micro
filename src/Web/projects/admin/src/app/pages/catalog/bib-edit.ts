@@ -11,6 +11,7 @@ import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
 import { BibItems } from '../holdings/bib-items';
 import { BibCover } from './bib-cover';
+import { BibHistory } from './bib-history';
 import { MarcPick } from './marc-tools';
 
 /** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
@@ -24,12 +25,15 @@ const BLANK_FIELDS: MarcField[] = [
 /** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover, TranslatePipe],
+  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover, BibHistory, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'BIB_EDITOR.BACK' | translate"><span class="material-icons">arrow_back</span></a>
       <h4 class="page-title">{{ (bib() ? 'BIB_EDITOR.EDIT_TITLE' : 'BIB_EDITOR.NEW_TITLE') | translate }}</h4>
-      @if (bib(); as b) { <span class="text-sm text-gray-500">MFN <b class="font-mono">{{ b.mfn }}</b> · {{ b.title }}</span> }
+      @if (bib(); as b) {
+        <span class="text-sm text-gray-500">MFN <b class="font-mono">{{ b.mfn }}</b> · {{ b.title }}</span>
+        <button type="button" class="btn-secondary !py-1.5" (click)="showHistory.set(true)"><span class="material-icons text-[18px]">history</span> {{ 'BIB_EDITOR.HISTORY' | translate }}</button>
+      }
       @if (canSave()) {
         @if (!bib() && hasSearch()) {
           <a routerLink="/z3950-search" class="btn-secondary ml-auto"><span class="material-icons text-[18px]">travel_explore</span> Tra Z39.50</a>
@@ -68,7 +72,7 @@ const BLANK_FIELDS: MarcField[] = [
       </div>
 
       <div class="p-5 bg-gray-50/50">
-        <app-marc-editor [(fields)]="fields" [defs]="defs()" />
+        <app-marc-editor [(fields)]="fields" [defs]="defs()" [suggest]="suggest" />
       </div>
 
       @if (dupes().length) {
@@ -86,8 +90,12 @@ const BLANK_FIELDS: MarcField[] = [
         @if (hasHoldings()) { <app-bib-items [mfn]="b.mfn" /> }
       }
 
-      <div class="flex gap-3 px-5 py-4 border-t border-gray-100">
+      <div class="flex flex-wrap gap-3 px-5 py-4 border-t border-gray-100">
         <a routerLink="/catalog-bibs" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</a>
+        @if (bib() && canSave()) {
+          <input id="be-reason" class="input !w-auto flex-1 min-w-[12rem]" maxlength="500" [(ngModel)]="reason"
+                 [placeholder]="'BIB_EDITOR.REASON_PH' | translate" [attr.aria-label]="'BIB_EDITOR.REASON' | translate" />
+        }
         @if (canSave()) {
           <button type="button" class="btn-primary ml-auto" [disabled]="saving()" (click)="save(false)">
             <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> {{ 'BIB_EDITOR.SAVE' | translate }}
@@ -97,6 +105,7 @@ const BLANK_FIELDS: MarcField[] = [
     </div>
 
     @if (picking()) { <app-marc-pick (chosen)="useRecord($event)" (closed)="picking.set(false)" /> }
+    @if (showHistory() && bib(); as b) { <app-bib-history [publicId]="b.publicId" [defs]="defs()" (closed)="showHistory.set(false)" /> }
   `,
 })
 export class BibEdit implements OnInit {
@@ -121,6 +130,10 @@ export class BibEdit implements OnInit {
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly picking = signal(false);
+  protected readonly showHistory = signal(false);
+  protected reason = '';
+  /** Gợi ý từ điển cho trình soạn MARC. */
+  protected readonly suggest = (kind: string, q: string) => this.api.dictionarySuggest(kind, q);
   protected bibTypeId: number | null = null;
   protected status = STATUS_ACTIVE;
   protected leader = '';
@@ -209,7 +222,8 @@ export class BibEdit implements OnInit {
       this.dupes.set([]);
       const body = { bibTypeId: this.bibTypeId, worksheetId: this.worksheetId(), leader: this.leader.trim() || null, fields: this.fields(), status: this.status };
       const current = this.bib();
-      const saved = current ? await this.client.update(current.publicId, body) : await this.client.add(body);
+      const saved = current ? await this.client.update(current.publicId, body, this.reason.trim() || null) : await this.client.add(body);
+      this.reason = '';
       if (isNew) this.toastr.success('BIB_EDITOR.SAVED_NEW', { mfn: saved.mfn });
       else this.toastr.success('BIB_EDITOR.UPDATED');
       if (isNew) {

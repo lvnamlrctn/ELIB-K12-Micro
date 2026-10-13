@@ -40,7 +40,19 @@ public sealed partial class BibResource
     {
         var bib = await OpacBibAsync(publicId, ct);
         var fields = WithSystemFields(bib.Fields, bib.Id, bib.UpdatedAt ?? bib.CreatedAt);
-        return new OpacMarcDto(bib.PublicId, bib.Id, bib.Leader, fields, Isbd.Build(bib.Fields));
+        return new OpacMarcDto(bib.PublicId, bib.Id, bib.Leader, fields, Isbd.Build(bib.Fields, await IsbdRulesAsync(bib.BibTypeId, ct)));
+    }
+
+    /// <summary>Quy tắc ISBD của loại biểu ghi (cấu hình ISBD) — chưa cấu hình → null (quy tắc mặc định).</summary>
+    public async Task<IReadOnlyList<IsbdRule>?> IsbdRulesAsync(long? bibTypeId, CancellationToken ct) => bibTypeId is { } type
+        ? await Db.Set<IsbdConfig>().AsNoTracking().Where(c => c.BibTypeId == type).Select(c => c.Rules).FirstOrDefaultAsync(ct)
+        : null;
+
+    /// <summary>ISBD của biểu ghi ở màn quản trị (xem trước khi biên mục).</summary>
+    public async Task<IReadOnlyList<string>> IsbdAsync(Guid publicId, CancellationToken ct)
+    {
+        var bib = await LoadAsync(publicId, ct);
+        return Isbd.Build(bib.Fields, await IsbdRulesAsync(bib.BibTypeId, ct));
     }
 
     /// <summary>Tải biểu ghi trên OPAC: ISO2709 (.mrc, UTF-8) hoặc MARCXML — thư viện khác nhập lại vào hệ của họ.</summary>

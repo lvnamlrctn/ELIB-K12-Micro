@@ -43,6 +43,51 @@ public static class Isbd
         return paragraphs;
     }
 
+    /// <summary>
+    /// ISBD theo cấu hình của loại biểu ghi (monolith: GenerateIsbd với Config_Isbd): lần lượt từng quy tắc trường, mỗi lần lặp của trường
+    /// → nối các trường con theo quy tắc trường con (mở + các giá trị nối bằng dấu nối + đóng), bọc dấu mở/đóng của trường. Không có cấu hình
+    /// → quy tắc mặc định; cấu hình không sinh được gì → rỗng (như monolith).
+    /// </summary>
+    public static IReadOnlyList<string> Build(IReadOnlyList<MarcField> fields, IReadOnlyList<IsbdRule>? rules)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        if (rules is not { Count: > 0 }) return Build(fields);
+        var text = new StringBuilder();
+        foreach (var fieldRule in rules.Where(r => r.Code is null))
+        {
+            var subRules = rules.Where(r => r.Code is not null && r.Tag == fieldRule.Tag).ToList();
+            foreach (var occurrence in fields.Where(f => f.Tag == fieldRule.Tag))
+            {
+                var part = new StringBuilder();
+                foreach (var sub in subRules)
+                {
+                    var values = occurrence.Values(sub.Code![0]).Select(v => v.Trim()).Where(v => v.Length > 0).ToList();
+                    if (values.Count == 0) continue;
+                    part.Append(sub.Prefix).Append(string.Join(sub.Separator ?? "", values)).Append(sub.Suffix);
+                }
+                if (part.Length > 0) text.Append(fieldRule.Prefix).Append(part).Append(fieldRule.Suffix);
+            }
+        }
+        var result = text.ToString().Trim();
+        return result.Length == 0 ? [] : [result];
+    }
+
+    /// <summary>Quy tắc khởi đầu tương đương quy tắc mặc định — nút "Tạo từ mẫu" ở màn cấu hình ISBD.</summary>
+    public static IReadOnlyList<IsbdRule> DefaultRules() =>
+    [
+        new() { Tag = "245" }, new() { Tag = "245", Code = "a" }, new() { Tag = "245", Code = "b", Prefix = " : " },
+        new() { Tag = "245", Code = "c", Prefix = " / " },
+        new() { Tag = "250", Prefix = ". — " }, new() { Tag = "250", Code = "a" },
+        new() { Tag = "260", Prefix = ". — " }, new() { Tag = "260", Code = "a", Separator = " ; " }, new() { Tag = "260", Code = "b", Prefix = " : " },
+        new() { Tag = "260", Code = "c", Prefix = ", " },
+        new() { Tag = "264", Prefix = ". — " }, new() { Tag = "264", Code = "a", Separator = " ; " }, new() { Tag = "264", Code = "b", Prefix = " : " },
+        new() { Tag = "264", Code = "c", Prefix = ", " },
+        new() { Tag = "300", Prefix = ". — " }, new() { Tag = "300", Code = "a" }, new() { Tag = "300", Code = "b", Prefix = " : " },
+        new() { Tag = "300", Code = "c", Prefix = " ; " }, new() { Tag = "300", Code = "e", Prefix = " + " },
+        new() { Tag = "490", Prefix = ". — (", Suffix = ")" }, new() { Tag = "490", Code = "a" }, new() { Tag = "490", Code = "v", Prefix = " ; " },
+        new() { Tag = "020", Prefix = ". — ISBN " }, new() { Tag = "020", Code = "a" },
+    ];
+
     private static string? TitleArea(MarcField? f) => Compose(f, code => code switch
     {
         'a' => "",

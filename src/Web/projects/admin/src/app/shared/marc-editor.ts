@@ -55,6 +55,8 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
                   <span class="text-gray-400 font-mono text-sm">$</span>
                   <input class="input !w-10 !py-1 font-mono text-center" maxlength="1" [(ngModel)]="s.code" [attr.aria-label]="'MARC_EDITOR.SUBFIELD_CODE_OF' | translate: { tag: f.tag }" />
                   <input class="input !py-1 flex-1" [(ngModel)]="s.value" [placeholder]="subName(def, s.code) ?? ((template() ? 'MARC_EDITOR.DEFAULT_VALUE' : 'MARC_EDITOR.VALUE') | translate)"
+                         [attr.list]="kindOf(f.tag, s.code) ? 'marc-suggest' : null" autocomplete="off"
+                         (focus)="lookup(f.tag, s.code, s.value)" (input)="lookup(f.tag, s.code, s.value)"
                          [title]="subName(def, s.code) ?? ''" [attr.aria-label]="f.tag + ' $' + s.code + ' ' + (subName(def, s.code) ?? '')" />
                   <button type="button" class="icon-btn text-red-400 hover:bg-red-50" [title]="'MARC_EDITOR.REMOVE_SUBFIELD' | translate" (click)="removeSubfield(f, j)"><span class="material-icons text-[16px]">remove</span></button>
                 </div>
@@ -63,6 +65,10 @@ import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
           }
         </div>
       }
+
+      <datalist id="marc-suggest">
+        @for (o of options(); track o.value) { <option [value]="o.value">{{ o.description ?? '' }}</option> }
+      </datalist>
 
       @if (picking()) {
         <div class="border border-blue-200 rounded-lg p-3 bg-blue-50/40">
@@ -93,6 +99,11 @@ export class MarcEditor {
   readonly defs = input<MarcFieldDef[]>([]);
   /** Soạn biểu mẫu: giữ thứ tự, cho sắp xếp, trường con được để trống. */
   readonly template = input(false);
+  /** Gợi ý từ điển biên mục (tác giả, NXB, từ khoá, phân loại) — trình biên mục truyền vào; biểu mẫu không dùng. */
+  readonly suggest = input<((kind: string, q: string) => Promise<{ value: string; description: string | null }[]>) | null>(null);
+
+  protected readonly options = signal<{ value: string; description: string | null }[]>([]);
+  private lookupTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly picking = signal(false);
   protected filter = '';
@@ -112,6 +123,34 @@ export class MarcEditor {
 
   protected subName(def: MarcFieldDef | undefined, code: string): string | null {
     return def?.subfields.find((s: MarcSubfieldDef) => s.code === code)?.name ?? null;
+  }
+
+  /** Trường con có từ điển: 100/110/700/710 $a tác giả, 260/264 $b NXB, 650/653 $a từ khoá, 082 $a phân loại. */
+  protected kindOf(tag: string, code: string): string | null {
+    if (!this.suggest()) return null;
+    if (code === 'a' && ['100', '110', '700', '710'].includes(tag)) return 'author';
+    if (code === 'b' && (tag === '260' || tag === '264')) return 'publisher';
+    if (code === 'a' && (tag === '650' || tag === '653')) return 'keyword';
+    if (code === 'a' && tag === '082') return 'class';
+    return null;
+  }
+
+  /** Nạp gợi ý sau 250ms kể từ lần gõ cuối (ít nhất 2 ký tự). */
+  protected lookup(tag: string, code: string, value: string): void {
+    clearTimeout(this.lookupTimer);
+    const kind = this.kindOf(tag, code);
+    const q = (value ?? '').trim();
+    if (!kind || q.length < 2) {
+      this.options.set([]);
+      return;
+    }
+    this.lookupTimer = setTimeout(async () => {
+      try {
+        this.options.set(await this.suggest()!(kind, q));
+      } catch {
+        this.options.set([]); // không có quyền / mạng lỗi — vẫn gõ tay được
+      }
+    }, 250);
   }
 
   protected isControl(tag: string): boolean {

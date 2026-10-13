@@ -55,7 +55,7 @@ public abstract class CrudResource<TSelf, TEntity, TSearch, TRequest, TDto>(ICru
     protected virtual IReadOnlyCollection<string> DiffIgnored => [];
 
     /// <summary>Diff DTO trước/sau cho nhật ký; <paramref name="before"/> chụp bằng <see cref="ToDto"/> trước khi sửa.</summary>
-    protected JsonObject? Diff(TDto before, TEntity entity) => CrudDiff.Compute(before, ToDto(entity), DiffIgnored);
+    protected virtual JsonObject? Diff(TDto before, TEntity entity) => CrudDiff.Compute(before, ToDto(entity), DiffIgnored);
 
     /// <summary>Tên hiển thị trong thông báo "Không tìm thấy …".</summary>
     protected abstract string EntityName { get; }

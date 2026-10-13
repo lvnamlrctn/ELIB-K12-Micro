@@ -1,5 +1,58 @@
 import { CrudConfig } from '../../shared/crud-page';
 
+/** Từ điển biên mục (monolith: DicAuthor/DicPublisher/DicKeyword/DicClass) — tự học khi lưu biểu ghi, gợi ý trong trình biên mục. */
+function dictionary(resource: string, perm: string, title: string, withDescription = false): CrudConfig {
+  return {
+    title, resource, service: 'catalog', perm, importable: true,
+    searchLabel: 'DICTIONARY.SEARCH_LABEL', searchPlaceholder: 'DICTIONARY.SEARCH_PH',
+    columns: [
+      { key: 'value', label: 'DICTIONARY.VALUE', type: withDescription ? 'mono' : undefined, width: withDescription ? '160px' : undefined },
+      ...(withDescription ? [{ key: 'description', label: 'DICTIONARY.DESCRIPTION' }] : []),
+      { key: 'useCount', label: 'DICTIONARY.USE_COUNT', type: 'number', width: '120px' },
+      { key: 'autoAdded', label: 'DICTIONARY.AUTO_ADDED', type: 'bool', width: '130px' },
+    ],
+    fields: [
+      { key: 'value', label: 'DICTIONARY.VALUE', type: 'text', required: true },
+      ...(withDescription ? [{ key: 'description', label: 'DICTIONARY.DESCRIPTION', type: 'text' as const }] : []),
+    ],
+    modalWidth: 'max-w-lg',
+  };
+}
+
+export const DIC_AUTHORS = dictionary('dic-authors', 'DIC_AUTHORS', 'DICTIONARY.AUTHORS');
+export const DIC_PUBLISHERS = dictionary('dic-publishers', 'DIC_PUBLISHERS', 'DICTIONARY.PUBLISHERS');
+export const DIC_KEYWORDS = dictionary('dic-keywords', 'DIC_KEYWORDS', 'DICTIONARY.KEYWORDS');
+export const DIC_CLASSES = dictionary('dic-classes', 'DIC_CLASSES', 'DICTIONARY.CLASSES', true);
+
+/**
+ * Cấu hình ISBD theo loại biểu ghi (monolith: ConfigIsbd + IsbdField + IsbdSubfield, quyền CONFIG_ISBD). Dòng để trống trường con =
+ * quy tắc của cả trường; loại chưa cấu hình dùng quy tắc ISBD mặc định. Thêm mới điền sẵn mẫu tương đương quy tắc mặc định.
+ */
+export const ISBD_CONFIGS: CrudConfig = {
+  title: 'ISBD_CONFIG.TITLE', resource: 'isbd-configs', service: 'catalog', perm: 'CONFIG_ISBD',
+  searchLabel: 'ISBD_CONFIG.SEARCH_LABEL', searchPlaceholder: '',
+  columns: [{ key: 'bibTypeId', label: 'ISBD_CONFIG.BIB_TYPE', type: 'lookup' }],
+  fields: [
+    {
+      key: 'bibTypeId', label: 'ISBD_CONFIG.BIB_TYPE', type: 'select', required: true,
+      optionsFrom: async (api) => (await api.crud<{ publicId: string; id: number; name: string }>('bib-types', 'catalog').searchAll()).map((t) => ({ value: t.id, label: t.name })),
+    },
+    {
+      key: 'rules', label: 'ISBD_CONFIG.RULES', type: 'rows', addLabel: 'ISBD_CONFIG.ADD_RULE', hint: 'ISBD_CONFIG.RULES_HINT',
+      rowFields: [
+        { key: 'tag', label: 'ISBD_CONFIG.TAG', type: 'text', maxLength: 3 },
+        { key: 'code', label: 'ISBD_CONFIG.CODE', type: 'text', maxLength: 1 },
+        { key: 'prefix', label: 'ISBD_CONFIG.PREFIX', type: 'text', maxLength: 20 },
+        { key: 'suffix', label: 'ISBD_CONFIG.SUFFIX', type: 'text', maxLength: 20 },
+        { key: 'separator', label: 'ISBD_CONFIG.SEPARATOR', type: 'text', maxLength: 20 },
+      ],
+    },
+  ],
+  defaults: { bibTypeId: null, rules: [] },
+  defaultsFrom: async (api) => ({ rules: await api.isbdTemplate() }),
+  modalWidth: 'max-w-3xl',
+};
+
 /** Leader/06 — dạng tài liệu (MARC21). */
 export const RECORD_TYPES = [
   { value: 'a', label: 'BIB_TYPES_PAGE.RECORD_TYPE.a' },

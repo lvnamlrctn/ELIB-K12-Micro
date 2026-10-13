@@ -56,7 +56,7 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new MediaDbContext(Options<MediaDbContext>(cs, t), t)),
         new("patron", "elib_leak_patron", ["readers", "reader_types", "classes", "courses", "reader_groups", "reader_import_jobs", "reader_group_members"],
             (cs, t) => new PatronDbContext(Options<PatronDbContext>(cs, t), t)),
-        new("catalog", "elib_leak_catalog", ["bibs", "bib_types", "worksheets"],
+        new("catalog", "elib_leak_catalog", ["bibs", "bib_types", "worksheets", "dictionary_terms", "isbd_configs"],
             (cs, t) => new CatalogDbContext(Options<CatalogDbContext>(cs, t), t)),
         new("holdings", "elib_leak_holdings", ["store_types", "stores", "items", "bib_snapshots"],
             (cs, t) => new HoldingsDbContext(Options<HoldingsDbContext>(cs, t), t)),

@@ -910,6 +910,34 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     find_log("/api/admin/audit/audit-logs/Search", token, tb, "ADD", f"Dế Mèn phiêu lưu ký {tag}")
     step("nhật ký có biên mục biểu ghi (catalog → audit)")
 
+    # Từ điển tự học + gợi ý, lịch sử biên mục theo trường MARC có lý do sửa, nhật ký biên mục, cấu hình ISBD theo loại.
+    s, _, body = tb.request("GET", f"{C}/dictionary/Suggest?kind=author&q=" + urllib.parse.quote("to hoa"), token=token)
+    expect(s == 200 and any(x["value"] == "Tô Hoài" for x in json.loads(body)), "từ điển tác giả tự học khi lưu biểu ghi, gợi ý không dấu", body[:200])
+    s, _, body = tb.request("GET", f"{C}/dictionary/Suggest?kind=publisher&q=kim", token=token)
+    expect(s == 200 and any(x["value"] == "Kim Đồng" for x in json.loads(body)), "từ điển NXB (bỏ dấu câu cuối \"Kim Đồng,\")", body[:200])
+    upd = [{**f, "subfields": [{**sf, "value": "Văn học Việt Nam" if f["tag"] == "650" and sf["code"] == "a" else sf["value"]} for sf in (f.get("subfields") or [])]}
+           if f.get("subfields") else f for f in bib["fields"] if f["tag"] not in ("001", "005")]
+    s, _, body = tb.request("PUT", f"{C}/bibs/Update/{bib['publicId']}", token=token,
+                            json_body={"bibTypeId": book["id"], "fields": upd, "status": 1},
+                            headers={"X-Change-Reason": urllib.parse.quote("Sửa từ khoá theo khung đề mục")})
+    expect(s == 200, "sửa biểu ghi kèm lý do sửa", body[:200])
+    hist = []
+    for _ in range(15):
+        s, _, body = tb.request("GET", f"/api/admin/audit/audit-logs/entity/Bib/{bib['publicId']}", token=token)
+        hist = json.loads(body) if s == 200 else []
+        if any(x.get("changes") and "650" in x["changes"] for x in hist): break
+        time.sleep(1)
+    ch = next((json.loads(x["changes"]) for x in hist if x.get("changes") and "650" in x["changes"]), {})
+    expect(ch.get("650", [None, ""])[1].endswith("Văn học Việt Nam") and ch.get("_reason") == "Sửa từ khoá theo khung đề mục" and "245" not in ch,
+           "lịch sử biên mục: chỉ trường 650 đổi (cũ → mới) kèm lý do", json.dumps(ch, ensure_ascii=False)[:300])
+    s, _, body = tb.request("POST", "/api/admin/audit/audit-logs/catalog/Search", token=token, json_body={"keyword": f"Dế Mèn phiêu lưu ký {tag}"})
+    expect(s == 200 and json.loads(body)["totalCount"] >= 2, "nhật ký biên mục (thêm + sửa biểu ghi)", body[:200])
+    s, _, body = tb.request("GET", f"{C}/isbd-configs/Template", token=token)
+    expect(s == 200 and len(json.loads(body)) > 10, "mẫu quy tắc ISBD", body[:120])
+    rules = [{"tag": "245"}, {"tag": "245", "code": "a"}, {"tag": "260", "prefix": " — "}, {"tag": "260", "code": "b"}]
+    s, _, body = tb.request("POST", f"{C}/isbd-configs/Preview", token=token, json_body={"mfn": bib["mfn"], "rules": rules})
+    expect(s == 200 and json.loads(body) == [f"Dế Mèn phiêu lưu ký {tag} / — Kim Đồng,"], "xem trước ISBD theo quy tắc đang soạn", body[:200])
+
     # Xuất/nhập file MARC: xuất biểu ghi vừa biên mục rồi nhập lại → bị bỏ qua vì trùng ISBN; MARCXML mới → nhập được.
     s, h, mrc = tb.request("POST", f"{C}/bibs/ExportMarc", token=token, binary=True,
                            json_body={"search": {"keyword": f"de men phieu luu ky {tag}"}, "format": "iso2709"})

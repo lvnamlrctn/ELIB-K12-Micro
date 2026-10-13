@@ -12,7 +12,8 @@ namespace Elib.Catalog.Api;
 
 /// <summary>
 /// Biên mục (gateway: /api/admin/catalog/** → /api/**, cần license CATALOG). Mã quyền giữ như monolith:
-/// CATALOG_BIBS (biểu ghi), BIB_TYPES (loại biểu ghi), WORKSHEETS (biểu mẫu biên mục).
+/// CATALOG_BIBS (biểu ghi), BIB_TYPES (loại biểu ghi), WORKSHEETS (biểu mẫu biên mục), DIC_AUTHORS / DIC_PUBLISHERS / DIC_KEYWORDS /
+/// DIC_CLASSES (từ điển), CONFIG_ISBD (cấu hình ISBD).
 /// </summary>
 public static class CatalogEndpoints
 {
@@ -56,6 +57,22 @@ public static class CatalogEndpoints
             var file = await r.ExportMarcAsync(request, ct);
             return Results.File(file.Content, file.ContentType, file.FileName);
         });
+
+        bibs.MapGet("/Isbd/{publicId:guid}", [Permission("CATALOG_BIBS", "view")] (Guid publicId, BibResource r, CancellationToken ct) => r.IsbdAsync(publicId, ct));
+
+        // Từ điển biên mục: mỗi loại một màn/quyền; gợi ý cho trình biên mục (ai biên mục được thì xem được gợi ý).
+        api.MapCrud<AuthorDictionaryResource>("/dic-authors", "DIC_AUTHORS").WithTags("Dictionaries");
+        api.MapCrud<PublisherDictionaryResource>("/dic-publishers", "DIC_PUBLISHERS").WithTags("Dictionaries");
+        api.MapCrud<KeywordDictionaryResource>("/dic-keywords", "DIC_KEYWORDS").WithTags("Dictionaries");
+        api.MapCrud<ClassDictionaryResource>("/dic-classes", "DIC_CLASSES").WithTags("Dictionaries");
+        api.MapGet("/dictionary/Suggest", [PermissionAny("CATALOG_BIBS:add", "CATALOG_BIBS:edit")] (string? kind, string? q, int? take, DictionaryLearner d,
+            CancellationToken ct) => d.SuggestAsync(kind, q, take, ct)).WithTags("Dictionaries");
+
+        // Cấu hình ISBD theo loại biểu ghi.
+        var isbd = api.MapCrud<IsbdConfigResource>("/isbd-configs", "CONFIG_ISBD").WithTags("IsbdConfigs");
+        isbd.MapGet("/Template", [Permission("CONFIG_ISBD", "view")] () => IsbdConfigResource.Template());
+        isbd.MapPost("/Preview", [Permission("CONFIG_ISBD", "view")] (IsbdPreviewRequest request, IsbdConfigResource r, CancellationToken ct)
+            => r.PreviewAsync(request, ct));
 
         // OPAC (gateway: /api/opac/catalog/** → /api/opac/**, công khai theo host đơn vị, license SEARCH ở gateway): xem MARC/ISBD và
         // tải biểu ghi (.mrc / MARCXML) — chỉ biểu ghi đang hiện trên OPAC.

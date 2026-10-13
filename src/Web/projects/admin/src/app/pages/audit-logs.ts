@@ -23,9 +23,9 @@ const WARN = new Set(['IMPERSONATION_STARTED', 'USER_ROLES', 'ROLE_UPDATE', 'ROL
   imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5">
-      <h4 class="page-title">{{ (platform() ? 'AUDIT.TITLE_PLATFORM' : 'AUDIT.TITLE_TENANT') | translate }}</h4>
+      <h4 class="page-title">{{ (platform() ? 'AUDIT.TITLE_PLATFORM' : scope() === 'catalog' ? 'AUDIT.TITLE_CATALOG' : 'AUDIT.TITLE_TENANT') | translate }}</h4>
       <p class="text-sm text-gray-500 mt-1">
-        {{ (platform() ? 'AUDIT.SUB_PLATFORM' : 'AUDIT.SUB_TENANT') | translate }}
+        {{ (platform() ? 'AUDIT.SUB_PLATFORM' : scope() === 'catalog' ? 'AUDIT.SUB_CATALOG' : 'AUDIT.SUB_TENANT') | translate }}
       </p>
     </div>
 
@@ -94,8 +94,8 @@ const WARN = new Set(['IMPERSONATION_STARTED', 'USER_ROLES', 'ROLE_UPDATE', 'ROL
   `,
 })
 export class AuditLogs implements OnInit {
-  /** Từ data của route: 'tenant' | 'platform'. */
-  readonly scope = input<'tenant' | 'platform'>('tenant');
+  /** Từ data của route: 'tenant' | 'platform' | 'catalog' (nhật ký biên mục — chỉ thao tác trên biểu ghi, quyền CATALOG_BIBS). */
+  readonly scope = input<'tenant' | 'platform' | 'catalog'>('tenant');
 
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
@@ -116,6 +116,10 @@ export class AuditLogs implements OnInit {
 
   async ngOnInit(): Promise<void> {
     void this.load();
+    if (this.scope() === 'catalog') {
+      this.actions.set(['ADD', 'UPDATE', 'DELETE', 'IMPORT', 'CHANGE_STATUS']);
+      return;
+    }
     try {
       this.actions.set(await this.api.auditActions(this.platform()));
     } catch {
@@ -148,9 +152,8 @@ export class AuditLogs implements OnInit {
       // Ngày theo giờ trình duyệt: "Đến ngày" tính hết ngày đó.
       const from = this.from ? new Date(this.from + 'T00:00:00').toISOString() : null;
       const to = this.to ? new Date(this.to + 'T23:59:59.999').toISOString() : null;
-      this.page.set(await this.api.auditLogs(this.platform(), {
-        keyword: this.keyword.trim() || undefined, action: this.action, from, to, pageIndex: this.pageIndex, pageSize: this.pageSize,
-      }));
+      const body = { keyword: this.keyword.trim() || undefined, action: this.action, from, to, pageIndex: this.pageIndex, pageSize: this.pageSize };
+      this.page.set(await (this.scope() === 'catalog' ? this.api.catalogLogs(body) : this.api.auditLogs(this.platform(), body)));
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

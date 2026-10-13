@@ -50,8 +50,10 @@ export interface CrudField {
 export interface CrudRowField {
   key: string;
   label: string;
-  type: 'select' | 'number';
+  type: 'select' | 'number' | 'text';
   options?: { value: string | number; label: string }[];
+  /** Ô chữ: số ký tự tối đa / độ rộng. */
+  maxLength?: number;
   optionsFrom?: (api: Api) => Promise<{ value: string | number; label: string }[]>;
   emptyLabel?: string;
 }
@@ -74,6 +76,8 @@ export interface CrudConfig {
   /** Có lọc/đổi trạng thái (entity có Status). */
   hasStatus?: boolean;
   defaults?: Record<string, unknown>;
+  /** Giá trị mặc định khi thêm mới lấy từ API (ví dụ mẫu quy tắc ISBD) — gộp đè lên defaults. */
+  defaultsFrom?: (api: Api) => Promise<Record<string, unknown>>;
   modalWidth?: string;
   /** Huy hiệu thêm sau cột đầu tiên (ví dụ "Hệ thống" cho tham số có sẵn). */
   badge?: (item: Row) => string | null;
@@ -331,6 +335,9 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                                     <select class="input py-1 min-w-[10rem]" [name]="f.key + '-' + i + '-' + sf.key" [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate">
                                       @for (o of rowOptions(f, sf); track o.value) { <option [ngValue]="o.value">{{ o.label | translate }}</option> }
                                     </select>
+                                  } @else if (sf.type === 'text') {
+                                    <input type="text" class="input py-1 font-mono min-w-[3.5rem]" [attr.maxlength]="sf.maxLength ?? null" [name]="f.key + '-' + i + '-' + sf.key"
+                                           [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate" />
                                   } @else {
                                     <input type="number" min="0" step="1" class="input py-1 min-w-[4.5rem]" [name]="f.key + '-' + i + '-' + sf.key"
                                            [(ngModel)]="r[sf.key]" [attr.aria-label]="sf.label | translate" />
@@ -514,8 +521,14 @@ export class CrudPage implements OnInit {
     this.selected.set(this.allSelected() ? new Set() : new Set((this.page()?.items ?? []).map((r) => r.publicId)));
   }
 
-  protected openAdd(): void {
-    const blank: Row = { publicId: '', id: 0, ...(this.config().hasStatus ? { status: STATUS_ACTIVE } : {}), ...this.config().defaults };
+  protected async openAdd(): Promise<void> {
+    let extra: Record<string, unknown> = {};
+    try {
+      extra = (await this.config().defaultsFrom?.(this.api)) ?? {};
+    } catch {
+      /* không lấy được mẫu — form trống */
+    }
+    const blank: Row = { publicId: '', id: 0, ...(this.config().hasStatus ? { status: STATUS_ACTIVE } : {}), ...structuredClone(this.config().defaults ?? {}), ...extra };
     this.editing.set(blank);
   }
 

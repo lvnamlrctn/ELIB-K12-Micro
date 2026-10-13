@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Text.Json.Nodes;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
@@ -38,7 +39,8 @@ public sealed record IsbnMatch(Guid PublicId, long Mfn, string Title);
 /// Biểu ghi thư mục (monolith: CatalogueBookController, quyền CATALOG_BIBS). Ngoài 8 endpoint chuẩn: GetByMfn, CheckIsbn.
 /// Mọi thay đổi phát <see cref="BibChanged"/> (outbox, cùng transaction) cho bản sao ở holdings/circulation/search.
 /// </summary>
-public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock)
+public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor, TimeProvider clock,
+    DictionaryLearner? learner = null)
     : CrudResource<BibResource, Bib, BibSearch, BibRequest, BibDto>(db)
 {
     protected override string EntityName => "Biểu ghi";
@@ -87,6 +89,47 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
 
     protected override IOrderedQueryable<Bib> Order(IQueryable<Bib> query) => query.OrderByDescending(x => x.Id);
 
+    /// <summary>
+    /// Lịch sử biên mục (monolith: LogBienMuc — có bảng nhưng không ghi): diff theo nhãn trường MARC, mỗi nhãn một chuỗi
+    /// "chỉ thị $a giá trị $b …" (trường lặp nối " | "), kèm loại biểu ghi, trạng thái, Leader. 001/005 do hệ thống quản — bỏ qua.
+    /// </summary>
+    protected override JsonObject? Diff(BibDto before, Bib entity)
+    {
+        var after = ToDto(entity);
+        var result = new JsonObject();
+        var a = ByTag(before.Fields);
+        var b = ByTag(after.Fields);
+        foreach (var tag in a.Keys.Union(b.Keys).Order(StringComparer.Ordinal))
+        {
+            var old = a.GetValueOrDefault(tag);
+            var now = b.GetValueOrDefault(tag);
+            if (old != now) result[tag] = new JsonArray(old, now);
+        }
+        if (before.BibTypeId != after.BibTypeId) result["bibTypeId"] = new JsonArray(before.BibTypeId, after.BibTypeId);
+        if (before.Status != after.Status) result["status"] = new JsonArray(before.Status, after.Status);
+        if (before.Leader != after.Leader) result["leader"] = new JsonArray(before.Leader, after.Leader);
+        return result.Count == 0 ? null : result;
+    }
+
+    private static Dictionary<string, string> ByTag(IEnumerable<MarcField> fields) =>
+        fields.Where(f => f.Tag is not ("001" or "005")).GroupBy(f => f.Tag).ToDictionary(g => g.Key, g => string.Join(" | ", g.Select(Display)));
+
+    /// <summary>"10 $a Tô Hoài $c 1920-2014" — trường điều khiển: giá trị.</summary>
+    public static string Display(MarcField f) => f.IsControl
+        ? f.Value ?? ""
+        : $"{Ind(f.Ind1)}{Ind(f.Ind2)} " + string.Join(" ", (f.Subfields ?? []).Select(s => "$" + s.Code + " " + s.Value));
+
+    private static string Ind(string? i) => string.IsNullOrEmpty(i) ? "#" : i == " " ? "#" : i;
+
+    /// <summary>Sửa biểu ghi, rồi từ điển học các giá trị mới xuất hiện (sau khi lưu — lỗi của từ điển không làm hỏng việc sửa).</summary>
+    public override async Task<BibDto> UpdateAsync(Guid publicId, BibRequest request, CancellationToken ct)
+    {
+        var before = (await LoadAsync(publicId, ct)).Fields.ToList();
+        var dto = await base.UpdateAsync(publicId, request, ct);
+        if (learner is not null) await learner.LearnAsync(before, dto.Fields, ct);
+        return dto;
+    }
+
     protected override async Task ValidateAsync(Bib entity, CancellationToken ct)
     {
         if (entity.BibTypeId is { } type && !await Db.Set<BibType>().AnyAsync(t => t.Id == type, ct))
@@ -114,6 +157,7 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
             await Db.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
         }, ct);
+        if (learner is not null) await learner.LearnAsync([], entity.Fields, ct);
         return ToDto(entity);
     }
 

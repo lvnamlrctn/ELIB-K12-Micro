@@ -29,6 +29,7 @@ public class AuditLogSearch : CrudSearch
 {
     public string? Action { get; set; }
     public string? Service { get; set; }
+    public string? EntityType { get; set; }
     public long? ActorId { get; set; }
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
@@ -69,6 +70,15 @@ public sealed class AuditQueries(IAuditDb db, ITenantContext tenant)
         return new CrudPage<AuditLogDto>(items, total, page, size);
     }
 
+    /// <summary>Nhật ký biên mục: chỉ thao tác trên biểu ghi (service catalog, loại Bib), cùng bộ lọc với nhật ký hệ thống.</summary>
+    public Task<CrudPage<AuditLogDto>> CatalogSearchAsync(AuditLogSearch search, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(search);
+        search.Service = "catalog";
+        search.EntityType = "Bib";
+        return SearchAsync(search, ct);
+    }
+
     /// <summary>Các loại thao tác đã có trong nhật ký của đơn vị — cho ô lọc "Thao tác".</summary>
     public async Task<IReadOnlyList<string>> ActionsAsync(CancellationToken ct)
     {
@@ -93,6 +103,7 @@ public sealed class AuditQueries(IAuditDb db, ITenantContext tenant)
         if (search.TenantId is { } tenantId) q = q.Where(l => l.TargetTenantId == tenantId);
         if (!string.IsNullOrWhiteSpace(search.Action)) q = q.Where(l => l.Action == search.Action.Trim());
         if (!string.IsNullOrWhiteSpace(search.Service)) q = q.Where(l => l.Service == search.Service.Trim());
+        if (!string.IsNullOrWhiteSpace(search.EntityType)) q = q.Where(l => l.EntityType == search.EntityType.Trim());
         if (search.ActorId is { } actorId) q = q.Where(l => l.ActorId == actorId);
         if (search.From is { } from) q = q.Where(l => l.OccurredAt >= from);
         if (search.To is { } to) q = q.Where(l => l.OccurredAt <= to);

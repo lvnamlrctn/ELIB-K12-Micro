@@ -51,6 +51,11 @@ public static class PermissionCatalog
         new("CATALOG_BIBS", "Biên mục biểu ghi", CatalogGroup, Crud, CatalogLicense),
         new("WORKSHEETS", "Biểu mẫu biên mục", CatalogGroup, Crud, CatalogLicense),
         new("BIB_TYPES", "Loại biểu ghi", CatalogGroup, Crud, CatalogLicense),
+        new("DIC_AUTHORS", "Từ điển tác giả", CatalogGroup, Crud, CatalogLicense),
+        new("DIC_PUBLISHERS", "Từ điển nhà xuất bản", CatalogGroup, Crud, CatalogLicense),
+        new("DIC_KEYWORDS", "Từ điển từ khoá", CatalogGroup, Crud, CatalogLicense),
+        new("DIC_CLASSES", "Khung phân loại", CatalogGroup, Crud, CatalogLicense),
+        new("CONFIG_ISBD", "Cấu hình ISBD", CatalogGroup, Crud, CatalogLicense),
 
         new("DOC_SEARCH", "Tìm kiếm tài liệu", StoreGroup, [View], HoldingsLicense),
         new("STORE_TYPES", "Loại kho", StoreGroup, Crud, HoldingsLicense),

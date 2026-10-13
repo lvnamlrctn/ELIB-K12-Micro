@@ -9,7 +9,13 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddCrudResource<BibTypeResource>();
         services.AddCrudResource<WorksheetResource>();
+        services.AddScoped<DictionaryLearner>();
         services.AddCrudResource<BibResource>();
+        services.AddCrudResource<AuthorDictionaryResource>();
+        services.AddCrudResource<PublisherDictionaryResource>();
+        services.AddCrudResource<KeywordDictionaryResource>();
+        services.AddCrudResource<ClassDictionaryResource>();
+        services.AddCrudResource<IsbdConfigResource>();
         return services;
     }
 }

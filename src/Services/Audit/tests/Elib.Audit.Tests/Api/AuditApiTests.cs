@@ -149,6 +149,27 @@ public sealed class AuditApiTests : IClassFixture<AuditApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Catalog_log_and_bib_history_are_visible_to_catalogers()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var bibId = Guid.NewGuid();
+        await _factory.PublishAsync(Entry(tenantId, "UPDATE", "Sửa biểu ghi: MFN 7") with
+        {
+            Service = "catalog", EntityType = "Bib", EntityId = bibId.ToString(), ChangesJson = """{"264":["a","b"]}""",
+        });
+        await _factory.PublishAsync(Entry(tenantId, "UPDATE", "Sửa bạn đọc: HS09") with { Service = "patron", EntityType = "Reader", EntityId = Guid.NewGuid().ToString() });
+        await WaitTenantLogAsync(tenantId, "Sửa biểu ghi: MFN 7");
+        await WaitTenantLogAsync(tenantId, "Sửa bạn đọc: HS09");
+
+        var cataloger = Staff(tenantId, "CATALOG_BIBS:view");
+        var log = await Read<CrudPage<AuditLogDto>>(await cataloger.PostAsJsonAsync("/api/audit-logs/catalog/Search", new AuditLogSearch { Service = "patron" }, Json));
+        Assert.Equal(["Sửa biểu ghi: MFN 7"], log.Items.Select(i => i.Summary)); // luôn chỉ catalog/Bib
+        Assert.Single(await Read<List<EntityHistoryDto>>(await cataloger.GetAsync(new Uri($"/api/audit-logs/entity/Bib/{bibId}", UriKind.Relative))));
+        Assert.Equal(HttpStatusCode.Forbidden, (await cataloger.PostAsJsonAsync("/api/audit-logs/Search", new AuditLogSearch(), Json)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId, "READERS:view").PostAsJsonAsync("/api/audit-logs/catalog/Search", new AuditLogSearch(), Json)).StatusCode);
+    }
+
+    [Fact]
     public async Task Old_entries_are_purged_after_retention()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);
