@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
+import { CirculationApi, HoldDto, HoldStatus, LoanDto, ReaderPanel } from '../core/circulation';
 import { LDatePipe, Language } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
@@ -85,10 +86,95 @@ import { ReaderCard } from './reader-card';
           </form>
         </section>
 
-        <section class="rounded-2xl border border-dashed border-slate-300 p-6 mt-6 text-sm text-slate-600">
-          <span class="material-icons align-middle text-slate-400 mr-1">schedule</span>
-          {{ 'OPAC.MY_LIBRARY.LOANS_COMING' | translate }}
-        </section>
+        @if (library.has('CIRCULATION')) {
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.MY_LIBRARY.MY_LOANS' | translate }}</h2>
+            @if (panel(); as p) {
+              @if (p.currentLoans.length) {
+                <ul class="divide-y divide-slate-100">
+                  @for (loan of p.currentLoans; track loan.publicId) {
+                    <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                      <div class="min-w-0">
+                        <div class="font-medium text-slate-900 truncate">{{ loan.title || loan.barcode }}</div>
+                        <div class="text-sm text-slate-500">
+                          {{ 'OPAC.MY_LIBRARY.DUE_DATE' | translate }}
+                          <span [class.text-red-600]="isOverdue(loan)">{{ loan.dueAt | ldate }}</span>
+                          @if (loan.renewCount > 0) { · {{ 'OPAC.MY_LIBRARY.RENEWED_N' | translate: { count: loan.renewCount } }} }
+                        </div>
+                        @if (renewMessage(); as msg) {
+                          @if (msg.loanId === loan.publicId) {
+                            <div class="text-sm mt-1" [class.text-green-700]="msg.ok" [class.text-red-600]="!msg.ok" role="status">{{ msg.text }}</div>
+                          }
+                        }
+                      </div>
+                      <button type="button" [disabled]="renewingId() === loan.publicId"
+                              class="px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 text-sm hover:bg-blue-50 disabled:opacity-50 shrink-0"
+                              (click)="renew(loan)">{{ 'OPAC.MY_LIBRARY.RENEW' | translate }}</button>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="text-sm text-slate-500">{{ 'OPAC.MY_LIBRARY.NO_LOANS' | translate }}</p>
+              }
+            } @else if (loansError(); as err) {
+              <p class="text-red-600 text-sm" role="alert">{{ err }}</p>
+            } @else {
+              <div class="flex justify-center py-6"><span class="material-icons animate-spin text-blue-600 text-2xl">autorenew</span></div>
+            }
+          </section>
+
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.MY_LIBRARY.MY_HOLDS' | translate }}</h2>
+            @if (holdsError(); as err) { <p class="text-red-600 text-sm mb-3" role="alert">{{ err }}</p> }
+            @if (holds().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (hold of holds(); track hold.publicId) {
+                  <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                      <div class="font-medium text-slate-900 truncate">{{ hold.title || hold.mfn }}</div>
+                      <div class="text-sm text-slate-500">
+                        @if (hold.status === HoldStatus.Ready) {
+                          <span class="text-green-700">{{ 'OPAC.MY_LIBRARY.HOLD_READY' | translate: { date: (hold.expiresAt | ldate) } }}</span>
+                        } @else {
+                          {{ 'OPAC.MY_LIBRARY.HOLD_WAITING' | translate: { position: hold.queuePosition } }}
+                        }
+                      </div>
+                    </div>
+                    <button type="button" [disabled]="cancelingId() === hold.publicId"
+                            class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50 shrink-0"
+                            (click)="cancelHold(hold)">{{ 'OPAC.MY_LIBRARY.CANCEL_HOLD' | translate }}</button>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.MY_LIBRARY.NO_HOLDS' | translate }}</p>
+            }
+          </section>
+
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.MY_LIBRARY.LOAN_HISTORY' | translate }}</h2>
+            @if (historyLoading()) {
+              <div class="flex justify-center py-6"><span class="material-icons animate-spin text-blue-600 text-2xl">autorenew</span></div>
+            } @else if (history().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (loan of history(); track loan.publicId) {
+                  <li class="py-3">
+                    <div class="font-medium text-slate-900 truncate">{{ loan.title || loan.barcode }}</div>
+                    <div class="text-sm text-slate-500">
+                      @if (loan.returnedAt) {
+                        {{ 'OPAC.MY_LIBRARY.RETURNED_AT' | translate: { date: (loan.returnedAt | ldate) } }}
+                      } @else {
+                        <span [class.text-red-600]="isOverdue(loan)">{{ 'OPAC.MY_LIBRARY.STILL_BORROWING' | translate }} — {{ 'OPAC.MY_LIBRARY.DUE_DATE' | translate }} {{ loan.dueAt | ldate }}</span>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.MY_LIBRARY.NO_HISTORY' | translate }}</p>
+            }
+          </section>
+        }
       }
     </div>
   `,
@@ -96,6 +182,7 @@ import { ReaderCard } from './reader-card';
 export class Account implements OnInit {
   protected readonly auth = inject(ReaderAuth);
   protected readonly library = inject(Library);
+  private readonly circulation = inject(CirculationApi);
   private readonly language = inject(Language);
   protected readonly me = signal<ReaderMe | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -104,6 +191,17 @@ export class Account implements OnInit {
   protected current = '';
   protected next = '';
   protected confirm = '';
+
+  protected readonly HoldStatus = HoldStatus;
+  protected readonly panel = signal<ReaderPanel | null>(null);
+  protected readonly loansError = signal<string | null>(null);
+  protected readonly renewingId = signal<string | null>(null);
+  protected readonly renewMessage = signal<{ loanId: string; ok: boolean; text: string } | null>(null);
+  protected readonly holds = signal<HoldDto[]>([]);
+  protected readonly holdsError = signal<string | null>(null);
+  protected readonly cancelingId = signal<string | null>(null);
+  protected readonly history = signal<LoanDto[]>([]);
+  protected readonly historyLoading = signal(false);
 
   async ngOnInit(): Promise<void> {
     if (!(await this.auth.restore())) return;
@@ -116,10 +214,72 @@ export class Account implements OnInit {
       }
       this.error.set(this.language.apiError(e));
     }
+    if (!this.library.has('CIRCULATION')) return;
+    this.loadLoans();
+    this.loadHolds();
+    this.loadHistory();
   }
 
   protected expired(m: ReaderMe): boolean {
     return !!m.expireDate && m.expireDate < new Date().toISOString().slice(0, 10);
+  }
+
+  protected isOverdue(loan: LoanDto): boolean {
+    return !loan.returnedAt && loan.dueAt < new Date().toISOString();
+  }
+
+  protected async renew(loan: LoanDto): Promise<void> {
+    this.renewingId.set(loan.publicId);
+    this.renewMessage.set(null);
+    try {
+      const updated = await this.circulation.renew(loan.publicId);
+      this.panel.update((p) => (p ? { ...p, currentLoans: p.currentLoans.map((l) => (l.publicId === updated.publicId ? updated : l)) } : p));
+      this.renewMessage.set({ loanId: loan.publicId, ok: true, text: this.language.t('OPAC.MY_LIBRARY.RENEW_DONE') });
+    } catch (e) {
+      this.renewMessage.set({ loanId: loan.publicId, ok: false, text: this.language.apiError(e) });
+    } finally {
+      this.renewingId.set(null);
+    }
+  }
+
+  protected async cancelHold(hold: HoldDto): Promise<void> {
+    this.cancelingId.set(hold.publicId);
+    this.holdsError.set(null);
+    try {
+      await this.circulation.cancelHold(hold.publicId);
+      this.holds.update((hs) => hs.filter((h) => h.publicId !== hold.publicId));
+    } catch (e) {
+      this.holdsError.set(this.language.apiError(e));
+    } finally {
+      this.cancelingId.set(null);
+    }
+  }
+
+  private async loadLoans(): Promise<void> {
+    try {
+      this.panel.set(await this.circulation.myLoans());
+    } catch (e) {
+      this.loansError.set(this.language.apiError(e));
+    }
+  }
+
+  private async loadHolds(): Promise<void> {
+    try {
+      this.holds.set(await this.circulation.myHolds());
+    } catch (e) {
+      this.holdsError.set(this.language.apiError(e));
+    }
+  }
+
+  private async loadHistory(): Promise<void> {
+    this.historyLoading.set(true);
+    try {
+      this.history.set((await this.circulation.history({ pageSize: 20 })).items);
+    } catch {
+      // Lịch sử không quan trọng bằng sách đang mượn — lỗi thì để trống, không chặn phần còn lại của trang.
+    } finally {
+      this.historyLoading.set(false);
+    }
   }
 
   protected async changePassword(): Promise<void> {

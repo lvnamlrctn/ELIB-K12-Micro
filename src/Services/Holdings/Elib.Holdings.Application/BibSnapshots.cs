@@ -35,6 +35,10 @@ public sealed class BibSnapshots(ICrudDbContext db, ICatalogBibs catalog, ITenan
         snapshot.PublishYear = Cut(e.PublishYear, 4);
         snapshot.Isbns = e.Isbns.Count > 0 ? Cut(string.Join(", ", e.Isbns), 1000) : null;
         snapshot.Ddc = Cut(e.Ddc, 50);
+        snapshot.Cutter = Cut(e.Cutter, 50);
+        snapshot.CutterKnown = true;
+        snapshot.BibTypeId = e.BibTypeId;
+        snapshot.BibTypeName = Cut(e.BibTypeName, 250);
         snapshot.Status = e.Status;
         snapshot.Deleted = e.Deleted;
         snapshot.Version = e.Version;
@@ -60,6 +64,33 @@ public sealed class BibSnapshots(ICrudDbContext db, ICatalogBibs catalog, ITenan
             }
         }
         return snapshot is { Deleted: false } ? snapshot : throw new NotFoundException("Biểu ghi", mfn);
+    }
+
+    public const int MaxCutterRefresh = 200;
+
+    /// <summary>
+    /// Bản sao có từ trước khi lưu Cutter → hỏi lại catalog (tối đa <see cref="MaxCutterRefresh"/> biểu ghi mỗi lần) để in nhãn gáy đúng.
+    /// Catalog không trả lời được thì bỏ qua — nhãn in thiếu ký hiệu tác giả, không làm hỏng việc in.
+    /// </summary>
+    public async Task EnsureCuttersAsync(IReadOnlyCollection<long> mfns, CancellationToken ct)
+    {
+        var missing = await db.Set<BibSnapshot>().Where(x => !x.CutterKnown && mfns.Contains(x.Mfn)).Take(MaxCutterRefresh).ToListAsync(ct);
+        if (missing.Count == 0) return;
+        var tenantId = tenant.RequireTenantId();
+        try
+        {
+            foreach (var snapshot in missing)
+            {
+                if (await catalog.GetAsync(tenantId, snapshot.Mfn, ct) is not { } state) continue;
+                snapshot.Cutter = Cut(state.Cutter, 50);
+                snapshot.CutterKnown = true;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // catalog đang down — lưu những bản đã lấy được
+        }
+        await db.SaveChangesAsync(ct);
     }
 
     private static string? Cut(string? value, int max) => value is null ? null : value.Length <= max ? value : value[..max];

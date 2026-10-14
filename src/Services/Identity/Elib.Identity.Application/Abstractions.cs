@@ -11,6 +11,7 @@ public interface IIdentityDb
     DbSet<Role> Roles { get; }
     DbSet<TenantReplicaRecord> TenantReplicas { get; }
     DbSet<ReaderAccount> ReaderAccounts { get; }
+    DbSet<StaffPreference> StaffPreferences { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -144,6 +144,20 @@ public sealed class GatewayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reader_route_for_circulation_requires_reader_token_and_license()
+    {
+        var reader = _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Reader(11));
+        var response = await reader.GetAsync(U("/api/opac/circulation/loans"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var echo = (await response.Content.ReadFromJsonAsync<Echo>())!;
+        Assert.Equal(("/api/reader/loans", "11"), (echo.Path, echo.Headers["X-Tenant-Id"]));
+
+        // Nhân viên không tự phục vụ qua route này; đơn vị chưa mua CIRCULATION thì bạn đọc cũng không vào được.
+        Assert.Equal(HttpStatusCode.Forbidden, (await _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Staff(11)).GetAsync(U("/api/opac/circulation/loans"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _gateway.ClientFor("truong-b.thuvientn.vn", TestClaims.Reader(12)).GetAsync(U("/api/opac/circulation/loans"))).StatusCode);
+    }
+
+    [Fact]
     public async Task System_routes_only_on_system_host_and_without_tenant_header()
     {
         var onSystemHost = await _gateway.ClientFor("quantri.thuvientn.vn", TestClaims.SuperAdmin).GetAsync(U("/api/system/tenant/tenants"));

@@ -144,6 +144,27 @@ public sealed class SearchApiTests(SearchApiFactory factory) : IClassFixture<Sea
     }
 
     [Fact]
+    public async Task Quoted_phrase_must_match_whole_words_in_order()
+    {
+        var tenantId = NewTenant();
+        await Publish(
+            Bib(tenantId, "Lập trình hướng đối tượng", "Nguyễn An"),
+            Bib(tenantId, "Đối tượng lập trình", "Trần Bình"),
+            Bib(tenantId, "Tập lập trình viên", "Lê Chi"));
+        var opac = Opac(tenantId);
+
+        // Không nháy: mọi từ có mặt, thứ tự bất kỳ.
+        Assert.Equal(2, (await Search(opac, new OpacSearchRequest { Q = "trinh doi lap" })).Total);
+        // Có nháy: đúng cụm, liền nhau, đủ từ ("trinh vien" không khớp "trinh huong").
+        var exact = await Search(opac, new OpacSearchRequest { Q = "\"lập trình hướng\"" });
+        Assert.Equal(["Lập trình hướng đối tượng"], exact.Items.Select(i => i.Title));
+        Assert.Equal(["Đối tượng lập trình"], (await Search(opac, new OpacSearchRequest { Title = "“doi tuong lap” trinh" })).Items.Select(i => i.Title));
+        Assert.Equal(0, (await Search(opac, new OpacSearchRequest { Q = "\"ap trinh\"" })).Total); // không khớp giữa chừng một từ
+        Assert.Equal(3, (await Search(opac, new OpacSearchRequest { Q = "\"lap trinh" })).Total); // nháy chưa đóng = tìm từng từ
+        Assert.True(exact.ElapsedMs >= 0);
+    }
+
+    [Fact]
     public async Task Rebuild_reads_source_services_page_by_page_and_marks_missing_records_deleted()
     {
         var tenantId = NewTenant();

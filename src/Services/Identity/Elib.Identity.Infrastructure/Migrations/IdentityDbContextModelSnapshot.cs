@@ -294,6 +294,51 @@ namespace Elib.Identity.Infrastructure.Migrations
                     b.ToTable("roles", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Identity.Domain.StaffPreference", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<long?>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_staff_preferences");
+
+                    b.HasIndex("TenantId", "UserId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_staff_preferences_tenant_id_user_id_key");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TenantId", "UserId", "Key"), false);
+
+                    b.ToTable("staff_preferences", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Identity.Domain.StaffUser", b =>
                 {
                     b.Property<long>("Id")

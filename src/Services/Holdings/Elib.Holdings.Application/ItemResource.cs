@@ -50,7 +50,7 @@ public sealed record NextBarcode(string Prefix, long Number, string Barcode);
 /// Bản sách / số đăng ký cá biệt (monolith: Barcode, đăng ký ở CatalogueBookController, xếp giá ở StoreShelvingController).
 /// Mọi thay đổi phát <see cref="ItemChanged"/> (outbox, cùng transaction) cho circulation/search.
 /// </summary>
-public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishEndpoint publisher, ITenantContext tenant, ICurrentActor actor)
+public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvents events, TimeProvider clock)
     : CrudResource<ItemResource, Item, ItemSearch, ItemRequest, ItemDto>(db)
 {
     public const int MaxBatch = 1000;
@@ -127,7 +127,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
     protected override async Task OnSavingAsync(Item entity, CrudChange change, CancellationToken ct)
     {
         if (change == CrudChange.Deleted) entity.MarkDeleted();
-        await PublishAsync(entity, change == CrudChange.Deleted, await StoreNamesAsync(ct), ct);
+        await events.PublishAsync(entity, change == CrudChange.Deleted, ct);
     }
 
     /// <summary>Đăng ký ĐKCB theo lô. Cả lô bị từ chối nếu có mã trùng ĐKCB đã có; lưu một lần.</summary>
@@ -150,12 +150,11 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         if (conflicts.Count > 0)
             throw new ConflictException("BARCODE_EXISTS", $"Số ĐKCB đã có: {string.Join(", ", conflicts)} — chọn số bắt đầu khác.");
 
-        var stores = await StoreNamesAsync(ct);
         var items = values.Select(v => Item.Register(bib, v, request.StoreId)).ToList();
         foreach (var item in items)
         {
             Set.Add(item);
-            await PublishAsync(item, deleted: false, stores, ct);
+            await events.PublishAsync(item, deleted: false, ct);
         }
         if (AuditSink is not null)
             await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, bib.BibPublicId, CrudChange.Added,
@@ -188,7 +187,6 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         var items = await Set.Where(x => ids.Contains(x.PublicId) || keys.Contains(x.BarcodeKey)).ToListAsync(ct);
         var found = items.Select(i => i.BarcodeKey).ToHashSet(StringComparer.Ordinal);
         var notFound = barcodes.Where(b => !found.Contains(Item.Key(b))).ToList();
-        var stores = await StoreNamesAsync(ct);
         var skipped = new List<string>();
         var shelved = 0;
         foreach (var item in items.OrderBy(i => i.BarcodeKey, StringComparer.Ordinal))
@@ -199,7 +197,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
                 continue;
             }
             item.Shelve(request.StoreId);
-            await PublishAsync(item, deleted: false, stores, ct);
+            await events.PublishAsync(item, deleted: false, ct);
             shelved++;
         }
         if (shelved > 0 && AuditSink is not null)
@@ -216,7 +214,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
     {
         var key = Item.Key(barcode);
         var item = await Set.AsNoTracking().FirstOrDefaultAsync(x => x.BarcodeKey == key, ct);
-        return item is null ? null : ToEvent(item, deleted: false, await StoreNamesAsync(ct));
+        return item is null ? null : await events.ToEventAsync(item, deleted: false, ct);
     }
 
     /// <summary>
@@ -229,7 +227,10 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
         var item = await Set.FirstOrDefaultAsync(x => x.PublicId == e.ItemPublicId, ct);
         if (item is null) return;
         if (!item.ApplyLoan(e.LoanPublicId, e.Version, e.CardNo, e.LoanedAt, e.DueAt, e.ReturnedAt is not null, e.ClosedItemStatus)) return;
-        await PublishAsync(item, deleted: false, await StoreNamesAsync(ct), ct);
+        // Mất khi đang mượn cũng có bản ghi báo mất — danh sách sách mất không phải gộp thêm ĐKCB "L" không có bản ghi như monolith.
+        if (item.Status == ItemStatus.Lost)
+            Db.Set<LostRecord>().Add(LostRecord.For(item, VietnamDate.Of(e.ReturnedAt ?? clock.GetUtcNow()), "Mất khi đang mượn (phiếu phạt)", e.CardNo));
+        await events.PublishAsync(item, deleted: false, ct);
         if (AuditSink is not null)
             await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, item.PublicId, CrudChange.Updated,
                 $"ĐKCB {item.Barcode} chuyển trạng thái \"{ItemStatus.Names.GetValueOrDefault(item.Status)}\" (lưu thông báo mất, thẻ {e.CardNo})"), ct);
@@ -242,8 +243,9 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
     {
         var size = Math.Clamp(take, 1, MaxStatePage);
         var items = await Set.AsNoTracking().Where(x => x.Id > afterId).OrderBy(x => x.Id).Take(size).ToListAsync(ct);
-        var stores = await StoreNamesAsync(ct);
-        return (items.Select(i => ToEvent(i, deleted: false, stores)).ToList(), items.Count == size ? items[^1].Id : null);
+        var states = new List<ItemChanged>(items.Count);
+        foreach (var item in items) states.Add(await events.ToEventAsync(item, deleted: false, ct));
+        return (states, items.Count == size ? items[^1].Id : null);
     }
 
     private static string NormalizePrefix(string? prefix)
@@ -265,28 +267,75 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, IPublishE
             throw new BusinessRuleException("STORE_NOT_FOUND", "Kho đã chọn không còn.");
     }
 
-    private Task<Dictionary<long, string>> StoreNamesAsync(CancellationToken ct) =>
-        Db.Set<Store>().AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name, ct);
-
-    private Task PublishAsync(Item item, bool deleted, Dictionary<long, string> stores, CancellationToken ct)
+    /// <summary>
+    /// Trang bản sách theo bộ lọc chuẩn + điều kiện thêm của màn gọi (chọn bản cho phiếu điều chuyển, phiếu giao nhận…), cùng thứ tự
+    /// và DTO với tìm kiếm tài liệu.
+    /// </summary>
+    public async Task<CrudPage<ItemDto>> PageAsync(ItemSearch search, Expression<Func<Item, bool>> extra, CancellationToken ct)
     {
-        if (item.PublicId == Guid.Empty) item.PublicId = Guid.CreateVersion7(); // bản mới: interceptor chỉ gán khi còn trống
-        return publisher.Publish(ToEvent(item, deleted, stores), ct);
+        ArgumentNullException.ThrowIfNull(search);
+        var page = Math.Max(1, search.PageIndex);
+        var size = Math.Clamp(search.PageSize, 1, 500);
+        var query = Query(search).Where(extra);
+        var total = await query.CountAsync(ct);
+        var items = await query.Skip((page - 1) * size).Take(size).Select(Projection).ToListAsync(ct);
+        return new CrudPage<ItemDto>(items, total, page, size);
     }
 
-    private ItemChanged ToEvent(Item item, bool deleted, Dictionary<long, string> stores) =>
-        new()
+    /// <summary>Bản sách theo id kèm DTO đầy đủ (nhan đề, kho…), giữ thứ tự ĐKCB.</summary>
+    public async Task<IReadOnlyList<ItemDto>> ListAsync(IReadOnlyCollection<long> ids, CancellationToken ct) =>
+        await Set.AsNoTracking().Where(x => ids.Contains(x.Id)).OrderBy(x => x.BarcodeKey).Select(Projection).ToListAsync(ct);
+
+    public const int MaxLabels = 2000;
+
+    /// <summary>
+    /// Dữ liệu in nhãn (ELIB-LRC: In mã vạch, In nhãn môn loại): ĐKCB theo danh sách quét/dán, khoảng ĐKCB, biểu ghi, kho, trạng thái —
+    /// phải có ít nhất một điều kiện; tối đa <see cref="MaxLabels"/> nhãn, theo thứ tự ĐKCB. Ký hiệu phân loại = DDC, ký hiệu tác giả = Cutter
+    /// của biểu ghi (bản sao cũ chưa có Cutter thì hỏi lại catalog).
+    /// </summary>
+    public async Task<IReadOnlyList<ItemLabel>> LabelsAsync(ItemLabelRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var keys = (request.Barcodes ?? []).Select(Item.Key).Where(k => k.Length > 0).Distinct().ToList();
+        if (keys.Count > MaxLabels) throw new BusinessRuleException("LABELS_TOO_MANY", $"In tối đa {MaxLabels:N0} nhãn mỗi lần.");
+        var search = new ItemSearch
         {
-            TenantId = tenant.RequireTenantId(),
-            Actor = new EventActor(actor.Id, actor.Kind),
-            ItemPublicId = item.PublicId,
-            Barcode = item.Barcode,
-            BibPublicId = item.BibPublicId,
-            Mfn = item.BibId,
-            StoreId = item.StoreId,
-            StoreName = item.StoreId is { } s && stores.TryGetValue(s, out var name) ? name : null,
-            Status = item.Status,
-            Deleted = deleted,
-            Version = item.Version,
+            Mfn = request.Mfn, StoreId = request.StoreId, ItemStatus = request.ItemStatus, BarcodeFrom = request.BarcodeFrom, BarcodeTo = request.BarcodeTo,
         };
+        if (keys.Count == 0 && search is { Mfn: null, StoreId: null } && string.IsNullOrWhiteSpace(search.ItemStatus)
+            && string.IsNullOrWhiteSpace(search.BarcodeFrom) && string.IsNullOrWhiteSpace(search.BarcodeTo))
+            throw new BusinessRuleException("LABELS_FILTER_REQUIRED", "Nhập danh sách ĐKCB, khoảng ĐKCB, biểu ghi hoặc kho cần in nhãn.");
+
+        var query = Query(search).AsNoTracking();
+        if (keys.Count > 0) query = query.Where(x => keys.Contains(x.BarcodeKey));
+        var rows = await query.Take(MaxLabels + 1).Select(x => new { x.Barcode, x.BibId, x.StoreId }).ToListAsync(ct);
+        if (rows.Count > MaxLabels)
+            throw new BusinessRuleException("LABELS_TOO_MANY", $"Quá {MaxLabels:N0} nhãn — thu hẹp khoảng ĐKCB hoặc bộ lọc.");
+
+        var mfns = rows.Select(r => r.BibId).Distinct().ToList();
+        await bibs.EnsureCuttersAsync(mfns, ct);
+        var bibRows = await Db.Set<BibSnapshot>().AsNoTracking().Where(b => mfns.Contains(b.Mfn))
+            .Select(b => new { b.Mfn, b.Title, b.Author, b.PublishYear, b.Ddc, b.Cutter }).ToListAsync(ct);
+        var bibMap = bibRows.GroupBy(b => b.Mfn).ToDictionary(g => g.Key, g => g.First());
+        var storeIds = rows.Select(r => r.StoreId).OfType<long>().Distinct().ToList();
+        var stores = await Db.Set<Store>().AsNoTracking().Where(s => storeIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => new { s.Code, s.Name }, ct);
+
+        var byKey = rows.ToDictionary(r => Item.Key(r.Barcode));
+        // Dán danh sách ĐKCB → in theo đúng thứ tự đã dán; lọc theo khoảng/kho → theo thứ tự ĐKCB.
+        var ordered = keys.Count > 0 ? keys.Where(byKey.ContainsKey).Select(k => byKey[k]) : rows;
+        return [.. ordered.Select(r =>
+        {
+            var bib = bibMap.GetValueOrDefault(r.BibId);
+            var store = r.StoreId is { } id ? stores.GetValueOrDefault(id) : null;
+            return new ItemLabel(r.Barcode, r.BibId, bib?.Title, bib?.Author, bib?.PublishYear, bib?.Ddc, bib?.Cutter, store?.Code, store?.Name);
+        })];
+    }
 }
+
+/// <summary>Điều kiện chọn bản sách cần in nhãn — <see cref="Barcodes"/>: ĐKCB quét/dán (in theo đúng thứ tự).</summary>
+public sealed record ItemLabelRequest(
+    IReadOnlyList<string>? Barcodes = null, long? Mfn = null, long? StoreId = null, string? ItemStatus = null, string? BarcodeFrom = null, string? BarcodeTo = null);
+
+/// <summary>Một nhãn: mã vạch ĐKCB, ký hiệu phân loại (DDC) / ký hiệu tác giả (Cutter), nhan đề – tác giả chú thích, kho.</summary>
+public sealed record ItemLabel(
+    string Barcode, long Mfn, string? Title, string? Author, string? PublishYear, string? Ddc, string? Cutter, string? StoreCode, string? StoreName);

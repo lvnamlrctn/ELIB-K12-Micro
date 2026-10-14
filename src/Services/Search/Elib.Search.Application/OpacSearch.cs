@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq.Expressions;
 using Elib.BuildingBlocks.Domain;
 using Elib.Search.Domain;
@@ -7,7 +8,7 @@ namespace Elib.Search.Application;
 
 /// <summary>
 /// Tra cứu OPAC (monolith: PublicUnifiedSearch — phần sách in). <see cref="Q"/>: tìm nhanh mọi trường; các ô nâng cao tìm theo đúng
-/// trường. Không phân biệt dấu/hoa thường, mọi từ phải có mặt. Facet chọn nhiều giá trị (Authors/Years/MaterialTypes/Languages/Stores).
+/// trường. Không phân biệt dấu/hoa thường, mọi từ phải có mặt; cụm đặt trong "..." phải khớp đúng cụm (ELIB-LRC). Facet chọn nhiều giá trị (Authors/Years/MaterialTypes/Languages/Stores).
 /// Sort: relevance (mặc định) | newest | oldest | title.
 /// </summary>
 public sealed record OpacSearchRequest
@@ -50,8 +51,12 @@ public sealed record OpacFacets(
     IReadOnlyList<FacetCount> Years, IReadOnlyList<FacetCount> Authors, IReadOnlyList<FacetCount> MaterialTypes, IReadOnlyList<FacetCount> Languages,
     IReadOnlyList<FacetCount> Stores, int AvailableCount);
 
-/// <summary><see cref="QueryId"/>: mã lượt tìm (thống kê) — trình duyệt gửi lại khi bạn đọc mở một kết quả; null nếu không ghi lượt tìm.</summary>
-public sealed record OpacSearchResult(int Total, int Page, int PageSize, IReadOnlyList<OpacBib> Items, OpacFacets Facets, Guid? QueryId = null);
+/// <summary>
+/// <see cref="QueryId"/>: mã lượt tìm (thống kê) — trình duyệt gửi lại khi bạn đọc mở một kết quả; null nếu không ghi lượt tìm.
+/// <see cref="ElapsedMs"/>: thời gian tìm ở server (mili giây) — OPAC hiện "Tìm thấy N kết quả (x ms)" như ELIB-LRC.
+/// </summary>
+public sealed record OpacSearchResult(int Total, int Page, int PageSize, IReadOnlyList<OpacBib> Items, OpacFacets Facets, Guid? QueryId = null,
+    long ElapsedMs = 0);
 
 /// <summary>Bản sách trên trang chi tiết: trạng thái hiển thị "Sẵn sàng" / "Đang mượn" (kèm hạn trả) / "Đang xử lý".</summary>
 public sealed record OpacCopy(string Barcode, string? StoreName, string Status, string StatusName, DateTimeOffset? DueAt);
@@ -74,6 +79,7 @@ public sealed class OpacSearch(ISearchDb db)
     public async Task<OpacSearchResult> SearchAsync(OpacSearchRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var started = Stopwatch.GetTimestamp();
         var page = Math.Max(1, request.Page);
         var size = Math.Clamp(request.PageSize, 1, MaxPageSize);
         var query = Filter(request);
@@ -81,7 +87,8 @@ public sealed class OpacSearch(ISearchDb db)
         var total = await query.CountAsync(ct);
         var phrase = TextFold.Fold(request.Q ?? request.Title);
         var items = await Order(query, request.Sort, phrase).Skip((page - 1) * size).Take(size).Select(Projection).ToListAsync(ct);
-        return new OpacSearchResult(total, page, size, items, await FacetsAsync(query, ct));
+        var facets = await FacetsAsync(query, ct);
+        return new OpacSearchResult(total, page, size, items, facets, ElapsedMs: (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
     }
 
     public async Task<OpacBibDetail> DetailAsync(Guid publicId, CancellationToken ct)
@@ -123,11 +130,11 @@ public sealed class OpacSearch(ISearchDb db)
     private IQueryable<SearchBib> Filter(OpacSearchRequest r)
     {
         var query = Visible;
-        foreach (var token in TextFold.Tokens(r.Q)) query = query.Where(b => b.SearchText.Contains(token));
-        foreach (var token in TextFold.Tokens(r.Title)) query = query.Where(b => b.TitleFold.Contains(token));
-        foreach (var token in TextFold.Tokens(r.Author)) query = query.Where(b => b.AuthorFold.Contains(token));
-        foreach (var token in TextFold.Tokens(r.Publisher)) query = query.Where(b => b.PublisherFold.Contains(token));
-        foreach (var token in TextFold.Tokens(r.Keyword)) query = query.Where(b => b.KeywordFold.Contains(token));
+        query = Match(query, r.Q, b => b.SearchText);
+        query = Match(query, r.Title, b => b.TitleFold);
+        query = Match(query, r.Author, b => b.AuthorFold);
+        query = Match(query, r.Publisher, b => b.PublisherFold);
+        query = Match(query, r.Keyword, b => b.KeywordFold);
         if (Digits(r.Isbn) is { Length: > 0 } isbn) query = query.Where(b => b.IsbnKey.Contains(isbn));
         if (!string.IsNullOrWhiteSpace(r.Ddc))
         {
@@ -151,6 +158,31 @@ public sealed class OpacSearch(ISearchDb db)
         if (r.Stores is { Count: > 0 } stores) query = query.Where(b => Copies.Any(i => i.Mfn == b.Mfn && i.StoreName != null && stores.Contains(i.StoreName)));
         if (r.AvailableOnly) query = query.Where(b => Copies.Any(i => i.Mfn == b.Mfn && i.Status == "R" && !i.OnLoan));
         return query;
+    }
+
+    /// <summary>
+    /// Mỗi điều kiện của câu truy vấn phải có trong trường: từ thường = chuỗi con (như trước); cụm "..." = nguyên cụm, đứng riêng thành
+    /// từ (không khớp giữa chừng một từ). Contains thường đứng trước để PostgreSQL dùng chỉ mục trigram, điều kiện biên từ lọc lại.
+    /// </summary>
+    private static IQueryable<SearchBib> Match(IQueryable<SearchBib> query, string? input, Expression<Func<SearchBib, string>> field)
+    {
+        foreach (var term in TextFold.Terms(input))
+        {
+            var text = term.Text;
+            var padded = $" {text} ";
+            Expression<Func<string, bool>> test = term.Phrase
+                ? v => v.Contains(text) && (" " + v + " ").Contains(padded)
+                : v => v.Contains(text);
+            var body = new Rebind(test.Parameters[0], field.Body).Visit(test.Body);
+            query = query.Where(Expression.Lambda<Func<SearchBib, bool>>(body, field.Parameters));
+        }
+        return query;
+    }
+
+    /// <summary>Thay tham số của biểu thức điều kiện bằng trường của biểu ghi.</summary>
+    private sealed class Rebind(ParameterExpression from, Expression to) : ExpressionVisitor
+    {
+        protected override Expression VisitParameter(ParameterExpression node) => node == from ? to : base.VisitParameter(node);
     }
 
     private static IQueryable<SearchBib> Order(IQueryable<SearchBib> query, string? sort, string phrase) => (sort ?? "").ToLowerInvariant() switch

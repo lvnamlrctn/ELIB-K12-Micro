@@ -42,6 +42,18 @@ public abstract class CirculationTestBase(CirculationApiFactory factory) : IClas
         return Factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, userId));
     }
 
+    /// <summary>Cán bộ có claim name/preferred_username như token thật — lượt mượn ghi "Họ tên (tên đăng nhập)" người thao tác.</summary>
+    protected HttpClient NamedStaff(long tenantId, string name, string userName)
+    {
+        var userId = Interlocked.Increment(ref _nextUserId);
+        Factory.Permissions.Grants[userId] = ["*"];
+        return Factory.CreateClient().WithClaims($"{TestClaims.Staff(tenantId, userId)};name={name};preferred_username={userName}");
+    }
+
+    /// <summary>Token bạn đọc (OPAC tự phục vụ) — card_no/reader_id như token thật do identity phát.</summary>
+    protected HttpClient ReaderClient(long tenantId, string cardNo, Guid readerPublicId) =>
+        Factory.CreateClient().WithClaims(TestClaims.Reader(tenantId, cardNo, readerPublicId));
+
     protected static async Task<T> Read<T>(HttpResponseMessage response)
     {
         Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");

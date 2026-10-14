@@ -24,8 +24,32 @@ public static class TextFold
     public static IReadOnlyList<string> Tokens(string? query, int max = 10) =>
         [.. Fold(query).Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct().Take(max)];
 
+    /// <summary>
+    /// Điều kiện tìm của câu truy vấn (ELIB-LRC): phần đặt trong "..." là một cụm phải có đúng thứ tự, liền nhau; phần còn lại tách từng từ.
+    /// Đã bỏ dấu, bỏ trùng, tối đa <paramref name="max"/> điều kiện. Dấu " lẻ (chưa đóng) bị bỏ qua.
+    /// </summary>
+    public static IReadOnlyList<SearchTerm> Terms(string? query, int max = 10)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return [];
+        var parts = query.Replace('“', '"').Replace('”', '"').Split('"');
+        var terms = new List<SearchTerm>();
+        for (var i = 0; i < parts.Length; i++)
+        {
+            // Phần lẻ (1, 3...) nằm giữa hai dấu nháp; phần cuối mà số dấu nháp lẻ thì là nháp chưa đóng — coi như từ thường.
+            var quoted = i % 2 == 1 && i < parts.Length - (parts.Length % 2 == 0 ? 1 : 0);
+            var folded = Fold(parts[i]);
+            if (folded.Length == 0) continue;
+            if (quoted && folded.Contains(' ', StringComparison.Ordinal)) terms.Add(new SearchTerm(folded, true));
+            else terms.AddRange(folded.Split(' ').Select(t => new SearchTerm(t, false)));
+        }
+        return [.. terms.Distinct().Take(max)];
+    }
+
     public static string? Cut(string? value, int max) => value is null ? null : value.Length <= max ? value : value[..max];
 }
+
+/// <summary>Một điều kiện tìm đã bỏ dấu: một từ, hoặc một cụm từ (<see cref="Phrase"/>) phải khớp nguyên cụm.</summary>
+public sealed record SearchTerm(string Text, bool Phrase);
 
 /// <summary>
 /// Biểu ghi trong chỉ mục tra cứu (read model của search, docs 04 §6) — ghi từ BibChanged, chỉ khi Version lớn hơn bản đang có.

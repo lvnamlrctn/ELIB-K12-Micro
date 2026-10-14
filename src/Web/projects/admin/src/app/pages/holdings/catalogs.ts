@@ -42,3 +42,20 @@ export const STORES: CrudConfig = {
   defaults: { storeTypeId: null },
   modalWidth: 'max-w-lg',
 };
+
+/** Danh mục chỉ có tên của màn sách ra vào kho (monolith: /admin/export-reason, /admin/book-out-unit, /admin/exhibition-location). */
+const named = (title: string, resource: string, perm: string): CrudConfig => ({
+  title,
+  resource,
+  service: 'holdings',
+  perm,
+  searchLabel: 'STORE_CAT.NAME_COL',
+  searchPlaceholder: 'STORE_CAT.NAME_SEARCH_PH',
+  columns: [{ key: 'name', label: 'STORE_CAT.NAME_COL' }],
+  fields: [{ key: 'name', label: 'STORE_CAT.NAME_COL', type: 'text', required: true }],
+  importable: true,
+});
+
+export const EXPORT_REASONS = named('STORE_CAT.EXPORT_REASONS', 'export-reasons', 'EXPORT_REASON');
+export const BOOK_OUT_UNITS = named('STORE_CAT.BOOK_OUT_UNITS', 'book-out-units', 'BOOK_OUT_UNIT');
+export const EXHIBITION_LOCATIONS = named('STORE_CAT.EXHIBITION_LOCATIONS', 'exhibition-locations', 'EXHIBITION_LOCATION');

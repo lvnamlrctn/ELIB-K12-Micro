@@ -150,7 +150,8 @@ public sealed record SaveFineTicketRequest(
 /// chính sách; dòng có lý do "Mất" đóng lượt mượn đang mở và báo holdings đổi trạng thái bản sách (LoanChanged.ClosedItemStatus).
 /// </summary>
 public sealed class FineTicketResource(
-    ICrudDbContext db, Replicas replicas, LoanPublisher loans, FineReasonResource fineReasons, ICurrentActor actor, TimeProvider clock)
+    ICrudDbContext db, Replicas replicas, LoanPublisher loans, FineReasonResource fineReasons, ICurrentActor actor, TimeProvider clock,
+    CrudAuditContext? auditContext = null)
     : CrudResource<FineTicketResource, FineTicket, FineTicketSearch, FineTicketCreateRequest, FineTicketDto>(db)
 {
     public const int MaxLines = 200;
@@ -342,7 +343,7 @@ public sealed class FineTicketResource(
         {
             var loan = await Db.Set<Loan>().FirstOrDefaultAsync(x => x.PublicId == line.LoanPublicId && x.ReturnedAt == null, ct);
             if (loan is null) continue;
-            loan.CloseAsLost(now, actor.Id);
+            loan.CloseAsLost(now, actor.Id, auditContext?.Capture().ActorName);
             await loans.PublishAsync(loan, ct);
             lostLoans.Add(loan.Barcode);
         }

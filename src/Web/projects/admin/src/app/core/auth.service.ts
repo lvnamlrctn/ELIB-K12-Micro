@@ -1,5 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
+import { forgetListStates } from './list-state';
+import { forgetLocalPreferences } from './preferences';
 
 /**
  * Đăng nhập OIDC Authorization Code + PKCE với service identity (docs 05 §1).
@@ -59,6 +61,8 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    forgetListStates();
+    forgetLocalPreferences();
     await this.manager.signoutRedirect();
   }
 

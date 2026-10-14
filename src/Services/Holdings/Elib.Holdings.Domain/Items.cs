@@ -124,6 +124,93 @@ public sealed class Item : TenantEntity
     /// <summary>Đánh dấu xoá — tăng version để event xoá thắng mọi event trước đó.</summary>
     public void MarkDeleted() => Version++;
 
+    /// <summary>Báo mất (monolith: MarkLost). Bản bạn đọc đang mượn mà làm mất xử lý qua phiếu phạt ở circulation (đóng lượt mượn).</summary>
+    public void MarkLost()
+    {
+        if (Status == ItemStatus.Lost) throw new BusinessRuleException("ITEM_ALREADY_LOST", $"ĐKCB {Barcode} đã ở trạng thái mất.");
+        if (Status == ItemStatus.Liquidated) throw Liquidated();
+        if (OnLoan) throw OnLoanError("xử lý mất qua phiếu phạt ở màn Mượn/Trả");
+        SetStatus(ItemStatus.Lost);
+    }
+
+    /// <summary>Khôi phục bản đã báo mất (tìm thấy lại) → sẵn sàng phục vụ.</summary>
+    public void RestoreFound()
+    {
+        if (Status != ItemStatus.Lost) throw new BusinessRuleException("ITEM_NOT_LOST", $"ĐKCB {Barcode} không ở trạng thái mất.");
+        SetStatus(ItemStatus.Available);
+    }
+
+    /// <summary>Thanh lý — chặn bản đang mượn, đang xuất kho (monolith sau ELIB-LRC 10-04). Bản đã báo mất thanh lý được.</summary>
+    public void Liquidate()
+    {
+        if (Status == ItemStatus.Liquidated) throw Liquidated();
+        if (OnLoan) throw OnLoanError("trả sách trước khi thanh lý");
+        if (Status == ItemStatus.OutOfStore) throw OutOfStore("nhập kho trước khi thanh lý");
+        SetStatus(ItemStatus.Liquidated);
+    }
+
+    /// <summary>Huỷ thanh lý: về "Mất" nếu bản còn bản ghi báo mất, ngược lại về sẵn sàng.</summary>
+    public void CancelLiquidation(bool stillLost)
+    {
+        if (Status != ItemStatus.Liquidated) throw new BusinessRuleException("ITEM_NOT_LIQUIDATED", $"ĐKCB {Barcode} không ở trạng thái thanh lý.");
+        SetStatus(stillLost ? ItemStatus.Lost : ItemStatus.Available);
+    }
+
+    /// <summary>Xuất kho tạm (photo, triển lãm, chuyển đơn vị khác…) — không cho mượn tới khi nhập lại.</summary>
+    public void TakeOut()
+    {
+        if (OnLoan) throw OnLoanError("không xuất kho được");
+        if (Status == ItemStatus.Lost) throw new BusinessRuleException("ITEM_LOST", $"ĐKCB {Barcode} đang ở trạng thái mất.");
+        if (Status == ItemStatus.Liquidated) throw Liquidated();
+        if (Status == ItemStatus.OutOfStore) throw OutOfStore("quét Nhập kho trước khi xuất lại");
+        SetStatus(ItemStatus.OutOfStore);
+    }
+
+    /// <summary>Nhập lại kho sau xuất kho → sẵn sàng phục vụ.</summary>
+    public void BringBack()
+    {
+        if (Status != ItemStatus.OutOfStore) throw new BusinessRuleException("ITEM_NOT_OUT", $"ĐKCB {Barcode} không ở trạng thái xuất kho.");
+        SetStatus(ItemStatus.Available);
+    }
+
+    /// <summary>Điều chuyển sang kho khác (hoàn thành phiếu điều chuyển). Bản đang mượn/xuất kho/mất/thanh lý không chuyển được.</summary>
+    public void MoveTo(long storeId)
+    {
+        if (OnLoan) throw OnLoanError("không chuyển kho được");
+        if (Status == ItemStatus.OutOfStore) throw OutOfStore("nhập kho trước khi chuyển");
+        if (Status == ItemStatus.Lost) throw new BusinessRuleException("ITEM_LOST", $"ĐKCB {Barcode} đã mất.");
+        if (Status == ItemStatus.Liquidated) throw Liquidated();
+        StoreId = storeId;
+        Version++;
+    }
+
+    /// <summary>
+    /// Đăng ký lại mã vạch (monolith: StoreReRegisterBarcode). Chặn bản đang mượn: lượt mượn ở circulation giữ mã cũ để trả sách
+    /// bằng mã quét, đổi mã giữa chừng thì quầy không trả được. Lịch sử đã đóng giữ mã cũ (ảnh chụp lúc mượn).
+    /// </summary>
+    public void ReRegister(string barcode, long? storeId)
+    {
+        if (OnLoan) throw OnLoanError("trả sách trước khi đăng ký lại mã");
+        var value = NormalizeBarcode(barcode);
+        var (prefix, number) = Split(value);
+        (Barcode, BarcodeKey, Prefix, Number) = (value, Key(value), prefix, number);
+        if (storeId is not null) StoreId = storeId;
+        Version++;
+    }
+
+    private void SetStatus(string status)
+    {
+        Status = status;
+        Version++;
+    }
+
+    private BusinessRuleException OnLoanError(string hint) =>
+        new("ITEM_ON_LOAN", $"ĐKCB {Barcode} đang được bạn đọc mượn (thẻ {LoanCardNo}) — {hint}.");
+
+    private BusinessRuleException Liquidated() => new("ITEM_LIQUIDATED", $"ĐKCB {Barcode} đã thanh lý.");
+
+    private BusinessRuleException OutOfStore(string hint) => new("ITEM_OUT_OF_STORE", $"ĐKCB {Barcode} đang xuất kho — {hint}.");
+
     public static string NormalizeBarcode(string? barcode)
     {
         var value = (barcode ?? "").Trim();
@@ -167,6 +254,17 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public string? PublishYear { get; set; }
     public string? Isbns { get; set; }
     public string? Ddc { get; set; }
+
+    /// <summary>Ký hiệu tác giả (Cutter) — dòng dưới của nhãn gáy/môn loại.</summary>
+    public string? Cutter { get; set; }
+
+    /// <summary>Bản sao đã có <see cref="Cutter"/> (bản ghi từ trước khi có cột này thì false — in nhãn hỏi lại catalog).</summary>
+    public bool CutterKnown { get; set; }
+
+    /// <summary>Loại biểu ghi (nhóm tài liệu) — thống kê kho theo loại tài liệu.</summary>
+    public long? BibTypeId { get; set; }
+
+    public string? BibTypeName { get; set; }
     public int Status { get; set; }
     public bool Deleted { get; set; }
     public long Version { get; set; }

@@ -21,6 +21,12 @@ public static class ElibClaimTypes
     /// Giá trị <see cref="ImpersonationModes.ReadOnly"/> = chỉ được dùng quyền "view" — mọi quyền thêm/sửa/xoá bị từ chối.
     /// </summary>
     public const string Impersonation = "imp";
+
+    /// <summary>Id hồ sơ bạn đọc ở patron (ReaderPublicId) — chỉ có ở token bạn đọc; service khác tra theo claim này, không theo <see cref="Subject"/>.</summary>
+    public const string ReaderId = "reader_id";
+
+    /// <summary>Số thẻ bạn đọc — chỉ có ở token bạn đọc.</summary>
+    public const string CardNo = "card_no";
 }
 
 public static class ImpersonationModes

@@ -41,6 +41,13 @@ public static class CirculationEndpoints
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
+        // Nội bộ: patron hỏi trước khi xoá loại bạn đọc (điểm lưu thông phục vụ + chính sách lưu thông theo loại).
+        app.MapGet("/internal/tenants/{tenantId:long}/reader-types/{readerTypeId:long}/usage",
+            async (long tenantId, long readerTypeId, ITenantContext tenant, CircPlaceResource r, CancellationToken ct) =>
+            {
+                using (tenant.Use(tenantId)) return await r.ReaderTypeUsageAsync(readerTypeId, ct);
+            }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
         // Sao chụp: 8 endpoint chuẩn + tổng tiền, đánh dấu đã thu.
         var photos = api.MapCrud<PhotocopyResource>("/photocopies", "C_PHOTO").WithTags("Photocopies");
         photos.MapPost("/Totals", [Permission("C_PHOTO", "view")] (PhotocopySearch search, PhotocopyResource r, CancellationToken ct) => r.TotalsAsync(search, ct));

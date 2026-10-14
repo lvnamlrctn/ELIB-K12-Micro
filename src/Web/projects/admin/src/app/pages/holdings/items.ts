@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { Api, CrudClient, CrudPage, ITEM_STATUSES, Item, ItemSearch, Store, errorMessage } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
+import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 
@@ -135,7 +136,7 @@ export class Items implements OnInit {
   protected readonly session = inject(Session);
 
   protected readonly statuses = [...ITEM_STATUSES, { code: 'B', name: 'ITEM_STATUS.B', badge: 'badge-info' }];
-  protected search: ItemSearch = { keyword: '', storeId: null, itemStatus: null, barcodeFrom: '', barcodeTo: '', pageIndex: 1, pageSize: 10 };
+  protected search: ItemSearch = rememberedSearch<ItemSearch>('items', { keyword: '', storeId: null, itemStatus: null, barcodeFrom: '', barcodeTo: '', pageIndex: 1, pageSize: 10 });
   protected readonly page = signal<CrudPage<Item> | null>(null);
   protected readonly stores = signal<Store[]>([]);
   protected readonly loading = signal(false);
@@ -205,9 +206,12 @@ export class Items implements OnInit {
     this.loading.set(true);
     try {
       const s = this.search;
-      this.page.set(await this.api.lookupItems({
+      const page = await this.api.lookupItems({
         ...s, keyword: s.keyword?.trim() || undefined, barcodeFrom: s.barcodeFrom?.trim() || null, barcodeTo: s.barcodeTo?.trim() || null,
-      }));
+      });
+      if (clampPage(s, page)) return void (await this.load());
+      this.page.set(page);
+      rememberSearch('items', s);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

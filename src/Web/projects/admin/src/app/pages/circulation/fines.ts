@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api, CrudPage, FineTicket, FineTicketSearch, FineTicketTotals, errorMessage } from '../../core/api';
 import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
+import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 
@@ -147,7 +148,7 @@ export class Fines implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  protected search: FineTicketSearch = { keyword: '', ticketStatus: null, unpaid: false, from: null, to: null, pageIndex: 1, pageSize: 10 };
+  protected search: FineTicketSearch = rememberedSearch<FineTicketSearch>('fines', { keyword: '', ticketStatus: null, unpaid: false, from: null, to: null, pageIndex: 1, pageSize: 10 });
   protected readonly page = signal<CrudPage<FineTicket> | null>(null);
   protected readonly totals = signal<FineTicketTotals | null>(null);
   protected readonly loading = signal(false);
@@ -218,7 +219,9 @@ export class Fines implements OnInit {
     try {
       const s = { ...this.search, keyword: this.search.keyword?.trim() || undefined, from: this.search.from || null, to: this.search.to || null, unpaid: this.search.unpaid || null };
       const [page, totals] = await Promise.all([this.api.searchFineTickets(s), this.api.fineTicketTotals(s)]);
+      if (clampPage(this.search, page)) return void (await this.load());
       this.page.set(page);
+      rememberSearch('fines', this.search);
       this.totals.set(totals);
     } catch (e) {
       this.toastr.error(errorMessage(e));

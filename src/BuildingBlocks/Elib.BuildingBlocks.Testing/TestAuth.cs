@@ -83,4 +83,8 @@ public static class TestClaims
     public const string Service = "sub=2;sub_type=service";
     public static string Staff(long tenantId, long userId = 10) => $"sub={userId};sub_type=staff;tenant_id={tenantId}";
     public static string Reader(long tenantId, long readerId = 20) => $"sub={readerId};sub_type=reader;tenant_id={tenantId}";
+
+    /// <summary>Bạn đọc kèm claim card_no/reader_id như token thật — dùng khi test endpoint tự phục vụ của bạn đọc (OPAC).</summary>
+    public static string Reader(long tenantId, string cardNo, Guid readerPublicId, long readerId = 20) =>
+        $"{Reader(tenantId, readerId)};card_no={cardNo};reader_id={readerPublicId}";
 }

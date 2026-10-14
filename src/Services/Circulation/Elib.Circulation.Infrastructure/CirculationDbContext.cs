@@ -48,6 +48,8 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.Property(x => x.Barcode).HasMaxLength(50);
             e.Property(x => x.Note).HasMaxLength(Loan.MaxNoteLength);
             e.Property(x => x.ClosedItemStatus).HasMaxLength(1);
+            e.Property(x => x.LoanedByName).HasMaxLength(Loan.MaxStaffNameLength);
+            e.Property(x => x.ReturnedByName).HasMaxLength(Loan.MaxStaffNameLength);
             e.Property(x => x.Version).IsConcurrencyToken();
             // Một bản sách chỉ có một lượt mượn đang mở — chặn cả hai quầy cùng mượn một ĐKCB.
             e.HasIndex(x => new { x.TenantId, x.ItemPublicId }).IsUnique().HasFilter("returned_at IS NULL AND is_deleted = false");
@@ -56,6 +58,7 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.Barcode });
             e.HasIndex(x => new { x.TenantId, x.DueAt });
             e.HasIndex(x => new { x.TenantId, x.LoanedAt });
+            e.HasIndex(x => new { x.TenantId, x.StoreId });
         });
 
         modelBuilder.Entity<PatronReplica>(e =>

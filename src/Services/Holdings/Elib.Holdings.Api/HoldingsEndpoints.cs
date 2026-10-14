@@ -11,7 +11,7 @@ namespace Elib.Holdings.Api;
 /// <summary>
 /// Kho và bản sách (gateway: /api/admin/holdings/** → /api/**, cần license HOLDINGS). Mã quyền giữ như monolith:
 /// STORE_TYPES, STORES; đăng ký/sửa/xoá ĐKCB theo CATALOG_BIBS (như CatalogueBookController); tìm tài liệu DOC_SEARCH;
-/// xếp giá MAP_SHELVING.
+/// xếp giá MAP_SHELVING. Kiểm kê, mất, thanh lý, xuất kho, điều chuyển, giao nhận, thống kê: <see cref="StoreOperationEndpoints"/>.
 /// </summary>
 public static class HoldingsEndpoints
 {
@@ -26,7 +26,7 @@ public static class HoldingsEndpoints
 
         var items = api.MapCrud<ItemResource>("/items", "CATALOG_BIBS").WithTags("Items");
         // Màn "Tìm kiếm tài liệu" và "Xếp giá" tìm bản sách bằng quyền riêng của màn đó.
-        items.MapPost("/Lookup", [PermissionAny("CATALOG_BIBS:view", "DOC_SEARCH:view", "MAP_SHELVING:view")] (ItemSearch search, ItemResource r, CancellationToken ct)
+        items.MapPost("/Lookup", [PermissionAny("CATALOG_BIBS:view", "DOC_SEARCH:view", "MAP_SHELVING:view", "LOST_BOOKS:view", "LIQUIDATES:view", "RE_REGISTER:view")] (ItemSearch search, ItemResource r, CancellationToken ct)
             => r.SearchAsync(search, ct));
         items.MapPost("/Register", [Permission("CATALOG_BIBS", "edit")] (RegisterItemsRequest request, ItemResource r, CancellationToken ct)
             => r.RegisterAsync(request, ct));
@@ -34,6 +34,9 @@ public static class HoldingsEndpoints
             => r.NextAsync(prefix, digits ?? 6, ct));
         items.MapPost("/Shelve", [Permission("MAP_SHELVING", "edit")] (ShelveRequest request, ItemResource r, CancellationToken ct)
             => r.ShelveAsync(request, ct));
+        // In nhãn mã vạch ĐKCB / nhãn gáy (ELIB-LRC: In mã vạch, In nhãn môn loại) — cán bộ biên mục in ngay khi đăng ký cá biệt.
+        items.MapPost("/Labels", [PermissionAny("PRINT_LABEL:view", "CATALOG_BIBS:view")] (ItemLabelRequest request, ItemResource r, CancellationToken ct)
+            => r.LabelsAsync(request, ct));
         // Nội bộ: circulation lấy trạng thái bản sách khi bản sao chưa có (không qua gateway, chỉ service token).
         app.MapGet("/internal/tenants/{tenantId:long}/items/by-barcode/{barcode}", async (long tenantId, string barcode, ITenantContext tenant, ItemResource r, CancellationToken ct) =>
         {
@@ -49,6 +52,7 @@ public static class HoldingsEndpoints
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
+        api.MapStoreOperationEndpoints();
         return app;
     }
 }

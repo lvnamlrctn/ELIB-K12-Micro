@@ -153,7 +153,10 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
         <div class="flex items-center gap-3 mb-4 flex-wrap">
           <div class="text-sm text-slate-600">
             @if (loading()) { {{ 'OPAC.SEARCH.SEARCHING' | translate }} }
-            @else if (result(); as r) { {{ 'OPAC.SEARCH.FOUND_N' | translate: { count: r.total } }} }
+            @else if (result(); as r) {
+              {{ 'OPAC.SEARCH.FOUND_N' | translate: { count: r.total } }}
+              @if (r.elapsedMs != null) { <span class="text-slate-400">{{ 'OPAC.SEARCH.ELAPSED' | translate: { ms: r.elapsedMs } }}</span> }
+            }
           </div>
           <label class="ml-auto text-sm text-slate-600 flex items-center gap-2">{{ 'OPAC.SEARCH.SORT' | translate }}
             <select class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="sort" (ngModelChange)="setSort($event)" name="sort">
@@ -200,6 +203,7 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
               <li class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
                 <span class="material-icons text-5xl text-slate-300">search_off</span>
                 <p class="mt-2">{{ 'OPAC.SEARCH.NO_RESULT_HINT' | translate }}</p>
+                <p class="mt-1 text-xs">{{ 'OPAC.SEARCH.PHRASE_HINT' | translate }}</p>
                 @if (hasZ3950() && q) {
                   <a routerLink="/lien-thu-vien" [queryParams]="{ q }" class="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline">
                     <span class="material-icons text-[18px]">hub</span> {{ 'OPAC.SEARCH.TRY_OTHER_LIBRARIES' | translate: { q } }}</a>

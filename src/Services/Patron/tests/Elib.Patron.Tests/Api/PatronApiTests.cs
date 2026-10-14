@@ -180,6 +180,29 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Reader_type_used_by_circulation_cannot_be_deleted()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        var used = await AddNamed(staff, "reader-types", "Giáo viên");
+        var down = await AddNamed(staff, "reader-types", "Phụ huynh");
+        var free = await AddNamed(staff, "reader-types", "Khách");
+        _factory.CirculationUsage[(tenantId, used.Id)] = new CirculationReaderTypeUsage(["GV — Quầy giáo viên"], 2);
+        _factory.CirculationUsage[(tenantId, down.Id)] = null;
+
+        var blocked = await staff.DeleteAsync(U($"/api/reader-types/Delete/{used.PublicId}"));
+        Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+        var detail = JsonDocument.Parse(await blocked.Content.ReadAsStringAsync()).RootElement.GetProperty("detail").GetString();
+        Assert.Contains("điểm lưu thông GV — Quầy giáo viên; 2 chính sách lưu thông", detail, StringComparison.Ordinal);
+
+        // Không hỏi được lưu thông thì không xoá (tránh để lại điểm/chính sách trỏ vào loại đã xoá).
+        var unavailable = await staff.DeleteAsync(U($"/api/reader-types/Delete/{down.PublicId}"));
+        Assert.Equal((HttpStatusCode.ServiceUnavailable, "CIRCULATION_UNAVAILABLE"), (unavailable.StatusCode, await ErrorCode(unavailable)));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync(U($"/api/reader-types/Delete/{free.PublicId}"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Import_resolves_catalog_names_dates_and_full_name()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

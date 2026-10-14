@@ -189,7 +189,9 @@
       "SORT_TITLE": "Title A–Z",
       "NO_RESULT_HINT": "No matching documents. Try fewer words or remove some filters.",
       "TRY_OTHER_LIBRARIES": "Search other libraries for \"{{q}}\"",
-      "ALL_BORROWED": "All copies on loan"
+      "ALL_BORROWED": "All copies on loan",
+      "ELAPSED": "({{ms}} ms)",
+      "PHRASE_HINT": "Put words in \"...\" to search for the exact phrase, e.g. \"object oriented programming\"."
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Document not found (it may have been hidden or removed).",
@@ -210,7 +212,12 @@
       "DUE": "due {{date}}",
       "NO_COPIES": "The library has no copies of this document available yet.",
       "BORROW_TITLE": "Borrowing",
-      "BORROW_HINT": "Bring your library card to the desk to borrow, or ask a librarian to place a hold when all copies are on loan.",
+      "BORROW_HINT": "Bring your library card to the desk to borrow, or place a hold online and the library will keep a copy for you.",
+      "LOGIN_TO_BORROW": "Sign in to place a hold on this document.",
+      "PLACE_HOLD": "Place hold",
+      "HOLD_WAITING_POSITION": "You have a hold on this document, queue position {{position}}.",
+      "HOLD_READY_PICKUP": "Your copy is ready — pick it up by {{date}}.",
+      "CANCEL_HOLD": "Cancel hold",
       "SIMILAR": "Related documents",
       "OTHER_AUTHORS": "Other authors",
       "PUBLICATION": "Publication",
@@ -245,11 +252,25 @@
       "PASSWORD_MIN": "The new password must have at least 6 characters.",
       "PASSWORD_MISMATCH": "The new passwords do not match.",
       "PASSWORD_CHANGED": "Password changed.",
-      "LOANS_COMING": "Current loans, online renewal and holds will appear on this page in an upcoming update.",
       "LOGIN_FAILED": "Sign-in could not be completed (the link was already used or has expired).",
       "LOGIN_RETRY": "Try signing in again",
       "E_CARD": "Digital library card",
-      "E_CARD_HINT": "Show the barcode or QR code at the library desk instead of your plastic card."
+      "E_CARD_HINT": "Show the barcode or QR code at the library desk instead of your plastic card.",
+      "MY_LOANS": "Current loans",
+      "NO_LOANS": "You have no items currently on loan.",
+      "DUE_DATE": "Due",
+      "RENEW": "Renew",
+      "RENEWED_N": "renewed {{count}} time(s)",
+      "RENEW_DONE": "Renewed.",
+      "MY_HOLDS": "My holds",
+      "NO_HOLDS": "You have no active holds.",
+      "HOLD_WAITING": "Waiting, queue position {{position}}",
+      "HOLD_READY": "Ready for pickup by {{date}}",
+      "CANCEL_HOLD": "Cancel hold",
+      "LOAN_HISTORY": "Loan history",
+      "NO_HISTORY": "No past loans yet.",
+      "RETURNED_AT": "Returned on {{date}}",
+      "STILL_BORROWING": "On loan"
     },
     "LOGIN": {
       "SIGNING_IN": "Signing in…"

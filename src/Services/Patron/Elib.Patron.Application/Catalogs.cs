@@ -6,7 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Patron.Application;
 
-public sealed class ReaderTypeResource(ICrudDbContext db) : NamedCatalogResource<ReaderTypeResource, ReaderType>(db)
+/// <summary>
+/// Loại bạn đọc. Không xoá được khi còn bạn đọc, hoặc khi lưu thông còn dùng (điểm lưu thông phục vụ loại này, chính sách lưu thông theo
+/// loại này — như ELIB-LRC). <paramref name="usage"/> null (unit test) thì bỏ qua kiểm tra phía lưu thông.
+/// </summary>
+public sealed class ReaderTypeResource(ICrudDbContext db, IReaderTypeUsage? usage = null) : NamedCatalogResource<ReaderTypeResource, ReaderType>(db)
 {
     protected override string EntityName => "Loại bạn đọc";
 
@@ -14,6 +18,8 @@ public sealed class ReaderTypeResource(ICrudDbContext db) : NamedCatalogResource
     {
         if (await Db.Set<Reader>().AnyAsync(r => r.ReaderTypeId == entity.Id, ct))
             throw new ConflictException("READER_TYPE_IN_USE", $"Loại bạn đọc '{entity.Name}' đang có bạn đọc — chuyển bạn đọc sang loại khác trước khi xoá.");
+        if (usage is not null && await usage.CirculationAsync(entity.Id, ct) is { } circulation && circulation.InUse)
+            throw new ConflictException("READER_TYPE_IN_USE", $"Loại bạn đọc '{entity.Name}' đang được dùng ở lưu thông: {circulation.Describe()} — gỡ khỏi điểm lưu thông và xoá chính sách trước khi xoá.");
     }
 
     /// <summary>Loại bạn đọc mặc định của trường K12 — seed khi khởi tạo đơn vị, chạy lại không thêm trùng.</summary>

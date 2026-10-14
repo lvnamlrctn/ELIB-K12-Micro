@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, HostListener, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Router, RouterLink } from '@angular/router';
@@ -9,6 +9,7 @@ import { Session } from '../../core/session';
 import { MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
+import { HasUnsavedChanges, LeaveConfirm, UnsavedConfirm } from '../../shared/unsaved';
 import { BibItems } from '../holdings/bib-items';
 import { BibCover } from './bib-cover';
 import { BibHistory } from './bib-history';
@@ -22,10 +23,13 @@ const BLANK_FIELDS: MarcField[] = [
   { tag: '260', ind1: ' ', ind2: ' ', subfields: [{ code: 'a', value: '' }, { code: 'b', value: '' }, { code: 'c', value: '' }] },
 ];
 
-/** Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). */
+/**
+ * Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). Rời trang (chuyển màn, đóng tab) khi còn
+ * thay đổi chưa lưu thì hỏi lại (ELIB-LRC).
+ */
 @Component({
   selector: 'app-bib-edit',
-  imports: [FormsModule, RouterLink, Loading, MarcEditor, MarcPick, BibItems, BibCover, BibHistory, TranslatePipe],
+  imports: [FormsModule, RouterLink, Loading, UnsavedConfirm, MarcEditor, MarcPick, BibItems, BibCover, BibHistory, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/catalog-bibs" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'BIB_EDITOR.BACK' | translate"><span class="material-icons">arrow_back</span></a>
@@ -106,9 +110,10 @@ const BLANK_FIELDS: MarcField[] = [
 
     @if (picking()) { <app-marc-pick (chosen)="useRecord($event)" (closed)="picking.set(false)" /> }
     @if (showHistory() && bib(); as b) { <app-bib-history [publicId]="b.publicId" [defs]="defs()" (closed)="showHistory.set(false)" /> }
+    <app-unsaved-confirm [state]="leave" />
   `,
 })
-export class BibEdit implements OnInit {
+export class BibEdit implements OnInit, HasUnsavedChanges {
   /** Tham số route: "new" hoặc MFN. */
   readonly mfn = input<string>();
 
@@ -137,6 +142,27 @@ export class BibEdit implements OnInit {
   protected bibTypeId: number | null = null;
   protected status = STATUS_ACTIVE;
   protected leader = '';
+  protected readonly leave = new LeaveConfirm();
+  /** Ảnh chụp biểu ghi lúc nạp/lưu gần nhất; null = chưa nạp xong (không hỏi), '' = bản nháp chưa từng lưu (sao Z39.50). */
+  private baseline: string | null = null;
+
+  hasUnsavedChanges(): boolean {
+    return this.baseline != null && this.canSave() && this.snapshot() !== this.baseline;
+  }
+
+  confirmLeave(): Promise<boolean> {
+    return this.leave.ask();
+  }
+
+  /** Đóng tab / tải lại trang khi chưa lưu → trình duyệt hỏi lại. */
+  @HostListener('window:beforeunload', ['$event'])
+  protected beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) event.preventDefault();
+  }
+
+  private snapshot(): string {
+    return JSON.stringify([this.bibTypeId, this.worksheetId(), this.leader.trim(), this.status, this.fields()]);
+  }
 
   async ngOnInit(): Promise<void> {
     this.loading.set(true);
@@ -168,7 +194,10 @@ export class BibEdit implements OnInit {
           this.toastr.success('BIB_EDITOR.DRAFT_LOADED', { source: draft.source });
         } else if (first) this.useWorksheet(first);
         else this.fields.set(structuredClone(BLANK_FIELDS));
+        this.baseline = draft ? '' : this.snapshot();
+        return;
       }
+      this.baseline = this.snapshot();
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
@@ -226,12 +255,13 @@ export class BibEdit implements OnInit {
       this.reason = '';
       if (isNew) this.toastr.success('BIB_EDITOR.SAVED_NEW', { mfn: saved.mfn });
       else this.toastr.success('BIB_EDITOR.UPDATED');
-      if (isNew) {
-        await this.router.navigate(['/catalog-bibs', saved.mfn], { replaceUrl: true });
-      }
       this.bib.set(saved);
       this.leader = saved.leader;
       this.fields.set(structuredClone(saved.fields));
+      this.baseline = this.snapshot();
+      if (isNew) {
+        await this.router.navigate(['/catalog-bibs', saved.mfn], { replaceUrl: true });
+      }
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

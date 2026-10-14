@@ -230,11 +230,15 @@ public sealed class HoldResource(ICrudDbContext db, Replicas replicas, HoldAlloc
         return await GetAsync(hold.Id, ct);
     }
 
-    /// <summary>Huỷ đặt mượn; bản đang giữ chuyển cho người đặt kế tiếp.</summary>
-    public async Task<HoldDto> CancelAsync(CancelHoldRequest request, CancellationToken ct)
+    /// <summary>
+    /// Huỷ đặt mượn; bản đang giữ chuyển cho người đặt kế tiếp. <paramref name="requireOwnerReaderId"/>: bạn đọc tự huỷ qua OPAC —
+    /// đặt mượn không phải của mình thì coi như không có (404), không lộ việc đặt mượn đó tồn tại.
+    /// </summary>
+    public async Task<HoldDto> CancelAsync(CancelHoldRequest request, CancellationToken ct, Guid? requireOwnerReaderId = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var hold = await Set.FirstOrDefaultAsync(h => h.PublicId == request.HoldId, ct) ?? throw new NotFoundException(EntityName, request.HoldId);
+        if (requireOwnerReaderId is { } owner && hold.ReaderPublicId != owner) throw new NotFoundException(EntityName, request.HoldId);
         var held = hold.Status == HoldStatus.Ready ? hold.ItemPublicId : null;
         hold.Cancel(clock.GetUtcNow(), request.Reason);
         Hold? next = null;

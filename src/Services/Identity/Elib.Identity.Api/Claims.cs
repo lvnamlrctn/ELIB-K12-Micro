@@ -79,11 +79,6 @@ internal static class ElibPrincipals
         return Finish(identity, scopes);
     }
 
-    /// <summary>Id hồ sơ bạn đọc ở patron (ReaderPublicId) — service khác tra bạn đọc theo claim này, không theo sub.</summary>
-    public const string ReaderIdClaim = "reader_id";
-
-    public const string CardNoClaim = "card_no";
-
     /// <summary>Phiên đăng nhập bạn đọc trên trang identity (cookie riêng <see cref="IdentityCookie.ReaderScheme"/>).</summary>
     public static ClaimsPrincipal ForReaderCookie(ReaderIdentity who)
     {
@@ -112,8 +107,8 @@ internal static class ElibPrincipals
             .SetClaim(Claims.PreferredUsername, who.CardNo)
             .SetClaim(ElibClaimTypes.SubjectType, ElibSubjectTypes.Reader)
             .SetClaim(ElibClaimTypes.TenantId, who.TenantId.ToString(CultureInfo.InvariantCulture))
-            .SetClaim(ReaderIdClaim, who.ReaderPublicId.ToString())
-            .SetClaim(CardNoClaim, who.CardNo);
+            .SetClaim(ElibClaimTypes.ReaderId, who.ReaderPublicId.ToString())
+            .SetClaim(ElibClaimTypes.CardNo, who.CardNo);
         if (who.External) identity.SetClaim(ExternalReaderClaim, "1");
         return Finish(identity, scopes);
     }

@@ -189,7 +189,9 @@
       "SORT_TITLE": "Nhan đề A–Z",
       "NO_RESULT_HINT": "Không tìm thấy tài liệu phù hợp. Thử bỏ dấu, dùng ít từ hơn hoặc bỏ bớt bộ lọc.",
       "TRY_OTHER_LIBRARIES": "Tìm \"{{q}}\" ở thư viện khác",
-      "ALL_BORROWED": "Đã mượn hết"
+      "ALL_BORROWED": "Đã mượn hết",
+      "ELAPSED": "({{ms}} ms)",
+      "PHRASE_HINT": "Đặt cụm từ trong dấu \"...\" để tìm đúng cụm, ví dụ \"lập trình hướng đối tượng\"."
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Không tìm thấy tài liệu (có thể đã bị ẩn hoặc xoá).",
@@ -210,7 +212,12 @@
       "DUE": "hạn trả {{date}}",
       "NO_COPIES": "Thư viện chưa có bản sách phục vụ cho tài liệu này.",
       "BORROW_TITLE": "Mượn tài liệu",
-      "BORROW_HINT": "Mang thẻ bạn đọc đến quầy để mượn, hoặc nhờ thủ thư đặt giữ khi sách đã mượn hết.",
+      "BORROW_HINT": "Mang thẻ bạn đọc đến quầy để mượn, hoặc đặt mượn trực tuyến để thư viện giữ sách cho bạn.",
+      "LOGIN_TO_BORROW": "Đăng nhập để đặt mượn tài liệu này.",
+      "PLACE_HOLD": "Đặt mượn",
+      "HOLD_WAITING_POSITION": "Bạn đang đặt mượn tài liệu này, thứ tự chờ {{position}}.",
+      "HOLD_READY_PICKUP": "Sách đã sẵn sàng, đến thư viện lấy trước {{date}}.",
+      "CANCEL_HOLD": "Huỷ đặt mượn",
       "SIMILAR": "Tài liệu liên quan",
       "OTHER_AUTHORS": "Tác giả khác",
       "PUBLICATION": "Xuất bản",
@@ -245,11 +252,25 @@
       "PASSWORD_MIN": "Mật khẩu mới tối thiểu 6 ký tự.",
       "PASSWORD_MISMATCH": "Hai lần nhập mật khẩu mới không khớp.",
       "PASSWORD_CHANGED": "Đã đổi mật khẩu.",
-      "LOANS_COMING": "Sách đang mượn, gia hạn trực tuyến và đặt mượn sẽ có trên trang này trong bản cập nhật tới.",
       "LOGIN_FAILED": "Không hoàn tất được đăng nhập (liên kết đã dùng hoặc hết hạn).",
       "LOGIN_RETRY": "Thử đăng nhập lại",
       "E_CARD": "Thẻ thư viện điện tử",
-      "E_CARD_HINT": "Đưa mã vạch hoặc mã QR cho quầy thư viện quét thay thẻ nhựa."
+      "E_CARD_HINT": "Đưa mã vạch hoặc mã QR cho quầy thư viện quét thay thẻ nhựa.",
+      "MY_LOANS": "Sách đang mượn",
+      "NO_LOANS": "Bạn đọc không có tài liệu nào đang mượn.",
+      "DUE_DATE": "Hạn trả",
+      "RENEW": "Gia hạn",
+      "RENEWED_N": "đã gia hạn {{count}} lần",
+      "RENEW_DONE": "Đã gia hạn.",
+      "MY_HOLDS": "Đặt mượn của tôi",
+      "NO_HOLDS": "Bạn đọc không có đặt mượn nào.",
+      "HOLD_WAITING": "Đang chờ sách, thứ tự {{position}}",
+      "HOLD_READY": "Sách đã sẵn sàng, đến lấy trước {{date}}",
+      "CANCEL_HOLD": "Huỷ đặt mượn",
+      "LOAN_HISTORY": "Lịch sử mượn",
+      "NO_HISTORY": "Chưa có lượt mượn nào.",
+      "RETURNED_AT": "Đã trả ngày {{date}}",
+      "STILL_BORROWING": "Đang mượn"
     },
     "LOGIN": {
       "SIGNING_IN": "Đang đăng nhập…"

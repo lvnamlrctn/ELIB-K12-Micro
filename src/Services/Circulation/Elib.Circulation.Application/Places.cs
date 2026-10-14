@@ -9,6 +9,9 @@ namespace Elib.Circulation.Application;
 public sealed record CircPlaceRequest(string Code, string Name, IReadOnlyList<long>? StoreIds = null, IReadOnlyList<long>? ReaderTypeIds = null,
     int Kind = CircPlace.KindBorrow, int? MaxLoans = null, IReadOnlyList<WorkSession>? WorkSessions = null, string? Note = null);
 
+/// <summary>Nơi lưu thông đang dùng một loại bạn đọc: tên các điểm phục vụ loại đó + số chính sách lưu thông theo loại đó.</summary>
+public sealed record ReaderTypeUsage(IReadOnlyList<string> Places, int Policies);
+
 public sealed record CircPlaceDto(long Id, Guid PublicId, string Code, string Name, IReadOnlyList<long> StoreIds, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
     IReadOnlyList<long>? ReaderTypeIds = null, int Kind = CircPlace.KindBorrow, int? MaxLoans = null, IReadOnlyList<WorkSession>? WorkSessions = null,
     string? Note = null);
@@ -98,6 +101,18 @@ public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlac
     {
         if (await Db.Set<Sip2Station>().AnyAsync(s => s.CircPlaceId == entity.Id, ct))
             throw new ConflictException("CIRC_PLACE_IN_USE", $"Điểm {entity.Code} đang có trạm tự phục vụ SIP2 — chuyển trạm sang điểm khác trước.");
+    }
+
+    /// <summary>
+    /// Loại bạn đọc đang được lưu thông dùng (điểm phục vụ loại này, chính sách lưu thông theo loại này) — patron hỏi trước khi xoá loại bạn đọc
+    /// (ELIB-LRC: ReaderTypeRepository.DeleteAsync kiểm CircPlaceReaderTypes + PolicyCircs). Chỉ trong đơn vị hiện tại.
+    /// </summary>
+    public async Task<ReaderTypeUsage> ReaderTypeUsageAsync(long readerTypeId, CancellationToken ct)
+    {
+        var places = await Set.AsNoTracking().Where(p => p.ReaderTypeIds.Contains(readerTypeId)).OrderBy(p => p.Code)
+            .Select(p => p.Code + " — " + p.Name).ToListAsync(ct);
+        var policies = await Db.Set<LoanPolicy>().CountAsync(p => p.ReaderTypeId == readerTypeId, ct);
+        return new ReaderTypeUsage(places, policies);
     }
 
     /// <summary>Đơn vị mới: một quầy mượn trả để dùng được ngay.</summary>

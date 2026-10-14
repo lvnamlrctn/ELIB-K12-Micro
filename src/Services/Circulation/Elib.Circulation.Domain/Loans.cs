@@ -28,6 +28,15 @@ public sealed class Loan : TenantEntity
     public DateTimeOffset? ReturnedAt { get; private set; }
     public long? LoanedBy { get; private set; }
     public long? ReturnedBy { get; private set; }
+
+    /// <summary>"Họ tên (tên đăng nhập)" người cho mượn / nhận trả, chụp lúc thao tác (ELIB-LRC: lịch sử mượn trả có người thực hiện).</summary>
+    public string? LoanedByName { get; private set; }
+
+    public string? ReturnedByName { get; private set; }
+
+    /// <summary>Trả sau ngày hết hạn (theo ngày lịch Việt Nam) — lọc "trả đúng hạn / trả quá hạn" ở lịch sử lưu thông.</summary>
+    public bool ReturnedLate { get; private set; }
+
     public long? ReturnCircPlaceId { get; private set; }
     public int RenewCount { get; private set; }
     public string? Note { get; private set; }
@@ -43,7 +52,9 @@ public sealed class Loan : TenantEntity
 
     public bool IsOpen => ReturnedAt is null;
 
-    public static Loan Open(PatronReplica reader, ItemReplica item, long? circPlaceId, DateTimeOffset now, int loanDays, long? staffId)
+    public const int MaxStaffNameLength = 300;
+
+    public static Loan Open(PatronReplica reader, ItemReplica item, long? circPlaceId, DateTimeOffset now, int loanDays, long? staffId, string? staffName = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(item);
@@ -52,35 +63,41 @@ public sealed class Loan : TenantEntity
             ReaderPublicId = reader.ReaderPublicId, CardNo = reader.CardNo,
             ItemPublicId = item.ItemPublicId, Barcode = item.Barcode, Mfn = item.Mfn, StoreId = item.StoreId,
             CircPlaceId = circPlaceId, LoanedAt = now, DueAt = loanDays > 0 ? now.AddDays(loanDays) : EndOfLocalDay(now), LoanedBy = staffId,
+            LoanedByName = StaffName(staffName),
         };
     }
 
     /// <summary>
     /// Mượn đọc tại chỗ: hạn trả là 23:59:59 ngày mượn (giờ Việt Nam) — trong ngày chưa tính quá hạn, sang ngày sau thì quá hạn 1 ngày.
     /// </summary>
-    public static Loan OpenReadingRoom(PatronReplica reader, ItemReplica item, long circPlaceId, DateTimeOffset now, long? staffId) =>
-        Open(reader, item, circPlaceId, now, 0, staffId);
+    public static Loan OpenReadingRoom(PatronReplica reader, ItemReplica item, long circPlaceId, DateTimeOffset now, long? staffId, string? staffName = null) =>
+        Open(reader, item, circPlaceId, now, 0, staffId, staffName);
 
     public static DateTimeOffset EndOfLocalDay(DateTimeOffset at) => VietnamStart(LocalDate(at).AddDays(1)).AddSeconds(-1);
 
-    public void Return(DateTimeOffset now, long? circPlaceId, long? staffId)
+    public void Return(DateTimeOffset now, long? circPlaceId, long? staffId, string? staffName = null)
     {
         if (!IsOpen) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", $"ĐKCB {Barcode} đã trả lúc {ReturnedAt:dd/MM/yyyy HH:mm}.");
+        ReturnedLate = OverdueDays(now) > 0;
         ReturnedAt = now;
         ReturnCircPlaceId = circPlaceId;
         ReturnedBy = staffId;
+        ReturnedByName = StaffName(staffName);
         Version++;
     }
+
+    private static string? StaffName(string? name) =>
+        name?.Trim() is { Length: > 0 } n ? n.Length <= MaxStaffNameLength ? n : n[..MaxStaffNameLength] : null;
 
     /// <summary>
     /// Đóng lượt vì mất tài liệu (monolith: lý do phạt có Status_Reg_Id — BookOut "R" + BookIn, ĐKCB sang "Mất"). Holdings nhận
     /// LoanChanged có <see cref="ClosedItemStatus"/> để đổi trạng thái bản sách.
     /// </summary>
-    public void CloseAsLost(DateTimeOffset now, long? staffId)
+    public void CloseAsLost(DateTimeOffset now, long? staffId, string? staffName = null)
     {
         if (!IsOpen) return;
         ClosedItemStatus = LostStatus;
-        Return(now, null, staffId);
+        Return(now, null, staffId, staffName);
     }
 
     public void MarkDueSoonNotified(DateOnly day) => DueSoonNotifiedOn = day;

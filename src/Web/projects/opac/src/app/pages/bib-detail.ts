@@ -1,10 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, effect, inject, input, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import { LDatePipe } from '../core/i18n';
+import { CirculationApi, HoldDto, HoldStatus } from '../core/circulation';
+import { LDatePipe, Language } from '../core/i18n';
 import { Library } from '../core/library';
+import { ReaderAuth } from '../core/reader-auth';
 import { Bib, BibDetail as Detail, MarcField, Msg, OpacMarc, SearchApi, languageName, searchErrorMessage } from '../core/search';
 
 type Tab = 'info' | 'isbd' | 'marc';
@@ -143,7 +145,27 @@ type Tab = 'info' | 'isbd' | 'marc';
             @if (library.has('CIRCULATION')) {
               <div class="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
                 <div class="font-medium text-slate-900 mb-1">{{ 'OPAC.BOOK_DETAIL.BORROW_TITLE' | translate }}</div>
-                {{ 'OPAC.BOOK_DETAIL.BORROW_HINT' | translate }}
+                @if (!auth.loggedIn()) {
+                  <p>{{ 'OPAC.BOOK_DETAIL.LOGIN_TO_BORROW' | translate }}</p>
+                  <button type="button" class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                          (click)="auth.login(router.url)">
+                    <span class="material-icons text-[18px]">login</span>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
+                } @else if (myHold(); as hold) {
+                  <p [class.text-green-700]="hold.status === HoldStatus.Ready">
+                    {{ (hold.status === HoldStatus.Ready ? 'OPAC.BOOK_DETAIL.HOLD_READY_PICKUP' : 'OPAC.BOOK_DETAIL.HOLD_WAITING_POSITION')
+                      | translate: { date: (hold.expiresAt | ldate), position: hold.queuePosition } }}
+                  </p>
+                  @if (holdError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
+                  <button type="button" [disabled]="holdBusy()" (click)="cancelHold()"
+                          class="mt-3 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">
+                    {{ 'OPAC.BOOK_DETAIL.CANCEL_HOLD' | translate }}</button>
+                } @else {
+                  <p>{{ 'OPAC.BOOK_DETAIL.BORROW_HINT' | translate }}</p>
+                  @if (holdError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
+                  <button type="button" [disabled]="holdBusy()" (click)="placeHold()"
+                          class="mt-3 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {{ 'OPAC.BOOK_DETAIL.PLACE_HOLD' | translate }}</button>
+                }
               </div>
             }
             @if (similar().length) {
@@ -169,6 +191,10 @@ export class BibDetail {
   protected readonly api = inject(SearchApi);
   private readonly title = inject(Title);
   protected readonly library = inject(Library);
+  protected readonly auth = inject(ReaderAuth);
+  protected readonly router = inject(Router);
+  private readonly circulation = inject(CirculationApi);
+  private readonly language = inject(Language);
 
   readonly publicId = input.required<string>();
 
@@ -186,8 +212,58 @@ export class BibDetail {
   protected readonly marc = signal<OpacMarc | null>(null);
   protected readonly marcError = signal<Msg | null>(null);
 
+  protected readonly HoldStatus = HoldStatus;
+  protected readonly myHold = signal<HoldDto | null>(null);
+  protected readonly holdBusy = signal(false);
+  protected readonly holdError = signal<string | null>(null);
+
   constructor() {
     effect(() => void this.load(this.publicId()));
+    // Chạy lại khi đăng nhập xong (restore chạy ở app.ts, có thể xong sau khi biểu ghi đã tải) hoặc khi đổi sang biểu ghi khác.
+    effect(() => {
+      const b = this.bib();
+      const loggedIn = this.auth.loggedIn();
+      if (b && loggedIn && this.library.has('CIRCULATION')) void this.refreshHold(b.mfn);
+      else this.myHold.set(null);
+    });
+  }
+
+  protected async placeHold(): Promise<void> {
+    const b = this.bib();
+    if (!b) return;
+    this.holdBusy.set(true);
+    this.holdError.set(null);
+    try {
+      this.myHold.set(await this.circulation.placeHold(b.mfn));
+    } catch (e) {
+      this.holdError.set(this.language.apiError(e));
+    } finally {
+      this.holdBusy.set(false);
+    }
+  }
+
+  protected async cancelHold(): Promise<void> {
+    const hold = this.myHold();
+    if (!hold) return;
+    this.holdBusy.set(true);
+    this.holdError.set(null);
+    try {
+      await this.circulation.cancelHold(hold.publicId);
+      this.myHold.set(null);
+    } catch (e) {
+      this.holdError.set(this.language.apiError(e));
+    } finally {
+      this.holdBusy.set(false);
+    }
+  }
+
+  private async refreshHold(mfn: number): Promise<void> {
+    try {
+      const holds = await this.circulation.myHolds();
+      this.myHold.set(holds.find((h) => h.mfn === mfn) ?? null);
+    } catch {
+      this.myHold.set(null);
+    }
   }
 
   protected onLoan(b: Detail): boolean {

@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, Item, ItemSearch, NextBarcode, Store, errorMessage } from '../../core/api';
 import { Session } from '../../core/session';
@@ -15,12 +16,18 @@ const PREFIX_KEY = 'elib.items.prefix';
  */
 @Component({
   selector: 'app-bib-items',
-  imports: [FormsModule, ConfirmDelete, TranslatePipe],
+  imports: [FormsModule, RouterLink, ConfirmDelete, TranslatePipe],
   template: `
     <div class="px-5 py-4 border-t border-gray-100">
       <div class="flex items-center gap-2 mb-3">
         <h5 class="font-semibold text-gray-800">{{ 'BIB_ITEMS.TITLE' | translate }}</h5>
         <span class="text-sm text-gray-500">{{ 'BIB_ITEMS.COUNT' | translate: { count: items().length } }}</span>
+        @if (items().length) {
+          <!-- In nhãn ngay sau khi đăng ký cá biệt: lô vừa đăng ký (nếu có) hoặc mọi ĐKCB của biểu ghi. -->
+          <a class="ml-auto btn-secondary !py-1 !px-2.5 !text-xs" [routerLink]="['/print-labels']"
+             [queryParams]="lastBatch() ? { mfn: mfn(), from: lastBatch()!.from, to: lastBatch()!.to } : { mfn: mfn() }">
+            <span class="material-icons text-[16px]">print</span> {{ (lastBatch() ? 'BIB_ITEMS.PRINT_BATCH' : 'BIB_ITEMS.PRINT_LABELS') | translate }}</a>
+        }
       </div>
 
       @if (canEdit()) {
@@ -95,6 +102,8 @@ export class BibItems implements OnInit {
   protected readonly next = signal<NextBarcode | null>(null);
   protected readonly busy = signal(false);
   protected readonly deleting = signal<Item | null>(null);
+  /** Lô vừa đăng ký — nút In nhãn in đúng lô này. */
+  protected readonly lastBatch = signal<{ from: string; to: string } | null>(null);
   protected prefix = readPrefix();
   protected digits = 6;
   protected quantity = 1;
@@ -141,6 +150,7 @@ export class BibItems implements OnInit {
       });
       savePrefix(this.prefix.trim());
       this.startNumber = null;
+      this.lastBatch.set({ from: created[0].barcode, to: created[created.length - 1].barcode });
       this.toastr.success(created.length > 1 ? 'BIB_ITEMS.REGISTERED_RANGE' : 'BIB_ITEMS.REGISTERED_ONE',
         { count: created.length, first: created[0].barcode, last: created[created.length - 1].barcode });
     });

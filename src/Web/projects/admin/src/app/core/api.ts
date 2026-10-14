@@ -104,6 +104,15 @@ export type MarcFormat = 'iso2709' | 'marcxml';
 export interface Store {
   id: number; publicId: string; code: string; name: string; storeTypeId: number | null; position: string | null; capacity: number | null; itemCount: number;
 }
+/** barcodes: ĐKCB quét/dán (in đúng thứ tự); hoặc khoảng ĐKCB / biểu ghi / kho / trạng thái. */
+export interface ItemLabelRequest {
+  barcodes?: string[] | null; mfn?: number | null; storeId?: number | null; itemStatus?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null;
+}
+/** Một nhãn: ĐKCB, ký hiệu phân loại (DDC) / ký hiệu tác giả (Cutter), nhan đề – tác giả, kho. */
+export interface ItemLabel {
+  barcode: string; mfn: number; title: string | null; author: string | null; publishYear: string | null; ddc: string | null; cutter: string | null;
+  storeCode: string | null; storeName: string | null;
+}
 /** Trạng thái bản sách (mã monolith): I chưa xếp giá, R sẵn sàng, L mất, S thanh lý, X xuất kho. */
 export const ITEM_STATUSES: { code: string; name: string; badge: string }[] = [
   { code: 'I', name: 'ITEM_STATUS.I', badge: 'badge-off' },
@@ -124,6 +133,82 @@ export interface ItemSearch extends CrudSearch {
 export interface RegisterItems { mfn: number; quantity: number; prefix: string; digits: number; startNumber?: number | null; storeId?: number | null; }
 export interface NextBarcode { prefix: string; number: number; barcode: string; }
 export interface ShelveResult { shelved: number; notFound: string[]; skipped: string[]; }
+/** Kho rút gọn cho ô chọn (mọi màn kho xem được, không cần quyền STORES). */
+export interface StoreOption { id: number; code: string; name: string; }
+export interface SkippedItem { barcode: string; reason: string; }
+/** Kết quả thao tác hàng loạt theo ĐKCB (báo mất, thanh lý, thêm dòng phiếu). */
+export interface ItemBatchResult { done: number; notFound: string[]; skipped: SkippedItem[]; }
+export interface CompleteResult { done: number; skipped: SkippedItem[]; }
+/** Lọc sách mất / thanh lý. Ngày yyyy-MM-dd. */
+export interface StoreRecordSearch extends CrudSearch { storeId?: number | null; from?: string | null; to?: string | null; }
+export interface LostRow {
+  id: number; publicId: string; barcode: string; itemPublicId: string | null; mfn: number | null; title: string | null; author: string | null;
+  storeId: number | null; storeName: string | null; lostOn: string; reason: string | null; cardNo: string | null; itemStatus: string | null; createdAt: string;
+}
+export interface LiquidationRow {
+  id: number; publicId: string; barcode: string; itemPublicId: string | null; mfn: number | null; title: string | null; author: string | null;
+  publisher: string | null; storeId: number | null; storeName: string | null; liquidatedOn: string; reason: string | null; itemStatus: string | null; createdAt: string;
+}
+export interface StoreOutSearch extends CrudSearch {
+  barcode?: string | null; open?: boolean | null; reasonId?: number | null; unitId?: number | null; exhibitionLocationId?: number | null;
+  outFrom?: string | null; outTo?: string | null; inFrom?: string | null; inTo?: string | null;
+}
+export interface StoreOutRow {
+  id: number; publicId: string; barcode: string; itemPublicId: string | null; mfn: number | null; title: string | null; storeId: number | null;
+  storeName: string | null; reasonId: number | null; reasonName: string | null; unitId: number | null; unitName: string | null;
+  exhibitionLocationId: number | null; exhibitionLocationName: string | null; delivererName: string | null; receiverName: string | null;
+  returnAtLibrary: boolean; outAt: string | null; inAt: string | null;
+}
+export interface ScanOut {
+  barcode: string; reasonId: number | null; unitId: number | null; exhibitionLocationId: number | null; delivererName: string | null;
+  receiverName: string | null; returnAtLibrary: boolean;
+}
+export interface IdName { id: number; name: string; }
+export interface StoreOutOptions { reasons: IdName[]; units: IdName[]; locations: IdName[]; }
+export interface Inventory {
+  id: number; publicId: string; name: string; startedOn: string; storeId: number | null; storeName: string | null; note: string | null;
+  closedAt: string | null; scanCount: number; createdAt: string;
+}
+export interface InventoryScanRow {
+  id: number; publicId: string; barcode: string; itemPublicId: string | null; mfn: number | null; title: string | null; storeId: number | null;
+  storeName: string | null; scanStoreId: number | null; registered: boolean; wrongStore: boolean; onLoan: boolean; abnormal: boolean;
+  itemStatus: string | null; createdAt: string;
+}
+export interface InventorySummary { scanned: number; wrongStore: number; unregistered: number; onLoan: number; abnormal: number; missing: number; }
+export interface MissingRow { itemPublicId: string; barcode: string; mfn: number; title: string | null; author: string | null; storeName: string | null; status: string; }
+export interface InventoryImportResult { scanned: number; alreadyScanned: number; unregistered: number; errors: ImportError[]; }
+/** Dòng của phiếu điều chuyển / giao nhận; skipReason: lý do không chuyển được khi hoàn thành. */
+export interface TransferLine {
+  publicId: string; itemPublicId: string; barcode: string; mfn: number; title: string | null; author: string | null; storeId: number | null;
+  storeName: string | null; status: string; onLoan: boolean; skipReason: string | null;
+}
+export interface StoreMove {
+  id: number; publicId: string; fromStoreId: number; fromStoreName: string | null; toStoreId: number; toStoreName: string | null;
+  delivererName: string | null; receiverName: string | null; movedOn: string | null; note: string | null; completedAt: string | null;
+  movedCount: number; lineCount: number; createdAt: string;
+}
+/** status: 1 đang giao, 2 đã nhận đủ (mới ký nhận được). */
+export interface Delivery {
+  id: number; publicId: string; delivererName: string | null; delivererAddress: string | null; receiverName: string | null;
+  receiverAddress: string | null; deliveredOn: string | null; receivedOn: string | null; storeId: number | null; storeName: string | null;
+  status: number; note: string | null; signedAt: string | null; shelvedCount: number; lineCount: number; createdAt: string;
+}
+export type TransferKind = 'store-moves' | 'deliveries';
+export interface ReRegisterLine { row: number; oldBarcode: string | null; newBarcode: string | null; storeCode: string | null; error: string | null; }
+export interface ReRegisterImportResult { total: number; applied: number; dryRun: boolean; errorCount: number; lines: ReRegisterLine[]; }
+/** criterion: status | store | ddc | bibtype. */
+export interface DocumentStatsRequest { criterion: string; from: string | null; to: string | null; storeId: number | null; }
+export interface DocumentStatRow { key: string; label: string; titles: number; copies: number; }
+export interface DocumentStats { criterion: string; rows: DocumentStatRow[]; titles: number; copies: number; }
+export interface StoreBookReportRequest { storeId: number | null; from: string | null; to: string | null; pageIndex: number; pageSize: number; }
+export interface StoreBookRow {
+  barcode: string; mfn: number; title: string | null; author: string | null; ddc: string | null; registeredOn: string; storeName: string | null;
+  status: string; onLoan: boolean;
+}
+export interface StoreBookReport {
+  rows: StoreBookRow[]; totalCount: number; titleCount: number; storeStats: { storeId: number | null; storeName: string; titles: number; copies: number }[];
+  libraryName: string | null;
+}
 
 // ── Lưu thông (service circulation) ──
 /** Khung giờ làm việc của điểm lưu thông: day 1 = thứ Hai … 7 = Chủ nhật, giờ "HH:mm". */
@@ -144,6 +229,8 @@ export interface Loan {
   id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; itemPublicId: string; barcode: string;
   mfn: number; title: string | null; author: string | null; circPlaceId: number | null; storeName: string | null; loanedAt: string; dueAt: string;
   returnedAt: string | null; renewCount: number; note: string | null; version: number;
+  /** Kho của bản sách lúc mượn; người cho mượn / nhận trả ("Họ tên (tên đăng nhập)"); trả sau ngày hết hạn. */
+  storeId?: number | null; returnCircPlaceId?: number | null; loanedByName?: string | null; returnedByName?: string | null; returnedLate?: boolean;
 }
 export interface ReaderPanel {
   readerPublicId: string; cardNo: string; fullName: string; readerTypeName: string | null; className: string | null; courseName: string | null;
@@ -169,9 +256,10 @@ export const HOLD_STATUSES: { code: number; name: string; badge: string }[] = [
   { code: 4, name: 'HOLD_STATUS.4', badge: 'badge-off' },
   { code: 5, name: 'HOLD_STATUS.5', badge: 'badge-off' },
 ];
-/** state: open | overdue | returned; from/to: yyyy-MM-dd (ngày mượn). */
+/** state: open | borrowing | overdue | returned | returned_ontime | returned_late; storeId: kho lúc mượn; from/to: yyyy-MM-dd (ngày mượn). */
 export interface LoanSearch extends CrudSearch {
-  cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; from?: string | null; to?: string | null;
+  cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; storeId?: number | null;
+  from?: string | null; to?: string | null;
 }
 export interface CirculationReportRequest {
   reportType: number; from: string | null; to: string | null; circPlaceId: number | null; readerTypeId: number | null; className: string | null;
@@ -418,6 +506,9 @@ export class Api {
   // Tài khoản của tôi
   me() { return this.get<Me>('/api/me'); }
   changePassword(currentPassword: string, newPassword: string) { return this.post<void>('/api/me/password', { currentPassword, newPassword }); }
+  /** Tuỳ chọn giao diện theo tài khoản (ELIB-LRC: AdminPreference) — giá trị là chuỗi JSON. */
+  preferences() { return this.get<Record<string, string>>('/api/me/preferences'); }
+  setPreference(key: string, value: string | null) { return this.put<void>(`/api/me/preferences/${encodeURIComponent(key)}`, { value }); }
 
   // Host đơn vị
   features() { return this.get<Features>('/api/admin/tenant/features'); }
@@ -552,9 +643,89 @@ export class Api {
   }
   // Kho (holdings): crud('stores' | 'store-types' | 'items', 'holdings') + đăng ký theo lô, tìm, xếp giá
   lookupItems(search: ItemSearch) { return this.post<CrudPage<Item>>('/api/admin/holdings/items/Lookup', search); }
+  /** Dữ liệu in nhãn mã vạch / nhãn gáy (quyền PRINT_LABEL hoặc CATALOG_BIBS). */
+  itemLabels(body: ItemLabelRequest) { return this.post<ItemLabel[]>('/api/admin/holdings/items/Labels', body); }
   registerItems(body: RegisterItems) { return this.post<Item[]>('/api/admin/holdings/items/Register', body); }
   nextBarcode(prefix: string, digits: number) { return this.get<NextBarcode>('/api/admin/holdings/items/NextBarcode', { prefix, digits }); }
   shelveItems(body: { ids?: string[]; barcodes?: string[]; storeId?: number | null }) { return this.post<ShelveResult>('/api/admin/holdings/items/Shelve', body); }
+  storeOptions() { return this.get<StoreOption[]>('/api/admin/holdings/stores/Options'); }
+  // Sách mất (LOST_BOOKS) / thanh lý (LIQUIDATES)
+  searchLost(search: StoreRecordSearch) { return this.post<CrudPage<LostRow>>('/api/admin/holdings/lost-books/Search', search); }
+  exportLost(search: StoreRecordSearch) { return this.holdingsFile('lost-books/Export', search); }
+  markLost(body: { barcodes: string[]; lostOn: string | null; reason: string | null }) { return this.post<ItemBatchResult>('/api/admin/holdings/lost-books/MarkLost', body); }
+  restoreLost(barcode: string) { return this.post<void>('/api/admin/holdings/lost-books/Restore', { barcode }); }
+  searchLiquidations(search: StoreRecordSearch) { return this.post<CrudPage<LiquidationRow>>('/api/admin/holdings/liquidations/Search', search); }
+  exportLiquidations(search: StoreRecordSearch) { return this.holdingsFile('liquidations/Export', search); }
+  liquidate(body: { barcodes: string[]; liquidatedOn: string | null; reason: string | null }) {
+    return this.post<ItemBatchResult>('/api/admin/holdings/liquidations/Liquidate', body);
+  }
+  cancelLiquidation(barcode: string) { return this.post<void>('/api/admin/holdings/liquidations/Cancel', { barcode }); }
+  // Sách ra vào kho (BOOK_OUT_STORE)
+  storeOutOptions() { return this.get<StoreOutOptions>('/api/admin/holdings/store-outs/Options'); }
+  searchStoreOuts(search: StoreOutSearch) { return this.post<CrudPage<StoreOutRow>>('/api/admin/holdings/store-outs/Search', search); }
+  exportStoreOuts(search: StoreOutSearch) { return this.holdingsFile('store-outs/Export', search); }
+  scanOut(body: ScanOut) { return this.post<StoreOutRow>('/api/admin/holdings/store-outs/ScanOut', body); }
+  scanIn(barcode: string) { return this.post<StoreOutRow>('/api/admin/holdings/store-outs/ScanIn', { barcode }); }
+  deleteStoreOut(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/holdings/store-outs/Delete/${publicId}`)); }
+  // Kiểm kê (INVENTORY): crud('inventories', 'holdings') + quét, nhập Excel, đối chiếu
+  closeInventory(publicId: string) { return this.post<Inventory>(`/api/admin/holdings/inventories/Close/${publicId}`); }
+  reopenInventory(publicId: string) { return this.post<Inventory>(`/api/admin/holdings/inventories/Reopen/${publicId}`); }
+  scanInventory(inventoryId: string, barcode: string, storeId: number | null) {
+    return this.post<{ scan: InventoryScanRow; alreadyScanned: boolean }>('/api/admin/holdings/inventories/Scan', { inventoryId, barcode, storeId });
+  }
+  inventoryScanTemplate() { return blobRequest(firstValueFrom(this.http.get('/api/admin/holdings/inventories/ScanTemplate', { responseType: 'blob' }))); }
+  /** Có dòng lỗi → body 400 vẫn là InventoryImportResult, trả về như kết quả thường. */
+  async importInventoryScans(publicId: string, file: File): Promise<InventoryImportResult> {
+    try {
+      return await this.post<InventoryImportResult>(`/api/admin/holdings/inventories/ImportScans/${publicId}`, fileForm(file));
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && (e.error as InventoryImportResult | null)?.errors?.length) return e.error as InventoryImportResult;
+      throw e;
+    }
+  }
+  inventoryScans(body: CrudSearch & { inventoryId: string; filter: string | null }) {
+    return this.post<CrudPage<InventoryScanRow>>('/api/admin/holdings/inventories/Scans', body);
+  }
+  inventorySummary(publicId: string) { return this.get<InventorySummary>(`/api/admin/holdings/inventories/Summary/${publicId}`); }
+  inventoryMissing(publicId: string, pageIndex: number, pageSize: number) {
+    return this.get<CrudPage<MissingRow>>(`/api/admin/holdings/inventories/Missing/${publicId}`, { pageIndex, pageSize });
+  }
+  inventoryReport(publicId: string) {
+    return blobRequest(firstValueFrom(this.http.get(`/api/admin/holdings/inventories/Report/${publicId}`, { responseType: 'blob' })));
+  }
+  // Điều chuyển kho (AB_MOVES) / giao nhận (AB_DELIVERERS): crud(kind, 'holdings') + dòng phiếu
+  transferLines(kind: TransferKind, publicId: string) { return this.get<TransferLine[]>(`/api/admin/holdings/${kind}/Lines/${publicId}`); }
+  transferCandidates(kind: TransferKind, body: CrudSearch & { transferId: string; mfn?: number | null; barcodeFrom?: string | null; barcodeTo?: string | null }) {
+    return this.post<CrudPage<Item>>(`/api/admin/holdings/${kind}/Candidates`, body);
+  }
+  addTransferLines(kind: TransferKind, publicId: string, body: { itemIds?: string[]; barcodes?: string[] }) {
+    return this.post<ItemBatchResult>(`/api/admin/holdings/${kind}/AddLines/${publicId}`, body);
+  }
+  removeTransferLine(kind: TransferKind, linePublicId: string) {
+    return firstValueFrom(this.http.delete<void>(`/api/admin/holdings/${kind}/Lines/${linePublicId}`));
+  }
+  completeMove(publicId: string) { return this.post<CompleteResult>(`/api/admin/holdings/store-moves/Complete/${publicId}`); }
+  signDelivery(publicId: string) { return this.post<CompleteResult>(`/api/admin/holdings/deliveries/Sign/${publicId}`); }
+  // Đăng ký lại mã vạch (RE_REGISTER)
+  reRegister(body: { oldBarcode: string; newBarcode: string; storeId: number | null }) { return this.post<Item>('/api/admin/holdings/items/ReRegister', body); }
+  reRegisterTemplate() { return blobRequest(firstValueFrom(this.http.get('/api/admin/holdings/items/ReRegister/Template', { responseType: 'blob' }))); }
+  /** dryRun: chỉ kiểm tra. Có dòng lỗi → body 400 vẫn là kết quả, trả về như thường. */
+  async reRegisterImport(file: File, dryRun: boolean): Promise<ReRegisterImportResult> {
+    try {
+      return await firstValueFrom(this.http.post<ReRegisterImportResult>('/api/admin/holdings/items/ReRegister/Import', fileForm(file), { params: { dryRun } }));
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && (e.error as ReRegisterImportResult | null)?.lines) return e.error as ReRegisterImportResult;
+      throw e;
+    }
+  }
+  // Thống kê tài liệu (STAT_DOC), báo cáo sách trong kho (STORE_BOOK_REPORT)
+  documentStats(body: DocumentStatsRequest) { return this.post<DocumentStats>('/api/admin/holdings/statistics/Document', body); }
+  exportDocumentStats(body: DocumentStatsRequest) { return this.holdingsFile('statistics/DocumentExport', body); }
+  storeBookReport(body: StoreBookReportRequest) { return this.post<StoreBookReport>('/api/admin/holdings/store-book-report/Search', body); }
+  exportStoreBookReport(body: StoreBookReportRequest) { return this.holdingsFile('store-book-report/Export', body); }
+  private holdingsFile(path: string, body: unknown) {
+    return blobRequest(firstValueFrom(this.http.post(`/api/admin/holdings/${path}`, body, { responseType: 'blob' })));
+  }
   // Lưu thông (circulation): quầy mượn trả + lịch sử; điểm lưu thông/chính sách qua crud('circ-places' | 'loan-policies', 'circulation')
   loanReader(cardNo: string, circPlaceId: number | null) { return this.post<ReaderPanel>('/api/admin/circulation/loans/Reader', { cardNo, circPlaceId }); }
   checkout(cardNo: string, barcodes: string[], circPlaceId: number) { return this.post<CheckoutResult>('/api/admin/circulation/loans/Checkout', { cardNo, barcodes, circPlaceId }); }
@@ -592,7 +763,9 @@ export class Api {
   fineTicketTotals(search: FineTicketSearch) { return this.post<FineTicketTotals>('/api/admin/circulation/fine-tickets/Totals', search); }
   fineTicket(publicId: string) { return this.get<FineTicketDetail>(`/api/admin/circulation/fine-tickets/Detail/${publicId}`); }
   addFineTicket(body: { cardNo: string; amount: number; note: string | null }) { return this.post<FineTicket>('/api/admin/circulation/fine-tickets/Add', body); }
-  buildFineTicket(cardNo: string, loanIds: string[] = []) { return this.post<FineTicketDetail>('/api/admin/circulation/fine-tickets/BuildForReader', { cardNo, loanIds }); }
+  buildFineTicket(cardNo: string, loanIds: string[] = [], circPlaceId: number | null = null) {
+    return this.post<FineTicketDetail>('/api/admin/circulation/fine-tickets/BuildForReader', { cardNo, loanIds, circPlaceId });
+  }
   saveFineTicket(publicId: string, body: SaveFineTicket) { return this.put<FineTicketDetail>(`/api/admin/circulation/fine-tickets/Save/${publicId}`, body); }
   deleteFineTicket(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/fine-tickets/Delete/${publicId}`)); }
   addDefaultFineReasons() { return this.post<{ added: number }>('/api/admin/circulation/fine-reasons/AddDefaults'); }

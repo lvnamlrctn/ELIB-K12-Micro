@@ -19,7 +19,8 @@ export interface Bib {
 export interface Facet { key: string; count: number; }
 export interface Facets { years: Facet[]; authors: Facet[]; materialTypes: Facet[]; languages: Facet[]; stores: Facet[]; availableCount: number; }
 /** queryId: mã lượt tìm (thống kê) — gửi lại khi bạn đọc mở một kết quả. */
-export interface SearchResult { total: number; page: number; pageSize: number; items: Bib[]; facets: Facets; queryId: string | null; }
+/** elapsedMs: thời gian tìm ở server (ms) — hiện cạnh số kết quả như ELIB-LRC. */
+export interface SearchResult { total: number; page: number; pageSize: number; items: Bib[]; facets: Facets; queryId: string | null; elapsedMs?: number; }
 /** status: available | on-loan | processing */
 export interface Copy { barcode: string; storeName: string | null; status: string; statusName: string; dueAt: string | null; }
 export interface BibDetail {

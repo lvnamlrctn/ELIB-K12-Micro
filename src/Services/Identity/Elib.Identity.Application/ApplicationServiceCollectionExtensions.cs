@@ -22,6 +22,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<CaptchaService>();
         services.AddScoped<LoginOtpService>();
         services.AddScoped<ReaderPasswordResetService>();
+        services.AddScoped<StaffPreferenceService>();
         return services;
     }
 }

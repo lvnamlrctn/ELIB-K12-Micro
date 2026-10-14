@@ -93,9 +93,39 @@ public sealed class CirculationApiTests(CirculationApiFactory factory) : Circula
         var overdue = await Read<CrudPage<LoanDto>>(await staff.PostAsJsonAsync(U("/api/loans/Search"), new LoanSearch { State = "overdue", CardNo = "qh" }, Json));
         Assert.Equal("QH01", Assert.Single(overdue.Items).Barcode);
 
-        var returned = await Read<ReturnResult>(await staff.PostAsJsonAsync(U("/api/loans/Return"), new ReturnRequest("QH01"), Json));
+        var desk = NamedStaff(tenantId, "Thu thu An", "an");
+        var returned = await Read<ReturnResult>(await desk.PostAsJsonAsync(U("/api/loans/Return"), new ReturnRequest("QH01"), Json));
         Assert.Equal(6, returned.OverdueDays);
-        Assert.Equal(1, (await Read<CheckoutResult>(await Checkout(staff, "QH", place.Id, "QH02"))).Succeeded);
+        Assert.Equal(("Thu thu An (an)", true), (returned.Loan.ReturnedByName, returned.Loan.ReturnedLate));
+        Assert.Equal(1, (await Read<CheckoutResult>(await Checkout(desk, "QH", place.Id, "QH02"))).Succeeded);
+
+        // 4 trạng thái như ELIB-LRC: đang mượn / quá hạn / trả đúng hạn / trả quá hạn.
+        async Task<string[]> State(string state) =>
+            [.. (await Read<CrudPage<LoanDto>>(await staff.PostAsJsonAsync(U("/api/loans/Search"), new LoanSearch { State = state, CardNo = "QH" }, Json))).Items.Select(l => l.Barcode)];
+        Assert.Equal(["QH02"], await State("borrowing"));
+        Assert.Empty(await State("overdue"));
+        Assert.Equal(["QH01"], await State("returned_late"));
+        Assert.Empty(await State("returned_ontime"));
+        var borrowing = (await Read<CrudPage<LoanDto>>(await staff.PostAsJsonAsync(U("/api/loans/Search"), new LoanSearch { State = "borrowing", CardNo = "QH" }, Json))).Items[0];
+        Assert.Equal("Thu thu An (an)", borrowing.LoanedByName);
+
+        await Read<ReturnResult>(await staff.PostAsJsonAsync(U("/api/loans/Return"), new ReturnRequest("QH02"), Json));
+        Assert.Equal(["QH02"], await State("returned_ontime"));
+    }
+
+    [Fact]
+    public async Task Loan_history_filters_by_store_of_the_item()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var place = await AddPlace(staff, "QK");
+        var mfn = NextMfn();
+        await Publish(Reader(tenantId, "KHO"), Item(tenantId, "KA01", mfn), Item(tenantId, "KB01", mfn, storeId: 8));
+        Assert.Equal(2, (await Read<CheckoutResult>(await Checkout(staff, "KHO", place.Id, "KA01", "KB01"))).Succeeded);
+
+        var page = await Read<CrudPage<LoanDto>>(await staff.PostAsJsonAsync(U("/api/loans/Search"), new LoanSearch { StoreId = 8 }, Json));
+        Assert.Equal("KB01", Assert.Single(page.Items).Barcode);
+        Assert.Equal(8, page.Items[0].StoreId);
     }
 
     [Fact]

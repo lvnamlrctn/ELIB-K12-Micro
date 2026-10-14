@@ -37,6 +37,17 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddHttpMessageHandler<ServiceTokenHandler>();
         services.AddScoped<ITenantReferences, HttpTenantReferences>();
+
+        // Lưu thông: loại bạn đọc còn được điểm lưu thông / chính sách dùng thì không cho xoá (service token).
+        var circulationUrl = configuration["Circulation:Url"];
+        if (string.IsNullOrWhiteSpace(circulationUrl)) throw new InvalidOperationException("Thiếu Circulation:Url (địa chỉ nội bộ của service circulation).");
+        services.AddHttpClient(HttpReaderTypeUsage.HttpClientName, c =>
+            {
+                c.BaseAddress = new Uri(circulationUrl.TrimEnd('/') + "/");
+                c.Timeout = TimeSpan.FromSeconds(10);
+            })
+            .AddHttpMessageHandler<ServiceTokenHandler>();
+        services.AddScoped<IReaderTypeUsage, HttpReaderTypeUsage>();
         services.AddHostedService<ReaderImportWorker>();
         services.AddElibMessaging<PatronDbContext>(ServiceName, configuration, x =>
         {

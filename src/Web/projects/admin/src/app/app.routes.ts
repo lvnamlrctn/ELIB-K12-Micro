@@ -8,9 +8,10 @@ import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
 import { BIB_TYPES, DIC_AUTHORS, DIC_CLASSES, DIC_KEYWORDS, DIC_PUBLISHERS, ISBD_CONFIGS } from './pages/catalog/catalogs';
 import { Z3950_SERVERS } from './pages/search/catalogs';
-import { STORES, STORE_TYPES } from './pages/holdings/catalogs';
+import { BOOK_OUT_UNITS, EXHIBITION_LOCATIONS, EXPORT_REASONS, STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import { FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
 import type { CrudConfig } from './shared/crud-page';
+import { unsavedChangesGuard } from './shared/unsaved';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
 const catalog = (path: string, config: CrudConfig) => ({
@@ -30,6 +31,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'reader-cards', loadComponent: () => import('./pages/patron/reader-print').then((m) => m.ReaderPrint), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'READER.PRINT_CARD' },
+      { path: 'labels', loadComponent: () => import('./pages/holdings/labels').then((m) => m.LabelPrint), canActivate: [tenantGuard, anyPermissionGuard('PRINT_LABEL:view', 'CATALOG_BIBS:view')], title: 'LABELS_PAGE.TITLE' },
     ],
   },
   {
@@ -69,11 +71,38 @@ export const routes: Routes = [
       { path: 'worksheets', loadComponent: () => import('./pages/catalog/worksheets').then((m) => m.Worksheets), canActivate: [tenantGuard, permissionGuard('WORKSHEETS')], title: 'WORKSHEET_PAGE.TITLE' },
       { path: 'catalog-bibs', loadComponent: () => import('./pages/catalog/bibs').then((m) => m.Bibs), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'BIBS_PAGE.TITLE' },
       // ":mfn" = "new" khi biên mục mới (monolith: /catalog-bibs/new và /catalog-bibs/edit/:mfn).
-      { path: 'catalog-bibs/:mfn', loadComponent: () => import('./pages/catalog/bib-edit').then((m) => m.BibEdit), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], title: 'PAGE_TITLE.CATALOGING' },
+      { path: 'catalog-bibs/:mfn', loadComponent: () => import('./pages/catalog/bib-edit').then((m) => m.BibEdit), canActivate: [tenantGuard, permissionGuard('CATALOG_BIBS')], canDeactivate: [unsavedChangesGuard], title: 'PAGE_TITLE.CATALOGING' },
       catalog('store-types', STORE_TYPES),
       catalog('stores', STORES),
       { path: 'books', loadComponent: () => import('./pages/holdings/items').then((m) => m.Items), canActivate: [tenantGuard, permissionGuard('DOC_SEARCH')], title: 'ITEMS_PAGE.TITLE' },
+      { path: 'print-labels', loadComponent: () => import('./pages/holdings/labels').then((m) => m.Labels), canActivate: [tenantGuard, anyPermissionGuard('PRINT_LABEL:view', 'CATALOG_BIBS:view')], title: 'LABELS_PAGE.TITLE' },
       { path: 'shelving', loadComponent: () => import('./pages/holdings/shelving').then((m) => m.Shelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], title: 'SHELVING_PAGE.TITLE' },
+      { path: 'inventory', loadComponent: () => import('./pages/holdings/inventories').then((m) => m.Inventories), canActivate: [tenantGuard, permissionGuard('INVENTORY')], title: 'INVENTORY_PAGE.TITLE' },
+      { path: 'inventory/:id', loadComponent: () => import('./pages/holdings/inventories').then((m) => m.InventoryDetail), canActivate: [tenantGuard, permissionGuard('INVENTORY')], title: 'INVENTORY_PAGE.TITLE' },
+      {
+        path: 'lost-books', loadComponent: () => import('./pages/holdings/store-records').then((m) => m.StoreRecords),
+        canActivate: [tenantGuard, permissionGuard('LOST_BOOKS')], data: { kind: 'lost' }, title: 'STORE_RECORD.LOST_TITLE',
+      },
+      {
+        path: 'liquidates', loadComponent: () => import('./pages/holdings/store-records').then((m) => m.StoreRecords),
+        canActivate: [tenantGuard, permissionGuard('LIQUIDATES')], data: { kind: 'liquidation' }, title: 'STORE_RECORD.LIQUIDATE_TITLE',
+      },
+      { path: 'book-out-store', loadComponent: () => import('./pages/holdings/store-outs').then((m) => m.StoreOuts), canActivate: [tenantGuard, permissionGuard('BOOK_OUT_STORE')], title: 'STORE_OUT.TITLE' },
+      catalog('export-reason', EXPORT_REASONS),
+      catalog('book-out-unit', BOOK_OUT_UNITS),
+      catalog('exhibition-location', EXHIBITION_LOCATIONS),
+      ...(['ab-moves', 'ab-deliverers'] as const).flatMap((path) => {
+        const kind = path === 'ab-moves' ? 'store-moves' : 'deliveries';
+        const perm = path === 'ab-moves' ? 'AB_MOVES' : 'AB_DELIVERERS';
+        const title = path === 'ab-moves' ? 'TRANSFER.MOVE_TITLE' : 'TRANSFER.DELIVERY_TITLE';
+        return [
+          { path, loadComponent: () => import('./pages/holdings/transfers').then((m) => m.Transfers), canActivate: [tenantGuard, permissionGuard(perm)], data: { kind }, title },
+          { path: path + '/:id', loadComponent: () => import('./pages/holdings/transfers').then((m) => m.TransferDetail), canActivate: [tenantGuard, permissionGuard(perm)], data: { kind }, title },
+        ];
+      }),
+      { path: 're-register-barcode', loadComponent: () => import('./pages/holdings/re-register').then((m) => m.ReRegister), canActivate: [tenantGuard, permissionGuard('RE_REGISTER')], title: 'RE_REGISTER_PAGE.TITLE' },
+      { path: 'statistics-document', loadComponent: () => import('./pages/holdings/store-reports').then((m) => m.StoreStats), canActivate: [tenantGuard, permissionGuard('STAT_DOC')], title: 'STORE_STATS.TITLE' },
+      { path: 'store-book-report', loadComponent: () => import('./pages/holdings/store-reports').then((m) => m.StoreBookReportPage), canActivate: [tenantGuard, permissionGuard('STORE_BOOK_REPORT')], title: 'STORE_BOOK_REPORT.TITLE' },
       { path: 'circ-places', loadComponent: () => import('./pages/circulation/circ-places').then((m) => m.CircPlaces), canActivate: [tenantGuard, permissionGuard('CIRC_PLACES')], title: 'CIRC_PLACE_PAGE.TITLE' },
       catalog('circ-policies', LOAN_POLICIES),
       catalog('cfine-types', FINE_REASONS),

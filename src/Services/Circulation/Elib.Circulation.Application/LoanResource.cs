@@ -9,8 +9,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Elib.Circulation.Application;
 
 /// <summary>
-/// Lịch sử lưu thông (monolith: CirculationHistory/Search, quyền LOAN_HISTORY). <see cref="State"/>: open (đang mượn),
-/// overdue (đang mượn quá hạn), returned (đã trả); trống = tất cả. From/To lọc theo ngày mượn (giờ Việt Nam).
+/// Lịch sử lưu thông (monolith: CirculationHistory/Search, quyền LOAN_HISTORY). <see cref="State"/>: open (chưa trả, kể cả quá hạn),
+/// borrowing (đang mượn, chưa quá hạn), overdue (đang mượn quá hạn), returned (đã trả), returned_ontime (trả đúng hạn),
+/// returned_late (trả quá hạn); trống = tất cả — 4 trạng thái như ELIB-LRC. From/To lọc theo ngày mượn (giờ Việt Nam);
+/// <see cref="StoreId"/> lọc theo kho của bản sách lúc mượn.
 /// </summary>
 public sealed class LoanSearch : CrudSearch
 {
@@ -18,6 +20,7 @@ public sealed class LoanSearch : CrudSearch
     public string? Barcode { get; set; }
     public string? State { get; set; }
     public long? CircPlaceId { get; set; }
+    public long? StoreId { get; set; }
     public DateOnly? From { get; set; }
     public DateOnly? To { get; set; }
 }
@@ -25,7 +28,12 @@ public sealed class LoanSearch : CrudSearch
 public sealed record LoanDto(
     long Id, Guid PublicId, Guid ReaderPublicId, string CardNo, string? ReaderName, Guid ItemPublicId, string Barcode, long Mfn,
     string? Title, string? Author, long? CircPlaceId, string? StoreName, DateTimeOffset LoanedAt, DateTimeOffset DueAt,
-    DateTimeOffset? ReturnedAt, int RenewCount, string? Note, long Version);
+    DateTimeOffset? ReturnedAt, int RenewCount, string? Note, long Version,
+    long? StoreId = null, long? ReturnCircPlaceId = null, string? LoanedByName = null, string? ReturnedByName = null, bool ReturnedLate = false)
+{
+    /// <summary>Bạn đọc tự xem (OPAC) — không lộ tên cán bộ thao tác.</summary>
+    public LoanDto ForReader() => this with { LoanedByName = null, ReturnedByName = null };
+}
 
 /// <summary>Bạn đọc ở quầy (monolith: ReaderSnapshot) — thông tin thẻ, lý do không được mượn, các lượt đang mượn, chính sách áp dụng.</summary>
 public sealed record ReaderPanel(
@@ -59,7 +67,8 @@ public sealed record LoanNoteRequest(Guid LoanId, string? Note, string Reason);
 /// <see cref="LoanChanged"/> (outbox, cùng transaction).
 /// </summary>
 public sealed class LoanResource(
-    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ICurrentActor actor, TimeProvider clock)
+    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ICurrentActor actor, TimeProvider clock,
+    CrudAuditContext? auditContext = null)
     : CrudResource<LoanResource, Loan, LoanSearch, LoanNoteRequest, LoanDto>(db)
 {
     public const int MaxCheckout = 200;
@@ -77,7 +86,8 @@ public sealed class LoanResource(
         Db.Set<BibSnapshot>().Where(b => b.Mfn == x.Mfn).Select(b => b.Author).FirstOrDefault(),
         x.CircPlaceId,
         Db.Set<ItemReplica>().Where(i => i.ItemPublicId == x.ItemPublicId).Select(i => i.StoreName).FirstOrDefault(),
-        x.LoanedAt, x.DueAt, x.ReturnedAt, x.RenewCount, x.Note, x.Version);
+        x.LoanedAt, x.DueAt, x.ReturnedAt, x.RenewCount, x.Note, x.Version,
+        x.StoreId, x.ReturnCircPlaceId, x.LoanedByName, x.ReturnedByName, x.ReturnedLate);
 
     protected override Loan Create(LoanNoteRequest request) => throw new NotSupportedException("Lượt mượn tạo qua CheckoutAsync.");
 
@@ -98,12 +108,16 @@ public sealed class LoanResource(
 #pragma warning restore CA1862, CA1304, CA1311
         }
         if (s.CircPlaceId is { } place) query = query.Where(x => x.CircPlaceId == place);
+        if (s.StoreId is { } store) query = query.Where(x => x.StoreId == store);
         var now = clock.GetUtcNow();
         query = (s.State ?? "").Trim().ToLowerInvariant() switch
         {
             "open" => query.Where(x => x.ReturnedAt == null),
+            "borrowing" => query.Where(x => x.ReturnedAt == null && x.DueAt >= now),
             "overdue" => query.Where(x => x.ReturnedAt == null && x.DueAt < now),
             "returned" => query.Where(x => x.ReturnedAt != null),
+            "returned_ontime" => query.Where(x => x.ReturnedAt != null && !x.ReturnedLate),
+            "returned_late" => query.Where(x => x.ReturnedAt != null && x.ReturnedLate),
             _ => query,
         };
         if (s.From is { } from)
@@ -220,7 +234,7 @@ public sealed class LoanResource(
 #pragma warning restore CA1862, CA1304, CA1311
         }
         var now = clock.GetUtcNow();
-        loan.Return(now, request.CircPlaceId, actor.Id);
+        loan.Return(now, request.CircPlaceId, actor.Id, StaffName());
         await PublishAsync(loan, ct);
         var item = await Db.Set<ItemReplica>().FirstOrDefaultAsync(i => i.ItemPublicId == loan.ItemPublicId, ct);
         var next = item is null ? null : await holds.AssignNextAsync(item, ct, returningLoan: loan.PublicId);
@@ -230,12 +244,17 @@ public sealed class LoanResource(
         return new ReturnResult((await ToDtosAsync([loan], ct))[0], loan.OverdueDays(now), next is null ? null : await holdList.GetAsync(next.Id, ct));
     }
 
-    /// <summary>Gia hạn (monolith: Renew): theo chính sách của bạn đọc tại điểm mượn; lý do bắt buộc, ghi vào nhật ký.</summary>
-    public async Task<LoanDto> RenewAsync(RenewRequest request, CancellationToken ct)
+    /// <summary>
+    /// Gia hạn (monolith: Renew): theo chính sách của bạn đọc tại điểm mượn; lý do bắt buộc, ghi vào nhật ký.
+    /// <paramref name="requireOwnerReaderId"/>: bạn đọc tự gia hạn qua OPAC — lượt mượn không phải của mình thì coi như không có (404),
+    /// không lộ việc lượt mượn đó tồn tại.
+    /// </summary>
+    public async Task<LoanDto> RenewAsync(RenewRequest request, CancellationToken ct, Guid? requireOwnerReaderId = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var reason = RequireReason(request.Reason, "gia hạn");
         var loan = await Set.FirstOrDefaultAsync(x => x.PublicId == request.LoanId, ct) ?? throw new NotFoundException(EntityName, request.LoanId);
+        if (requireOwnerReaderId is { } owner && loan.ReaderPublicId != owner) throw new NotFoundException(EntityName, request.LoanId);
         if (loan.CircPlaceId is { } placeId && await Db.Set<CircPlace>().AsNoTracking().AnyAsync(p => p.Id == placeId && p.Kind == CircPlace.KindReadingRoom, ct))
             throw new BusinessRuleException("RENEW_READING_ROOM", "Tài liệu mượn đọc tại chỗ không gia hạn được.");
         var reader = await Db.Set<PatronReplica>().AsNoTracking().FirstOrDefaultAsync(r => r.ReaderPublicId == loan.ReaderPublicId, ct);
@@ -288,7 +307,8 @@ public sealed class LoanResource(
         if (rows.Count > CrudExcel.MaxExportRows)
             throw new BusinessRuleException("EXPORT_TOO_LARGE", $"Kết quả quá {CrudExcel.MaxExportRows:N0} lượt mượn — thu hẹp khoảng ngày hoặc bộ lọc.");
         var now = clock.GetUtcNow();
-        static string State(LoanDto l, DateTimeOffset now) => l.ReturnedAt is not null ? "Đã trả" : l.DueAt < now ? "Quá hạn" : "Đang mượn";
+        static string State(LoanDto l, DateTimeOffset now) =>
+            l.ReturnedAt is not null ? l.ReturnedLate ? "Trả quá hạn" : "Trả đúng hạn" : l.DueAt < now ? "Quá hạn" : "Đang mượn";
         return CrudExcel.Export<LoanDto>("Lịch sử lưu thông",
         [
             new("cardNo", "Số thẻ", l => l.CardNo),
@@ -296,9 +316,12 @@ public sealed class LoanResource(
             new("barcode", "Số ĐKCB", l => l.Barcode),
             new("title", "Nhan đề", l => l.Title),
             new("author", "Tác giả", l => l.Author),
+            new("storeName", "Kho", l => l.StoreName),
             new("loanedAt", "Ngày mượn", l => Loan.LocalDate(l.LoanedAt)),
+            new("loanedBy", "Người cho mượn", l => l.LoanedByName),
             new("dueAt", "Hạn trả", l => Loan.LocalDate(l.DueAt)),
             new("returnedAt", "Ngày trả", l => l.ReturnedAt is { } r ? Loan.LocalDate(r) : null),
+            new("returnedBy", "Người nhận trả", l => l.ReturnedByName),
             new("renewCount", "Số lần gia hạn", l => l.RenewCount),
             new("state", "Tình trạng", l => State(l, now)),
             new("note", "Ghi chú", l => l.Note),
@@ -344,8 +367,8 @@ public sealed class LoanResource(
                 : $"Bạn đọc đã mượn đủ {typeMax} tài liệu thuộc nhóm này theo chính sách.");
 
         var loan = place.IsReadingRoom
-            ? Loan.OpenReadingRoom(reader, item, place.Id, now, actor.Id)
-            : Loan.Open(reader, item, place.Id, now, policy.LoanDaysFor(bibType), actor.Id);
+            ? Loan.OpenReadingRoom(reader, item, place.Id, now, actor.Id, StaffName())
+            : Loan.Open(reader, item, place.Id, now, policy.LoanDaysFor(bibType), actor.Id, StaffName());
         if (bibType is { } counted) typeCounts[counted] = typeCounts.GetValueOrDefault(counted) + 1;
         Set.Add(loan);
         await holds.FulfilAsync(reader, item, ct);
@@ -400,6 +423,9 @@ public sealed class LoanResource(
             // catalog đang down — hiển thị không có nhan đề
         }
     }
+
+    /// <summary>Người đang thao tác ("Họ tên (tên đăng nhập)" từ token; trạm SIP2/việc nền lấy theo người đã đặt).</summary>
+    public string? StaffName() => auditContext?.Capture().ActorName;
 
     private Task Record(Loan loan, CrudChange change, string summary, CancellationToken ct) =>
         AuditSink?.RecordAsync(new CrudAuditEntry(nameof(Loan), EntityName, loan.PublicId, change, summary), ct) ?? Task.CompletedTask;

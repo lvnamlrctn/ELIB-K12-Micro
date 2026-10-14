@@ -35,6 +35,18 @@ public static class AdminEndpoints
             return Results.NoContent();
         }).RequireAuthorization(new RequireStaffAttribute()).WithTags("Me");
 
+        // Tuỳ chọn giao diện của chính mình (cột hiện/ẩn...). Đóng vai đơn vị (chỉ đọc) không lưu — giao diện giữ tạm ở trình duyệt.
+        app.MapGet("/api/me/preferences", async (ICurrentActor actor, ITenantContext tenant, StaffPreferenceService s, CancellationToken ct) =>
+            actor.Id is { } userId ? Results.Ok(await s.GetAllAsync(tenant.IsSystem ? null : tenant.TenantId, userId, ct)) : Results.Unauthorized())
+            .RequireAuthorization(new RequireStaffAttribute()).WithTags("Me");
+        app.MapPut("/api/me/preferences/{key}", async (string key, SetPreferenceRequest request, ClaimsPrincipal principal, ICurrentActor actor,
+            ITenantContext tenant, StaffPreferenceService s, CancellationToken ct) =>
+        {
+            if (actor.Id is not { } userId || principal.FindFirst(ElibClaimTypes.Impersonation) is not null) return Results.Forbid();
+            await s.SetAsync(tenant.IsSystem ? null : tenant.TenantId, userId, key, request?.Value, ct);
+            return Results.NoContent();
+        }).RequireAuthorization(new RequireStaffAttribute()).WithTags("Me");
+
         var users = app.MapGroup("/api/users").WithTags("Users");
         users.MapGet("/", [Permission("USER", "view")] (UserAdminService s, string? search, int? page, int? pageSize, CancellationToken ct)
             => s.ListAsync(search, page ?? 1, pageSize ?? 20, ct));

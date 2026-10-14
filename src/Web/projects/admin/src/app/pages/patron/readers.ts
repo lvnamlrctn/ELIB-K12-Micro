@@ -6,6 +6,9 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudClient, CrudPage, Reader, ReaderAccount, ReaderSearch, errorMessage } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
+import { columnPrefs } from '../../core/preferences';
+import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
+import { ColumnPicker } from '../../shared/column-picker';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
@@ -17,7 +20,7 @@ import { ReaderPassword, accountLabel } from './reader-password';
 import { MAX_PRINT, PRINT_KEY } from './reader-print';
 import { ReaderExport, ReaderPhotos } from './reader-tools';
 
-/** Cột của bảng bạn đọc — người dùng chọn hiện/ẩn (nhớ trên trình duyệt), mặc định như ELIB-LRC. */
+/** Cột của bảng bạn đọc — người dùng chọn hiện/ẩn (nhớ theo tài khoản), mặc định như ELIB-LRC. */
 type ColumnKey = 'cardNo' | 'fullName' | 'sex' | 'birthDate' | 'readerType' | 'class' | 'course' | 'org' | 'ethnicity' | 'degree'
   | 'citizenId' | 'cardUid' | 'email' | 'phone' | 'address' | 'issueDate' | 'expireDate' | 'status' | 'opac';
 const COLUMNS: { key: ColumnKey; label: string; shown: boolean }[] = [
@@ -41,6 +44,7 @@ const COLUMNS: { key: ColumnKey; label: string; shown: boolean }[] = [
   { key: 'status', label: 'READER.STATUS', shown: true },
   { key: 'opac', label: 'READER.OPAC_LOGIN', shown: true },
 ];
+/** Khoá localStorage trước khi lưu theo tài khoản — đọc một lần để giữ lựa chọn cũ. */
 const COLUMNS_KEY = 'elib.readers.columns';
 const VIEW_KEY = 'elib.readers.view';
 
@@ -50,7 +54,7 @@ const VIEW_KEY = 'elib.readers.view';
  */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, NgTemplateOutlet, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport, ReaderBatch, ReaderHistory,
+  imports: [FormsModule, NgTemplateOutlet, ColumnPicker, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport, ReaderBatch, ReaderHistory,
     ReaderExport, ReaderPhotos, ReaderPassword, ReaderFormDialog],
   providers: [ReaderCatalogs],
   template: `
@@ -153,20 +157,7 @@ const VIEW_KEY = 'elib.readers.view';
       <!-- ml-auto: khi thanh công cụ xuống dòng vẫn nằm bên phải — menu chọn cột (right-0) không tràn ra ngoài. -->
       <div class="flex items-center gap-2 ml-auto">
         <span class="text-sm text-gray-500">{{ 'READER.COUNT' | translate: { count: page()?.totalCount ?? 0 } }}</span>
-        <div class="relative">
-          <button type="button" class="btn-secondary !py-1.5 !px-2" [title]="'READER.COLUMNS' | translate" (click)="columnsOpen.set(!columnsOpen())">
-            <span class="material-icons text-[18px]">view_column</span></button>
-          @if (columnsOpen()) {
-            <div class="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-30">
-              <div class="text-xs font-semibold text-gray-500 px-1 pb-1">{{ 'READER.COLUMNS' | translate }}</div>
-              @for (col of columns; track col.key) {
-                <label class="flex items-center gap-2 px-1 py-0.5 text-sm text-gray-700 cursor-pointer select-none">
-                  <input type="checkbox" class="rounded border-gray-300" [checked]="shown().has(col.key)" (change)="toggleColumn(col.key)" /> {{ col.label | translate }}
-                </label>
-              }
-            </div>
-          }
-        </div>
+        <app-column-picker [prefs]="cols" />
         <div class="flex rounded-lg border border-gray-200 overflow-hidden" role="group">
           <button type="button" class="px-2 py-1.5" [class]="view() === 'table' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'"
                   [title]="'READER.VIEW_TABLE' | translate" (click)="setView('table')"><span class="material-icons text-[18px]">table_rows</span></button>
@@ -354,18 +345,18 @@ export class Readers implements OnInit {
   protected readonly c = inject(ReaderCatalogs);
   private readonly client: CrudClient<Reader> = this.api.crud<Reader>('readers', 'patron');
 
-  protected search: ReaderSearch = blankSearch();
-  protected orgFilter: number | null = null;
-  protected readonly columns = COLUMNS;
+  /** Bộ lọc + trang nhớ trong tab — in thẻ rồi quay lại vẫn đúng trang đang xem. */
+  private readonly saved = rememberedSearch('readers', { search: blankSearch(), orgFilter: null as number | null });
+  protected search: ReaderSearch = { ...blankSearch(), ...this.saved.search };
+  protected orgFilter: number | null = this.saved.orgFilter;
   protected readonly accountLabel = accountLabel;
   protected readonly page = signal<CrudPage<Reader> | null>(null);
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly moreFilters = signal(false);
-  protected readonly columnsOpen = signal(false);
   protected readonly view = signal<'table' | 'card'>(readStored(VIEW_KEY) === 'card' ? 'card' : 'table');
-  protected readonly shown = signal<Set<ColumnKey>>(storedColumns());
-  protected readonly visibleColumns = computed(() => COLUMNS.filter((c) => this.shown().has(c.key)));
+  protected readonly cols = columnPrefs<ColumnKey>('readers', COLUMNS, COLUMNS_KEY);
+  protected readonly visibleColumns = this.cols.visible;
   protected readonly selected = signal<Set<string>>(new Set());
   protected readonly editing = signal<{ reader: Reader | null } | null>(null);
   protected readonly locking = signal<Reader | null>(null);
@@ -445,15 +436,6 @@ export class Readers implements OnInit {
     this.selected.set(this.allSelected() ? new Set() : new Set((this.page()?.items ?? []).map((r) => r.publicId)));
   }
 
-  protected toggleColumn(key: ColumnKey): void {
-    const next = new Set(this.shown());
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    if (!next.size) return;
-    this.shown.set(next);
-    writeStored(COLUMNS_KEY, JSON.stringify([...next]));
-  }
-
   protected setView(view: 'table' | 'card'): void {
     this.view.set(view);
     writeStored(VIEW_KEY, view);
@@ -527,7 +509,10 @@ export class Readers implements OnInit {
   protected async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.page.set(await this.client.search(this.effectiveSearch()) as unknown as CrudPage<Reader>);
+      const page = await this.client.search(this.effectiveSearch()) as unknown as CrudPage<Reader>;
+      if (clampPage(this.search, page)) return void (await this.load());
+      this.page.set(page);
+      rememberSearch('readers', { search: this.search, orgFilter: this.orgFilter });
       void this.loadAccounts();
       void this.loadPhotos();
     } catch (e) {
@@ -567,17 +552,6 @@ function blankSearch(pageSize = 10): ReaderSearch {
     keyword: '', cardNoContains: '', lastName: '', firstName: '', readerTypeId: null, classId: null, courseId: null, status: null, expired: null,
     issuedFrom: null, issuedTo: null, expiredFrom: null, expiredTo: null, groupId: null, pageIndex: 1, pageSize,
   };
-}
-
-function storedColumns(): Set<ColumnKey> {
-  try {
-    const keys = JSON.parse(readStored(COLUMNS_KEY) ?? 'null') as ColumnKey[] | null;
-    const valid = (keys ?? []).filter((k) => COLUMNS.some((c) => c.key === k));
-    if (valid.length) return new Set(valid);
-  } catch {
-    /* giá trị hỏng — dùng mặc định */
-  }
-  return new Set(COLUMNS.filter((c) => c.shown).map((c) => c.key));
 }
 
 function readStored(key: string): string | null {

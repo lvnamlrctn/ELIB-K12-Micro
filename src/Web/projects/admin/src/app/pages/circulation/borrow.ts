@@ -13,7 +13,8 @@ const PLACE_KEY = 'elib.circulation.place';
 
 /**
  * Quầy mượn trả (monolith: /admin/borrow, quyền BORROW). Quét thẻ → thông tin bạn đọc + lượt đang mượn; quét ĐKCB → mượn ngay.
- * Ô "Trả sách" nhận ĐKCB của bất kỳ bạn đọc nào.
+ * Ô "Trả sách" nhận ĐKCB của bất kỳ bạn đọc nào (không cần quét thẻ). Trả tài liệu quá hạn → hộp thoại như ELIB-LRC:
+ * Huỷ / Lập phiếu phạt (trả + mở phiếu phạt quá hạn của bạn đọc) / Trả không phạt.
  */
 @Component({
   selector: 'app-borrow',
@@ -191,6 +192,24 @@ const PLACE_KEY = 'elib.circulation.place';
         </ng-container>
       </app-modal>
     }
+
+    @if (overdueReturn(); as o) {
+      <app-modal [title]="'BORROW_PAGE.OVERDUE_CONFIRM_TITLE' | translate" widthClass="max-w-lg" (closed)="overdueReturn.set(null)">
+        <div class="space-y-3 text-sm text-gray-700">
+          <p [innerHTML]="'BORROW_PAGE.OVERDUE_CONFIRM' | translate: { barcode: o.barcode, name: o.readerName ?? '', card: o.cardNo, date: (o.dueAt | ldate: 'dd/MM/yyyy'), days: overdueDays(o) }"></p>
+          @if (o.title) { <p class="text-gray-500">{{ o.title }}</p> }
+          <p class="text-xs text-gray-500">{{ 'BORROW_PAGE.OVERDUE_CONFIRM_HINT' | translate }}</p>
+        </div>
+        <ng-container footer>
+          <button type="button" class="btn-secondary" [disabled]="busy()" (click)="overdueReturn.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          @if (canFine()) {
+            <button type="button" class="btn-danger" [disabled]="busy()" (click)="returnWithFine(o)">
+              <span class="material-icons text-[18px]">gavel</span> {{ 'BORROW_PAGE.RETURN_WITH_FINE' | translate }}</button>
+          }
+          <button type="button" class="btn-primary" [disabled]="busy()" (click)="returnNoFine(o)">{{ 'BORROW_PAGE.RETURN_NO_FINE' | translate }}</button>
+        </ng-container>
+      </app-modal>
+    }
   `,
 })
 export class Borrow implements OnInit {
@@ -217,6 +236,8 @@ export class Borrow implements OnInit {
   protected readonly returns = signal<ReturnResult[]>([]);
   protected readonly busy = signal(false);
   protected readonly action = signal<{ loan: Loan; kind: 'renew' | 'note' } | null>(null);
+  /** Lượt quá hạn đang chờ cán bộ chọn Huỷ / Lập phiếu phạt / Trả không phạt. */
+  protected readonly overdueReturn = signal<Loan | null>(null);
   protected cardNo = '';
   protected barcode = '';
   protected returnCode = '';
@@ -254,6 +275,12 @@ export class Borrow implements OnInit {
 
   protected overdue(l: Loan): boolean {
     return new Date(l.dueAt).getTime() < Date.now();
+  }
+
+  /** Số ngày quá hạn theo ngày lịch (trả trong ngày hết hạn = không quá hạn) — như Loan.OverdueDays của circulation. */
+  protected overdueDays(l: Loan): number {
+    const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
+    return Math.max(0, day(new Date()) - day(new Date(l.dueAt)));
   }
 
   protected choosePlace(id: number | null): void {
@@ -296,22 +323,53 @@ export class Borrow implements OnInit {
   }
 
   protected async returnLoan(l: Loan): Promise<void> {
-    await this.run(async () => {
-      const result = await this.api.returnLoan({ loanId: l.publicId, circPlaceId: this.placeId() });
-      this.returns.update((all) => [result, ...all].slice(0, 20));
-      await this.refresh();
-    });
+    if (this.overdueDays(l) > 0) {
+      this.overdueReturn.set(l);
+      return;
+    }
+    await this.run(() => this.doReturn(l));
   }
 
+  /** Trả theo ĐKCB quét được — tra lượt đang mở trước để hỏi khi quá hạn; không tra được (thiếu quyền...) thì trả thẳng như cũ. */
   protected async quickReturn(): Promise<void> {
     const code = this.returnCode.trim();
     if (!code) return;
     await this.run(async () => {
+      const open = await this.api.searchLoans({ barcode: code, state: 'open', pageIndex: 1, pageSize: 1 }).then((p) => p.items[0] ?? null, () => null);
+      if (open && this.overdueDays(open) > 0) {
+        this.overdueReturn.set(open);
+        return;
+      }
       const result = await this.api.returnLoan({ barcode: code, circPlaceId: this.placeId() });
-      this.returns.update((all) => [result, ...all].slice(0, 20));
-      this.returnCode = '';
-      if (this.reader()?.readerPublicId === result.loan.readerPublicId) await this.refresh();
+      this.afterReturn(result);
     });
+  }
+
+  protected async returnNoFine(l: Loan): Promise<void> {
+    await this.run(async () => {
+      await this.doReturn(l);
+      this.overdueReturn.set(null);
+    });
+  }
+
+  /** Lập phiếu phạt TRƯỚC khi trả (phiếu gom lượt đang mượn quá hạn, tính số ngày đến hôm nay), rồi trả và mở phiếu để thu tiền. */
+  protected async returnWithFine(l: Loan): Promise<void> {
+    await this.run(async () => {
+      const detail = await this.api.buildFineTicket(l.cardNo, [], this.placeId());
+      await this.doReturn(l);
+      this.overdueReturn.set(null);
+      await this.router.navigate(['/fine-ticket', detail.ticket.publicId]);
+    });
+  }
+
+  private async doReturn(l: Loan): Promise<void> {
+    this.afterReturn(await this.api.returnLoan({ loanId: l.publicId, circPlaceId: this.placeId() }));
+  }
+
+  private afterReturn(result: ReturnResult): void {
+    this.returns.update((all) => [result, ...all].slice(0, 20));
+    if (this.returnCode.trim() && result.loan.barcode.toUpperCase() === this.returnCode.trim().toUpperCase()) this.returnCode = '';
+    if (this.reader()?.readerPublicId === result.loan.readerPublicId) void this.refresh();
   }
 
   protected openAction(loan: Loan, kind: 'renew' | 'note'): void {

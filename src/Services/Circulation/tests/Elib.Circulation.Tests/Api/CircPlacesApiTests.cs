@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Testing;
 using Elib.Circulation.Application;
 using Elib.Circulation.Application.Sip2;
 using Elib.Circulation.Domain;
@@ -116,6 +117,27 @@ public sealed class CircPlacesApiTests(CirculationApiFactory factory) : Circulat
         Assert.Equal(404, (int)(await staffB.PutAsJsonAsync(U($"/api/circ-places/Update/{place.PublicId}"), Place("A1"), Json)).StatusCode);
         // Cùng mã ở đơn vị khác vẫn được.
         await Read<CircPlaceDto>(await staffB.PostAsJsonAsync(U("/api/circ-places/Add"), Place("A1"), Json));
+    }
+
+    [Fact]
+    public async Task Patron_asks_whether_a_reader_type_is_used_before_deleting_it()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        await Read<CircPlaceDto>(await staff.PostAsJsonAsync(U("/api/circ-places/Add"), Place("GV", [41]), Json));
+        await Read<LoanPolicyDto>(await staff.PostAsJsonAsync(U("/api/loan-policies/Add"), new LoanPolicyRequest(42, null), Json));
+        var other = Staff(NewTenant());
+        await Read<CircPlaceDto>(await other.PostAsJsonAsync(U("/api/circ-places/Add"), Place("KHAC", [43]), Json));
+
+        var service = Factory.CreateClient().WithClaims(TestClaims.Service);
+        async Task<ReaderTypeUsage> Usage(long type) =>
+            await Read<ReaderTypeUsage>(await service.GetAsync(U($"/internal/tenants/{tenantId}/reader-types/{type}/usage")));
+
+        static string Show(ReaderTypeUsage u) => string.Join(", ", u.Places) + " | " + u.Policies;
+        Assert.Equal("GV — Điểm GV | 1", Show(await Usage(41))); // chính sách riêng tạo khi gán loại vào điểm
+        Assert.Equal(" | 1", Show(await Usage(42)));
+        Assert.Equal(" | 0", Show(await Usage(43))); // loại của đơn vị khác
+        Assert.Equal(403, (int)(await staff.GetAsync(U($"/internal/tenants/{tenantId}/reader-types/41/usage"))).StatusCode);
     }
 
     private static (int, string?) Pick((int Status, string? Code, string? Detail) e) => (e.Status, e.Code);

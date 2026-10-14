@@ -283,6 +283,26 @@ public sealed partial class IdentityFlowTests(IdentityApiFactory factory) : ICla
     }
 
     [Fact]
+    public async Task Staff_preferences_are_per_account()
+    {
+        var (tenantId, _, admin) = await NewTenantWithAdminAsync();
+        var me = factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, admin.Id));
+        var other = factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, admin.Id + 1000));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await me.PutAsJsonAsync("/api/me/preferences/columns.readers", new SetPreferenceRequest("[\"cardNo\"]"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await me.PutAsJsonAsync("/api/me/preferences/columns.readers", new SetPreferenceRequest("[\"cardNo\",\"sex\"]"))).StatusCode);
+        var mine = (await me.GetFromJsonAsync<Dictionary<string, string>>(U("/api/me/preferences")))!;
+        Assert.Equal("[\"cardNo\",\"sex\"]", Assert.Single(mine).Value);
+        Assert.Empty((await other.GetFromJsonAsync<Dictionary<string, string>>(U("/api/me/preferences")))!);
+
+        var bad = await me.PutAsJsonAsync("/api/me/preferences/Cot%20Hien", new SetPreferenceRequest("x"));
+        Assert.Contains("PREFERENCE_KEY_INVALID", await bad.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await me.PutAsJsonAsync("/api/me/preferences/columns.readers", new SetPreferenceRequest(null))).StatusCode);
+        Assert.Empty((await me.GetFromJsonAsync<Dictionary<string, string>>(U("/api/me/preferences")))!);
+    }
+
+    [Fact]
     public async Task Wrong_current_password_counts_towards_lockout()
     {
         var (tenantId, _, admin) = await NewTenantWithAdminAsync();

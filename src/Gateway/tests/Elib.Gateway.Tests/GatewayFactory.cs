@@ -107,6 +107,11 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Routes:circulation-admin:Match:Path"] = "/api/admin/circulation/{**rest}",
             ["ReverseProxy:Routes:circulation-admin:Transforms:0:PathPattern"] = "/api/{**rest}",
             ["ReverseProxy:Routes:circulation-admin:Metadata:Module"] = "CIRCULATION",
+            ["ReverseProxy:Routes:circulation-reader:ClusterId"] = "search",
+            ["ReverseProxy:Routes:circulation-reader:AuthorizationPolicy"] = "elib-reader",
+            ["ReverseProxy:Routes:circulation-reader:Match:Path"] = "/api/opac/circulation/{**rest}",
+            ["ReverseProxy:Routes:circulation-reader:Transforms:0:PathPattern"] = "/api/reader/{**rest}",
+            ["ReverseProxy:Routes:circulation-reader:Metadata:Module"] = "CIRCULATION",
         };
         settings["Gateway:TrustedProxyNetworks:0"] = "10.0.0.0/8"; // "nginx" trong test
         foreach (var (key, value) in settings) builder.UseSetting(key, value);

@@ -54,8 +54,114 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.Property(x => x.PublishYear).HasMaxLength(4);
             e.Property(x => x.Isbns).HasMaxLength(1000);
             e.Property(x => x.Ddc).HasMaxLength(50);
+            e.Property(x => x.Cutter).HasMaxLength(50);
+            e.Property(x => x.BibTypeName).HasMaxLength(250);
             e.HasIndex(x => new { x.TenantId, x.BibPublicId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Mfn });
+        });
+
+        modelBuilder.NamedCatalog<ExportReason>("export_reasons", 250);
+        modelBuilder.NamedCatalog<BookOutUnit>("book_out_units", 250);
+        modelBuilder.NamedCatalog<ExhibitionLocation>("exhibition_locations", 250);
+
+        modelBuilder.Entity<LostRecord>(e =>
+        {
+            e.ToTable("lost_records");
+            e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.HasIndex(x => new { x.TenantId, x.ItemId });
+            e.HasIndex(x => new { x.TenantId, x.LostOn });
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Liquidation>(e =>
+        {
+            e.ToTable("liquidations");
+            e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.ItemId });
+            e.HasIndex(x => new { x.TenantId, x.LiquidatedOn });
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StoreOut>(e =>
+        {
+            e.ToTable("store_outs");
+            e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.DelivererName).HasMaxLength(250);
+            e.Property(x => x.ReceiverName).HasMaxLength(250);
+            e.Ignore(x => x.IsOpen);
+            e.HasIndex(x => new { x.TenantId, x.ItemId, x.InAt });
+            e.HasIndex(x => new { x.TenantId, x.OutAt });
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ExportReason>().WithMany().HasForeignKey(x => x.ReasonId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<BookOutUnit>().WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ExhibitionLocation>().WithMany().HasForeignKey(x => x.ExhibitionLocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Inventory>(e =>
+        {
+            e.ToTable("inventories");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Ignore(x => x.IsClosed);
+            e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryScan>(e =>
+        {
+            e.ToTable("inventory_scans");
+            e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.BarcodeKey).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.ItemStatus).HasMaxLength(1);
+            e.Ignore(x => x.Abnormal);
+            // Mỗi mã một lần trong đợt — quét lại trả dòng cũ.
+            e.HasIndex(x => new { x.TenantId, x.InventoryId, x.BarcodeKey }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.InventoryId, x.ItemId });
+            e.HasOne<Inventory>().WithMany().HasForeignKey(x => x.InventoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StoreMove>(e =>
+        {
+            e.ToTable("store_moves");
+            e.Property(x => x.DelivererName).HasMaxLength(250);
+            e.Property(x => x.ReceiverName).HasMaxLength(250);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Ignore(x => x.IsCompleted);
+            e.HasOne<Store>().WithMany().HasForeignKey(x => x.FromStoreId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Store>().WithMany().HasForeignKey(x => x.ToStoreId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StoreMoveLine>(e =>
+        {
+            e.ToTable("store_move_lines");
+            e.Property(x => x.SkipReason).HasMaxLength(250);
+            e.HasIndex(x => new { x.TenantId, x.MoveId, x.ItemId }).IsUnique().HasFilter("is_deleted = false");
+            e.HasOne<StoreMove>().WithMany().HasForeignKey(x => x.MoveId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Delivery>(e =>
+        {
+            e.ToTable("deliveries");
+            e.Property(x => x.DelivererName).HasMaxLength(250);
+            e.Property(x => x.DelivererAddress).HasMaxLength(500);
+            e.Property(x => x.ReceiverName).HasMaxLength(250);
+            e.Property(x => x.ReceiverAddress).HasMaxLength(500);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Ignore(x => x.IsSigned);
+            e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DeliveryLine>(e =>
+        {
+            e.ToTable("delivery_lines");
+            // Mỗi bản sách chỉ nằm ở một phiếu giao nhận (monolith ELIB-LRC 10-03: hai người cùng chọn một cuốn).
+            e.HasIndex(x => new { x.TenantId, x.ItemId }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.DeliveryId });
+            e.HasOne<Delivery>().WithMany().HasForeignKey(x => x.DeliveryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.AddTenantReplica();
@@ -64,13 +170,16 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
     }
 }
 
-/// <summary>Đơn vị mới có phân hệ Kho: loại kho mặc định và một kho chung (saga khởi tạo chờ holdings báo TenantSeeded).</summary>
-public sealed class HoldingsTenantSeeder(StoreTypeResource storeTypes, StoreResource stores) : ITenantSeeder
+/// <summary>
+/// Đơn vị mới có phân hệ Kho: loại kho mặc định, một kho chung, lý do xuất kho mặc định (saga khởi tạo chờ holdings báo TenantSeeded).
+/// </summary>
+public sealed class HoldingsTenantSeeder(StoreTypeResource storeTypes, StoreResource stores, ExportReasonResource exportReasons) : ITenantSeeder
 {
     public async Task SeedAsync(TenantProvisioned tenant, CancellationToken cancellationToken)
     {
         await storeTypes.AddMissingDefaultsAsync(cancellationToken);
         await stores.AddDefaultAsync(cancellationToken);
+        await exportReasons.AddMissingDefaultsAsync(cancellationToken);
     }
 }
 

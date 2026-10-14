@@ -21,6 +21,7 @@ if (app.Configuration.GetValue<bool>(DatabaseMigration.MigrateOnStartupKey))
 
 app.UseElibServiceDefaults();
 app.MapCirculationEndpoints();
+app.MapReaderCirculationEndpoints();
 app.Run();
 
 /// <summary>Để WebApplicationFactory trong test tham chiếu được.</summary>

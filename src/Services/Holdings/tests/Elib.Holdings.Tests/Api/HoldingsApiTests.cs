@@ -93,6 +93,31 @@ public sealed class HoldingsApiTests : IClassFixture<HoldingsApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task Labels_carry_ddc_and_cutter_in_requested_order()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var store = await AddStore(staff, "NL");
+        var bib = Bib(tenantId, Interlocked.Increment(ref _nextMfn), "Dế mèn phiêu lưu ký") with { Cutter = "T450H" };
+        await _factory.PublishAsync(bib);
+        await _factory.WaitConsumedAsync(bib);
+        await Read<List<ItemDto>>(await Register(staff, bib.Mfn, 3, "NL", storeId: store.Id));
+
+        var range = await Read<List<ItemLabel>>(await staff.PostAsJsonAsync(U("/api/items/Labels"), new ItemLabelRequest(BarcodeFrom: "nl000002", BarcodeTo: "NL000003"), Json));
+        Assert.Equal(["NL000002", "NL000003"], range.Select(l => l.Barcode));
+        Assert.Equal(("895.9223", "T450H", "Tô Hoài", "NL"), (range[0].Ddc, range[0].Cutter, range[0].Author, range[0].StoreCode));
+
+        // Dán danh sách → đúng thứ tự đã dán, bỏ mã không có.
+        var listed = await Read<List<ItemLabel>>(await staff.PostAsJsonAsync(U("/api/items/Labels"), new ItemLabelRequest(["nl000003", "KHONGCO", "NL000001"]), Json));
+        Assert.Equal(["NL000003", "NL000001"], listed.Select(l => l.Barcode));
+
+        var noFilter = await staff.PostAsJsonAsync(U("/api/items/Labels"), new ItemLabelRequest(), Json);
+        Assert.Equal("LABELS_FILTER_REQUIRED", await ErrorCode(noFilter));
+        var printer = Staff(tenantId, "PRINT_LABEL:view");
+        Assert.Equal(3, (await Read<List<ItemLabel>>(await printer.PostAsJsonAsync(U("/api/items/Labels"), new ItemLabelRequest(Mfn: bib.Mfn), Json))).Count);
+    }
+
+    [Fact]
     public async Task Register_batch_numbers_on_from_highest_number_and_rejects_duplicates()
     {
         var tenantId = NewTenant();

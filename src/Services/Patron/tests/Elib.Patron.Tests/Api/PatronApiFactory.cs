@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Testing;
@@ -29,6 +29,9 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
     /// <summary>Danh mục của service tenant (đơn vị, dân tộc…) theo (đơn vị, loại) — thay cho gọi /internal của tenant.</summary>
     public ConcurrentDictionary<(long TenantId, string Kind), List<ReferenceItem>> References { get; } = new();
 
+    /// <summary>Loại bạn đọc lưu thông đang dùng theo (đơn vị, loại) — thay cho gọi /internal của circulation; null = circulation không trả lời.</summary>
+    public ConcurrentDictionary<(long TenantId, long ReaderTypeId), CirculationReaderTypeUsage?> CirculationUsage { get; } = new();
+
     public IEnumerable<T> PublishedOf<T>() => Published.OfType<T>();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -53,6 +56,8 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IPermissionSource>(Permissions);
             services.RemoveAll<ITenantReferences>();
             services.AddScoped<ITenantReferences>(sp => new FakeTenantReferences(References, sp.GetRequiredService<ITenantContext>()));
+            services.RemoveAll<IReaderTypeUsage>();
+            services.AddScoped<IReaderTypeUsage>(sp => new FakeReaderTypeUsage(CirculationUsage, sp.GetRequiredService<ITenantContext>()));
         });
     }
 
@@ -117,4 +122,13 @@ public sealed class FakeTenantReferences(ConcurrentDictionary<(long TenantId, st
 {
     public Task<IReadOnlyList<ReferenceItem>> ListAsync(string kind, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<ReferenceItem>>(all.GetValueOrDefault((tenant.RequireTenantId(), kind)) ?? []);
+}
+
+public sealed class FakeReaderTypeUsage(ConcurrentDictionary<(long TenantId, long ReaderTypeId), CirculationReaderTypeUsage?> all, ITenantContext tenant)
+    : IReaderTypeUsage
+{
+    public Task<CirculationReaderTypeUsage> CirculationAsync(long readerTypeId, CancellationToken ct) =>
+        all.TryGetValue((tenant.RequireTenantId(), readerTypeId), out var usage)
+            ? Task.FromResult(usage ?? throw new Elib.BuildingBlocks.Domain.BusinessRuleException("CIRCULATION_UNAVAILABLE", "Không kiểm tra được.", 503))
+            : Task.FromResult(new CirculationReaderTypeUsage([], 0));
 }

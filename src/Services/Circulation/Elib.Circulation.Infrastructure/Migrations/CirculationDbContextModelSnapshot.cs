@@ -820,6 +820,11 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("loaned_by");
 
+                    b.Property<string>("LoanedByName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("loaned_by_name");
+
                     b.Property<long>("Mfn")
                         .HasColumnType("bigint")
                         .HasColumnName("mfn");
@@ -856,6 +861,15 @@ namespace Elib.Circulation.Infrastructure.Migrations
                     b.Property<long?>("ReturnedBy")
                         .HasColumnType("bigint")
                         .HasColumnName("returned_by");
+
+                    b.Property<string>("ReturnedByName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("returned_by_name");
+
+                    b.Property<bool>("ReturnedLate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("returned_late");
 
                     b.Property<long?>("StoreId")
                         .HasColumnType("bigint")
@@ -904,6 +918,9 @@ namespace Elib.Circulation.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "LoanedAt")
                         .HasDatabaseName("ix_loans_tenant_id_loaned_at");
+
+                    b.HasIndex("TenantId", "StoreId")
+                        .HasDatabaseName("ix_loans_tenant_id_store_id");
 
                     b.HasIndex("TenantId", "ReaderPublicId", "ReturnedAt")
                         .HasDatabaseName("ix_loans_tenant_id_reader_public_id_returned_at");

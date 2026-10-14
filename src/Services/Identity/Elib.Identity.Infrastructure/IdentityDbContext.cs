@@ -18,6 +18,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<TenantReplicaRecord> TenantReplicas => Set<TenantReplicaRecord>();
     public DbSet<ReaderAccount> ReaderAccounts => Set<ReaderAccount>();
+    public DbSet<StaffPreference> StaffPreferences => Set<StaffPreference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,14 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             e.ComplexProperty(a => a.Credentials, c => c.Property(x => x.PasswordHash).HasMaxLength(100));
             e.HasIndex(a => new { a.TenantId, a.ReaderPublicId }).IsUnique();
             e.HasIndex(a => new { a.TenantId, a.CardKey });
+        });
+
+        modelBuilder.Entity<StaffPreference>(e =>
+        {
+            e.ToTable("staff_preferences");
+            e.Property(p => p.Key).HasMaxLength(StaffPreference.MaxKeyLength);
+            e.Property(p => p.Value).HasMaxLength(StaffPreference.MaxValueLength);
+            e.HasIndex(p => new { p.TenantId, p.UserId, p.Key }).IsUnique().AreNullsDistinct(false);
         });
 
         // OpenIddict tự đặt tên bảng PascalCase — đổi về snake_case cho nhất quán.
