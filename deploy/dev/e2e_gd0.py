@@ -1419,8 +1419,11 @@ def acquisition_steps(tb, token, tag, book, kc, admin_user):
     expect(s == 200 and cands["totalCount"] == 3, "màn chọn sách liệt kê đúng 3 bản của đơn nhận", text[:200])
     s, text, added = post(f"{H}/deliveries/AddLines/{delivery['publicId']}", {"itemIds": [i["publicId"] for i in cands["items"]]})
     expect(s == 200, "thêm 3 bản vào phiếu giao nhận", text[:200])
+    s, _, text = tb.request("PUT", f"{H}/deliveries/Update/{delivery['publicId']}", token=token, json_body={
+        "delivererName": f"NCC {tag}", "receiverName": "Thủ kho", "storeId": kc["id"], "receiptPublicId": receipt["publicId"], "status": 2})
+    expect(s == 200, "phiếu giao nhận chuyển sang 'Đã nhận đủ'", text[:200])
     s, text, signed = post(f"{H}/deliveries/Sign/{delivery['publicId']}", None)
-    expect(s == 200 and signed["shelved"] == 3, f"ký nhận: xếp giá {signed.get('shelved')} bản vào kho nhận", text[:200])
+    expect(s == 200 and signed.get("done") == 3, f"ký nhận: xếp giá {signed.get('done')} bản vào kho nhận", text[:200])
 
     rp = {"from": today, "to": today, "receiptCodeFrom": receipt["id"], "receiptCodeTo": receipt["id"], "pageSize": 100}
     s, text, listed = post(f"{A}/reports/AcquisitionList", rp)
