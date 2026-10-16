@@ -1,7 +1,8 @@
-import { Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Api, CrudClient, Reader, STATUS_ACTIVE, errorMessage } from '../../core/api';
+import { Api, CrudClient, ExtraPhoto, Reader, STATUS_ACTIVE, errorMessage } from '../../core/api';
+import { CameraCapture, CapturedPhoto, shrinkImage } from '../../shared/camera';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
@@ -22,28 +23,47 @@ const BLANK: ReaderForm = {
  */
 @Component({
   selector: 'app-reader-form',
-  imports: [FormsModule, Modal, TranslatePipe],
+  imports: [FormsModule, Modal, TranslatePipe, CameraCapture],
   template: `
     <app-modal [title]="f.publicId ? 'READER.EDIT_TITLE' : 'READER.ADD_TITLE'" widthClass="max-w-4xl" (closed)="closed.emit()">
       <div class="flex flex-col md:flex-row gap-6">
-        @if (f.publicId) {
-          <div class="md:w-40 shrink-0 text-sm text-gray-600 space-y-2">
-            <div class="w-32 h-40 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center mx-auto md:mx-0">
-              @if (photoUrl()) { <img [src]="photoUrl()" [alt]="'READER.AVATAR' | translate" class="w-full h-full object-cover" /> }
-              @else { <span class="material-icons text-gray-300 text-[56px]">person</span> }
+        <div class="md:w-40 shrink-0 text-sm text-gray-600 space-y-2">
+          <button type="button" class="w-32 h-40 rounded-xl bg-gray-50 border-2 border-dashed border-gray-300 hover:border-blue-400 overflow-hidden flex items-center justify-center mx-auto md:mx-0 transition-colors"
+                  [title]="'READER.CHOOSE_PHOTO' | translate" [disabled]="photoBusy()" (click)="fileInput.click()">
+            @if (shownPhoto(); as src) { <img [src]="src" [alt]="'READER.AVATAR' | translate" class="w-full h-full object-cover" /> }
+            @else { <span class="flex flex-col items-center text-gray-300"><span class="material-icons text-[48px]">person</span><span class="text-[10px]">{{ 'READER.CLICK_TO_CHOOSE' | translate }}</span></span> }
+          </button>
+          <input #fileInput type="file" accept="image/jpeg,image/png,image/webp" class="hidden" (change)="changePhoto($event)" />
+          <button type="button" class="btn-secondary !py-1.5 !px-3 w-full justify-center" [disabled]="photoBusy()" (click)="camera.set('main')">
+            <span class="material-icons text-[18px]">{{ photoBusy() ? 'autorenew' : 'photo_camera' }}</span> {{ 'READER.TAKE_PHOTO' | translate }}</button>
+          @if (shownPhoto()) {
+            <button type="button" class="btn-secondary !py-1.5 !px-3 !text-red-600 w-full justify-center" [disabled]="photoBusy()" (click)="clearPhoto()">
+              <span class="material-icons text-[18px]">delete</span> {{ 'READER.DELETE_PHOTO' | translate }}</button>
+          }
+          <p class="text-xs text-gray-500">{{ (f.publicId ? 'READER.PHOTO_HINT' : 'READER.PHOTO_PENDING_HINT') | translate }}</p>
+          @if (f.publicId) {
+            <div class="pt-2 border-t border-gray-100">
+              <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{{ 'READER.EXTRA_PHOTOS' | translate }}</p>
+              <div class="flex flex-wrap gap-1.5">
+                @for (p of extraPhotos(); track p.fileId) {
+                  <div class="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 group bg-gray-100">
+                    @if (extraUrls()[p.fileId]; as u) { <img [src]="u" class="w-full h-full object-cover" alt="" /> }
+                    <button type="button" class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center justify-center transition-opacity"
+                            [title]="'READER.DELETE_PHOTO' | translate" (click)="removeExtra(p.fileId)"><span class="material-icons text-white text-[16px]">close</span></button>
+                  </div>
+                }
+                @if (extraPhotos().length < maxExtra) {
+                  <button type="button" class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 flex items-center justify-center text-gray-400"
+                          [title]="'READER.EXTRA_FROM_FILE' | translate" [disabled]="photoBusy()" (click)="extraInput.click()"><span class="material-icons text-[18px]">add</span></button>
+                  <button type="button" class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 flex items-center justify-center text-gray-400"
+                          [title]="'READER.EXTRA_FROM_CAMERA' | translate" [disabled]="photoBusy()" (click)="camera.set('extra')"><span class="material-icons text-[18px]">photo_camera</span></button>
+                }
+                <input #extraInput type="file" accept="image/jpeg,image/png,image/webp" class="hidden" (change)="addExtraFromFile($event)" />
+              </div>
+              <p class="text-[10px] text-gray-400 mt-1.5 leading-tight">{{ 'READER.EXTRA_PHOTOS_HINT' | translate: { max: maxExtra } }}</p>
             </div>
-            <label class="btn-secondary !py-1.5 !px-3 cursor-pointer w-full justify-center" [class.opacity-50]="photoBusy()">
-              <span class="material-icons text-[18px]">{{ photoBusy() ? 'autorenew' : 'photo_camera' }}</span>
-              {{ (photoId() ? 'READER.CHANGE_PHOTO' : 'READER.CHOOSE_PHOTO') | translate }}
-              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" [disabled]="photoBusy()" (change)="changePhoto($event)" />
-            </label>
-            @if (photoId()) {
-              <button type="button" class="btn-secondary !py-1.5 !px-3 !text-red-600 w-full justify-center" [disabled]="photoBusy()" (click)="setPhoto(null)">
-                <span class="material-icons text-[18px]">delete</span> {{ 'READER.DELETE_PHOTO' | translate }}</button>
-            }
-            <p class="text-xs text-gray-500">{{ 'READER.PHOTO_HINT' | translate }}</p>
-          </div>
-        }
+          }
+        </div>
         <form id="reader-form" (ngSubmit)="save()" class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div><label class="form-label" for="r-card">{{ 'READER.CARD_CODE' | translate }} <span class="text-red-500">*</span></label>
             <input id="r-card" name="card" class="input font-mono uppercase" [(ngModel)]="f.cardNo" required (blur)="checkCard()" />
@@ -120,6 +140,9 @@ const BLANK: ReaderForm = {
           <span class="material-icons text-[16px]">save</span>{{ (f.publicId ? 'COMMON.UPDATE' : 'COMMON.SAVE') | translate }}</button>
       </ng-container>
     </app-modal>
+    @if (camera()) {
+      <app-camera-capture title="READER.CAMERA_TITLE" hint="READER.CAMERA_HINT" (captured)="onCaptured($event)" (cancelled)="camera.set(null)" />
+    }
   `,
 })
 export class ReaderFormDialog implements OnInit {
@@ -144,6 +167,14 @@ export class ReaderFormDialog implements OnInit {
   protected readonly photoId = signal<string | null>(null);
   protected readonly photoUrl = signal<string | null>(null);
   protected readonly photoBusy = signal(false);
+  protected readonly camera = signal<'main' | 'extra' | null>(null);
+  protected readonly extraPhotos = signal<ExtraPhoto[]>([]);
+  protected readonly extraUrls = signal<Record<string, string>>({});
+  protected readonly maxExtra = 5;
+  /** Thêm mới: ảnh đã chọn/chụp, upload sau khi hồ sơ được lưu (chưa có bạn đọc để gán ngay). */
+  private readonly pendingFile = signal<File | null>(null);
+  private readonly pendingUrl = signal<string | null>(null);
+  protected readonly shownPhoto = computed(() => this.pendingUrl() ?? this.photoUrl());
   /** Nhóm bạn đọc (bảng nối ở patron) — lưu sau hồ sơ, chỉ khi đổi. */
   protected readonly groupIds = signal<number[]>([]);
   private initialGroups: number[] = [];
@@ -161,6 +192,26 @@ export class ReaderFormDialog implements OnInit {
     this.photoId.set(photoId);
     if (photoId) void this.showPhoto(photoId);
     void this.loadGroups(r.publicId);
+    void this.loadExtra(r.publicId);
+  }
+
+  private async loadExtra(publicId: string): Promise<void> {
+    try {
+      const list = await this.api.readerExtraPhotos(publicId);
+      this.extraPhotos.set(list);
+      for (const p of list) void this.showExtra(p.fileId);
+    } catch {
+      /* thiếu quyền / chưa tải được — để trống */
+    }
+  }
+
+  private async showExtra(fileId: string): Promise<void> {
+    try {
+      const url = await this.api.fileUrl(fileId);
+      this.extraUrls.update((u) => ({ ...u, [fileId]: url }));
+    } catch {
+      /* ảnh không còn ở media */
+    }
   }
 
   private async loadGroups(publicId: string): Promise<void> {
@@ -203,6 +254,15 @@ export class ReaderFormDialog implements OnInit {
       const groups = [...this.groupIds()].sort((a, b) => a - b);
       if (groups.join() !== [...this.initialGroups].sort((a, b) => a - b).join())
         await this.api.setReaderGroups(saved.publicId, groups, this.reason);
+      const pending = this.pendingFile();
+      if (!publicId && pending) {
+        try {
+          const uploaded = await this.api.upload('reader-photo', pending);
+          await this.api.setReaderPhoto(saved.publicId, uploaded.id);
+        } catch (e) {
+          this.toastr.error(errorMessage(e)); // hồ sơ đã lưu — chỉ ảnh lỗi, thêm lại khi sửa bạn đọc
+        }
+      }
       this.toastr.success(publicId ? 'READER.SAVED_UPDATE' : 'READER.SAVED_ADD');
       this.saved.emit();
     } catch (e) {
@@ -217,8 +277,17 @@ export class ReaderFormDialog implements OnInit {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    await this.useMainPhoto(file);
+  }
+
+  private async useMainPhoto(picked: File): Promise<void> {
+    const file = await shrinkImage(picked);
     if (file.size > 2 * 1024 * 1024) {
       this.toastr.warning('READER.PHOTO_TOO_BIG');
+      return;
+    }
+    if (!this.f.publicId) {
+      this.setPending(file);
       return;
     }
     this.photoBusy.set(true);
@@ -229,6 +298,64 @@ export class ReaderFormDialog implements OnInit {
       this.toastr.error(errorMessage(e));
     } finally {
       this.photoBusy.set(false);
+    }
+  }
+
+  private setPending(file: File | null): void {
+    const old = this.pendingUrl();
+    if (old) URL.revokeObjectURL(old);
+    this.pendingFile.set(file);
+    this.pendingUrl.set(file ? URL.createObjectURL(file) : null);
+  }
+
+  protected clearPhoto(): void {
+    if (this.pendingFile()) this.setPending(null);
+    else void this.setPhoto(null);
+  }
+
+  protected async onCaptured(p: CapturedPhoto): Promise<void> {
+    const target = this.camera();
+    this.camera.set(null);
+    if (target === 'extra') await this.addExtra(p.file);
+    else await this.useMainPhoto(p.file);
+  }
+
+  protected async addExtraFromFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) await this.addExtra(file);
+  }
+
+  private async addExtra(picked: File): Promise<void> {
+    const publicId = this.f.publicId;
+    if (!publicId) return;
+    const file = await shrinkImage(picked);
+    if (file.size > 2 * 1024 * 1024) {
+      this.toastr.warning('READER.PHOTO_TOO_BIG');
+      return;
+    }
+    this.photoBusy.set(true);
+    try {
+      const uploaded = await this.api.upload('reader-photo', file);
+      const added = await this.api.addReaderExtraPhoto(publicId, uploaded.id);
+      this.extraPhotos.update((l) => [...l, added]);
+      void this.showExtra(added.fileId);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.photoBusy.set(false);
+    }
+  }
+
+  protected async removeExtra(fileId: string): Promise<void> {
+    const publicId = this.f.publicId;
+    if (!publicId) return;
+    try {
+      await this.api.removeReaderExtraPhoto(publicId, fileId);
+      this.extraPhotos.update((l) => l.filter((p) => p.fileId !== fileId));
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
     }
   }
 

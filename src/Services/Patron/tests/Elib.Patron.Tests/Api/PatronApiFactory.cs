@@ -32,6 +32,15 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
     /// <summary>Loại bạn đọc lưu thông đang dùng theo (đơn vị, loại) — thay cho gọi /internal của circulation; null = circulation không trả lời.</summary>
     public ConcurrentDictionary<(long TenantId, long ReaderTypeId), CirculationReaderTypeUsage?> CirculationUsage { get; } = new();
 
+    /// <summary>Ảnh bạn đọc theo id file (thay cho media) và các lô gửi sang bộ so khớp (thay cho Gemini).</summary>
+    public ConcurrentDictionary<Guid, byte[]> PhotoFiles { get; } = new();
+
+    public ConcurrentQueue<Guid> PhotoReads { get; } = new();
+    public FakeFaceMatcher Matcher { get; } = new();
+
+    /// <summary>true = media không đọc được (token sai, dịch vụ sập) — mọi lần đọc ảnh ném lỗi.</summary>
+    public bool PhotoSourceDown { get; set; }
+
     public IEnumerable<T> PublishedOf<T>() => Published.OfType<T>();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -42,6 +51,7 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Messaging:UseOutbox", "false");
         builder.UseSetting("Auth:Authority", "https://identity.test");
         builder.UseSetting("Tenancy:GatewaySigningKey", "test-gateway-key-0123456789abcdef");
+        builder.UseSetting("FaceRecognition:ApiKey", "test-key");
 
         builder.ConfigureTestServices(services =>
         {
@@ -56,6 +66,10 @@ public sealed class PatronApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IPermissionSource>(Permissions);
             services.RemoveAll<ITenantReferences>();
             services.AddScoped<ITenantReferences>(sp => new FakeTenantReferences(References, sp.GetRequiredService<ITenantContext>()));
+            services.RemoveAll<IFaceMatcher>();
+            services.AddSingleton<IFaceMatcher>(Matcher);
+            services.RemoveAll<IReaderPhotoSource>();
+            services.AddScoped<IReaderPhotoSource>(_ => new FakePhotoSource(PhotoFiles, PhotoReads, () => PhotoSourceDown));
             services.RemoveAll<IReaderTypeUsage>();
             services.AddScoped<IReaderTypeUsage>(sp => new FakeReaderTypeUsage(CirculationUsage, sp.GetRequiredService<ITenantContext>()));
         });
@@ -131,4 +145,31 @@ public sealed class FakeReaderTypeUsage(ConcurrentDictionary<(long TenantId, lon
         all.TryGetValue((tenant.RequireTenantId(), readerTypeId), out var usage)
             ? Task.FromResult(usage ?? throw new Elib.BuildingBlocks.Domain.BusinessRuleException("CIRCULATION_UNAVAILABLE", "Không kiểm tra được.", 503))
             : Task.FromResult(new CirculationReaderTypeUsage([], 0));
+}
+
+/// <summary>Bộ so khớp giả: khớp ảnh nào có nội dung bằng <see cref="Target"/> với độ tin cậy <see cref="Confidence"/>; ghi lại các lô nhận được.</summary>
+public sealed class FakeFaceMatcher : IFaceMatcher
+{
+    public byte[]? Target { get; set; }
+    public double Confidence { get; set; } = 0.9;
+    public bool Fail { get; set; }
+    public ConcurrentQueue<IReadOnlyList<byte[]>> Batches { get; } = new();
+
+    public Task<FaceBatchMatch> MatchAsync(byte[] camera, IReadOnlyList<byte[]> candidates, CancellationToken ct)
+    {
+        if (Fail) throw new FaceServiceException("giả lập lỗi");
+        Batches.Enqueue(candidates);
+        var index = Target is null ? -1 : candidates.ToList().FindIndex(c => c.SequenceEqual(Target));
+        return Task.FromResult(index < 0 ? new FaceBatchMatch(null, 0) : new FaceBatchMatch(index + 1, Confidence));
+    }
+}
+
+public sealed class FakePhotoSource(ConcurrentDictionary<Guid, byte[]> files, ConcurrentQueue<Guid> reads, Func<bool> down) : IReaderPhotoSource
+{
+    public Task<byte[]?> ReadAsync(Guid fileId, CancellationToken ct)
+    {
+        reads.Enqueue(fileId);
+        if (down()) throw new FaceServiceException("giả lập media sập");
+        return Task.FromResult(files.TryGetValue(fileId, out var bytes) ? bytes : null);
+    }
 }

@@ -62,6 +62,13 @@ public sealed class PatronDbContext(DbContextOptions<PatronDbContext> options, I
             e.HasOne<ReaderGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<ReaderPhoto>(e =>
+        {
+            e.ToTable("reader_photos");
+            e.HasIndex(x => new { x.TenantId, x.ReaderId, x.FileId }).IsUnique();
+            e.HasOne<Reader>().WithMany().HasForeignKey(x => x.ReaderId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<ReaderImportJob>(e =>
         {
             e.ToTable("reader_import_jobs");

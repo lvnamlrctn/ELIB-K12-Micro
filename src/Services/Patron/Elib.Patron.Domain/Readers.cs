@@ -59,6 +59,23 @@ public sealed class ReaderGroupMember : Entity, ITenantOwned
     public static ReaderGroupMember Create(long readerId, long groupId) => new() { ReaderId = readerId, GroupId = groupId };
 }
 
+/// <summary>
+/// Ảnh khuôn mặt bổ sung của bạn đọc (monolith: ReaderPhoto) — id file ở media, dùng cùng ảnh thẻ khi nhận diện khuôn mặt. Xoá cứng.
+/// </summary>
+public sealed class ReaderPhoto : Entity, ITenantOwned
+{
+    public const int MaxPerReader = 5;
+
+    private ReaderPhoto() { }
+
+    public long TenantId { get; set; }
+    public long ReaderId { get; private set; }
+    public Guid FileId { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public static ReaderPhoto Create(long readerId, Guid fileId, DateTimeOffset now) => new() { ReaderId = readerId, FileId = fileId, CreatedAt = now };
+}
+
 /// <summary>Giới tính theo quy ước monolith: 1 = nam, 0 = nữ, null = không rõ.</summary>
 public static class Sex
 {

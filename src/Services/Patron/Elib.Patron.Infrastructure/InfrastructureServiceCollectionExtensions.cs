@@ -48,6 +48,22 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddHttpMessageHandler<ServiceTokenHandler>();
         services.AddScoped<IReaderTypeUsage, HttpReaderTypeUsage>();
+        // Nhận diện khuôn mặt (Gemini): tắt khi không có FaceRecognition:ApiKey. Ảnh bạn đọc đọc từ media qua service token.
+        services.Configure<Elib.Patron.Application.FaceRecognitionOptions>(configuration.GetSection(Elib.Patron.Application.FaceRecognitionOptions.Section));
+        var mediaUrl = configuration["Media:Url"] ?? "http://media:8080";
+        services.AddHttpClient(HttpReaderPhotoSource.HttpClientName, c =>
+            {
+                c.BaseAddress = new Uri(mediaUrl.TrimEnd('/') + "/");
+                c.Timeout = TimeSpan.FromSeconds(15);
+            })
+            .AddHttpMessageHandler<ServiceTokenHandler>();
+        services.AddScoped<Elib.Patron.Application.IReaderPhotoSource, HttpReaderPhotoSource>();
+        services.AddHttpClient(GeminiFaceMatcher.HttpClientName, c =>
+        {
+            c.BaseAddress = new Uri(configuration["FaceRecognition:BaseUrl"] ?? "https://generativelanguage.googleapis.com");
+            c.Timeout = TimeSpan.FromSeconds(45);
+        });
+        services.AddScoped<Elib.Patron.Application.IFaceMatcher, GeminiFaceMatcher>();
         services.AddHostedService<ReaderImportWorker>();
         services.AddElibMessaging<PatronDbContext>(ServiceName, configuration, x =>
         {

@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   AcqBib, AcquisitionOptions, Api, CrudPage, Currency, Receipt, ReceiptItem, ReceiptLine, ReceivableLine, RegisteredItem, StoreOption, errorMessage,
@@ -10,7 +10,8 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { itemStatus } from '../holdings/items';
-import { BibPicker } from './bib-picker';
+import { LABEL_BARCODES_KEY } from '../holdings/labels';
+import { BibSource } from './bib-source';
 import { PAYMENT_METHODS, loadCurrencies, today } from './orders';
 
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
@@ -53,6 +54,14 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
           <option [ngValue]="false">{{ 'ACQ_RECEIPT.DRAFT' | translate }}</option><option [ngValue]="true">{{ 'ACQ_RECEIPT.COMPLETED' | translate }}</option>
         </select>
       </div>
+      <label class="flex items-center gap-2 pb-2 text-sm text-gray-700"><input type="checkbox" [(ngModel)]="mine" (change)="find()" /> {{ 'ACQ_RECEIPT.MINE' | translate }}</label>
+      <div class="w-48">
+        <label for="ar-fund" class="field-label">{{ 'ACQ.FUND' | translate }}</label>
+        <select id="ar-fund" class="input" [(ngModel)]="fundId" (change)="find()"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+          @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select>
+      </div>
+      <div><label for="ar-cf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><input id="ar-cf" type="date" class="input" [(ngModel)]="createdFrom" /></div>
+      <div><label for="ar-ct" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><input id="ar-ct" type="date" class="input" [(ngModel)]="createdTo" /></div>
       <div><label for="ar-f" class="field-label">{{ 'ACQ_RECEIPT.RECEIVED_FROM' | translate }}</label><input id="ar-f" type="date" class="input" [(ngModel)]="from" /></div>
       <div><label for="ar-t" class="field-label">{{ 'COMMON.TO' | translate }}</label><input id="ar-t" type="date" class="input" [(ngModel)]="to" /></div>
       <button class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
@@ -140,6 +149,10 @@ export class Receipts implements OnInit {
   protected readonly paymentMethods = PAYMENT_METHODS;
   protected keyword = '';
   protected completed: boolean | null = null;
+  protected fundId: number | null = null;
+  protected mine = false;
+  protected createdFrom = '';
+  protected createdTo = '';
   protected from = '';
   protected to = '';
   protected pageIndex = 1;
@@ -222,7 +235,8 @@ export class Receipts implements OnInit {
     this.loading.set(true);
     try {
       this.page.set(await this.client.search({
-        keyword: this.keyword.trim() || undefined, completed: this.completed, from: this.from || null, to: this.to || null,
+        keyword: this.keyword.trim() || undefined, completed: this.completed, fundId: this.fundId, mine: this.mine, from: this.from || null, to: this.to || null,
+        createdFrom: this.createdFrom || null, createdTo: this.createdTo || null,
         pageIndex: this.pageIndex, pageSize: this.pageSize,
       }));
     } catch (e) {
@@ -244,7 +258,7 @@ interface RegisterForm {
  */
 @Component({
   selector: 'app-acq-receipt-detail',
-  imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibPicker],
+  imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource],
   template: `
     <div class="mb-5 flex flex-wrap gap-3 justify-between items-center">
       <div>
@@ -295,7 +309,7 @@ interface RegisterForm {
         @if (tab === 'bib') {
           <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
             <div class="lg:col-span-2"><label for="rl-bib" class="form-label">{{ 'ACQ.BIB' | translate }} *</label>
-              <app-acq-bib-picker inputId="rl-bib" [selected]="add.bib" (picked)="add.bib = $event" /></div>
+              <app-acq-bib-source inputId="rl-bib" [selected]="add.bib" (picked)="add.bib = $event" /></div>
             <div><label for="rl-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="rl-qty" type="number" min="1" class="input" [(ngModel)]="add.quantity" /></div>
             <div><label for="rl-price" class="form-label">{{ 'ACQ.PRICE' | translate }}</label>
               <div class="flex gap-1"><input id="rl-price" type="number" min="0" step="any" class="input" [(ngModel)]="add.price" />
@@ -358,7 +372,8 @@ interface RegisterForm {
           <tbody>
             @for (l of lines(); track l.publicId) {
               <tr class="hover:bg-gray-50/50">
-                <td class="td">{{ l.title }}<div class="text-[11px] text-gray-400">MFN {{ l.mfn }}@if (l.author) { · {{ l.author }} }@if (l.orderId) { · {{ 'ACQ_RECEIPT.FROM_ORDER' | translate: { no: l.orderId } }} }</div></td>
+                <td class="td">{{ l.title }}<div class="text-[11px] text-gray-400">MFN {{ l.mfn }}@if (l.author) { · {{ l.author }} }@if (l.orderId) { · {{ 'ACQ_RECEIPT.FROM_ORDER' | translate: { no: l.orderId } }} }
+                  @if (session.can('CATALOG_BIBS:edit')) { · <a [routerLink]="['/catalog-bibs', l.mfn]" target="_blank" rel="noopener" class="text-blue-600 hover:underline">{{ 'ACQ_RECEIPT.EDIT_MARC' | translate }}</a> }</div></td>
                 <td class="td text-right">@if (l.price !== null) { {{ l.price | lnumber: '1.0-2' }} <span class="text-[11px] text-gray-400">{{ l.currency }}</span> }
                   @if (l.rate !== 1) { <div class="text-[11px] text-gray-400">× {{ l.rate | lnumber: '1.0-4' }}</div> }</td>
                 <td class="td text-right">@if (l.price !== null) { {{ l.quantity * l.price * l.rate | lnumber: '1.0-0' }} }</td>
@@ -400,7 +415,12 @@ interface RegisterForm {
 
     @if (items().length) {
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">{{ 'ACQ_RECEIPT.ITEMS_N' | translate: { count: items().length } }}</div>
+        <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+          <span class="font-semibold text-gray-800">{{ 'ACQ_RECEIPT.ITEMS_N' | translate: { count: items().length } }}</span>
+          @if (session.can('PRINT_LABEL:view') || session.can('CATALOG_BIBS:view')) {
+            <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="printLabels()"><span class="material-icons text-[18px]">label</span> {{ 'ACQ_RECEIPT.PRINT_LABELS' | translate }}</button>
+          }
+        </div>
         <div class="overflow-x-auto w-full">
           <table class="w-full text-left border-collapse min-w-[760px]">
             <thead><tr>
@@ -494,6 +514,8 @@ export class ReceiptDetail implements OnInit {
     const r = this.receipt();
     return !!r && !r.completedAt && this.session.can('AB_RECEIPTS:edit');
   });
+
+  private readonly router = inject(Router);
 
   async ngOnInit(): Promise<void> {
     this.api.storeOptions().then((s) => this.stores.set(s), () => undefined);
@@ -611,6 +633,17 @@ export class ReceiptDetail implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Chuyển toàn bộ ĐKCB của phiếu sang màn in nhãn (mã vạch hoặc nhãn môn loại, người dùng chọn ở đó). */
+  protected printLabels(): void {
+    try {
+      sessionStorage.setItem(LABEL_BARCODES_KEY, JSON.stringify(this.items().map((i) => i.barcode)));
+    } catch {
+      this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
+      return;
+    }
+    void this.router.navigateByUrl('/print-labels');
   }
 
   protected async removeItem(i: ReceiptItem): Promise<void> {

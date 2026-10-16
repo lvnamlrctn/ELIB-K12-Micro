@@ -448,6 +448,122 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Extra_face_photos_are_limited_unique_and_private_to_the_tenant()
+    {
+        var staff = Staff(Interlocked.Increment(ref _nextTenantId));
+        var reader = await Read<ReaderDto>(await AddReader(staff, new ReaderRequest("XP-1", null, "Ảnh")));
+        var first = Guid.NewGuid();
+        await staff.PostAsJsonAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"), new ReaderExtraPhotoRequest(first), Json);
+        Assert.Equal("PHOTO_EXISTS", await ErrorCode(await staff.PostAsJsonAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"), new ReaderExtraPhotoRequest(first), Json)));
+        for (var i = 1; i < Elib.Patron.Domain.ReaderPhoto.MaxPerReader; i++)
+            Assert.True((await staff.PostAsJsonAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"), new ReaderExtraPhotoRequest(Guid.NewGuid()), Json)).IsSuccessStatusCode);
+        Assert.Equal("PHOTO_LIMIT", await ErrorCode(await staff.PostAsJsonAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"), new ReaderExtraPhotoRequest(Guid.NewGuid()), Json)));
+
+        var listed = await Read<List<ReaderExtraPhotoDto>>(await staff.GetAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}")));
+        Assert.Equal(Elib.Patron.Domain.ReaderPhoto.MaxPerReader, listed.Count);
+
+        var other = Staff(Interlocked.Increment(ref _nextTenantId));
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}/{first}"))).StatusCode);
+        Assert.Equal(Elib.Patron.Domain.ReaderPhoto.MaxPerReader - 1, (await Read<List<ReaderExtraPhotoDto>>(await staff.GetAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}")))).Count);
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.DeleteAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}/{first}"))).StatusCode);
+    }
+
+    private static readonly string CameraJpeg = Convert.ToBase64String([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4]);
+
+    private async Task<(ReaderDto Reader, byte[] Photo)> ReaderWithPhoto(HttpClient staff, string card, byte seed, bool extra = false)
+    {
+        var reader = await Read<ReaderDto>(await AddReader(staff, new ReaderRequest(card, null, "Mặt " + card)));
+        var photo = new byte[] { 0xFF, 0xD8, 0xFF, seed, seed, seed };
+        var file = Guid.NewGuid();
+        _factory.PhotoFiles[file] = photo;
+        if (extra) await staff.PostAsJsonAsync(U($"/api/readers/ExtraPhotos/{reader.PublicId}"), new ReaderExtraPhotoRequest(file), Json);
+        else await staff.PutAsJsonAsync(U($"/api/readers/Photo/{reader.PublicId}"), new ReaderPhotoRequest(file), Json);
+        return (reader, photo);
+    }
+
+    [Fact]
+    public async Task Face_identify_matches_main_and_extra_photos_applies_the_threshold_and_never_reads_other_tenants_photos()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var staff = Staff(tenantId);
+        Assert.True((await Read<FaceStatus>(await staff.GetAsync(U("/api/readers/FaceStatus")))).Enabled);
+
+        Assert.Null(await Read<FaceMatch?>(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json))); // chưa có ảnh nào
+
+        var (a, _) = await ReaderWithPhoto(staff, "FA-1", 10);
+        var (b, bExtra) = await ReaderWithPhoto(staff, "FA-2", 20, extra: true);
+        var other = Staff(Interlocked.Increment(ref _nextTenantId));
+        await ReaderWithPhoto(other, "FA-9", 30);
+        _factory.PhotoReads.Clear();
+
+        _factory.Matcher.Target = bExtra;
+        var hit = await Read<FaceMatch?>(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest("data:image/jpeg;base64," + CameraJpeg), Json));
+        Assert.Equal((b.PublicId, "FA-2"), (hit!.ReaderPublicId, hit.CardNo));
+        Assert.Equal(2, _factory.PhotoReads.Count); // chỉ ảnh của hai bạn đọc cùng đơn vị
+
+        _factory.Matcher.Confidence = 0.5; // dưới ngưỡng 0.7
+        Assert.Null(await Read<FaceMatch?>(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json)));
+        _factory.Matcher.Confidence = 0.9;
+        _factory.Matcher.Target = null; // không ai khớp
+        Assert.Null(await Read<FaceMatch?>(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json)));
+
+        _factory.Matcher.Fail = true; // mọi lô lỗi → báo lỗi dịch vụ, không phải "không nhận ra"
+        try
+        {
+            Assert.Equal("FACE_UNAVAILABLE", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json)));
+        }
+        finally
+        {
+            _factory.Matcher.Fail = false;
+        }
+        Assert.NotEqual(a.PublicId, hit.ReaderPublicId);
+    }
+
+    [Fact]
+    public async Task Face_identify_reports_an_error_when_no_photo_can_be_read_and_splits_big_photos_into_batches()
+    {
+        var staff = Staff(Interlocked.Increment(ref _nextTenantId));
+        var (_, p1) = await ReaderWithPhoto(staff, "FB-1", 1);
+        var (_, p2) = await ReaderWithPhoto(staff, "FB-2", 2);
+        _factory.PhotoSourceDown = true;
+        try
+        {
+            Assert.Equal("FACE_UNAVAILABLE", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json)));
+        }
+        finally
+        {
+            _factory.PhotoSourceDown = false;
+        }
+
+        // Hai ảnh 5 MB: tổng quá trần lô (8 MB) → mỗi ảnh một lô, không dồn vào một yêu cầu Gemini.
+        foreach (var file in _factory.PhotoFiles.Keys.ToList())
+            if (_factory.PhotoFiles[file] is var small && (small.SequenceEqual(p1) || small.SequenceEqual(p2)))
+                _factory.PhotoFiles[file] = [.. small, .. new byte[5_000_000]];
+        _factory.Matcher.Batches.Clear();
+        _factory.Matcher.Target = null;
+        await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(CameraJpeg), Json);
+        Assert.Equal(2, _factory.Matcher.Batches.Count(b => b.Any(x => x.Length > 4_000_000)));
+        Assert.All(_factory.Matcher.Batches, b => Assert.True(b.Count == 1 || b.Sum(x => (long)x.Length) <= 8_000_000));
+    }
+
+    [Fact]
+    public async Task Face_identify_rejects_bad_images_and_is_off_without_a_key()
+    {
+        var staff = Staff(Interlocked.Increment(ref _nextTenantId));
+        Assert.Equal("FACE_IMAGE_REQUIRED", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(" "), Json)));
+        Assert.Equal("FACE_IMAGE_INVALID", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest("không phải base64"), Json)));
+        Assert.Equal("FACE_IMAGE_INVALID", await ErrorCode(await staff.PostAsJsonAsync(U("/api/readers/FaceIdentify"), new FaceIdentifyRequest(Convert.ToBase64String([1, 2, 3, 4, 5])), Json)));
+
+        using var off = _factory.WithWebHostBuilder(b => b.UseSetting("FaceRecognition:ApiKey", ""));
+        var userId = Interlocked.Increment(ref _nextUserId);
+        _factory.Permissions.Grants[userId] = ["*"];
+        var client = off.CreateClient().WithClaims(TestClaims.Staff(Interlocked.Increment(ref _nextTenantId), userId));
+        Assert.False((await Read<FaceStatus>(await client.GetAsync(U("/api/readers/FaceStatus")))).Enabled);
+    }
+
+    [Fact]
     public async Task Photos_are_set_per_reader_and_in_bulk_by_card_number()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

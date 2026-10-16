@@ -105,6 +105,10 @@ export interface Store {
   id: number; publicId: string; code: string; name: string; storeTypeId: number | null; position: string | null; capacity: number | null; itemCount: number;
 }
 /** barcodes: ĐKCB quét/dán (in đúng thứ tự); hoặc khoảng ĐKCB / biểu ghi / kho / trạng thái. */
+/** Ảnh khuôn mặt bổ sung của bạn đọc (id file ở media). */
+export interface FaceMatch { readerPublicId: string; cardNo: string; fullName: string; confidence: number; }
+export interface ExtraPhoto { fileId: string; createdAt: string; }
+
 export interface ItemLabelRequest {
   barcodes?: string[] | null; mfn?: number | null; storeId?: number | null; itemStatus?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null;
 }
@@ -276,6 +280,7 @@ export interface RegisteredItem { publicId: string; barcode: string; mfn: number
 export interface AcqReportRequest {
   from: string | null; to: string | null; storeId: number | null; supplierId: number | null; sourceId: number | null; fundId: number | null;
   receiptCodeFrom: number | null; receiptCodeTo: number | null; receiptName: string | null; completed: boolean | null;
+  createdFrom: string | null; createdTo: string | null;
   mfnFrom: number | null; mfnTo: number | null; title: string | null; author: string | null; publisher: string | null; publishYear: string | null;
   pageIndex: number; pageSize: number;
 }
@@ -896,6 +901,12 @@ export class Api {
   deleteFineTicket(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/fine-tickets/Delete/${publicId}`)); }
   addDefaultFineReasons() { return this.post<{ added: number }>('/api/admin/circulation/fine-reasons/AddDefaults'); }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
+  faceStatus() { return this.get<{ enabled: boolean }>('/api/admin/patron/readers/FaceStatus'); }
+  /** Nhận diện bạn đọc từ ảnh camera (base64 JPEG, có hoặc không tiền tố data URL); không ai khớp → null. */
+  faceIdentify(imageBase64: string) { return this.post<FaceMatch | null>('/api/admin/patron/readers/FaceIdentify', { imageBase64 }); }
+  readerExtraPhotos(publicId: string) { return this.get<ExtraPhoto[]>(`/api/admin/patron/readers/ExtraPhotos/${publicId}`); }
+  addReaderExtraPhoto(publicId: string, fileId: string) { return this.post<ExtraPhoto>(`/api/admin/patron/readers/ExtraPhotos/${publicId}`, { fileId }); }
+  removeReaderExtraPhoto(publicId: string, fileId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/patron/readers/ExtraPhotos/${publicId}/${fileId}`)); }
   setReaderPhoto(publicId: string, fileId: string | null) { return this.put<Reader>(`/api/admin/patron/readers/Photo/${publicId}`, { fileId }); }
   /** Gán ảnh theo số thẻ (sau khi đã upload từng ảnh lên media). */
   assignReaderPhotos(items: { cardNo: string; fileId: string }[]) { return this.post<ReaderPhotosResult>('/api/admin/patron/readers/Photos', { items }); }

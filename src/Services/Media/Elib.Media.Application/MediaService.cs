@@ -45,6 +45,8 @@ public sealed record MediaFileDto(Guid Id, string Purpose, string FileName, stri
 
 public sealed record DownloadDto(string Url, DateTimeOffset? ExpiresAt);
 
+public sealed record FileContent(byte[] Bytes, string ContentType);
+
 public sealed record FileUrlsRequest(IReadOnlyList<Guid>? Ids);
 
 public sealed record FileUrlDto(Guid Id, string Url, DateTimeOffset? ExpiresAt);
@@ -170,6 +172,18 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         if (file.IsPublic) return new DownloadDto(storage.PublicUrl(file.Bucket, file.ObjectKey), null);
         var expiry = TimeSpan.FromMinutes(_options.DownloadUrlMinutes);
         return new DownloadDto(await storage.PresignGetAsync(file.Bucket, file.ObjectKey, expiry), clock.GetUtcNow() + expiry);
+    }
+
+    /// <summary>
+    /// Nội dung ảnh bạn đọc cho service khác (nhận diện khuôn mặt, service token) — chỉ file mục đích reader-photo đã xong, của đơn vị hiện tại.
+    /// Nội dung không đi qua gateway; service gọi không có quyền đọc các loại file khác.
+    /// </summary>
+    public async Task<FileContent> ReadReaderPhotoAsync(Guid fileId, CancellationToken ct)
+    {
+        var file = await FindAsync(fileId, ct);
+        if (file.Status != MediaFileStatus.Ready || file.Purpose != MediaPurpose.ReaderPhoto.Code) throw new NotFoundException("file", fileId);
+        var bytes = await storage.ReadAsync(file.Bucket, file.ObjectKey, MediaPurpose.ReaderPhoto.MaxBytes, ct);
+        return new FileContent(bytes, file.ContentType);
     }
 
     public const int MaxUrlsPerCall = 100;

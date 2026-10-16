@@ -13,6 +13,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<ReaderGroupResource>();
         services.AddCrudResource<ReaderResource>();
         services.AddScoped<ReaderImportService>();
+        services.AddScoped<FaceRecognition>();
         services.AddSingleton<IReaderImportDispatcher, ReaderImportDispatcher>();
         return services;
     }

@@ -10,10 +10,15 @@ import { ToastrService } from '../../shared/toastr';
 
 /** sessionStorage: nhãn cần in — màn chọn nhãn ghi trước khi mở trang in. */
 const PRINT_KEY = 'elib.print.labels';
-const HEADER_PREF = 'labels.header';
+export const HEADER_PREF = 'labels.header';
+/** sessionStorage: danh sách ĐKCB do màn khác (đơn nhận) chuyển sang để in nhãn ngay — đọc một lần rồi xoá. */
+export const LABEL_BARCODES_KEY = 'elib.labels.barcodes';
 
 /** Số nhãn mỗi trang A4 ngang: 5 hàng × 5 cột (ELIB-LRC: CLASS_LABELS_PER_PAGE). */
 export const LABELS_PER_PAGE = 25;
+
+/** Số ĐKCB tối đa backend nhận mỗi lần gọi in nhãn (Holdings: ItemResource.MaxLabels). */
+const LABELS_PER_REQUEST = 2000;
 
 /** barcode: nhãn mã vạch ĐKCB; spine: nhãn gáy / môn loại (DDC + Cutter). */
 export type LabelKind = 'barcode' | 'spine';
@@ -165,8 +170,12 @@ export class Labels implements OnInit {
   async ngOnInit(): Promise<void> {
     this.header.set({ parent: '', library: this.session.features()?.name ?? '' });
     this.prefs.watch<LabelHeader>(HEADER_PREF, (h) => this.header.set({ parent: h?.parent ?? '', library: h?.library ?? '' }));
+    const handed = this.takeHandedBarcodes();
     const mfn = Number(this.mfn());
-    if (mfn > 0) {
+    if (handed.length) {
+      this.list = handed.join('\n');
+      void this.load();
+    } else if (mfn > 0) {
       this.request = { ...this.request, mfn, barcodeFrom: this.from() ?? '', barcodeTo: this.to() ?? '' };
       void this.load();
     }
@@ -174,6 +183,17 @@ export class Labels implements OnInit {
       this.stores.set(await this.api.crud<Store>('stores', 'holdings').searchAll());
     } catch {
       /* thiếu quyền xem kho — chỉ mất bộ lọc kho */
+    }
+  }
+
+  private takeHandedBarcodes(): string[] {
+    try {
+      const raw = sessionStorage.getItem(LABEL_BARCODES_KEY);
+      sessionStorage.removeItem(LABEL_BARCODES_KEY);
+      const list = JSON.parse(raw ?? '[]') as unknown;
+      return Array.isArray(list) ? list.filter((b): b is string => typeof b === 'string') : [];
+    } catch {
+      return [];
     }
   }
 
@@ -187,10 +207,15 @@ export class Labels implements OnInit {
     const r = this.request;
     this.loading.set(true);
     try {
-      this.labels.set(await this.api.itemLabels({
-        barcodes: barcodes.length ? barcodes : null, mfn: r.mfn || null, storeId: r.storeId, itemStatus: r.itemStatus,
-        barcodeFrom: r.barcodeFrom?.trim() || null, barcodeTo: r.barcodeTo?.trim() || null,
-      }));
+      const query = { mfn: r.mfn || null, storeId: r.storeId, itemStatus: r.itemStatus, barcodeFrom: r.barcodeFrom?.trim() || null, barcodeTo: r.barcodeTo?.trim() || null };
+      if (barcodes.length <= LABELS_PER_REQUEST) {
+        this.labels.set(await this.api.itemLabels({ ...query, barcodes: barcodes.length ? barcodes : null }));
+      } else {
+        // Backend nhận tối đa LABELS_PER_REQUEST ĐKCB mỗi lần — chia lô, gọi lần lượt rồi nối lại (giữ thứ tự nhập).
+        const all: ItemLabel[] = [];
+        for (let i = 0; i < barcodes.length; i += LABELS_PER_REQUEST) all.push(...await this.api.itemLabels({ ...query, barcodes: barcodes.slice(i, i + LABELS_PER_REQUEST) }));
+        this.labels.set(all);
+      }
       this.loaded.set(true);
     } catch (e) {
       this.toastr.error(errorMessage(e));

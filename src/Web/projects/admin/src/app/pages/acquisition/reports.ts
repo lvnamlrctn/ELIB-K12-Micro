@@ -1,13 +1,17 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslatePipe } from '@ngx-translate/core';
+import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   AcqAccessionRow, AcqAllocation, AcqListPage, AcqLookupRow, AcqNewBookRow, AcqReportName, AcqReportRequest, AcquisitionOptions, Api, CrudPage, StoreOption,
   errorMessage, saveFile,
 } from '../../core/api';
 import { LDatePipe, LNumberPipe } from '../../core/i18n';
+import { Session } from '../../core/session';
+import { LABEL_BARCODES_KEY } from '../holdings/labels';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { ACQ_PRINT_KEY, ACQ_PRINT_MAX_ROWS, AcqPrintJob } from './report-print';
 
 type Tab = 'list' | 'lookup' | 'allocation' | 'register' | 'newbooks';
 
@@ -22,7 +26,7 @@ const TABS: { tab: Tab; label: string; report: AcqReportName; file: string }[] =
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
 
 const emptyRequest = (): AcqReportRequest => ({
-  from: '', to: '', storeId: null, supplierId: null, sourceId: null, fundId: null, receiptCodeFrom: null, receiptCodeTo: null, receiptName: '', completed: null,
+  from: '', to: '', storeId: null, supplierId: null, sourceId: null, fundId: null, receiptCodeFrom: null, receiptCodeTo: null, receiptName: '', completed: null, createdFrom: '', createdTo: '',
   mfnFrom: null, mfnTo: null, title: '', author: '', publisher: '', publishYear: '', pageIndex: 1, pageSize: 20,
 });
 
@@ -57,6 +61,11 @@ const emptyRequest = (): AcqReportRequest => ({
         <div><label for="rp-src" class="field-label">{{ 'ACQ.SOURCE' | translate }}</label>
           <select id="rp-src" class="input" [(ngModel)]="request.sourceId"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
             @for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+        <div><label for="rp-fund" class="field-label">{{ 'ACQ.FUND' | translate }}</label>
+          <select id="rp-fund" class="input" [(ngModel)]="request.fundId"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+            @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+        <div><label for="rp-crf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><input id="rp-crf" type="date" class="input" [(ngModel)]="request.createdFrom" /></div>
+        <div><label for="rp-crt" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><input id="rp-crt" type="date" class="input" [(ngModel)]="request.createdTo" /></div>
         <div><label for="rp-cf" class="field-label">{{ 'ACQ_REPORT.CODE_FROM' | translate }}</label><input id="rp-cf" type="number" min="1" class="input" [(ngModel)]="request.receiptCodeFrom" /></div>
         <div><label for="rp-ct" class="field-label">{{ 'ACQ_REPORT.CODE_TO' | translate }}</label><input id="rp-ct" type="number" min="1" class="input" [(ngModel)]="request.receiptCodeTo" /></div>
         <div><label for="rp-st" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>
@@ -68,6 +77,10 @@ const emptyRequest = (): AcqReportRequest => ({
         <div><label for="rp-mt" class="field-label">{{ 'ACQ_REPORT.MFN_TO' | translate }}</label><input id="rp-mt" type="number" min="1" class="input" [(ngModel)]="request.mfnTo" /></div>
       }
       <div class="col-span-2 md:col-span-4 flex gap-2 justify-end">
+        @if (tab() === 'register' && (session.can('PRINT_LABEL:view') || session.can('CATALOG_BIBS:view'))) {
+          <button class="btn-secondary" [disabled]="busy()" (click)="printLabels()"><span class="material-icons text-[18px]">label</span> {{ 'ACQ_RECEIPT.PRINT_LABELS' | translate }}</button>
+        }
+        <button class="btn-secondary" [disabled]="busy()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'ACQ_REPORT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
       </div>
@@ -189,6 +202,9 @@ const emptyRequest = (): AcqReportRequest => ({
 export class AcquisitionReports implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
+  protected readonly session = inject(Session);
+  private readonly i18n = inject(TranslateService);
 
   protected readonly tabs = TABS;
   protected readonly tab = signal<Tab>('list');
@@ -262,11 +278,125 @@ export class AcquisitionReports implements OnInit {
     }
   }
 
+  /** Lấy hết các trang của báo cáo đang xem (trần ACQ_PRINT_MAX_ROWS dòng) rồi mở trang in theo mẫu giấy. */
+  protected async print(): Promise<void> {
+    const t = TABS.find((x) => x.tab === this.tab())!;
+    this.busy.set(true);
+    try {
+      const job = await this.buildPrintJob(t);
+      if (!job.rows.length) {
+        this.toastr.warning('ACQ_REPORT.NOTHING_TO_PRINT');
+        return;
+      }
+      try {
+        sessionStorage.setItem(ACQ_PRINT_KEY, JSON.stringify(job));
+      } catch {
+        this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
+        return;
+      }
+      void this.router.navigateByUrl('/print/acq-report');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** In nhãn cho các ĐKCB của sổ đăng ký cá biệt đang lọc (tối đa ACQ_PRINT_MAX_ROWS dòng). */
+  protected async printLabels(): Promise<void> {
+    this.busy.set(true);
+    try {
+      const all = await this.allPages<AcqAccessionRow>('AccessionRegister', (p) => p.totalCount ?? 0);
+      if (all.truncated) this.toastr.warning('ACQ_REPORT.LABELS_TRUNCATED', { max: ACQ_PRINT_MAX_ROWS });
+      const barcodes = all.rows.map((x) => x.barcode);
+      if (!barcodes.length) {
+        this.toastr.warning('ACQ_REPORT.NOTHING_TO_PRINT');
+        return;
+      }
+      try {
+        sessionStorage.setItem(LABEL_BARCODES_KEY, JSON.stringify(barcodes));
+      } catch {
+        this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
+        return;
+      }
+      void this.router.navigateByUrl('/print-labels');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private async allPages<R>(name: AcqReportName, total: (p: { items: R[]; total?: number; totalCount?: number }) => number): Promise<{ rows: R[]; truncated: boolean; first: { items: R[] } }> {
+    const size = 500;
+    const rows: R[] = [];
+    let first: { items: R[] } | null = null;
+    for (let page = 1; ; page++) {
+      const p = await this.api.acqReport<{ items: R[]; total?: number; totalCount?: number }>(name, { ...this.body(), pageIndex: page, pageSize: size });
+      first ??= p;
+      rows.push(...p.items);
+      if (!p.items.length || rows.length >= total(p) || rows.length >= ACQ_PRINT_MAX_ROWS) break;
+    }
+    return { rows: rows.slice(0, ACQ_PRINT_MAX_ROWS), truncated: total(first!) > ACQ_PRINT_MAX_ROWS, first: first! };
+  }
+
+  private async buildPrintJob(t: { tab: Tab; label: string; report: AcqReportName }): Promise<AcqPrintJob> {
+    const tr = (k: string) => this.i18n.instant(k) as string;
+    const num = (v: number, digits = 0) => v.toLocaleString('vi-VN', { maximumFractionDigits: digits });
+    const date = (v: string | null) => (v ? v.split('-').reverse().join('/') : '');
+    const r = this.request;
+    const range = (a: string, b: string) => (a && b ? `Từ ngày ${date(a)} đến ngày ${date(b)}` : a ? `Từ ngày ${date(a)}` : b ? `Đến ngày ${date(b)}` : '');
+    const base = { title: tr(t.label), subtitle: range(r.from ?? '', r.to ?? ''), total: null as string[] | null, truncated: false };
+    switch (t.tab) {
+      case 'list': {
+        const all = await this.allPages<AcqListPage['items'][number]>(t.report, (p) => p.total ?? 0);
+        const page = all.first as unknown as AcqListPage;
+        return {
+          ...base, truncated: all.truncated,
+          headers: [tr('ACQ_REPORT.RECEIPT'), tr('ACQ_RECEIPT.RECEIVED_ON'), tr('ITEMS_PAGE.TITLE_COL'), tr('ACQ.QUANTITY'), tr('ACQ.PRICE'), tr('ACQ.AMOUNT')],
+          rows: all.rows.map((x) => ['#' + x.receiptId, date(x.receivedOn), `${x.title} (MFN ${x.mfn})`, num(x.quantity), x.price === null ? '' : num(x.price, 2) + ' ' + (x.currency ?? ''), num(x.total)]),
+          total: [tr('STORE_STATS.TOTAL'), '', '', num(page.quantity), '', num(page.amount)], right: [3, 4, 5],
+        };
+      }
+      case 'lookup': {
+        const all = await this.allPages<AcqLookupRow>(t.report, (p) => p.totalCount ?? 0);
+        return {
+          ...base, truncated: all.truncated, right: [],
+          headers: ['MFN', tr('ACQ_REPORT.RECEIPT'), tr('ACQ_REPORT.DOCUMENT'), tr('ACQ_RECEIPT.RECEIVED_ON'), tr('ACQ.SOURCE'), tr('ACQ_RECEIPT.STORE')],
+          rows: all.rows.map((x) => [String(x.mfn), '#' + x.receiptId, x.isbd, date(x.receivedOn), x.sourceName ?? '', this.storeName(x)]),
+        };
+      }
+      case 'allocation': {
+        const a = await this.api.acqReport<AcqAllocation>(t.report, this.body());
+        return {
+          ...base, truncated: false, right: [1], headers: [tr('ITEMS_PAGE.STORE'), tr('ACQ_REPORT.COPIES')],
+          rows: a.items.map((x) => [x.storeName ?? tr('ACQ_REPORT.NO_STORE'), num(x.copies)]), total: [tr('STORE_STATS.TOTAL'), num(a.total)],
+        };
+      }
+      case 'register': {
+        const all = await this.allPages<AcqAccessionRow>(t.report, (p) => p.totalCount ?? 0);
+        return {
+          ...base, truncated: all.truncated, right: [5],
+          headers: [tr('ITEMS_PAGE.BARCODE'), tr('ITEMS_PAGE.TITLE_COL'), tr('ITEMS_PAGE.AUTHOR'), tr('ITEMS_PAGE.STORE'), tr('ACQ_RECEIPT.RECEIVED_ON'), tr('ACQ.PRICE')],
+          rows: all.rows.map((x) => [x.barcode, `${x.title ?? ''} (MFN ${x.mfn})`, x.author ?? '', x.storeName ?? '', date(x.date), x.price === null ? '' : num(x.price, 2) + ' ' + (x.currency ?? '')]),
+        };
+      }
+      case 'newbooks': {
+        const all = await this.allPages<AcqNewBookRow>(t.report, (p) => p.totalCount ?? 0);
+        return {
+          ...base, truncated: all.truncated, right: [],
+          headers: ['MFN', tr('ITEMS_PAGE.TITLE_COL'), tr('ITEMS_PAGE.AUTHOR'), tr('ACQ.PUBLISHER'), tr('ACQ.YEAR'), tr('ACQ_REPORT.CATALOGED_ON')],
+          rows: all.rows.map((x) => [String(x.mfn), x.title, x.author ?? '', x.publisher ?? '', x.publishYear ?? '', date(x.catalogedOn)]),
+        };
+      }
+    }
+  }
+
   private body(): AcqReportRequest {
     const text = (v: string | null) => v?.trim() || null;
     const r = this.request;
     return {
-      ...r, from: r.from || null, to: r.to || null, receiptName: text(r.receiptName), title: text(r.title), author: text(r.author),
+      ...r, from: r.from || null, to: r.to || null, createdFrom: r.createdFrom || null, createdTo: r.createdTo || null, receiptName: text(r.receiptName), title: text(r.title), author: text(r.author),
       publisher: text(r.publisher), publishYear: text(r.publishYear),
     };
   }

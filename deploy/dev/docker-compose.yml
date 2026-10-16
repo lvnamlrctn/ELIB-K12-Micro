@@ -291,6 +291,10 @@ services:
       ConnectionStrings__PatronDb: Host=postgres;Database=elib_patron;Username=patron_app;Password=${PATRON_DB_PASSWORD}
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PATRON_SECRET}
+      Media__Url: http://media:8080
+      # Nhận diện khuôn mặt (Gemini) — để trống = tắt. Bật thì ảnh bạn đọc và ảnh camera được gửi tới Google. Giới hạn theo đơn vị: thêm FaceRecognition__AllowedTenantIds__0=<id> (trống = mọi đơn vị).
+      FaceRecognition__ApiKey: ${FACE_GEMINI_API_KEY:-}
+      FaceRecognition__Model: ${FACE_GEMINI_MODEL:-gemini-2.0-flash-lite}
 
   # GĐ1: biên mục MARC21 — loại biểu ghi, biểu mẫu, biểu ghi (phát BibChanged cho kho/lưu thông/tra cứu…).
   catalog:

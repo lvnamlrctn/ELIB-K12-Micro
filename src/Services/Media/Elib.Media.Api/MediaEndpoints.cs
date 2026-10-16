@@ -28,6 +28,15 @@ public static class MediaEndpoints
         system.MapPost("/uploads", (SystemUploadRequest request, MediaService s, CancellationToken ct) => s.RequestSystemUploadAsync(request, ct));
         system.MapPost("/{tenantId:long}/{id:guid}/complete", (long tenantId, Guid id, MediaService s, CancellationToken ct)
             => s.CompleteSystemAsync(tenantId, id, ct));
+        // Nội bộ: service khác đọc nội dung ảnh bạn đọc (nhận diện khuôn mặt) — chỉ service token, không qua gateway.
+        app.MapGet("/internal/tenants/{tenantId:long}/files/{id:guid}/content", async (long tenantId, Guid id, ITenantContext tenant, MediaService s, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+            {
+                var content = await s.ReadReaderPhotoAsync(id, ct);
+                return Results.File(content.Bytes, content.ContentType);
+            }
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }
 

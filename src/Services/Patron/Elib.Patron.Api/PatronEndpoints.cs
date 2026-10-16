@@ -48,6 +48,20 @@ public static class PatronEndpoints
             CancellationToken ct) => r.SetGroupsAsync(publicId, request, ct));
         readers.MapPut("/Photo/{publicId:guid}", [Permission("READERS", "edit")] (Guid publicId, ReaderPhotoRequest request, ReaderResource r, CancellationToken ct)
             => r.SetPhotoAsync(publicId, request.FileId, ct));
+        // Nhận diện khuôn mặt tại quầy mượn trả: chỉ nhận diện (không ghi gì), nên cán bộ xem bạn đọc hoặc mượn trả đều gọi được.
+        readers.MapGet("/FaceStatus", [PermissionAny("READERS:view", "BORROW:view", "BORROW:add")] (FaceRecognition f) => f.Status());
+        readers.MapPost("/FaceIdentify", [PermissionAny("READERS:view", "BORROW:view", "BORROW:add")] (FaceIdentifyRequest request, FaceRecognition f, CancellationToken ct)
+            => f.IdentifyAsync(request.ImageBase64, ct));
+        // Ảnh khuôn mặt bổ sung (tối đa ReaderPhoto.MaxPerReader mỗi bạn đọc): dùng cùng ảnh thẻ khi nhận diện khuôn mặt.
+        readers.MapGet("/ExtraPhotos/{publicId:guid}", [Permission("READERS", "view")] (Guid publicId, ReaderResource r, CancellationToken ct)
+            => r.ExtraPhotosAsync(publicId, ct));
+        readers.MapPost("/ExtraPhotos/{publicId:guid}", [Permission("READERS", "edit")] (Guid publicId, ReaderExtraPhotoRequest request, ReaderResource r, CancellationToken ct)
+            => r.AddExtraPhotoAsync(publicId, request.FileId, ct));
+        readers.MapDelete("/ExtraPhotos/{publicId:guid}/{fileId:guid}", [Permission("READERS", "edit")] async (Guid publicId, Guid fileId, ReaderResource r, CancellationToken ct) =>
+        {
+            await r.RemoveExtraPhotoAsync(publicId, fileId, ct);
+            return Results.NoContent();
+        });
         readers.MapPost("/Photos", [Permission("READERS", "edit")] (ReaderPhotosRequest request, ReaderResource r, CancellationToken ct)
             => r.SetPhotosAsync(request, ct));
         // Nội bộ: service khác lấy trạng thái bạn đọc khi bản sao chưa có (không qua gateway, chỉ service token).

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Elib.Acquisition.Application;
+using Elib.Acquisition.Domain;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
@@ -12,6 +13,7 @@ using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Platform;
 using MassTransit;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -25,8 +27,19 @@ public sealed class BibChangedConsumer(BibSnapshots snapshots, ICrudDbContext db
 
     protected override async Task HandleAsync(BibChanged message, ConsumeContext<BibChanged> context)
     {
-        await snapshots.ApplyAsync(message, context.CancellationToken);
-        await db.SaveChangesAsync(context.CancellationToken);
+        var ct = context.CancellationToken;
+        var snapshot = await snapshots.ApplyAsync(message, ct);
+        await db.SaveChangesAsync(ct);
+        // Biểu ghi được sửa (event mới hơn đã áp dụng): dòng phiếu nhận / đơn đặt chép nhan đề, tác giả lúc lưu — làm mới để báo cáo,
+        // tìm kiếm và màn dòng cùng thấy bản mới.
+        if (snapshot.Version != message.Version || snapshot.Deleted) return;
+        var title = snapshot.Title.Length <= 1000 ? snapshot.Title : snapshot.Title[..1000];
+        var author = snapshot.Author is { Length: > 500 } a ? a[..500] : snapshot.Author;
+        var bib = snapshot.BibPublicId;
+        await db.Set<ReceiptLine>().Where(l => l.BibPublicId == bib && (l.Title != title || l.Author != author))
+            .ExecuteUpdateAsync(u => u.SetProperty(l => l.Title, title).SetProperty(l => l.Author, author), ct);
+        await db.Set<OrderLine>().Where(l => l.BibPublicId == bib && (l.Title != title || l.Author != author))
+            .ExecuteUpdateAsync(u => u.SetProperty(l => l.Title, title).SetProperty(l => l.Author, author), ct);
     }
 }
 

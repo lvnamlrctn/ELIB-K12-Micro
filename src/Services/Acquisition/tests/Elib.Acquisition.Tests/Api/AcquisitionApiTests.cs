@@ -221,6 +221,59 @@ public sealed class AcquisitionApiTests : IClassFixture<AcquisitionApiFactory>, 
     }
 
     [Fact]
+    public async Task Receipt_list_filters_by_fund_and_creation_date()
+    {
+        var staff = Staff(NewTenant());
+        var fund = await Read<FundDto>(await staff.PostAsJsonAsync(U("/api/funds/Add"), new FundRequest("Quỹ sách giáo khoa"), Json));
+        var withFund = await Read<ReceiptDto>(await staff.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 9, 1), "Có quỹ", FundId: fund.Id), Json));
+        await staff.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 9, 1), "Không quỹ"), Json);
+
+        var byFund = await Read<CrudPage<ReceiptDto>>(await staff.PostAsJsonAsync(U("/api/receipts/Search"), new ReceiptSearch { FundId = fund.Id }, Json));
+        Assert.Equal(withFund.PublicId, Assert.Single(byFund.Items).PublicId);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var created = await Read<CrudPage<ReceiptDto>>(await staff.PostAsJsonAsync(U("/api/receipts/Search"),
+            new ReceiptSearch { CreatedFrom = today.AddDays(-1), CreatedTo = today.AddDays(1) }, Json));
+        Assert.Equal(2, created.TotalCount);
+        var past = await Read<CrudPage<ReceiptDto>>(await staff.PostAsJsonAsync(U("/api/receipts/Search"), new ReceiptSearch { CreatedTo = today.AddDays(-2) }, Json));
+        Assert.Equal(0, past.TotalCount);
+    }
+
+    [Fact]
+    public async Task Receipt_line_accepts_a_bib_just_created_in_catalog_before_its_event_arrives()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var bib = Bib(tenantId, "Vừa biên mục trong phiếu nhận");
+        _factory.CatalogBibs.Bibs[(tenantId, bib.Mfn)] = bib; // catalog đã có, bản sao ở acquisition chưa có (event chưa tới)
+        var receipt = await Read<ReceiptDto>(await staff.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 10, 1)), Json));
+
+        var line = await Read<ReceiptLineDto>(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"), new ReceiptLineRequest(Mfn: bib.Mfn, Quantity: 2), Json));
+        Assert.Equal((bib.Mfn, "Vừa biên mục trong phiếu nhận", 2), (line.Mfn, line.Title, line.Quantity));
+    }
+
+    [Fact]
+    public async Task Receipt_list_can_be_limited_to_my_receipts_and_lines_follow_the_edited_bib()
+    {
+        var tenantId = NewTenant();
+        var me = Staff(tenantId);
+        var other = Staff(tenantId);
+        var mine = await Read<ReceiptDto>(await me.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 9, 1), "Của tôi"), Json));
+        await other.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 9, 1), "Của người khác"), Json);
+        var page = await Read<CrudPage<ReceiptDto>>(await me.PostAsJsonAsync(U("/api/receipts/Search"), new ReceiptSearch { Mine = true }, Json));
+        Assert.Equal(mine.PublicId, Assert.Single(page.Items).PublicId);
+        Assert.Equal(2, (await Read<CrudPage<ReceiptDto>>(await me.PostAsJsonAsync(U("/api/receipts/Search"), new ReceiptSearch(), Json))).TotalCount);
+
+        var bib = await PublishBib(tenantId, "Tên cũ");
+        await me.PostAsJsonAsync(U($"/api/receipts/SaveLine/{mine.PublicId}"), new ReceiptLineRequest(Mfn: bib.Mfn, Quantity: 1), Json);
+        var edited = new BibChanged { TenantId = tenantId, BibPublicId = bib.BibPublicId, Mfn = bib.Mfn, Title = "Tên mới", Author = "Nam Cao", Isbns = [], Status = 2, Version = 5 };
+        await _factory.PublishAsync(edited);
+        await _factory.WaitConsumedAsync(edited);
+        var view = await Read<ReceiptLinesView>(await me.GetAsync(U($"/api/receipts/Lines/{mine.PublicId}")));
+        Assert.Equal("Tên mới", Assert.Single(view.Lines).Title);
+    }
+
+    [Fact]
     public async Task Bib_lookup_by_mfn_asks_catalog_when_the_replica_misses_and_other_tenants_are_isolated()
     {
         var tenantId = NewTenant();

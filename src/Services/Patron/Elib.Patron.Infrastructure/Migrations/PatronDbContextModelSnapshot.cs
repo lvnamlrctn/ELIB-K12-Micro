@@ -632,6 +632,47 @@ namespace Elib.Patron.Infrastructure.Migrations
                     b.ToTable("reader_import_jobs", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Patron.Domain.ReaderPhoto", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<long>("ReaderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reader_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reader_photos");
+
+                    b.HasIndex("ReaderId")
+                        .HasDatabaseName("ix_reader_photos_reader_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_reader_photos_tenant_id");
+
+                    b.HasIndex("TenantId", "ReaderId", "FileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reader_photos_tenant_id_reader_id_file_id");
+
+                    b.ToTable("reader_photos", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Patron.Domain.ReaderType", b =>
                 {
                     b.Property<long>("Id")
@@ -1034,6 +1075,16 @@ namespace Elib.Patron.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_reader_group_members_readers_reader_id");
+                });
+
+            modelBuilder.Entity("Elib.Patron.Domain.ReaderPhoto", b =>
+                {
+                    b.HasOne("Elib.Patron.Domain.Reader", null)
+                        .WithMany()
+                        .HasForeignKey("ReaderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reader_photos_readers_reader_id");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

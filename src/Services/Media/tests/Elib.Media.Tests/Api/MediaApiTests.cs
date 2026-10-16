@@ -95,6 +95,26 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Service_can_read_reader_photo_bytes_only_for_its_own_tenant_and_only_that_purpose()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var client = Staff(tenantId);
+        var t = await Ticket(client, "reader-photo", "image/png", PngBytes.Length, "anh.png");
+        _factory.Storage.Upload(t.UploadUrl, PngBytes);
+        await Read<MediaFileDto>(await client.PostAsync(U($"/api/files/{t.FileId}/complete"), null));
+        var logo = await Ticket(client, "attachment", "image/png", PngBytes.Length, "tep.png");
+        _factory.Storage.Upload(logo.UploadUrl, PngBytes);
+        await Read<MediaFileDto>(await client.PostAsync(U($"/api/files/{logo.FileId}/complete"), null));
+
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        var ok = await service.GetAsync(U($"/internal/tenants/{tenantId}/files/{t.FileId}/content"));
+        Assert.Equal(PngBytes, await ok.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/files/{logo.FileId}/content"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{Interlocked.Increment(ref _nextTenantId)}/files/{t.FileId}/content"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(U($"/internal/tenants/{tenantId}/files/{t.FileId}/content"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Content_that_is_not_the_declared_type_is_rejected_and_deleted()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

@@ -25,8 +25,18 @@ public sealed class ReceiptSearch : CrudSearch
     public bool? Completed { get; set; }
     public long? SupplierId { get; set; }
     public long? SourceId { get; set; }
+    public long? FundId { get; set; }
+
+    /// <summary>true = chỉ phiếu do người đang đăng nhập lập (lọc theo người tạo, không cần quyền xem danh sách tài khoản).</summary>
+    public bool Mine { get; set; }
+
     public DateOnly? From { get; set; }
     public DateOnly? To { get; set; }
+
+    /// <summary>Ngày lập phiếu (giờ Việt Nam) từ … đến … — khác ngày nhận <see cref="From"/>/<see cref="To"/>.</summary>
+    public DateOnly? CreatedFrom { get; set; }
+
+    public DateOnly? CreatedTo { get; set; }
 }
 
 public sealed record ReceiptDto(
@@ -90,6 +100,18 @@ public sealed class ReceiptResource(
         if (search.Completed is { } done) query = done ? query.Where(x => x.CompletedAt != null) : query.Where(x => x.CompletedAt == null);
         if (search.SupplierId is { } supplier) query = query.Where(x => x.SupplierId == supplier);
         if (search.SourceId is { } source) query = query.Where(x => x.SourceId == source);
+        if (search.Mine && actor.Id is { } me) query = query.Where(x => x.CreatedBy == me);
+        if (search.FundId is { } fund) query = query.Where(x => x.FundId == fund);
+        if (search.CreatedFrom is { } createdFrom)
+        {
+            var start = VietnamDate.Start(createdFrom);
+            query = query.Where(x => x.CreatedAt >= start);
+        }
+        if (search.CreatedTo is { } createdTo)
+        {
+            var end = VietnamDate.Start(createdTo.AddDays(1));
+            query = query.Where(x => x.CreatedAt < end);
+        }
         if (search.From is { } from) query = query.Where(x => x.ReceivedOn >= from);
         if (search.To is { } to) query = query.Where(x => x.ReceivedOn <= to);
         if (search.Term is { } term)
