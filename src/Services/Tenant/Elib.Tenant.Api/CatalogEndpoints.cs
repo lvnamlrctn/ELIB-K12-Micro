@@ -13,7 +13,8 @@ public static class CatalogEndpoints
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapCrud<SystemParameterResource>("/api/system-parameters", "SYSTEM_PARAMS").WithTags("SystemParameters");
-        app.MapCrud<CurrencyResource>("/api/currencies", "CURRENCIES").WithTags("Currencies");
+        var currencies = app.MapCrud<CurrencyResource>("/api/currencies", "CURRENCIES").WithTags("Currencies");
+        currencies.MapGet("/Options", [PermissionAny("CURRENCIES:view", "AB_ORDERS:view", "AB_RECEIPTS:view")] (CurrencyResource r, CancellationToken ct) => r.ActiveAsync(ct));
         app.MapCrud<NationalityResource>("/api/nationalities", "NATIONALITIES").WithTags("Nationalities");
         app.MapCrud<EthnicityResource>("/api/ethnicities", "ETHNICS").WithTags("Ethnicities");
         app.MapCrud<AcademicTitleResource>("/api/academic-titles", "PROFS").WithTags("AcademicTitles");

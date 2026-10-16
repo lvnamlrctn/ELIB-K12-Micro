@@ -1,10 +1,30 @@
 # Bề mặt public của Elib.Contracts.Events — sinh bởi ContractCompatibilityTests, KHÔNG sửa tay.
 # Dòng bị xoá/đổi trong diff của PR = thay đổi phá vỡ contract.
+type Elib.Contracts.Events.Acquisition.ReceiptChanged class : Elib.Contracts.Events.IntegrationEvent
+  Code : System.Int64 required
+  Completed : System.Boolean
+  Deleted : System.Boolean
+  Lines : IReadOnlyList<Elib.Contracts.Events.Acquisition.ReceiptLineState>
+  Name : System.String?
+  ReceiptPublicId : System.Guid required
+  ReceivedOn : Nullable<System.DateOnly>
+  SourceName : System.String?
+  StoreId : Nullable<System.Int64>
+  SupplierName : System.String?
+  Version : System.Int64
+type Elib.Contracts.Events.Acquisition.ReceiptLineState class
+  BibPublicId : System.Guid required
+  Currency : System.String?
+  LinePublicId : System.Guid required
+  Mfn : System.Int64 required
+  Price : Nullable<System.Decimal>
+  Quantity : System.Int32 required
 type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.IntegrationEvent
   Author : System.String?
   BibPublicId : System.Guid required
   BibTypeId : Nullable<System.Int64>
   BibTypeName : System.String?
+  CatalogedAt : Nullable<System.DateTimeOffset>
   CoverUrl : System.String?
   Cutter : System.String?
   Ddc : System.String?

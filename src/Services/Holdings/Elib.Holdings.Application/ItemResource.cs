@@ -22,6 +22,9 @@ public sealed class ItemSearch : CrudSearch
     public string? ItemStatus { get; set; }
     public string? BarcodeFrom { get; set; }
     public string? BarcodeTo { get; set; }
+
+    /// <summary>Bản đăng ký theo phiếu nhận này (phân hệ bổ sung).</summary>
+    public Guid? ReceiptPublicId { get; set; }
 }
 
 /// <summary>Thêm một ĐKCB nhập tay (monolith: RegisterSingleBarcode) — cần Mfn, Barcode. Sửa: chỉ kho và ghi chú.</summary>
@@ -30,7 +33,7 @@ public sealed record ItemRequest(long? Mfn = null, string? Barcode = null, long?
 public sealed record ItemDto(
     long Id, Guid PublicId, string Barcode, long Mfn, Guid BibPublicId, string? Title, string? Author, string? PublishYear, string? Ddc,
     long? StoreId, string? StoreCode, string? StoreName, string Status, string? Note, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
-    bool OnLoan = false, string? LoanCardNo = null, DateTimeOffset? LoanDueAt = null);
+    bool OnLoan = false, string? LoanCardNo = null, DateTimeOffset? LoanDueAt = null, Guid? ReceiptPublicId = null, long? ReceiptCode = null);
 
 /// <summary>
 /// Đăng ký ĐKCB theo lô cho một biểu ghi (monolith: RegisterBarcodes / BarcodeNumbering): <see cref="Quantity"/> mã liên tiếp
@@ -69,7 +72,8 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
         x.StoreId,
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Code).FirstOrDefault(),
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Name).FirstOrDefault(),
-        x.Status, x.Note, x.Version, x.CreatedAt, x.UpdatedAt, x.OnLoan, x.OnLoan ? x.LoanCardNo : null, x.OnLoan ? x.LoanDueAt : null);
+        x.Status, x.Note, x.Version, x.CreatedAt, x.UpdatedAt, x.OnLoan, x.OnLoan ? x.LoanCardNo : null, x.OnLoan ? x.LoanDueAt : null,
+        x.ReceiptPublicId, Db.Set<ReceiptSnapshot>().Where(r => r.ReceiptPublicId == x.ReceiptPublicId).Select(r => (long?)r.Code).FirstOrDefault());
 
     protected override Item Create(ItemRequest request) => throw new NotSupportedException("Bản sách tạo qua CreateAsync (cần tra biểu ghi).");
 
@@ -87,6 +91,7 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
     {
         if (s.Mfn is { } mfn) query = query.Where(x => x.BibId == mfn);
         if (s.StoreId is { } store) query = query.Where(x => x.StoreId == store);
+        if (s.ReceiptPublicId is { } receipt) query = query.Where(x => x.ReceiptPublicId == receipt);
         if (!string.IsNullOrWhiteSpace(s.ItemStatus))
         {
             var status = s.ItemStatus.Trim().ToUpperInvariant();
@@ -134,11 +139,25 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
     public async Task<IReadOnlyList<ItemDto>> RegisterAsync(RegisterItemsRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var bib = await bibs.RequireAsync(request.Mfn, ct);
+        var items = await AddBatchAsync(bib, request, attach: null, ct);
+        if (AuditSink is not null)
+            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, bib.BibPublicId, CrudChange.Added,
+                $"Đăng ký {items.Count} ĐKCB {items[0].Barcode}–{items[^1].Barcode} cho MFN {bib.Mfn}"), ct);
+        await Db.SaveChangesAsync(ct);
+        return await ListAsync(items.Select(i => i.Id).ToList(), ct);
+    }
+
+    /// <summary>
+    /// Thêm một lô ĐKCB liên tiếp cho biểu ghi (chưa lưu — nơi gọi SaveChanges): kiểm tra số lượng, tiền tố, kho, trùng mã; phát
+    /// ItemChanged. <paramref name="attach"/>: gắn thêm thông tin trước khi phát event (vd dòng phiếu nhận).
+    /// </summary>
+    internal async Task<List<Item>> AddBatchAsync(BibSnapshot bib, RegisterItemsRequest request, Action<Item>? attach, CancellationToken ct)
+    {
         if (request.Quantity is < 1 or > MaxBatch)
             throw new BusinessRuleException("QUANTITY_INVALID", $"Số lượng đăng ký từ 1 đến {MaxBatch} bản mỗi lần.");
         var digits = Math.Clamp(request.Digits, 1, 18);
         var prefix = NormalizePrefix(request.Prefix);
-        var bib = await bibs.RequireAsync(request.Mfn, ct);
         await EnsureStoreAsync(request.StoreId, ct);
 
         var start = request.StartNumber is > 0 ? request.StartNumber.Value : await MaxNumberAsync(prefix, ct) + 1;
@@ -153,16 +172,22 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
         var items = values.Select(v => Item.Register(bib, v, request.StoreId)).ToList();
         foreach (var item in items)
         {
+            attach?.Invoke(item);
             Set.Add(item);
             await events.PublishAsync(item, deleted: false, ct);
         }
-        if (AuditSink is not null)
-            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, bib.BibPublicId, CrudChange.Added,
-                $"Đăng ký {items.Count} ĐKCB {values[0]}–{values[^1]} cho MFN {bib.Mfn}"), ct);
-        await Db.SaveChangesAsync(ct);
+        return items;
+    }
 
-        var ids = items.Select(i => i.Id).ToList();
-        return await Set.AsNoTracking().Where(x => ids.Contains(x.Id)).OrderBy(x => x.BarcodeKey).Select(Projection).ToListAsync(ct);
+    /// <summary>Thêm một ĐKCB nhập tay (chưa lưu): kiểm tra trùng mã, kho; phát ItemChanged.</summary>
+    internal async Task<Item> AddSingleAsync(BibSnapshot bib, string barcode, long? storeId, Action<Item>? attach, CancellationToken ct)
+    {
+        var item = Item.Register(bib, barcode, storeId);
+        attach?.Invoke(item);
+        await ValidateAsync(item, ct);
+        Set.Add(item);
+        await events.PublishAsync(item, deleted: false, ct);
+        return item;
     }
 
     /// <summary>Số ĐKCB tiếp theo của tiền tố — hiện trước cho cán bộ khi đăng ký theo lô.</summary>

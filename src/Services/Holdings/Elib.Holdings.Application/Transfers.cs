@@ -22,9 +22,13 @@ public sealed class TransferCandidateSearch : CrudSearch
     public string? BarcodeFrom { get; set; }
     public string? BarcodeTo { get; set; }
 
+    /// <summary>Chỉ bản đăng ký theo phiếu nhận này (phiếu giao nhận: sách của đơn nhận).</summary>
+    public Guid? ReceiptPublicId { get; set; }
+
     public ItemSearch ToItemSearch() => new()
     {
-        Keyword = Keyword, Mfn = Mfn, BarcodeFrom = BarcodeFrom, BarcodeTo = BarcodeTo, PageIndex = PageIndex, PageSize = PageSize,
+        Keyword = Keyword, Mfn = Mfn, BarcodeFrom = BarcodeFrom, BarcodeTo = BarcodeTo, ReceiptPublicId = ReceiptPublicId, PageIndex = PageIndex,
+        PageSize = PageSize,
     };
 }
 
@@ -230,7 +234,8 @@ public sealed class StoreMoveResource(ICrudDbContext db, ItemResource items, Ite
 
 public sealed record DeliveryRequest(
     string? DelivererName = null, string? DelivererAddress = null, string? ReceiverName = null, string? ReceiverAddress = null,
-    DateOnly? DeliveredOn = null, DateOnly? ReceivedOn = null, long? StoreId = null, int Status = DeliveryStatus.Delivering, string? Note = null);
+    DateOnly? DeliveredOn = null, DateOnly? ReceivedOn = null, long? StoreId = null, int Status = DeliveryStatus.Delivering, string? Note = null,
+    Guid? ReceiptPublicId = null);
 
 public sealed class DeliverySearch : CrudSearch
 {
@@ -242,12 +247,15 @@ public sealed class DeliverySearch : CrudSearch
 public sealed record DeliveryDto(
     long Id, Guid PublicId, string? DelivererName, string? DelivererAddress, string? ReceiverName, string? ReceiverAddress, DateOnly? DeliveredOn,
     DateOnly? ReceivedOn, long? StoreId, string? StoreName, int Status, string? Note, DateTimeOffset? SignedAt, int ShelvedCount, int LineCount,
-    DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, Guid? ReceiptPublicId = null, long? ReceiptCode = null);
+
+/// <summary>Đơn nhận chọn được cho phiếu giao nhận: đã hoàn tất, còn <see cref="Pending"/> bản chưa xếp giá chưa phân bổ.</summary>
+public sealed record DeliveryReceiptOption(Guid PublicId, long Code, string? Name, DateOnly? ReceivedOn, long? StoreId, int Pending);
 
 /// <summary>
 /// Phiếu giao nhận sách mới về kho (monolith: CatalogueDelivererController, quyền AB_DELIVERERS). Chọn bản "chưa xếp giá" chưa nằm ở
 /// phiếu giao nhận nào; ký nhận (khi "Đã nhận đủ") → các bản còn "chưa xếp giá" sang sẵn sàng phục vụ ở kho nhận của phiếu, phiếu khoá.
-/// Monolith liệt kê sách theo đơn nhận của phân hệ bổ sung — chờ service acquisition, hiện chọn theo MFN/ĐKCB/nhan đề.
+/// Chọn đơn nhận (phiếu nhận đã hoàn tất của phân hệ bổ sung) thì màn chọn sách liệt kê bản của đơn đó; vẫn tìm được theo MFN/ĐKCB/nhan đề.
 /// </summary>
 public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, ItemEvents events, TimeProvider clock)
     : CrudResource<DeliveryResource, Delivery, DeliverySearch, DeliveryRequest, DeliveryDto>(db)
@@ -259,13 +267,15 @@ public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, Item
     protected override Expression<Func<Delivery, DeliveryDto>> Projection => x => new DeliveryDto(
         x.Id, x.PublicId, x.DelivererName, x.DelivererAddress, x.ReceiverName, x.ReceiverAddress, x.DeliveredOn, x.ReceivedOn, x.StoreId,
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Name).FirstOrDefault(), x.Status, x.Note, x.SignedAt, x.ShelvedCount,
-        Db.Set<DeliveryLine>().Count(l => l.DeliveryId == x.Id), x.CreatedAt, x.UpdatedAt);
+        Db.Set<DeliveryLine>().Count(l => l.DeliveryId == x.Id), x.CreatedAt, x.UpdatedAt, x.ReceiptPublicId,
+        Db.Set<ReceiptSnapshot>().Where(r => r.ReceiptPublicId == x.ReceiptPublicId).Select(r => (long?)r.Code).FirstOrDefault());
 
     protected override Delivery Create(DeliveryRequest request) => Delivery.Create(request.DelivererName, request.DelivererAddress, request.ReceiverName,
-        request.ReceiverAddress, request.DeliveredOn, request.ReceivedOn, request.StoreId, request.Status, request.Note);
+        request.ReceiverAddress, request.DeliveredOn, request.ReceivedOn, request.StoreId, request.Status, request.Note, request.ReceiptPublicId);
 
     protected override void Update(Delivery entity, DeliveryRequest request) => entity.Update(request.DelivererName, request.DelivererAddress,
-        request.ReceiverName, request.ReceiverAddress, request.DeliveredOn, request.ReceivedOn, request.StoreId, request.Status, request.Note);
+        request.ReceiverName, request.ReceiverAddress, request.DeliveredOn, request.ReceivedOn, request.StoreId, request.Status, request.Note,
+        request.ReceiptPublicId);
 
     protected override IQueryable<Delivery> Filter(IQueryable<Delivery> query, DeliverySearch search)
     {
@@ -285,6 +295,29 @@ public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, Item
     {
         if (entity.StoreId is { } id && !await Db.Set<Store>().AnyAsync(s => s.Id == id, ct))
             throw new BusinessRuleException("STORE_NOT_FOUND", "Kho đã chọn không còn.");
+        if (entity.ReceiptPublicId is { } receipt && !await Db.Set<ReceiptSnapshot>().AnyAsync(r => r.ReceiptPublicId == receipt && !r.Deleted, ct))
+            throw new BusinessRuleException("RECEIPT_NOT_FOUND", "Đơn nhận đã chọn không còn (hoặc chưa đồng bộ từ phân hệ bổ sung).");
+    }
+
+    public const int MaxReceiptOptions = 500;
+
+    /// <summary>
+    /// Đơn nhận cho ô chọn của phiếu giao nhận (monolith: CatalogueReceipt/SearchAvailableForDeliverer): phiếu nhận đã hoàn tất còn bản
+    /// "chưa xếp giá" chưa nằm ở phiếu giao nhận nào. <paramref name="include"/>: luôn có đơn đang chọn của phiếu (kể cả đã phân bổ hết).
+    /// </summary>
+    public async Task<IReadOnlyList<DeliveryReceiptOption>> ReceiptOptionsAsync(Guid? include, CancellationToken ct)
+    {
+        var taken = Db.Set<DeliveryLine>().Select(l => l.ItemId);
+        var pending = await Db.Set<Item>().AsNoTracking()
+            .Where(i => i.ReceiptPublicId != null && i.Status == ItemStatus.Unshelved && !taken.Contains(i.Id))
+            .GroupBy(i => i.ReceiptPublicId!.Value).Select(g => new { Receipt = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Receipt, x => x.Count, ct);
+        var ids = pending.Keys.ToList();
+        var receipts = await Db.Set<ReceiptSnapshot>().AsNoTracking()
+            .Where(r => !r.Deleted && ((r.Completed && ids.Contains(r.ReceiptPublicId)) || r.ReceiptPublicId == include))
+            .OrderByDescending(r => r.Code).Take(MaxReceiptOptions).ToListAsync(ct);
+        return receipts.Select(r => new DeliveryReceiptOption(r.ReceiptPublicId, r.Code, r.Name, r.ReceivedOn, r.StoreId,
+            pending.GetValueOrDefault(r.ReceiptPublicId))).ToList();
     }
 
     /// <summary>Xoá phiếu chưa ký: bỏ luôn các dòng để bản sách chọn được cho phiếu khác.</summary>

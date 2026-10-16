@@ -74,6 +74,13 @@
     <Project Path="src/Services/Circulation/Elib.Circulation.Infrastructure/Elib.Circulation.Infrastructure.csproj" />
     <Project Path="src/Services/Circulation/tests/Elib.Circulation.Tests/Elib.Circulation.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Acquisition/">
+    <Project Path="src/Services/Acquisition/Elib.Acquisition.Api/Elib.Acquisition.Api.csproj" />
+    <Project Path="src/Services/Acquisition/Elib.Acquisition.Application/Elib.Acquisition.Application.csproj" />
+    <Project Path="src/Services/Acquisition/Elib.Acquisition.Domain/Elib.Acquisition.Domain.csproj" />
+    <Project Path="src/Services/Acquisition/Elib.Acquisition.Infrastructure/Elib.Acquisition.Infrastructure.csproj" />
+    <Project Path="src/Services/Acquisition/tests/Elib.Acquisition.Tests/Elib.Acquisition.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />

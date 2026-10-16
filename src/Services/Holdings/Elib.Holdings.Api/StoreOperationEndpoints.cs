@@ -20,7 +20,7 @@ public static class StoreOperationEndpoints
         // Ô chọn kho của mọi màn kho — cán bộ không có quyền STORES vẫn chọn được kho.
         api.MapGet("/stores/Options", [PermissionAny(
             "STORES:view", "DOC_SEARCH:view", "MAP_SHELVING:view", "CATALOG_BIBS:view", "INVENTORY:view", "LOST_BOOKS:view", "LIQUIDATES:view",
-            "BOOK_OUT_STORE:view", "AB_MOVES:view", "AB_DELIVERERS:view", "RE_REGISTER:view", "STAT_DOC:view", "STORE_BOOK_REPORT:view")]
+            "BOOK_OUT_STORE:view", "AB_MOVES:view", "AB_DELIVERERS:view", "RE_REGISTER:view", "STAT_DOC:view", "STORE_BOOK_REPORT:view", "AB_RECEIPTS:view")]
             async (ICrudDbContext db, CancellationToken ct) =>
                 await db.Set<Store>().AsNoTracking().OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync(ct))
             .WithTags("Stores");
@@ -158,6 +158,8 @@ public static class StoreOperationEndpoints
     private static void MapDeliveries(RouteGroupBuilder g)
     {
         g.MapGet("/Statuses", () => DeliveryStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
+        g.MapGet("/Receipts", [Permission("AB_DELIVERERS", "view")] ([FromServices] DeliveryResource r, Guid? include, CancellationToken ct)
+            => r.ReceiptOptionsAsync(include, ct));
         g.MapGet("/Lines/{publicId:guid}", [Permission("AB_DELIVERERS", "view")] ([FromServices] DeliveryResource r, Guid publicId, CancellationToken ct)
             => r.LinesAsync(publicId, ct));
         g.MapPost("/Candidates", [Permission("AB_DELIVERERS", "view")] ([FromServices] DeliveryResource r, TransferCandidateSearch search, CancellationToken ct)

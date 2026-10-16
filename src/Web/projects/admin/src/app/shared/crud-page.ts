@@ -24,8 +24,9 @@ export interface CrudField {
    * 'multiselect': danh sách ô tích, giá trị là mảng (vd các kho được mượn tại điểm lưu thông).
    * 'password': không bao giờ hiện giá trị cũ; để trống khi sửa = giữ nguyên (gửi null).
    * 'rows': bảng con nhiều dòng (giá trị là mảng object) theo rowFields — vd luật theo nhóm tài liệu của chính sách.
+   * 'date': ngày yyyy-MM-dd (để trống = null).
    */
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password' | 'rows';
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password' | 'rows' | 'date';
   /** Cột của bảng con ('rows'). */
   rowFields?: CrudRowField[];
   /** Nhãn nút thêm dòng của bảng con. */
@@ -295,6 +296,9 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                     <input [id]="'f-' + f.key" [name]="f.key" type="number" step="any" class="input" [(ngModel)]="item[f.key]"
                            [placeholder]="(f.placeholder ?? '') | translate" [required]="!!f.required" [disabled]="locked(f, item)" />
                   }
+                  @case ('date') {
+                    <input [id]="'f-' + f.key" [name]="f.key" type="date" class="input" [(ngModel)]="item[f.key]" [required]="!!f.required" [disabled]="locked(f, item)" />
+                  }
                   @case ('select') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)">
                       @for (o of optionsOf(f); track o.value) { <option [ngValue]="o.value">{{ o.label | translate }}</option> }
@@ -552,7 +556,7 @@ export class CrudPage implements OnInit {
     try {
       const { publicId, id: _id, ...body } = item;
       for (const f of this.config().fields)
-        if (f.type === 'password' && (body[f.key] === undefined || body[f.key] === '')) body[f.key] = null;
+        if ((f.type === 'password' || f.type === 'date') && (body[f.key] === undefined || body[f.key] === '')) body[f.key] = null;
       if (publicId) await this.client.update(publicId, body);
       else await this.client.add(body);
       this.toastr.success(publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');

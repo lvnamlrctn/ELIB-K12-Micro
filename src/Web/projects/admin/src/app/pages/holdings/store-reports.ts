@@ -34,12 +34,13 @@ const CRITERIA: { value: string; label: string }[] = [
           @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }
         </select>
       </div>
-      <div><label for="st-f" class="field-label">{{ 'STORE_STATS.REGISTERED_FROM' | translate }}</label><input id="st-f" type="date" class="input" [(ngModel)]="request.from" /></div>
-      <div><label for="st-t" class="field-label">{{ 'STORE_STATS.REGISTERED_TO' | translate }}</label><input id="st-t" type="date" class="input" [(ngModel)]="request.to" /></div>
+      <div><label for="st-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="st-f" type="date" class="input" [(ngModel)]="request.from" /></div>
+      <div><label for="st-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="st-t" type="date" class="input" [(ngModel)]="request.to" /></div>
       <div class="flex gap-2 justify-end">
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="run()"><span class="material-icons text-[18px]">query_stats</span></button>
       </div>
+      <p class="md:col-span-4 text-[11px] text-gray-400 -mt-1">{{ 'STORE_STATS.DATE_HINT' | translate }}</p>
     </div>
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
       @if (busy()) { <app-loading /> }
@@ -126,12 +127,13 @@ export class StoreStats implements OnInit {
           @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }
         </select>
       </div>
-      <div><label for="sb-f" class="field-label">{{ 'STORE_STATS.REGISTERED_FROM' | translate }}</label><input id="sb-f" type="date" class="input" [(ngModel)]="request.from" /></div>
-      <div><label for="sb-t" class="field-label">{{ 'STORE_STATS.REGISTERED_TO' | translate }}</label><input id="sb-t" type="date" class="input" [(ngModel)]="request.to" /></div>
+      <div><label for="sb-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="sb-f" type="date" class="input" [(ngModel)]="request.from" /></div>
+      <div><label for="sb-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="sb-t" type="date" class="input" [(ngModel)]="request.to" /></div>
       <div class="flex gap-2 justify-end">
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="run()"><span class="material-icons text-[18px]">summarize</span></button>
       </div>
+      <p class="md:col-span-4 text-[11px] text-gray-400 -mt-1">{{ 'STORE_STATS.DATE_HINT' | translate }}</p>
     </div>
 
     @if (report(); as r) {
@@ -154,14 +156,15 @@ export class StoreStats implements OnInit {
               <thead><tr>
                 <th class="th w-32">{{ 'ITEMS_PAGE.BARCODE' | translate }}</th><th class="th">{{ 'ITEMS_PAGE.TITLE_COL' | translate }}</th>
                 <th class="th w-40">{{ 'ITEMS_PAGE.AUTHOR' | translate }}</th><th class="th w-24">DDC</th>
-                <th class="th w-28">{{ 'STORE_BOOK_REPORT.REGISTERED_ON' | translate }}</th><th class="th w-36">{{ 'ITEMS_PAGE.STORE' | translate }}</th>
+                <th class="th w-32">{{ 'STORE_BOOK_REPORT.RECEIVED_ON' | translate }}</th><th class="th w-36">{{ 'ITEMS_PAGE.STORE' | translate }}</th>
                 <th class="th w-28 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
               </tr></thead>
               <tbody>
                 @for (b of r.rows; track b.barcode) {
                   <tr class="hover:bg-gray-50/50">
                     <td class="td font-mono text-[13px]">{{ b.barcode }}</td><td class="td">{{ b.title ?? '—' }}</td><td class="td">{{ b.author ?? '' }}</td>
-                    <td class="td font-mono text-[13px]">{{ b.ddc ?? '' }}</td><td class="td">{{ b.registeredOn | ldate: 'dd/MM/yyyy' }}</td>
+                    <td class="td font-mono text-[13px]">{{ b.ddc ?? '' }}</td><td class="td">{{ (b.receivedOn ?? b.registeredOn) | ldate: 'dd/MM/yyyy' }}
+                      @if (b.receiptCode) { <div class="text-[11px] text-gray-400">{{ 'STORE_BOOK_REPORT.RECEIPT_NO' | translate: { no: b.receiptCode } }}</div> }</td>
                     <td class="td">{{ b.storeName ?? '—' }}</td>
                     <td class="td text-center"><span [class]="status(b.status, b.onLoan).badge">{{ status(b.status, b.onLoan).name | translate }}</span></td>
                   </tr>

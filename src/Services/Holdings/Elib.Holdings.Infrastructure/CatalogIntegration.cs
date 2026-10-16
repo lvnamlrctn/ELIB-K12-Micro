@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Messaging;
+using Elib.Contracts.Events.Acquisition;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Circulation;
 using Elib.Holdings.Application;
@@ -34,6 +35,19 @@ public sealed class LoanChangedConsumer(ItemResource items, ICrudDbContext db, I
     protected override async Task HandleAsync(LoanChanged message, ConsumeContext<LoanChanged> context)
     {
         await items.ApplyLoanAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Bản sao đầu phiếu nhận theo event của acquisition (chỉ đơn vị có license HOLDINGS).</summary>
+public sealed class ReceiptChangedConsumer(ReceiptSnapshots snapshots, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<ReceiptChangedConsumer> logger)
+    : ElibConsumer<ReceiptChanged>(licenses, logger)
+{
+    protected override string? RequiredModule => "HOLDINGS";
+
+    protected override async Task HandleAsync(ReceiptChanged message, ConsumeContext<ReceiptChanged> context)
+    {
+        await snapshots.ApplyAsync(message, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);
     }
 }

@@ -187,12 +187,15 @@ export interface StoreMove {
   delivererName: string | null; receiverName: string | null; movedOn: string | null; note: string | null; completedAt: string | null;
   movedCount: number; lineCount: number; createdAt: string;
 }
-/** status: 1 đang giao, 2 đã nhận đủ (mới ký nhận được). */
+/** status: 1 đang giao, 2 đã nhận đủ (mới ký nhận được). receiptPublicId/receiptCode: đơn nhận (phiếu nhận bổ sung) được phân bổ. */
 export interface Delivery {
   id: number; publicId: string; delivererName: string | null; delivererAddress: string | null; receiverName: string | null;
   receiverAddress: string | null; deliveredOn: string | null; receivedOn: string | null; storeId: number | null; storeName: string | null;
   status: number; note: string | null; signedAt: string | null; shelvedCount: number; lineCount: number; createdAt: string;
+  receiptPublicId: string | null; receiptCode: number | null;
 }
+/** Đơn nhận chọn được cho phiếu giao nhận: đã hoàn tất; pending = số bản chưa xếp giá chưa phân bổ. */
+export interface DeliveryReceiptOption { publicId: string; code: number; name: string | null; receivedOn: string | null; storeId: number | null; pending: number; }
 export type TransferKind = 'store-moves' | 'deliveries';
 export interface ReRegisterLine { row: number; oldBarcode: string | null; newBarcode: string | null; storeCode: string | null; error: string | null; }
 export interface ReRegisterImportResult { total: number; applied: number; dryRun: boolean; errorCount: number; lines: ReRegisterLine[]; }
@@ -204,11 +207,97 @@ export interface StoreBookReportRequest { storeId: number | null; from: string |
 export interface StoreBookRow {
   barcode: string; mfn: number; title: string | null; author: string | null; ddc: string | null; registeredOn: string; storeName: string | null;
   status: string; onLoan: boolean;
+  /** Ngày nhận / số phiếu nhận đã đăng ký bản (null = đăng ký không qua phiếu nhận — báo cáo tính theo ngày đăng ký). */
+  receivedOn: string | null; receiptCode: number | null;
 }
 export interface StoreBookReport {
   rows: StoreBookRow[]; totalCount: number; titleCount: number; storeStats: { storeId: number | null; storeName: string; titles: number; copies: number }[];
   libraryName: string | null;
 }
+
+// ── Bổ sung (service acquisition) ──
+export interface AcqOption { id: number; name: string; }
+export interface AcquisitionOptions { sources: AcqOption[]; suppliers: AcqOption[]; budgets: AcqOption[]; funds: AcqOption[]; }
+/** Biểu ghi chọn được cho dòng đơn đặt / phiếu nhận (bản sao biểu ghi của acquisition). */
+export interface AcqBib {
+  bibPublicId: string; mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null; isbns: string | null;
+}
+/** status: 1 mới lập, 2 đã gửi đặt, 3 đã huỷ. quantity/received: tổng số bản đặt / đã nhận theo phiếu nhận. */
+export interface PurchaseOrder {
+  id: number; publicId: string; name: string; orderedOn: string | null; dueOn: string | null; sourceId: number | null; sourceName: string | null;
+  supplierId: number | null; supplierName: string | null; budgetId: number | null; fundId: number | null; note: string | null; status: number;
+  paymentMethod: number; lineCount: number; quantity: number; received: number; total: number; createdAt: string;
+}
+/** Dòng đơn đặt: biểu ghi đã có (mfn) hoặc mô tả tài liệu chưa biên mục; remaining = còn chờ nhận. */
+export interface OrderLine {
+  id: number; publicId: string; orderId: number; bibPublicId: string | null; mfn: number | null; title: string; author: string | null;
+  publisher: string | null; publishYear: string | null; isbn: string | null; quantity: number; price: number | null; currency: string | null;
+  rate: number; cancelReason: string | null; received: number; remaining: number;
+}
+export interface OrderLineInput {
+  linePublicId?: string | null; mfn?: number | null; title?: string | null; author?: string | null; publisher?: string | null;
+  publishYear?: string | null; isbn?: string | null; quantity: number; price?: number | null; currency?: string | null; rate?: number | null;
+  cancelReason?: string | null;
+}
+/** Phiếu nhận (đơn nhận); completedAt khác null = đã hoàn tất (khoá). */
+export interface Receipt {
+  id: number; publicId: string; name: string | null; receivedOn: string; sourceId: number | null; sourceName: string | null;
+  supplierId: number | null; supplierName: string | null; budgetId: number | null; fundId: number | null; storeId: number | null;
+  note: string | null; paymentStatus: number; paymentMethod: number; completedAt: string | null; lineCount: number; quantity: number; total: number;
+  createdAt: string;
+}
+/** registered: số ĐKCB đã đăng ký cho dòng (null = phân hệ Kho không trả lời). */
+export interface ReceiptLine {
+  id: number; publicId: string; bibPublicId: string; mfn: number; title: string; author: string | null; quantity: number; price: number | null;
+  currency: string | null; rate: number; orderLinePublicId: string | null; orderId: number | null; registered: number | null;
+}
+export interface ReceiptLineInput {
+  linePublicId?: string | null; mfn?: number | null; quantity: number; price?: number | null; currency?: string | null; orderLinePublicId?: string | null;
+  rate?: number | null;
+}
+/** ĐKCB của phiếu nhận (ở holdings); delivered = đã nằm ở phiếu giao nhận. */
+export interface ReceiptItem {
+  publicId: string; linePublicId: string | null; barcode: string; mfn: number; storeId: number | null; storeName: string | null; status: string;
+  onLoan: boolean; delivered: boolean; createdAt: string;
+}
+export interface ReceiptLinesView { lines: ReceiptLine[]; items: ReceiptItem[]; itemsAvailable: boolean; }
+export interface ReceivableLine {
+  orderLinePublicId: string; orderId: number; orderName: string; supplierId: number | null; bibPublicId: string | null; mfn: number | null;
+  title: string; author: string | null; isbn: string | null; quantity: number; received: number; remaining: number; price: number | null;
+  currency: string | null; rate: number;
+}
+/** Đăng ký ĐKCB cho dòng phiếu nhận: theo lô (quantity + prefix) hoặc một mã (barcode). */
+export interface RegisterReceiptItems {
+  quantity?: number; prefix?: string | null; digits?: number; startNumber?: number | null; barcode?: string | null; storeId?: number | null;
+}
+export interface RegisteredItem { publicId: string; barcode: string; mfn: number; storeId: number | null; storeName: string | null; status: string; }
+
+/** Bộ lọc báo cáo bổ sung / tra cứu đơn nhận. Ngày lọc theo ngày nhận của phiếu (thư mục sách mới: ngày biên mục). */
+export interface AcqReportRequest {
+  from: string | null; to: string | null; storeId: number | null; supplierId: number | null; sourceId: number | null; fundId: number | null;
+  receiptCodeFrom: number | null; receiptCodeTo: number | null; receiptName: string | null; completed: boolean | null;
+  mfnFrom: number | null; mfnTo: number | null; title: string | null; author: string | null; publisher: string | null; publishYear: string | null;
+  pageIndex: number; pageSize: number;
+}
+export type AcqReportName = 'AcquisitionList' | 'LookupLines' | 'StoreAllocation' | 'AccessionRegister' | 'NewBooks';
+export interface AcqListRow {
+  receiptId: number; receiptName: string | null; receivedOn: string; mfn: number; title: string; author: string | null; quantity: number;
+  price: number | null; currency: string | null; rate: number; total: number;
+}
+/** quantity / amount tính trên toàn bộ kết quả lọc. */
+export interface AcqListPage { items: AcqListRow[]; total: number; pageIndex: number; pageSize: number; quantity: number; amount: number; }
+export interface AcqLookupRow {
+  mfn: number; receiptId: number; isbd: string; createdAt: string; receivedOn: string; sourceName: string | null; storeId: number | null;
+  storeName: string | null; bibPublicId: string;
+}
+export interface AcqStoreCount { storeId: number | null; storeName: string | null; copies: number; }
+export interface AcqAllocation { items: AcqStoreCount[]; total: number; }
+export interface AcqAccessionRow {
+  barcode: string; mfn: number; title: string | null; author: string | null; publisher: string | null; publishYear: string | null; ddc: string | null;
+  storeName: string | null; date: string; receiptId: number | null; price: number | null; currency: string | null; rate: number | null;
+}
+/** catalogedOn null = biểu ghi không rõ ngày biên mục (xếp cuối). */
+export interface AcqNewBookRow { mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null; catalogedOn: string | null; }
 
 // ── Lưu thông (service circulation) ──
 /** Khung giờ làm việc của điểm lưu thông: day 1 = thứ Hai … 7 = Chủ nhật, giờ "HH:mm". */
@@ -695,7 +784,9 @@ export class Api {
   }
   // Điều chuyển kho (AB_MOVES) / giao nhận (AB_DELIVERERS): crud(kind, 'holdings') + dòng phiếu
   transferLines(kind: TransferKind, publicId: string) { return this.get<TransferLine[]>(`/api/admin/holdings/${kind}/Lines/${publicId}`); }
-  transferCandidates(kind: TransferKind, body: CrudSearch & { transferId: string; mfn?: number | null; barcodeFrom?: string | null; barcodeTo?: string | null }) {
+  transferCandidates(kind: TransferKind, body: CrudSearch & {
+    transferId: string; mfn?: number | null; barcodeFrom?: string | null; barcodeTo?: string | null; receiptPublicId?: string | null;
+  }) {
     return this.post<CrudPage<Item>>(`/api/admin/holdings/${kind}/Candidates`, body);
   }
   addTransferLines(kind: TransferKind, publicId: string, body: { itemIds?: string[]; barcodes?: string[] }) {
@@ -706,6 +797,41 @@ export class Api {
   }
   completeMove(publicId: string) { return this.post<CompleteResult>(`/api/admin/holdings/store-moves/Complete/${publicId}`); }
   signDelivery(publicId: string) { return this.post<CompleteResult>(`/api/admin/holdings/deliveries/Sign/${publicId}`); }
+  /** Đơn nhận đã hoàn tất còn sách chưa phân bổ (+ đơn đang chọn của phiếu). */
+  deliveryReceipts(include?: string | null) {
+    return this.get<DeliveryReceiptOption[]>('/api/admin/holdings/deliveries/Receipts', include ? { include } : undefined);
+  }
+  // Bổ sung (acquisition): crud('orders' | 'receipts' | 'sources' | 'suppliers' | 'budgets' | 'funds', 'acquisition') + dòng, ĐKCB theo phiếu
+  acquisitionOptions() { return this.get<AcquisitionOptions>('/api/admin/acquisition/options'); }
+  lookupAcqBibs(keyword: string) { return this.post<AcqBib[]>('/api/admin/acquisition/bibs/Lookup', { keyword }); }
+  orderLines(publicId: string) { return this.get<OrderLine[]>(`/api/admin/acquisition/orders/Lines/${publicId}`); }
+  saveOrderLine(publicId: string, body: OrderLineInput) { return this.post<OrderLine>(`/api/admin/acquisition/orders/SaveLine/${publicId}`, body); }
+  removeOrderLine(linePublicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/acquisition/orders/Lines/${linePublicId}`)); }
+  receiptLines(publicId: string) { return this.get<ReceiptLinesView>(`/api/admin/acquisition/receipts/Lines/${publicId}`); }
+  saveReceiptLine(publicId: string, body: ReceiptLineInput) { return this.post<ReceiptLine>(`/api/admin/acquisition/receipts/SaveLine/${publicId}`, body); }
+  removeReceiptLine(linePublicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/acquisition/receipts/Lines/${linePublicId}`)); }
+  receivableLines(body: CrudSearch & { orderId?: number | null; supplierId?: number | null }) {
+    return this.post<CrudPage<ReceivableLine>>('/api/admin/acquisition/receipts/Receivable', body);
+  }
+  registerReceiptItems(linePublicId: string, body: RegisterReceiptItems) {
+    return this.post<RegisteredItem[]>(`/api/admin/acquisition/receipts/RegisterItems/${linePublicId}`, body);
+  }
+  removeReceiptItem(publicId: string, itemPublicId: string) {
+    return firstValueFrom(this.http.delete<void>(`/api/admin/acquisition/receipts/Items/${publicId}/${itemPublicId}`));
+  }
+  completeReceipt(publicId: string) { return this.post<Receipt>(`/api/admin/acquisition/receipts/Complete/${publicId}`); }
+  reopenReceipt(publicId: string) { return this.post<Receipt>(`/api/admin/acquisition/receipts/Reopen/${publicId}`); }
+  /** Chốt thanh toán — làm được cả khi phiếu đã hoàn tất (quyền sửa phiếu nhận). */
+  setReceiptPayment(publicId: string, body: { paymentStatus: number; paymentMethod: number }) {
+    return this.post<Receipt>(`/api/admin/acquisition/receipts/Payment/${publicId}`, body);
+  }
+  /** Tiền tệ đang dùng + tỷ giá gợi ý (người có quyền bổ sung xem được, không cần quyền quản lý tiền tệ). */
+  currencyOptions() { return this.get<Currency[]>('/api/admin/tenant/currencies/Options'); }
+  /** Báo cáo bổ sung / tra cứu đơn nhận (quyền AB_RECEIPTS xem): danh sách, tra cứu theo dòng, phân bổ kho, sổ ĐKCB, thư mục sách mới. */
+  acqReport<T>(name: AcqReportName, body: AcqReportRequest) { return this.post<T>(`/api/admin/acquisition/reports/${name}`, body); }
+  exportAcqReport(name: AcqReportName, body: AcqReportRequest) {
+    return blobRequest(firstValueFrom(this.http.post(`/api/admin/acquisition/reports/${name}Export`, body, { responseType: 'blob' })));
+  }
   // Đăng ký lại mã vạch (RE_REGISTER)
   reRegister(body: { oldBarcode: string; newBarcode: string; storeId: number | null }) { return this.post<Item>('/api/admin/holdings/items/ReRegister', body); }
   reRegisterTemplate() { return blobRequest(firstValueFrom(this.http.get('/api/admin/holdings/items/ReRegister/Template', { responseType: 'blob' }))); }

@@ -40,6 +40,9 @@ public sealed class CrudAuditContext(IHttpContextAccessor http, ICurrentActor ac
 {
     public CrudAuditOrigin? Origin { get; private set; }
 
+    /// <summary>Người thao tác thật của lời gọi nội bộ giữa service (<see cref="ActingAsFilter"/>) — thay tài khoản service trong cột audit, event, nhật ký.</summary>
+    public CrudAuditOrigin? ActingAs { get; private set; }
+
     /// <summary>Người thao tác hiện tại — để lưu kèm việc chạy nền.</summary>
     public CrudAuditOrigin Capture()
     {
@@ -47,6 +50,13 @@ public sealed class CrudAuditContext(IHttpContextAccessor http, ICurrentActor ac
         var ctx = http.HttpContext;
         return new CrudAuditOrigin(actor.Id, actor.Kind, AuditActor.Name(ctx), CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString()),
             ctx?.Connection.RemoteIpAddress?.ToString());
+    }
+
+    public void ActAs(CrudAuditOrigin origin)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        ActingAs = origin;
+        actorSetter.Set(origin.ActorId, origin.ActorKind);
     }
 
     public void RunAs(CrudAuditOrigin origin)
@@ -71,7 +81,7 @@ public sealed class PublishingCrudAuditSink(
     {
         if (tenant.TenantId is not { } tenantId) return Task.CompletedTask;
         var ctx = http.HttpContext;
-        var origin = ctx is null ? context?.Origin : null;
+        var origin = ctx is null ? context?.Origin : context?.ActingAs;
         var (action, verb) = entry.Change switch
         {
             CrudChange.Added => ("ADD", "Thêm"),

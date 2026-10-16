@@ -61,6 +61,12 @@ public sealed class Item : TenantEntity
     public string? Note { get; private set; }
     public long Version { get; private set; }
 
+    /// <summary>Phiếu nhận bổ sung đã đăng ký bản này (monolith: Barcode.Receipt_Id). Null = đăng ký thẳng ở biên mục / dữ liệu cũ.</summary>
+    public Guid? ReceiptPublicId { get; private set; }
+
+    /// <summary>Dòng phiếu nhận — số ĐKCB của một dòng không vượt số bản nhận của dòng đó.</summary>
+    public Guid? ReceiptLinePublicId { get; private set; }
+
     /// <summary>Lượt mượn gần nhất (circulation sở hữu, nhận qua LoanChanged) — chỉ để hiển thị "đang mượn", không tăng Version.</summary>
     public Guid? LoanPublicId { get; private set; }
 
@@ -81,6 +87,9 @@ public sealed class Item : TenantEntity
             BibId = bib.Mfn, BibPublicId = bib.BibPublicId, StoreId = storeId,
         };
     }
+
+    /// <summary>Gắn bản mới đăng ký với dòng phiếu nhận (đăng ký cá biệt từ màn phiếu nhận của phân hệ bổ sung).</summary>
+    public void AttachReceipt(Guid receiptPublicId, Guid linePublicId) => (ReceiptPublicId, ReceiptLinePublicId) = (receiptPublicId, linePublicId);
 
     public void Update(long? storeId, string? note)
     {
@@ -268,4 +277,27 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public int Status { get; set; }
     public bool Deleted { get; set; }
     public long Version { get; set; }
+}
+
+/// <summary>
+/// Bản sao đầu phiếu nhận từ acquisition (event ReceiptChanged, hoặc trạng thái acquisition gửi kèm khi đăng ký ĐKCB) — chọn sách theo
+/// đơn nhận ở phiếu giao nhận, lọc báo cáo kho theo ngày nhận. Chỉ ghi khi Version lớn hơn bản đang có.
+/// </summary>
+public sealed class ReceiptSnapshot : Entity, ITenantOwned
+{
+    public long TenantId { get; set; }
+    public Guid ReceiptPublicId { get; set; }
+    public long Code { get; set; }
+    public string? Name { get; set; }
+    public DateOnly? ReceivedOn { get; set; }
+    public long? StoreId { get; set; }
+    public bool Completed { get; set; }
+    public bool Deleted { get; set; }
+    public long Version { get; set; }
+
+    /// <summary>
+    /// Khoá lạc quan khi đăng ký ĐKCB theo phiếu (concurrency token): mỗi lần đăng ký tăng giá trị này cùng transaction với bản sách mới —
+    /// hai phiên cùng đăng ký trên một phiếu thì phiên sau bị từ chối thay vì cùng vượt số bản nhận.
+    /// </summary>
+    public long RegistrationStamp { get; set; }
 }

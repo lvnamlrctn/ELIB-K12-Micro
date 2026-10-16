@@ -126,6 +126,20 @@ export class Menu {
         ],
       },
       {
+        title: 'MENU.ACQUISITION_GROUP',
+        icon: 'add_shopping_cart',
+        module: 'ACQUISITION',
+        children: [
+          { title: 'MENU.AB_ORDERS', icon: 'shopping_cart', link: '/ab-orders', perm: 'AB_ORDERS' },
+          { title: 'MENU.AB_RECEIPTS', icon: 'receipt_long', link: '/ab-receipts', perm: 'AB_RECEIPTS' },
+          { title: 'MENU.ACQ_REPORTS', icon: 'assessment', link: '/ab-reports', perm: 'AB_RECEIPTS' },
+          { title: 'MENU.AB_SOURCES', icon: 'source', link: '/ab-sources', perm: 'AB_SOURCES' },
+          { title: 'MENU.SUPPLIERS', icon: 'local_shipping', link: '/suppliers', perm: 'SUPPLIERS' },
+          { title: 'MENU.BUDGETS', icon: 'account_balance', link: '/budgets', perm: 'BUDGETS' },
+          { title: 'MENU.FUNDS', icon: 'savings', link: '/funds', perm: 'FUNDS' },
+        ],
+      },
+      {
         title: 'MENU.STORE_MGMT',
         icon: 'store',
         module: 'HOLDINGS',

@@ -1,3 +1,4 @@
+using Elib.Acquisition.Infrastructure;
 using Elib.Audit.Infrastructure;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Tenancy;
@@ -60,6 +61,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new CatalogDbContext(Options<CatalogDbContext>(cs, t), t)),
         new("holdings", "elib_leak_holdings", ["store_types", "stores", "items", "bib_snapshots"],
             (cs, t) => new HoldingsDbContext(Options<HoldingsDbContext>(cs, t), t)),
+        new("acquisition", "elib_leak_acquisition", ["sources", "suppliers", "budgets", "funds", "bib_snapshots", "purchase_orders", "order_lines",
+                "receipts", "receipt_lines"],
+            (cs, t) => new AcquisitionDbContext(Options<AcquisitionDbContext>(cs, t), t)),
         new("circulation", "elib_leak_circulation", ["circ_places", "loan_policies", "loans", "patron_replicas", "item_replicas", "bib_snapshots",
                 "fine_reasons", "fine_tickets", "fine_lines", "holds", "loan_renewals", "photocopies", "sip2_stations", "sip2_logs"],
             (cs, t) => new CirculationDbContext(Options<CirculationDbContext>(cs, t), t)),

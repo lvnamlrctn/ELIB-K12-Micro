@@ -254,6 +254,7 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
             OtherAuthors = d.OtherAuthors,
             CoverUrl = bib.CoverUrl,
             Status = bib.Status,
+            CatalogedAt = bib.CreatedAt == default ? null : bib.CreatedAt,
             Deleted = deleted,
             Version = bib.Version + (deleted ? 1 : 0),
         };

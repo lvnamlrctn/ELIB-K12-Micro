@@ -326,6 +326,10 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("public_id");
 
+                    b.Property<Guid?>("ReceiptPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_public_id");
+
                     b.Property<DateOnly?>("ReceivedOn")
                         .HasColumnType("date")
                         .HasColumnName("received_on");
@@ -380,6 +384,9 @@ namespace Elib.Holdings.Infrastructure.Migrations
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_deliveries_tenant_id");
+
+                    b.HasIndex("TenantId", "ReceiptPublicId")
+                        .HasDatabaseName("ix_deliveries_tenant_id_receipt_public_id");
 
                     b.ToTable("deliveries", (string)null);
                 });
@@ -893,6 +900,14 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("public_id");
 
+                    b.Property<Guid?>("ReceiptLinePublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_line_public_id");
+
+                    b.Property<Guid?>("ReceiptPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_public_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(1)
@@ -940,6 +955,12 @@ namespace Elib.Holdings.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "BibId")
                         .HasDatabaseName("ix_items_tenant_id_bib_id");
+
+                    b.HasIndex("TenantId", "ReceiptLinePublicId")
+                        .HasDatabaseName("ix_items_tenant_id_receipt_line_public_id");
+
+                    b.HasIndex("TenantId", "ReceiptPublicId")
+                        .HasDatabaseName("ix_items_tenant_id_receipt_public_id");
 
                     b.HasIndex("TenantId", "Prefix", "Number")
                         .HasDatabaseName("ix_items_tenant_id_prefix_number");
@@ -1133,6 +1154,73 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasDatabaseName("ix_lost_records_tenant_id_lost_on");
 
                     b.ToTable("lost_records", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Holdings.Domain.ReceiptSnapshot", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("Code")
+                        .HasColumnType("bigint")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("completed");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("ReceiptPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_public_id");
+
+                    b.Property<DateOnly?>("ReceivedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("received_on");
+
+                    b.Property<long>("RegistrationStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("registration_stamp");
+
+                    b.Property<long?>("StoreId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("store_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt_snapshots");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_receipt_snapshots_tenant_id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .HasDatabaseName("ix_receipt_snapshots_tenant_id_code");
+
+                    b.HasIndex("TenantId", "ReceiptPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_receipt_snapshots_tenant_id_receipt_public_id");
+
+                    b.ToTable("receipt_snapshots", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Holdings.Domain.Store", b =>

@@ -10,6 +10,7 @@ import { BIB_TYPES, DIC_AUTHORS, DIC_CLASSES, DIC_KEYWORDS, DIC_PUBLISHERS, ISBD
 import { Z3950_SERVERS } from './pages/search/catalogs';
 import { BOOK_OUT_UNITS, EXHIBITION_LOCATIONS, EXPORT_REASONS, STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import { FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
+import { ACQ_SOURCES, BUDGETS, FUNDS, SUPPLIERS } from './pages/acquisition/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 import { unsavedChangesGuard } from './shared/unsaved';
 
@@ -100,6 +101,16 @@ export const routes: Routes = [
           { path: path + '/:id', loadComponent: () => import('./pages/holdings/transfers').then((m) => m.TransferDetail), canActivate: [tenantGuard, permissionGuard(perm)], data: { kind }, title },
         ];
       }),
+      // Bổ sung (acquisition)
+      { path: 'ab-orders', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.Orders), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
+      { path: 'ab-orders/:id', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.OrderDetail), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
+      { path: 'ab-receipts', loadComponent: () => import('./pages/acquisition/receipts').then((m) => m.Receipts), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_RECEIPT.TITLE' },
+      { path: 'ab-receipts/:id', loadComponent: () => import('./pages/acquisition/receipts').then((m) => m.ReceiptDetail), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_RECEIPT.TITLE' },
+      { path: 'ab-reports', loadComponent: () => import('./pages/acquisition/reports').then((m) => m.AcquisitionReports), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_REPORT.TITLE' },
+      catalog('ab-sources', ACQ_SOURCES),
+      catalog('suppliers', SUPPLIERS),
+      catalog('budgets', BUDGETS),
+      catalog('funds', FUNDS),
       { path: 're-register-barcode', loadComponent: () => import('./pages/holdings/re-register').then((m) => m.ReRegister), canActivate: [tenantGuard, permissionGuard('RE_REGISTER')], title: 'RE_REGISTER_PAGE.TITLE' },
       { path: 'statistics-document', loadComponent: () => import('./pages/holdings/store-reports').then((m) => m.StoreStats), canActivate: [tenantGuard, permissionGuard('STAT_DOC')], title: 'STORE_STATS.TITLE' },
       { path: 'store-book-report', loadComponent: () => import('./pages/holdings/store-reports').then((m) => m.StoreBookReportPage), canActivate: [tenantGuard, permissionGuard('STORE_BOOK_REPORT')], title: 'STORE_BOOK_REPORT.TITLE' },

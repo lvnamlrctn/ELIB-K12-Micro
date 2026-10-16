@@ -44,6 +44,7 @@ public static class InfrastructureServiceCollectionExtensions
             x.AddTenantReplicaConsumers<HoldingsDbContext>();
             x.AddConsumer<BibChangedConsumer>();
             x.AddConsumer<LoanChangedConsumer>();
+            x.AddConsumer<ReceiptChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
         services.AddHealthChecks().AddDbContextCheck<HoldingsDbContext>("db", tags: [ElibHealthTags.Ready]);

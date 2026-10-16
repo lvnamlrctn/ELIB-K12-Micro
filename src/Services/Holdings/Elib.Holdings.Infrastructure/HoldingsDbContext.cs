@@ -42,6 +42,8 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.HasIndex(x => new { x.TenantId, x.Prefix, x.Number });
             e.HasIndex(x => new { x.TenantId, x.BibId });
             e.HasIndex(x => new { x.TenantId, x.StoreId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.ReceiptPublicId });
+            e.HasIndex(x => new { x.TenantId, x.ReceiptLinePublicId });
             e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -58,6 +60,15 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.Property(x => x.BibTypeName).HasMaxLength(250);
             e.HasIndex(x => new { x.TenantId, x.BibPublicId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Mfn });
+        });
+
+        modelBuilder.Entity<ReceiptSnapshot>(e =>
+        {
+            e.ToTable("receipt_snapshots");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.RegistrationStamp).IsConcurrencyToken();
+            e.HasIndex(x => new { x.TenantId, x.ReceiptPublicId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Code });
         });
 
         modelBuilder.NamedCatalog<ExportReason>("export_reasons", 250);
@@ -151,6 +162,7 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.Property(x => x.ReceiverAddress).HasMaxLength(500);
             e.Property(x => x.Note).HasMaxLength(500);
             e.Ignore(x => x.IsSigned);
+            e.HasIndex(x => new { x.TenantId, x.ReceiptPublicId });
             e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
         });
 

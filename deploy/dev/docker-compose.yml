@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, circulation, search, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, acquisition, circulation, search, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -39,6 +39,7 @@ services:
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD:?chạy ./init-env.sh trước}
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?chạy ./init-env.sh trước}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD:?chạy ./init-env.sh trước}
+      ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD:?chạy ./init-env.sh trước}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD:?chạy ./init-env.sh trước}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
@@ -72,6 +73,7 @@ services:
       PATRON_DB_PASSWORD: ${PATRON_DB_PASSWORD}
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD}
+      ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD}
     volumes:
@@ -159,6 +161,7 @@ services:
       Identity__Clients__svc-patron__ClientSecret: ${SVC_PATRON_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-catalog__ClientSecret: ${SVC_CATALOG_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-holdings__ClientSecret: ${SVC_HOLDINGS_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-acquisition__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-circulation__ClientSecret: ${SVC_CIRCULATION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-search__ClientSecret: ${SVC_SEARCH_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
@@ -204,6 +207,7 @@ services:
       Provisioning__DeployedServices__4: holdings
       Provisioning__DeployedServices__5: circulation
       Provisioning__DeployedServices__6: search
+      Provisioning__DeployedServices__7: acquisition
 
   notification:
     build:
@@ -327,6 +331,27 @@ services:
       ServiceClient__ClientSecret: ${SVC_HOLDINGS_SECRET}
       Catalog__Url: http://catalog:8080
 
+  # GĐ2: bổ sung — nguồn, nhà cung cấp, kinh phí, quỹ, đơn đặt, phiếu nhận; ĐKCB theo phiếu nhận đăng ký ở holdings (/internal, khoá số lượng).
+  acquisition:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Acquisition/Elib.Acquisition.Api/Elib.Acquisition.Api.csproj
+        ASSEMBLY: Elib.Acquisition.Api
+    image: elib/acquisition:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__AcquisitionDb: Host=postgres;Database=elib_acquisition;Username=acquisition_app;Password=${ACQUISITION_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
+      Catalog__Url: http://catalog:8080
+      Holdings__Url: http://holdings:8080
+
   # GĐ1: lưu thông — điểm lưu thông, chính sách, mượn/trả/gia hạn; bản sao bạn đọc/bản sách/biểu ghi (thiếu thì hỏi service gốc).
   circulation:
     build:
@@ -412,6 +437,7 @@ services:
       patron: { condition: service_started }
       catalog: { condition: service_started }
       holdings: { condition: service_started }
+      acquisition: { condition: service_started }
       circulation: { condition: service_started }
       search: { condition: service_started }
       opac-web: { condition: service_started }

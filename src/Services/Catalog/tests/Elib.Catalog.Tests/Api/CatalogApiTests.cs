@@ -148,6 +148,9 @@ public sealed class CatalogApiTests : IClassFixture<CatalogApiFactory>, IAsyncLi
         Assert.Equal(["Toán tuổi thơ tạp chí", "Toán tuổi thơ 2", "Toán tuổi thơ 2"], events.Select(e => e.Title));
         Assert.True(events.Select(e => e.Version).Distinct().Count() == 3 && events.Select(e => e.Version).SequenceEqual(events.Select(e => e.Version).Order()));
         Assert.Equal([false, false, true], events.Select(e => e.Deleted));
+        // Ngày biên mục = ngày tạo biểu ghi, không đổi khi sửa — thư mục sách mới của acquisition sắp theo ngày này.
+        Assert.All(events, e => Assert.Equal(events[0].CatalogedAt, e.CatalogedAt));
+        Assert.True(events[0].CatalogedAt is { } at && at > DateTimeOffset.UtcNow.AddMinutes(-10));
         Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync(U($"/api/bibs/GetByMfn/{created.Mfn}"))).StatusCode);
     }
 
@@ -237,6 +240,7 @@ public sealed class CatalogApiTests : IClassFixture<CatalogApiFactory>, IAsyncLi
         var state = await Read<BibChanged>(await service.GetAsync(U($"/internal/tenants/{tenantId}/bibs/{created.Mfn}")));
         Assert.Equal((created.PublicId, created.Mfn, tenantId, "Nhật ký trong tù", false), (state.BibPublicId, state.Mfn, state.TenantId, state.Title, state.Deleted));
         Assert.Equal(["9786040000099"], state.Isbns);
+        Assert.NotNull(state.CatalogedAt); // acquisition dựng bản sao từ /internal cũng có ngày biên mục
 
         // Đơn vị khác không có biểu ghi này; cán bộ không gọi được endpoint nội bộ.
         Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{NewTenant()}/bibs/{created.Mfn}"))).StatusCode);

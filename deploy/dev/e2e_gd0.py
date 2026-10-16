@@ -32,7 +32,9 @@ Kiểm tra tiêu chí hoàn thành GĐ0 trên môi trường DEV, đi đúng lu�
      sao chụp; báo cáo hoạt động + tài liệu mất; xuất Excel lịch sử.
  20. tra cứu OPAC (search): chỉ mục tự dựng khi service mới triển khai, tìm không dấu ẩn danh theo host, tìm nâng cao theo tác giả,
      số bản / bản sẵn sàng, chi tiết + tình trạng từng bản, gợi ý nhan đề, ẩn biểu ghi khỏi OPAC, quản trị chỉ mục (trạng thái, dựng lại).
- 21. OPAC mở rộng: xem MARC/ISBD + tải .mrc ẩn danh, ảnh bìa (upload media + tra theo ISBN), thống kê tra cứu + lượt mở kết quả,
+ 21. bổ sung (acquisition): đơn đặt (tỷ giá, thanh toán), phiếu nhận từ đơn đặt, khoá số lượng ĐKCB theo đơn nhận, hoàn tất khoá phiếu,
+     giao nhận theo đơn nhận, nhật ký holdings ghi đúng cán bộ, báo cáo bổ sung + tra cứu đơn nhận (xuất Excel), báo cáo kho theo ngày nhận.
+ 22. OPAC mở rộng: xem MARC/ISBD + tải .mrc ẩn danh, ảnh bìa (upload media + tra theo ISBN), thống kê tra cứu + lượt mở kết quả,
      Z39.50 ra Library of Congress (lx2.loc.gov:210/LCDB — máy chủ ngoài, lỗi mạng chỉ cảnh báo), chặn máy chủ trong mạng nội bộ,
      OPAC chỉ thấy máy chủ được bật, giới hạn lượt tra cứu theo IP (429 + Retry-After — chạy cuối vì chặn OPAC của IP này ~1 phút).
 Chạy trên máy DEV: python3 e2e_gd0.py   (đọc secret từ .env cùng thư mục; mật khẩu tài khoản demo ghi vào demo-accounts.txt, quyền 600)
@@ -292,7 +294,7 @@ def system_steps(sysb, accounts, admin_user):
     else:
         s, _, body = sysb.request("POST", "/api/system/tenant/tenants", token=sys_token, json_body={
             "code": TENANT_CODE, "name": "Trường demo nền tảng mới", "subdomain": SUBDOMAIN,
-            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH"]]})
+            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION"]]})
         expect(s == 201, f"tạo đơn vị {TENANT_CODE}", body)
         tenant = json.loads(body)
     for _ in range(60):
@@ -302,6 +304,11 @@ def system_steps(sysb, accounts, admin_user):
         time.sleep(1)
     steps = ", ".join(f"{p['service']}={p['status']}" for p in tenant["provisioningSteps"])
     expect(tenant["status"] == "Active", f"saga khởi tạo xong: Active ({steps})", json.dumps(tenant))
+    if not any(l["moduleCode"] == "ACQUISITION" for l in tenant["licenses"]):  # đơn vị từ lần chạy trước: bán thêm phân hệ Bổ sung
+        s, _, body = sysb.request("PUT", f"/api/system/tenant/tenants/{tenant['publicId']}/licenses", token=sys_token, json_body={
+            "licenses": [{"moduleCode": l["moduleCode"]} for l in tenant["licenses"]] + [{"moduleCode": "ACQUISITION"}]})
+        expect(s == 200, "bán thêm phân hệ Bổ sung (ACQUISITION) cho đơn vị", body)
+        tenant = json.loads(body)
     s, _, body = sysb.request("POST", f"/api/system/tenant/tenants/{tenant['publicId']}/resync", token=sys_token)
     expect(s == 200, "đồng bộ lại đơn vị sang các service (bản sao cho service thêm sau)", body)
 
@@ -371,8 +378,9 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         s, _, body = tb.request("GET", "/api/me", token=token)
         expect(not json.loads(body)["mustChangePassword"], "cờ buộc đổi mật khẩu đã tắt")
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
-    expect(s == 200 and sorted(json.loads(body)["modules"]) == ["CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"],
-           f"menu theo license: {json.loads(body).get('modules')}", body)
+    modules = set(json.loads(body)["modules"]) if s == 200 else set()
+    required = {"CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"}  # ACQUISITION: có khi quản trị nền tảng đã bán (bước 2) — không bắt buộc ở --tenant-only
+    expect(required <= modules <= required | {"ACQUISITION"}, f"menu theo license: {sorted(modules)}", body)
     s, _, body = tb.request("GET", "/api/admin/identity/users", token=token)
     expect(s == 200 and any(u["userName"] == admin_user for u in json.loads(body)["items"]), "API người dùng của đơn vị", body)
 
@@ -1223,7 +1231,14 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, _ = tb.request("DELETE", f"{C}/bibs/Delete/{sbib['publicId']}", token=token)
     expect(s == 204, "dọn ĐKCB, biểu ghi thử")
 
-    print("21. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
+    print("21. Bổ sung (service acquisition): đơn đặt, phiếu nhận, khoá số lượng ĐKCB, giao nhận, báo cáo")
+    s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
+    if s == 200 and "ACQUISITION" in json.loads(body)["modules"]:
+        acquisition_steps(tb, token, tag, book, kc, admin_user)
+    else:
+        print("  [BỎ QUA] đơn vị chưa có phân hệ Bổ sung — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
+
+    print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
         {"tag": "020", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "9780747532699"}]},
         {"tag": "100", "ind1": "1", "ind2": " ", "subfields": [{"code": "a", "value": "Rowling, J. K."}]},
@@ -1312,6 +1327,125 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
             limited = (i + 1, h.get("Retry-After"))
             break
     expect(limited and limited[1], f"giới hạn lượt tra cứu theo IP: request thứ {limited and limited[0]} bị 429, Retry-After {limited and limited[1]} giây")
+
+
+def acquisition_steps(tb, token, tag, book, kc, admin_user):
+    """21. Bổ sung (acquisition) — chạy sau catalog/holdings và trước OPAC mở rộng (bước 22 chặn OPAC của IP này).
+    Dữ liệu thử (biểu ghi, đơn đặt, phiếu nhận đã hoàn tất, ĐKCB đã ký nhận vào kho) giữ lại vì phiếu hoàn tất và bản đã giao nhận bị khoá;
+    mỗi lần chạy dùng nhan đề / tiền tố theo `tag` nên không đụng nhau."""
+    A, C, H = "/api/admin/acquisition", "/api/admin/catalog", "/api/admin/holdings"
+    today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600))
+
+    def post(path, body):
+        s, _, text = tb.request("POST", path, token=token, json_body=body)
+        return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    sources = []
+    for _ in range(30):  # acquisition vừa triển khai: chờ tự dựng bản sao đơn vị + seed nguồn bổ sung
+        s, text, sources = post(f"{A}/sources/SearchAll", {})
+        sources = sources if s == 200 else []
+        if len(sources) >= 4: break
+        time.sleep(2)
+    expect(len(sources) >= 4, f"nguồn bổ sung mặc định: {', '.join(x['name'] for x in sources)}", str(sources)[:200])
+
+    bibs = []
+    for title in (f"Bổ sung A {tag}", f"Bổ sung B {tag}"):
+        s, text, bib = post(f"{C}/bibs/Add", {"bibTypeId": book["id"], "fields": [
+            {"tag": "100", "ind1": "1", "ind2": " ", "subfields": [{"code": "a", "value": "Tô Hoài"}]},
+            {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": title}]}]})
+        expect(s == 201, f"biên mục '{title}' (MFN {bib.get('mfn')})", text[:200])
+        bibs.append(bib)
+    s, text, found = post(f"{A}/bibs/Lookup", {"keyword": str(bibs[0]["mfn"])})
+    expect(s == 200 and any(b["mfn"] == bibs[0]["mfn"] for b in found), "tìm biểu ghi theo MFN ở acquisition (bản sao, thiếu thì hỏi catalog)", text[:200])
+    s, _, text = tb.request("GET", "/api/admin/tenant/currencies/Options", token=token)
+    usd = next((c for c in json.loads(text) if c["code"] == "USD"), None) if s == 200 else None
+    expect(usd is not None, f"tiền tệ đang dùng cho đơn đặt / phiếu nhận (USD tỷ giá gợi ý {usd and usd['exchangeRate']})", f"{s} {text[:200]}")
+
+    s, text, supplier = post(f"{A}/suppliers/Add", {"name": f"NCC {tag}", "email": "ncc@example.vn"})
+    expect(s == 201, f"nhà cung cấp {supplier.get('name')}", text[:200])
+    s, text, order = post(f"{A}/orders/Add", {"name": f"Đặt sách {tag}", "orderedOn": today, "supplierId": supplier["id"], "paymentMethod": 1, "status": 2})
+    expect(s == 201 and order["paymentMethod"] == 1, f"đơn đặt #{order.get('id')} (chuyển khoản, đã gửi đặt)", text[:200])
+    s, text, oline = post(f"{A}/orders/SaveLine/{order['publicId']}", {"mfn": bibs[0]["mfn"], "quantity": 5, "price": 12.5, "currency": "usd", "rate": 25000})
+    expect(s == 200 and oline["currency"] == "USD" and oline["rate"] == 25000 and oline["remaining"] == 5, "dòng đặt 5 bản × 12,5 USD, tỷ giá 25.000", text[:200])
+    s, text, _ = post(f"{A}/orders/SaveLine/{order['publicId']}", {"mfn": bibs[1]["mfn"], "quantity": 2, "rate": 0})
+    expect(s == 400 and "RATE_INVALID" in text, "tỷ giá không dương bị từ chối", f"{s} {text[:200]}")
+    s, _, text = tb.request("GET", f"{A}/orders/GetById/{order['publicId']}", token=token)
+    expect(s == 200 and json.loads(text)["total"] == 5 * 12.5 * 25000, f"tổng giá trị đơn = {json.loads(text).get('total')}", text[:200])
+
+    s, text, receipt = post(f"{A}/receipts/Add", {"receivedOn": today, "name": f"Nhận {tag}", "supplierId": supplier["id"], "storeId": kc["id"],
+                                                  "paymentStatus": 2, "paymentMethod": 1})
+    expect(s == 201 and receipt["paymentStatus"] == 2, f"phiếu nhận #{receipt.get('id')} (đã thanh toán, chuyển khoản)", text[:200])
+    s, text, rline = post(f"{A}/receipts/SaveLine/{receipt['publicId']}", {"orderLinePublicId": oline["publicId"], "quantity": 3})
+    expect(s == 200 and rline["mfn"] == bibs[0]["mfn"] and rline["rate"] == 25000 and rline["currency"] == "USD" and rline["price"] == 12.5,
+           "nhận 3 bản từ đơn đặt: biểu ghi, giá, tiền tệ, tỷ giá theo dòng đặt", text[:300])
+    s, text, over = post(f"{A}/receipts/SaveLine/{receipt['publicId']}", {"mfn": bibs[1]["mfn"], "orderLinePublicId": oline["publicId"], "quantity": 3})
+    expect(s == 400 and "ORDER_LINE_EXCEEDED" in text, "nhận vượt số còn chờ của dòng đặt bị từ chối", f"{s} {text[:200]}")
+    s, _, text = tb.request("GET", f"{A}/orders/Lines/{order['publicId']}", token=token)
+    expect(s == 200 and json.loads(text)[0]["received"] == 3 and json.loads(text)[0]["remaining"] == 2, "đơn đặt: đã nhận 3, còn chờ 2", text[:200])
+
+    prefix = f"BS{tag.upper()}-"
+    s, text, items = post(f"{A}/receipts/RegisterItems/{rline['publicId']}", {"quantity": 3, "prefix": prefix, "digits": 4})
+    expect(s == 200 and [i["barcode"] for i in items] == [f"{prefix}000{n}" for n in (1, 2, 3)], f"đăng ký 3 ĐKCB {prefix}0001–0003 theo dòng phiếu nhận", text[:300])
+    s, text, _ = post(f"{A}/receipts/RegisterItems/{rline['publicId']}", {"quantity": 1, "prefix": prefix, "digits": 4})
+    expect(s >= 400 and "RECEIPT_LINE_FULL" in text, "khoá số lượng: đăng ký thêm quá số bản nhận bị từ chối", f"{s} {text[:200]}")
+    s, text, _ = post(f"{A}/receipts/RegisterItems/{rline['publicId']}", {"barcode": f"{prefix}9999"})
+    expect(s >= 400 and "RECEIPT_LINE_FULL" in text, "khoá số lượng: ĐKCB riêng lẻ cũng bị từ chối khi dòng đã đủ", f"{s} {text[:200]}")
+    s, text, _ = post(f"{A}/receipts/SaveLine/{receipt['publicId']}", {"linePublicId": rline["publicId"], "quantity": 1, "price": 12.5, "currency": "USD", "rate": 25000})
+    expect(s >= 400 and "QUANTITY_BELOW_REGISTERED" in text, "không giảm số bản dưới số ĐKCB đã đăng ký", f"{s} {text[:200]}")
+    s, text, page = post(f"{H}/items/Search", {"receiptPublicId": receipt["publicId"]})
+    expect(s == 200 and page["totalCount"] == 3 and all(i["receiptCode"] == receipt["id"] for i in page["items"]), "holdings: 3 bản gắn với phiếu nhận (lọc theo đơn nhận)", text[:300])
+    for _ in range(30):  # nhật ký của holdings ghi đúng cán bộ thao tác, không phải tài khoản service của acquisition
+        s, text, logs = post("/api/admin/audit/audit-logs/Search", {"action": "ADD", "pageSize": 50})
+        hit = next((i for i in logs.get("items", []) if f"theo phiếu nhận số {receipt['id']}" in (i.get("summary") or "")), None) if s == 200 else None
+        if hit: break
+        time.sleep(1)
+    expect(hit is not None and admin_user in (hit.get("actorName") or ""), f"nhật ký holdings: đăng ký ĐKCB theo phiếu ghi người thao tác '{hit and hit.get('actorName')}'", text[:300])
+
+    s, text, done = post(f"{A}/receipts/Complete/{receipt['publicId']}", None)
+    expect(s == 200 and done["completedAt"], "hoàn tất (khoá) phiếu nhận", text[:200])
+    s, text, _ = post(f"{A}/receipts/RegisterItems/{rline['publicId']}", {"barcode": f"{prefix}9998"})
+    expect(s >= 400 and "RECEIPT_COMPLETED" in text, "phiếu đã hoàn tất: không đăng ký thêm ĐKCB", f"{s} {text[:200]}")
+    options = []
+    for _ in range(30):  # ReceiptChanged tới holdings (outbox → RabbitMQ) → đơn nhận hiện ở phiếu giao nhận
+        s, _, text = tb.request("GET", f"{H}/deliveries/Receipts", token=token)
+        options = json.loads(text) if s == 200 else []
+        if any(o["code"] == receipt["id"] for o in options): break
+        time.sleep(1)
+    expect(any(o["code"] == receipt["id"] and o["pending"] == 3 for o in options), f"phiếu giao nhận chọn được đơn nhận #{receipt['id']} (còn 3 bản chưa phân bổ)", str(options)[:300])
+
+    s, text, delivery = post(f"{H}/deliveries/Add", {"delivererName": f"NCC {tag}", "receiverName": "Thủ kho", "storeId": kc["id"], "receiptPublicId": receipt["publicId"]})
+    expect(s == 201 and delivery["receiptCode"] == receipt["id"], f"phiếu giao nhận #{delivery.get('id')} theo đơn nhận", text[:200])
+    s, text, cands = post(f"{H}/deliveries/Candidates", {"transferId": delivery["publicId"], "receiptPublicId": receipt["publicId"], "pageSize": 20})
+    expect(s == 200 and cands["totalCount"] == 3, "màn chọn sách liệt kê đúng 3 bản của đơn nhận", text[:200])
+    s, text, added = post(f"{H}/deliveries/AddLines/{delivery['publicId']}", {"itemIds": [i["publicId"] for i in cands["items"]]})
+    expect(s == 200, "thêm 3 bản vào phiếu giao nhận", text[:200])
+    s, text, signed = post(f"{H}/deliveries/Sign/{delivery['publicId']}", None)
+    expect(s == 200 and signed["shelved"] == 3, f"ký nhận: xếp giá {signed.get('shelved')} bản vào kho nhận", text[:200])
+
+    rp = {"from": today, "to": today, "receiptCodeFrom": receipt["id"], "receiptCodeTo": receipt["id"], "pageSize": 100}
+    s, text, listed = post(f"{A}/reports/AcquisitionList", rp)
+    expect(s == 200 and listed["total"] == 1 and listed["quantity"] == 3 and listed["amount"] == 3 * 12.5 * 25000, f"báo cáo danh sách bổ sung: {listed.get('quantity')} bản, {listed.get('amount')}", text[:300])
+    s, text, lookup = post(f"{A}/reports/LookupLines", rp)
+    expect(s == 200 and lookup["totalCount"] == 1 and f"Bổ sung A {tag}" in lookup["items"][0]["isbd"] and lookup["items"][0]["storeName"] == kc["name"],
+           f"tra cứu đơn nhận theo dòng: {lookup['items'][0]['isbd'] if lookup.get('items') else ''}", text[:300])
+    s, _, content = tb.request("POST", f"{A}/reports/LookupLinesExport", token=token, json_body=rp, binary=True)
+    strings = ""
+    if s == 200 and content[:2] == b"PK":
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            strings = z.read("xl/sharedStrings.xml").decode("utf-8")
+    expect(f"Bổ sung A {tag}" in strings and "TRA CỨU ĐƠN NHẬN" in strings, f"xuất Excel tra cứu đơn nhận ({len(content)} byte)", str(s))
+    s, text, alloc = post(f"{A}/reports/StoreAllocation", rp)
+    expect(s == 200 and alloc["total"] == 3 and alloc["items"][0]["storeName"] == kc["name"], f"phân bổ kho: {alloc.get('total')} bản vào {kc['name']}", text[:300])
+    s, text, register = post(f"{A}/reports/AccessionRegister", rp)
+    rows = register.get("items", [])
+    expect(s == 200 and [r["barcode"] for r in rows] == [f"{prefix}000{n}" for n in (1, 2, 3)] and all(r["date"] == today and r["receiptId"] == receipt["id"] and r["price"] == 12.5 for r in rows),
+           "sổ ĐKCB: 3 bản theo số đăng ký, ngày nhận + đơn nhận + đơn giá theo phiếu", text[:300])
+    s, _, content = tb.request("POST", f"{A}/reports/AccessionRegisterExport", token=token, json_body=rp, binary=True)
+    expect(s == 200 and content[:2] == b"PK", "xuất Excel sổ ĐKCB", str(s))
+    s, text, newbooks = post(f"{A}/reports/NewBooks", {"from": today, "to": today, "pageSize": 100})
+    expect(s == 200 and any(b["mfn"] == bibs[0]["mfn"] and b["catalogedOn"] == today for b in newbooks.get("items", [])), "thư mục sách mới theo ngày biên mục (catalog gửi kèm trong BibChanged)", text[:300])
+    s, text, store_report = post(f"{H}/store-book-report/Search", {"storeId": kc["id"], "from": today, "to": today, "pageIndex": 1, "pageSize": 100})
+    expect(s == 200 and any(r["receiptCode"] == receipt["id"] and r["receivedOn"] == today for r in store_report["rows"]), "báo cáo sách trong kho lọc theo ngày nhận của đơn nhận", text[:300])
 
 
 if __name__ == "__main__":

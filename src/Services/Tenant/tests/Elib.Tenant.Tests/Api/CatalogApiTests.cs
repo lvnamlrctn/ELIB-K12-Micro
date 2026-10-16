@@ -161,6 +161,11 @@ public sealed class CatalogApiTests : IClassFixture<TenantApiFactory>, IAsyncLif
 
         var inactive = await Read<IReadOnlyList<CurrencyDto>>(await staff.PostAsJsonAsync("/api/currencies/SearchAll", new CrudSearch { Status = 1 }));
         Assert.Equal("JPY", Assert.Single(inactive).Code);
+
+        // Ô chọn tiền tệ của đơn đặt / phiếu nhận: chỉ tiền tệ đang dùng, người có quyền bổ sung xem được mà không cần quyền quản lý tiền tệ.
+        var picker = Staff(tenant.Id, "AB_RECEIPTS:view");
+        Assert.Equal(["EUR", "USD", "VND"], (await Read<IReadOnlyList<CurrencyDto>>(await picker.GetAsync("/api/currencies/Options"))).Select(c => c.Code));
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenant.Id, "POSITIONS:view").GetAsync("/api/currencies/Options")).StatusCode);
         Assert.Equal("STATUS_INVALID", await ErrorCode(await staff.PutAsJsonAsync("/api/currencies/ChangeStatus", new ChangeStatusRequest(jpy.PublicId, 7))));
 
         // Danh mục không có trạng thái thì không có endpoint ChangeStatus.

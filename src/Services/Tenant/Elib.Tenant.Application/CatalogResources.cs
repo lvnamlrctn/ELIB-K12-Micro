@@ -59,6 +59,10 @@ public sealed class CurrencyResource(ICrudDbContext db) : CrudResource<CurrencyR
 
     protected override IOrderedQueryable<Currency> Order(IQueryable<Currency> query) => query.OrderBy(x => x.Code);
 
+    /// <summary>Tiền tệ đang dùng — ô chọn tiền tệ và gợi ý tỷ giá ở đơn đặt / phiếu nhận của phân hệ bổ sung (cán bộ bổ sung không cần quyền quản lý tiền tệ).</summary>
+    public async Task<IReadOnlyList<CurrencyDto>> ActiveAsync(CancellationToken ct) =>
+        await Set.AsNoTracking().Where(x => x.Status == IHasStatus.Active).OrderBy(x => x.Code).Select(Projection).ToListAsync(ct);
+
     protected override async Task ValidateAsync(Currency entity, CancellationToken ct)
     {
         if (await Set.AnyAsync(x => x.Code == entity.Code && x.Id != entity.Id, ct))

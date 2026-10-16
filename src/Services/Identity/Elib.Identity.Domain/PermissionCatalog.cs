@@ -31,6 +31,9 @@ public static class PermissionCatalog
     private const string HoldingsLicense = "HOLDINGS";
     private const string CirculationGroup = "Lưu thông";
     private const string CirculationLicense = "CIRCULATION";
+    private const string AcquisitionGroup = "Bổ sung";
+    private const string AcquisitionParams = "Bổ sung / Tham số bổ sung";
+    private const string AcquisitionLicense = "ACQUISITION";
     private const string SearchGroup = "Tra cứu";
     private const string SearchLicense = "SEARCH";
 
@@ -74,6 +77,13 @@ public static class PermissionCatalog
         new("RE_REGISTER", "Đăng ký lại mã vạch", StoreGroup, [View, Edit], HoldingsLicense),
         new("STAT_DOC", "Thống kê tài liệu", StoreGroup, [View], HoldingsLicense),
         new("STORE_BOOK_REPORT", "Báo cáo sách trong kho", StoreGroup, [View], HoldingsLicense),
+
+        new("AB_ORDERS", "Đơn đặt bổ sung", AcquisitionGroup, Crud, AcquisitionLicense),
+        new("AB_RECEIPTS", "Phiếu nhận (đăng ký cá biệt theo phiếu)", AcquisitionGroup, Crud, AcquisitionLicense),
+        new("AB_SOURCES", "Nguồn bổ sung", AcquisitionParams, Crud, AcquisitionLicense),
+        new("SUPPLIERS", "Nhà cung cấp", AcquisitionParams, Crud, AcquisitionLicense),
+        new("BUDGETS", "Kinh phí", AcquisitionParams, Crud, AcquisitionLicense),
+        new("FUNDS", "Quỹ", AcquisitionParams, Crud, AcquisitionLicense),
 
         new("BORROW", "Mượn/Trả", CirculationGroup, [View, Add, Edit], CirculationLicense),
         new("REQUEST_BOOKS", "Yêu cầu mượn", CirculationGroup, [View, Add, Edit], CirculationLicense),

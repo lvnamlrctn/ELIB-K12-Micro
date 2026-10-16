@@ -323,18 +323,22 @@ public sealed class Delivery : TenantEntity
 
     public bool IsSigned => SignedAt is not null;
 
+    /// <summary>Đơn nhận (phiếu nhận của phân hệ bổ sung) mà phiếu giao nhận phân bổ sách — màn chọn sách liệt kê bản của đơn này.</summary>
+    public Guid? ReceiptPublicId { get; private set; }
+
     public static Delivery Create(string? deliverer, string? delivererAddress, string? receiver, string? receiverAddress, DateOnly? deliveredOn,
-        DateOnly? receivedOn, long? storeId, int status, string? note)
+        DateOnly? receivedOn, long? storeId, int status, string? note, Guid? receiptPublicId = null)
     {
         var delivery = new Delivery();
-        delivery.Update(deliverer, delivererAddress, receiver, receiverAddress, deliveredOn, receivedOn, storeId, status, note);
+        delivery.Update(deliverer, delivererAddress, receiver, receiverAddress, deliveredOn, receivedOn, storeId, status, note, receiptPublicId);
         return delivery;
     }
 
     public void Update(string? deliverer, string? delivererAddress, string? receiver, string? receiverAddress, DateOnly? deliveredOn,
-        DateOnly? receivedOn, long? storeId, int status, string? note)
+        DateOnly? receivedOn, long? storeId, int status, string? note, Guid? receiptPublicId = null)
     {
         EnsureEditable();
+        ReceiptPublicId = receiptPublicId;
         DelivererName = TextRules.Optional(deliverer, 250, "NAME_INVALID", "Người giao");
         DelivererAddress = TextRules.Optional(delivererAddress, 500, "ADDRESS_INVALID", "Địa chỉ người giao");
         ReceiverName = TextRules.Optional(receiver, 250, "NAME_INVALID", "Người nhận");

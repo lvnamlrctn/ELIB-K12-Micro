@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
-  Api, CompleteResult, CrudPage, Delivery, Item, ItemBatchResult, StoreMove, StoreOption, TransferKind, TransferLine, errorMessage,
+  Api, CompleteResult, CrudPage, Delivery, DeliveryReceiptOption, Item, ItemBatchResult, StoreMove, StoreOption, TransferKind, TransferLine, errorMessage,
 } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
@@ -22,7 +22,7 @@ const KINDS = {
 interface TransferForm {
   publicId: string | null; fromStoreId: number | null; toStoreId: number | null; storeId: number | null; status: number;
   delivererName: string; delivererAddress: string; receiverName: string; receiverAddress: string;
-  movedOn: string; deliveredOn: string; receivedOn: string; note: string;
+  movedOn: string; deliveredOn: string; receivedOn: string; note: string; receiptPublicId: string | null;
 }
 
 function kindOf(route: ActivatedRoute): TransferKind {
@@ -76,7 +76,8 @@ function isLocked(t: Transfer): boolean {
                   <td class="td text-[13px]">{{ m.delivererName ?? '' }}@if (m.receiverName) { → {{ m.receiverName }} }</td>
                   <td class="td">{{ m.movedOn ? (m.movedOn | ldate: 'dd/MM/yyyy') : '' }}</td>
                 } @else if (d) {
-                  <td class="td text-[13px]">{{ d.delivererName ?? '' }}@if (d.receiverName) { → {{ d.receiverName }} }</td>
+                  <td class="td text-[13px]">{{ d.delivererName ?? '' }}@if (d.receiverName) { → {{ d.receiverName }} }
+                    @if (d.receiptCode) { <div class="text-[11px] text-gray-400">{{ 'TRANSFER.RECEIPT_NO' | translate: { no: d.receiptCode } }}</div> }</td>
                   <td class="td">{{ d.storeName ?? '—' }}</td>
                   <td class="td">{{ d.deliveredOn ? (d.deliveredOn | ldate: 'dd/MM/yyyy') : '' }}</td>
                 }
@@ -114,6 +115,12 @@ function isLocked(t: Transfer): boolean {
             <div><label for="tf-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-rn" class="input" maxlength="250" [(ngModel)]="f.receiverName" /></div>
             <div><label for="tf-mo" class="form-label">{{ 'TRANSFER.DATE' | translate }}</label><input id="tf-mo" type="date" class="input" [(ngModel)]="f.movedOn" /></div>
           } @else {
+            <div class="col-span-2"><label for="tf-rc" class="form-label">{{ 'TRANSFER.RECEIPT' | translate }}</label>
+              <select id="tf-rc" class="input" [(ngModel)]="f.receiptPublicId" (ngModelChange)="onReceipt(f)">
+                <option [ngValue]="null">{{ 'TRANSFER.NO_RECEIPT' | translate }}</option>
+                @for (r of receipts(); track r.publicId) { <option [ngValue]="r.publicId">{{ receiptLabel(r) | translate: receiptParams(r) }}</option> }
+              </select>
+              <p class="text-[11px] text-gray-400 mt-1">{{ 'TRANSFER.RECEIPT_HINT' | translate }}</p></div>
             <div><label for="tf-dn" class="form-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="tf-dn" class="input" maxlength="250" [(ngModel)]="f.delivererName" /></div>
             <div><label for="tf-da" class="form-label">{{ 'TRANSFER.DELIVERER_ADDRESS' | translate }}</label><input id="tf-da" class="input" maxlength="500" [(ngModel)]="f.delivererAddress" /></div>
             <div><label for="tf-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-rn" class="input" maxlength="250" [(ngModel)]="f.receiverName" /></div>
@@ -153,6 +160,7 @@ export class Transfers implements OnInit {
   protected pageSize = 10;
   protected readonly page = signal<CrudPage<Transfer> | null>(null);
   protected readonly stores = signal<StoreOption[]>([]);
+  protected readonly receipts = signal<DeliveryReceiptOption[]>([]);
   protected readonly form = signal<TransferForm | null>(null);
   protected readonly deleting = signal<Transfer | null>(null);
   protected readonly loading = signal(false);
@@ -197,8 +205,23 @@ export class Transfers implements OnInit {
       publicId: t?.publicId ?? null, fromStoreId: m?.fromStoreId ?? this.stores()[0]?.id ?? null, toStoreId: m?.toStoreId ?? this.stores()[1]?.id ?? null,
       storeId: d?.storeId ?? null, status: d?.status ?? 1, delivererName: t?.delivererName ?? '', delivererAddress: d?.delivererAddress ?? '',
       receiverName: t?.receiverName ?? '', receiverAddress: d?.receiverAddress ?? '', movedOn: m?.movedOn ?? '', deliveredOn: d?.deliveredOn ?? '',
-      receivedOn: d?.receivedOn ?? '', note: t?.note ?? '',
+      receivedOn: d?.receivedOn ?? '', note: t?.note ?? '', receiptPublicId: d?.receiptPublicId ?? null,
     });
+    if (this.kind === 'deliveries') this.api.deliveryReceipts(d?.receiptPublicId).then((r) => this.receipts.set(r), () => this.receipts.set([]));
+  }
+
+  protected receiptLabel(r: DeliveryReceiptOption): string {
+    return receiptOptionLabel(r);
+  }
+
+  protected receiptParams(r: DeliveryReceiptOption) {
+    return receiptOptionParams(r);
+  }
+
+  /** Chọn đơn nhận: kho nhận mặc định theo kho của đơn (nếu phiếu chưa chọn kho). */
+  protected onReceipt(f: TransferForm): void {
+    const r = this.receipts().find((x) => x.publicId === f.receiptPublicId);
+    if (r?.storeId && f.storeId === null) f.storeId = r.storeId;
   }
 
   protected async save(f: TransferForm): Promise<void> {
@@ -208,7 +231,7 @@ export class Transfers implements OnInit {
       : {
         delivererName: text(f.delivererName), delivererAddress: text(f.delivererAddress), receiverName: text(f.receiverName),
         receiverAddress: text(f.receiverAddress), deliveredOn: f.deliveredOn || null, receivedOn: f.receivedOn || null, storeId: f.storeId,
-        status: f.status, note: text(f.note),
+        status: f.status, note: text(f.note), receiptPublicId: f.receiptPublicId,
       };
     this.busy.set(true);
     try {
@@ -250,6 +273,16 @@ export class Transfers implements OnInit {
   }
 }
 
+/** "Đơn nhận #12 — Mua đợt 1 (05/09/2026) · còn 8 bản" — khoá dịch + tham số. */
+function receiptOptionLabel(r: DeliveryReceiptOption): string {
+  return r.name ? 'TRANSFER.RECEIPT_OPTION_NAMED' : 'TRANSFER.RECEIPT_OPTION';
+}
+
+function receiptOptionParams(r: DeliveryReceiptOption) {
+  const on = r.receivedOn ? r.receivedOn.split('-').reverse().join('/') : '';
+  return { no: r.code, name: r.name ?? '', on, pending: r.pending };
+}
+
 function transferStatus(t: Transfer): { label: string; badge: string } {
   if ('fromStoreId' in t) return t.completedAt ? { label: 'TRANSFER.COMPLETED', badge: 'badge-on' } : { label: 'TRANSFER.DRAFT', badge: 'badge-info' };
   if (t.signedAt) return { label: 'TRANSFER.SIGNED', badge: 'badge-on' };
@@ -272,7 +305,10 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
           <h4 class="page-title">#{{ t.id }} <span [class]="statusOf(t).badge + ' align-middle'">{{ statusOf(t).label | translate }}</span></h4>
           <div class="text-sm text-gray-500">
             @if (asMove(t); as m) { {{ m.fromStoreName }} → {{ m.toStoreName }} }
-            @else if (asDelivery(t); as d) { {{ d.delivererName ?? '' }} → {{ d.receiverName ?? '' }} · {{ 'TRANSFER.TO_STORE' | translate }}: {{ d.storeName ?? '—' }} }
+            @else if (asDelivery(t); as d) {
+              {{ d.delivererName ?? '' }} → {{ d.receiverName ?? '' }} · {{ 'TRANSFER.TO_STORE' | translate }}: {{ d.storeName ?? '—' }}
+              @if (d.receiptCode) { · {{ 'TRANSFER.RECEIPT_NO' | translate: { no: d.receiptCode } }} }
+            }
             @if (t.note) { · {{ t.note }} }
           </div>
         }
@@ -303,6 +339,13 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
         </div>
         <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
           <div class="p-3 flex flex-wrap gap-2 items-end border-b border-gray-100">
+            @if (kind === 'deliveries') {
+              <div class="w-56"><label for="td-rc" class="field-label">{{ 'TRANSFER.RECEIPT' | translate }}</label>
+                <select id="td-rc" class="input" [(ngModel)]="pick.receiptPublicId" (ngModelChange)="findCandidates()">
+                  <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
+                  @for (r of receipts(); track r.publicId) { <option [ngValue]="r.publicId">{{ receiptLabel(r) | translate: receiptParams(r) }}</option> }
+                </select></div>
+            }
             <div class="flex-1 min-w-[160px]"><label for="td-kw" class="field-label">{{ 'TRANSFER.PICK_SEARCH' | translate }}</label>
               <input id="td-kw" class="input" [(ngModel)]="pick.keyword" (keydown.enter)="findCandidates()" /></div>
             <div class="w-32"><label for="td-bf" class="field-label">{{ 'ITEMS_PAGE.BARCODE_FROM' | translate }}</label><input id="td-bf" class="input font-mono" [(ngModel)]="pick.barcodeFrom" /></div>
@@ -372,7 +415,8 @@ export class TransferDetail implements OnInit {
   protected readonly text = computed(() => KINDS[this.kind]);
 
   protected codes = '';
-  protected pick = { keyword: '', barcodeFrom: '', barcodeTo: '', pageIndex: 1, pageSize: 25 };
+  protected pick = { keyword: '', barcodeFrom: '', barcodeTo: '', receiptPublicId: null as string | null, pageIndex: 1, pageSize: 25 };
+  protected readonly receipts = signal<DeliveryReceiptOption[]>([]);
   protected readonly transfer = signal<Transfer | null>(null);
   protected readonly lines = signal<TransferLine[]>([]);
   protected readonly candidates = signal<CrudPage<Item> | null>(null);
@@ -387,7 +431,20 @@ export class TransferDetail implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.load();
+    const d = this.transfer();
+    if (d && !('fromStoreId' in d)) {
+      this.pick.receiptPublicId = d.receiptPublicId;
+      if (this.editable()) this.api.deliveryReceipts(d.receiptPublicId).then((r) => this.receipts.set(r), () => undefined);
+    }
     if (this.editable()) void this.findCandidates();
+  }
+
+  protected receiptLabel(r: DeliveryReceiptOption): string {
+    return receiptOptionLabel(r);
+  }
+
+  protected receiptParams(r: DeliveryReceiptOption) {
+    return receiptOptionParams(r);
   }
 
   protected asMove(t: Transfer): StoreMove | null {
@@ -498,7 +555,7 @@ export class TransferDetail implements OnInit {
       const p = this.pick;
       this.candidates.set(await this.api.transferCandidates(this.kind, {
         transferId: this.id(), keyword: p.keyword.trim() || undefined, barcodeFrom: p.barcodeFrom.trim() || null, barcodeTo: p.barcodeTo.trim() || null,
-        pageIndex: p.pageIndex, pageSize: p.pageSize,
+        receiptPublicId: this.kind === 'deliveries' ? p.receiptPublicId : null, pageIndex: p.pageIndex, pageSize: p.pageSize,
       }));
     } catch (e) {
       this.toastr.error(errorMessage(e));

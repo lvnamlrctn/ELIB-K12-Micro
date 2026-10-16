@@ -6,8 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Elib.Holdings.Application;
 
 /// <summary>
-/// Thống kê tài liệu kho. Criterion: status | store | ddc | bibtype (mặc định). From/To: ngày đăng ký cá biệt (giờ VN) — monolith lọc
-/// theo ngày tạo bản ghi, chưa có ngày nhận theo phiếu nhập (chờ acquisition).
+/// Thống kê tài liệu kho. Criterion: status | store | ddc | bibtype (mặc định). From/To: ngày nhận (xem <see cref="StoreReports"/>).
 /// </summary>
 public sealed record DocumentStatsRequest(string? Criterion = null, DateOnly? From = null, DateOnly? To = null, long? StoreId = null);
 
@@ -16,11 +15,12 @@ public sealed record DocumentStatRow(string Key, string Label, int Titles, int C
 
 public sealed record DocumentStats(string Criterion, IReadOnlyList<DocumentStatRow> Rows, int Titles, int Copies);
 
-/// <summary>Báo cáo sách trong kho: bản chưa mất/chưa thanh lý, lọc theo kho và ngày đăng ký (giờ VN).</summary>
+/// <summary>Báo cáo sách trong kho: bản chưa mất/chưa thanh lý, lọc theo kho và ngày nhận.</summary>
 public sealed record StoreBookReportRequest(long? StoreId = null, DateOnly? From = null, DateOnly? To = null, int PageIndex = 1, int PageSize = 50);
 
+/// <summary><see cref="ReceivedOn"/>/<see cref="ReceiptCode"/>: ngày nhận và số của phiếu nhận đã đăng ký bản (null = đăng ký không qua phiếu nhận).</summary>
 public sealed record StoreBookRow(string Barcode, long Mfn, string? Title, string? Author, string? Ddc, DateOnly RegisteredOn, string? StoreName, string Status,
-    bool OnLoan);
+    bool OnLoan, DateOnly? ReceivedOn = null, long? ReceiptCode = null);
 
 public sealed record StoreBookStat(long? StoreId, string StoreName, int Titles, int Copies);
 
@@ -28,7 +28,9 @@ public sealed record StoreBookReport(IReadOnlyList<StoreBookRow> Rows, int Total
 
 /// <summary>
 /// Thống kê và báo cáo kho (monolith: StoreStatisticsController quyền STAT_DOC, StoreBookReportController quyền STORE_BOOK_REPORT).
-/// Đếm trên bản sao biểu ghi trong DB holdings — không gọi catalog.
+/// Đếm trên bản sao biểu ghi trong DB holdings — không gọi catalog. Lọc ngày theo NGÀY NHẬN như ELIB-LRC ("sách đã nhận —
+/// ab_receipt.Receipt_Date — trong khoảng ngày"): bản đăng ký theo phiếu nhận lấy ngày nhận của phiếu (bản sao từ acquisition); bản
+/// đăng ký thẳng ở biên mục / dữ liệu cũ không có phiếu thì lấy ngày đăng ký cá biệt (monolith lọc mọi bản theo ngày tạo bản ghi).
 /// </summary>
 public sealed class StoreReports(ICrudDbContext db, HoldingsExcel excel)
 {
@@ -140,8 +142,8 @@ public sealed class StoreReports(ICrudDbContext db, HoldingsExcel excel)
         var period = HoldingsExcel.Period(request.From, request.To);
         return await excel.BuildAsync("sach-trong-kho", ct,
             new ExcelSheet("Sách trong kho", "BÁO CÁO SÁCH TRONG KHO", period,
-                ["Đăng ký cá biệt", "Nhan đề", "Tác giả", "Phân loại", "Ngày đăng ký", "Kho", "Trạng thái"],
-                rows.Select(r => (IReadOnlyList<object?>)[r.Barcode, r.Title, r.Author, r.Ddc, r.RegisteredOn, r.StoreName,
+                ["Đăng ký cá biệt", "Nhan đề", "Tác giả", "Phân loại", "Ngày nhận", "Đơn nhận", "Ngày đăng ký", "Kho", "Trạng thái"],
+                rows.Select(r => (IReadOnlyList<object?>)[r.Barcode, r.Title, r.Author, r.Ddc, r.ReceivedOn, r.ReceiptCode, r.RegisteredOn, r.StoreName,
                     r.OnLoan ? "Đang mượn" : ItemStatus.Names.GetValueOrDefault(r.Status, r.Status)])),
             new ExcelSheet("Theo kho", "TỔNG HỢP THEO KHO", period, ["Kho", "Số đầu sách", "Số bản"],
                 [.. stats.Select(s => (IReadOnlyList<object?>)[s.StoreName, s.Titles, s.Copies]),
@@ -161,9 +163,11 @@ public sealed class StoreReports(ICrudDbContext db, HoldingsExcel excel)
         from b in bj.DefaultIfEmpty()
         join st in db.Set<Store>() on i.StoreId equals (long?)st.Id into sj
         from st in sj.DefaultIfEmpty()
+        join rc in db.Set<ReceiptSnapshot>() on i.ReceiptPublicId equals (Guid?)rc.ReceiptPublicId into rj
+        from rc in rj.DefaultIfEmpty()
         orderby i.CreatedAt descending, i.BarcodeKey
         select new StoreBookRow(i.Barcode, i.BibId, b == null ? null : b.Title, b == null ? null : b.Author, b == null ? null : b.Ddc,
-            VietnamDate.Of(i.CreatedAt), st == null ? null : st.Name, i.Status, i.OnLoan);
+            VietnamDate.Of(i.CreatedAt), st == null ? null : st.Name, i.Status, i.OnLoan, rc == null ? null : rc.ReceivedOn, rc == null ? null : rc.Code);
 
     private async Task<IReadOnlyList<StoreBookStat>> StoreStatsAsync(IQueryable<Item> items, CancellationToken ct)
     {
@@ -174,18 +178,22 @@ public sealed class StoreReports(ICrudDbContext db, HoldingsExcel excel)
             .OrderBy(s => s.StoreName, StringComparer.CurrentCulture).ToList();
     }
 
-    private static IQueryable<Item> Filter(IQueryable<Item> items, long? storeId, DateOnly? from, DateOnly? to)
+    /// <summary>Lọc kho + khoảng ngày nhận (ngày nhận của phiếu nhận; bản không có phiếu nhận / phiếu chưa có ngày nhận → ngày đăng ký).</summary>
+    private IQueryable<Item> Filter(IQueryable<Item> items, long? storeId, DateOnly? from, DateOnly? to)
     {
         if (storeId is { } store) items = items.Where(i => i.StoreId == store);
+        var received = db.Set<ReceiptSnapshot>().Where(r => r.ReceivedOn != null);
         if (from is { } f)
         {
             var start = VietnamDate.Start(f);
-            items = items.Where(i => i.CreatedAt >= start);
+            items = items.Where(i => received.Any(r => r.ReceiptPublicId == i.ReceiptPublicId && r.ReceivedOn >= f)
+                || (!received.Any(r => r.ReceiptPublicId == i.ReceiptPublicId) && i.CreatedAt >= start));
         }
         if (to is { } t)
         {
             var end = VietnamDate.Start(t.AddDays(1));
-            items = items.Where(i => i.CreatedAt < end);
+            items = items.Where(i => received.Any(r => r.ReceiptPublicId == i.ReceiptPublicId && r.ReceivedOn <= t)
+                || (!received.Any(r => r.ReceiptPublicId == i.ReceiptPublicId) && i.CreatedAt < end));
         }
         return items;
     }

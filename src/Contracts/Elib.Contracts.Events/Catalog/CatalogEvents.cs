@@ -43,6 +43,9 @@ public sealed record BibChanged : IntegrationEvent
     /// <summary>2 = hiện trên OPAC, 1 = ẩn.</summary>
     public int Status { get; init; }
 
+    /// <summary>Ngày biên mục (tạo biểu ghi) — báo cáo "thư mục sách mới" của acquisition sắp theo ngày này. null = không rõ.</summary>
+    public DateTimeOffset? CatalogedAt { get; init; }
+
     public bool Deleted { get; init; }
     public long Version { get; init; }
 }

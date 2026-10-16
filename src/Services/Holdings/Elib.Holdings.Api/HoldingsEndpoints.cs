@@ -30,7 +30,8 @@ public static class HoldingsEndpoints
             => r.SearchAsync(search, ct));
         items.MapPost("/Register", [Permission("CATALOG_BIBS", "edit")] (RegisterItemsRequest request, ItemResource r, CancellationToken ct)
             => r.RegisterAsync(request, ct));
-        items.MapGet("/NextBarcode", [Permission("CATALOG_BIBS", "edit")] (string? prefix, int? digits, ItemResource r, CancellationToken ct)
+        // Số ĐKCB tiếp theo: cán bộ biên mục, hoặc cán bộ bổ sung đăng ký ĐKCB theo phiếu nhận.
+        items.MapGet("/NextBarcode", [PermissionAny("CATALOG_BIBS:edit", "AB_RECEIPTS:edit")] (string? prefix, int? digits, ItemResource r, CancellationToken ct)
             => r.NextAsync(prefix, digits ?? 6, ct));
         items.MapPost("/Shelve", [Permission("MAP_SHELVING", "edit")] (ShelveRequest request, ItemResource r, CancellationToken ct)
             => r.ShelveAsync(request, ct));
@@ -51,6 +52,43 @@ public static class HoldingsEndpoints
                 return new StatePage<ItemChanged>(list, next);
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        // Nội bộ: acquisition đăng ký / liệt kê / xoá ĐKCB theo phiếu nhận (quyền AB_RECEIPTS và khoá phiếu kiểm tra ở acquisition).
+        // Người thao tác thật (acquisition gửi kèm) thay tài khoản service trong cột audit, event và nhật ký — filter chỉ chạy sau khi đã qua RequireServiceCaller.
+        var receiptItems = app.MapGroup("/internal/tenants/{tenantId:long}/receipt-items").WithTags("Internal")
+            .RequireAuthorization(new RequireServiceCallerAttribute()).AddEndpointFilter<ActingAsFilter>();
+        // Báo cáo bổ sung (acquisition lọc phiếu nhận, holdings trả bản sách): trang bản sách theo số ĐKCB và số bản theo kho.
+        receiptItems.MapPost("/Report", async (long tenantId, ReceiptItemReportRequest request, ITenantContext tenant, ReceiptItemReports r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.PageAsync(request, ct);
+        });
+        receiptItems.MapGet("/Stores", async (long tenantId, ITenantContext tenant, ReceiptItemReports r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.StoresAsync(ct);
+        });
+        receiptItems.MapPost("/StoreCounts", async (long tenantId, ReceiptItemReportRequest request, ITenantContext tenant, ReceiptItemReports r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.StoreCountsAsync(request, ct);
+        });
+        receiptItems.MapPost("/Register", async (long tenantId, ReceiptItemsRequest request, ITenantContext tenant, ReceiptItems r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.RegisterAsync(request, ct);
+        });
+        receiptItems.MapGet("/{receiptPublicId:guid}", async (long tenantId, Guid receiptPublicId, ITenantContext tenant, ReceiptItems r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.ListAsync(receiptPublicId, ct);
+        });
+        receiptItems.MapDelete("/{receiptPublicId:guid}/{itemPublicId:guid}", async (long tenantId, Guid receiptPublicId, Guid itemPublicId, ITenantContext tenant,
+            ReceiptItems r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                await r.RemoveAsync(receiptPublicId, itemPublicId, ct);
+            return Results.NoContent();
+        });
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
         api.MapStoreOperationEndpoints();
         return app;
