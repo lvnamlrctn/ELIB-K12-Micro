@@ -108,7 +108,11 @@ export const routes: Routes = [
       { path: 'ab-orders', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.Orders), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
       { path: 'ab-orders/:id', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.OrderDetail), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
       { path: 'ab-receipts', loadComponent: () => import('./pages/acquisition/receipts').then((m) => m.Receipts), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_RECEIPT.TITLE' },
-      { path: 'ab-receipts/:id', loadComponent: () => import('./pages/acquisition/receipts').then((m) => m.ReceiptDetail), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_RECEIPT.TITLE' },
+      { path: 'ab-receipts/lookup', loadComponent: () => import('./pages/acquisition/receipt-lookup').then((m) => m.ReceiptLookup), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_LOOKUP.TITLE' },
+      {
+        path: 'ab-receipts/:id', loadComponent: () => import('./pages/acquisition/receipts').then((m) => m.ReceiptDetail), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')],
+        canDeactivate: [unsavedChangesGuard], title: 'ACQ_RECEIPT.TITLE',
+      },
       { path: 'ab-reports', loadComponent: () => import('./pages/acquisition/reports').then((m) => m.AcquisitionReports), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_REPORT.TITLE' },
       catalog('ab-sources', ACQ_SOURCES),
       catalog('suppliers', SUPPLIERS),

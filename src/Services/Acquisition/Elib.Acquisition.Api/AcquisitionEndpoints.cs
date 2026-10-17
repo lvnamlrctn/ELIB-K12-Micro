@@ -28,6 +28,11 @@ public static class AcquisitionEndpoints
             .WithTags("Options");
         api.MapPost("/bibs/Lookup", [PermissionAny("AB_ORDERS:view", "AB_RECEIPTS:view")] (CrudSearch search, BibSnapshots bibs, CancellationToken ct)
             => bibs.LookupAsync(search.Keyword, ct)).WithTags("Bibs");
+        // "Tra trùng" của phiếu nhận (ELIB-LRC): tìm nâng cao có phân trang + loại tài liệu cho ô lọc.
+        api.MapPost("/bibs/Search", [PermissionAny("AB_ORDERS:view", "AB_RECEIPTS:view")] (BibSearchRequest request, BibSnapshots bibs, CancellationToken ct)
+            => bibs.SearchAsync(request, ct)).WithTags("Bibs");
+        api.MapGet("/bibs/Types", [PermissionAny("AB_ORDERS:view", "AB_RECEIPTS:view")] (BibSnapshots bibs, CancellationToken ct)
+            => bibs.TypesAsync(ct)).WithTags("Bibs");
 
         MapOrders(api.MapCrud<PurchaseOrderResource>("/orders", "AB_ORDERS").WithTags("Orders"));
         MapReceipts(api.MapCrud<ReceiptResource>("/receipts", "AB_RECEIPTS").WithTags("Receipts"));

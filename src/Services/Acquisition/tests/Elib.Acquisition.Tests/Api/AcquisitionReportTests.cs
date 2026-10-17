@@ -168,6 +168,8 @@ public sealed class AcquisitionReportTests : IClassFixture<AcquisitionApiFactory
         Assert.Equal(2, lookup.TotalCount);
         var row = lookup.Items.Single(r => r.ReceiptId == sept.Id);
         Assert.Equal(("Truyện Kiều / Nguyễn Du .- NXB Văn học, 2020", "Kho chính", kieu.Mfn), (row.Isbd, row.StoreName, row.Mfn));
+        Assert.Equal(sept.PublicId, row.ReceiptPublicId); // cột "Mã đơn" mở chi tiết đơn
+        Assert.Equal(0, (await Read<CrudPage<ReceiptLookupRow>>(await Post(staff, "LookupLines", new AcquisitionReportRequest { CreatedBy = 987654321 }))).TotalCount);
         Assert.Equal("Kho phụ", lookup.Items.Single(r => r.ReceiptId == oct.Id).StoreName);
         Assert.Equal(sept.Id, Assert.Single((await Read<CrudPage<ReceiptLookupRow>>(await Post(staff, "LookupLines",
             new AcquisitionReportRequest { ReceiptCodeFrom = sept.Id, ReceiptCodeTo = sept.Id }))).Items).ReceiptId);

@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
@@ -8,7 +8,27 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { BibPicker } from './bib-picker';
 
-type Source = 'existing' | 'new' | 'file' | 'paste' | 'z3950';
+export type Source = 'existing' | 'new' | 'file' | 'paste' | 'z3950';
+
+/** Trường MARC của nguồn bỏ 001/003/005 — catalog tự sinh MFN, mã đơn vị, thời điểm (như khi sao từ Z39.50 sang màn biên mục). */
+export function ownFields(fields: MarcField[]): MarcField[] {
+  return fields.filter((f) => !['001', '003', '005'].includes(f.tag));
+}
+
+/** Biểu ghi ở catalog có cùng ISBN (020$a đầu tiên) — hỏi lại trước khi tạo bản mới. */
+export async function isbnDupes(api: Api, fields: MarcField[]): Promise<IsbnMatch[]> {
+  const isbn = fields.find((f) => f.tag === '020')?.subfields?.find((s) => s.code === 'a' && s.value.trim())?.value;
+  return isbn ? api.checkIsbn(isbn) : [];
+}
+
+/** Tạo biểu ghi ở catalog (ẩn trên OPAC tới khi biên mục viên bật) và trả về như biểu ghi chọn cho dòng đơn. */
+export async function createCatalogBib(api: Api, leader: string | null, fields: MarcField[], bibTypeId: number | null): Promise<AcqBib> {
+  const bib = await api.crud<Bib>('bibs', 'catalog').add({ bibTypeId, leader: leader?.trim() || null, fields, status: STATUS_INACTIVE });
+  return {
+    bibPublicId: bib.publicId, mfn: bib.mfn, title: bib.title, author: bib.author, publisher: bib.publisher, publishYear: bib.publishYear,
+    isbns: bib.isbns.length ? bib.isbns.join(', ') : null,
+  };
+}
 
 const SOURCES: { code: Source; label: string; icon: string }[] = [
   { code: 'existing', label: 'ACQ_SOURCE.EXISTING', icon: 'search' },
@@ -43,9 +63,9 @@ function quickFields(f: { title: string; author: string; publisher: string; year
     @if (selected(); as b) {
       <app-acq-bib-picker [inputId]="inputId()" [selected]="b" (picked)="picked.emit($event)" />
     } @else {
-      @if (canCreate()) {
+      @if (canCreate() && sources().length > 1) {
         <div class="flex flex-wrap gap-1.5 mb-2" role="group">
-          @for (s of sources; track s.code) {
+          @for (s of sources(); track s.code) {
             <button type="button" class="px-2.5 py-1 rounded-lg border text-[13px] flex items-center gap-1"
                     [class]="source() === s.code ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'" (click)="open(s.code)">
               <span class="material-icons text-[16px]">{{ s.icon }}</span> {{ s.label | translate }}</button>
@@ -126,16 +146,21 @@ function quickFields(f: { title: string; author: string; publisher: string; year
     }
   `,
 })
-export class BibSource {
+export class BibSource implements OnInit {
   readonly inputId = input('acq-bib');
   readonly selected = input<AcqBib | null>(null);
+  /** Chỉ các nguồn này (nút riêng kiểu ELIB-LRC: "Thêm sách lẻ", "Thêm sách từ Z3950", "Thêm sách từ file Marc"); null = mọi nguồn. */
+  readonly only = input<Source[] | null>(null);
   readonly picked = output<AcqBib | null>();
 
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
 
-  protected readonly sources = SOURCES;
+  protected readonly sources = computed(() => {
+    const only = this.only();
+    return only ? SOURCES.filter((s) => only.includes(s.code)) : SOURCES;
+  });
   protected readonly canCreate = computed(() => this.session.can('CATALOG_BIBS:add'));
   protected readonly source = signal<Source>('existing');
   protected readonly types = signal<BibType[]>([]);
@@ -154,6 +179,11 @@ export class BibSource {
   /** Biểu ghi chờ xác nhận khi ISBN đã có trong catalog. */
   private pending: { leader: string | null; fields: MarcField[]; bibTypeId: number | null; record: number | null } | null = null;
   private typesLoaded = false;
+
+  ngOnInit(): void {
+    const first = this.only()?.[0];
+    if (first) this.open(first);
+  }
 
   protected open(source: Source): void {
     this.source.set(source);
@@ -222,13 +252,11 @@ export class BibSource {
 
   /** Tạo biểu ghi ở catalog từ các trường MARC; ISBN đã có → hỏi dùng bản có sẵn hay vẫn tạo. */
   protected async createFrom(leader: string | null, fields: MarcField[], bibTypeId: number | null = this.bibTypeId, record: number | null = null): Promise<void> {
-    // 001/003/005 của nguồn bỏ đi — catalog tự sinh MFN, mã đơn vị, thời điểm (như khi sao từ Z39.50 sang màn biên mục).
-    const own = fields.filter((f) => !['001', '003', '005'].includes(f.tag));
+    const own = ownFields(fields);
     this.pending = { leader, fields: own, bibTypeId: bibTypeId ?? this.bibTypeId, record };
     this.busy.set(true);
     try {
-      const isbn = own.find((f) => f.tag === '020')?.subfields?.find((s) => s.code === 'a' && s.value.trim())?.value;
-      const dupes = isbn ? await this.api.checkIsbn(isbn) : [];
+      const dupes = await isbnDupes(this.api, own);
       this.dupes.set(dupes);
       if (!dupes.length) await this.save();
     } catch (e) {
@@ -252,15 +280,12 @@ export class BibSource {
   private async save(): Promise<void> {
     const p = this.pending;
     if (!p) return;
-    const bib = await this.api.crud<Bib>('bibs', 'catalog').add({ bibTypeId: p.bibTypeId, leader: p.leader?.trim() || null, fields: p.fields, status: STATUS_INACTIVE });
+    const bib = await createCatalogBib(this.api, p.leader, p.fields, p.bibTypeId);
     this.pending = null;
     this.dupes.set([]);
     if (p.record !== null) this.used.update((u) => new Set(u).add(p.record!));
     this.toastr.success('ACQ_SOURCE.CREATED', { mfn: bib.mfn });
-    this.picked.emit({
-      bibPublicId: bib.publicId, mfn: bib.mfn, title: bib.title, author: bib.author, publisher: bib.publisher, publishYear: bib.publishYear,
-      isbns: bib.isbns.length ? bib.isbns.join(', ') : null,
-    });
+    this.picked.emit(bib);
   }
 
   protected cancelDuplicate(): void {

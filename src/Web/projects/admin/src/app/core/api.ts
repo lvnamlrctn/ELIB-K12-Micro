@@ -236,6 +236,13 @@ export interface AcquisitionOptions { sources: AcqOption[]; suppliers: AcqOption
 export interface AcqBib {
   bibPublicId: string; mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null; isbns: string | null;
 }
+/** "Tra trùng" (ELIB-LRC): điều kiện tìm biểu ghi có sẵn — chữ không phân biệt dấu. */
+export interface AcqBibSearch {
+  mfnFrom: number | null; mfnTo: number | null; publishYear: string | null; publisher: string | null; title: string | null; author: string | null;
+  bibTypeId: number | null; pageIndex: number; pageSize: number;
+}
+/** hasReceipt / hasOrder: biểu ghi đã có trong phiếu nhận / đơn đặt nào chưa. */
+export interface AcqBibRow extends AcqBib { bibTypeName: string | null; hasReceipt: boolean; hasOrder: boolean; }
 /** status: 1 mới lập, 2 đã gửi đặt, 3 đã huỷ. quantity/received: tổng số bản đặt / đã nhận theo phiếu nhận. */
 export interface PurchaseOrder {
   id: number; publicId: string; name: string; orderedOn: string | null; dueOn: string | null; sourceId: number | null; sourceName: string | null;
@@ -290,7 +297,7 @@ export interface RegisteredItem { publicId: string; barcode: string; mfn: number
 export interface AcqReportRequest {
   from: string | null; to: string | null; storeId: number | null; supplierId: number | null; sourceId: number | null; fundId: number | null;
   receiptCodeFrom: number | null; receiptCodeTo: number | null; receiptName: string | null; completed: boolean | null;
-  createdFrom: string | null; createdTo: string | null;
+  createdFrom: string | null; createdTo: string | null; createdBy?: number | null;
   mfnFrom: number | null; mfnTo: number | null; title: string | null; author: string | null; publisher: string | null; publishYear: string | null;
   pageIndex: number; pageSize: number;
 }
@@ -303,7 +310,7 @@ export interface AcqListRow {
 export interface AcqListPage { items: AcqListRow[]; total: number; pageIndex: number; pageSize: number; quantity: number; amount: number; }
 export interface AcqLookupRow {
   mfn: number; receiptId: number; isbd: string; createdAt: string; receivedOn: string; sourceName: string | null; storeId: number | null;
-  storeName: string | null; bibPublicId: string;
+  storeName: string | null; bibPublicId: string; receiptPublicId: string;
 }
 export interface AcqStoreCount { storeId: number | null; storeName: string | null; copies: number; }
 export interface AcqAllocation { items: AcqStoreCount[]; total: number; }
@@ -834,6 +841,8 @@ export class Api {
   // Bổ sung (acquisition): crud('orders' | 'receipts' | 'sources' | 'suppliers' | 'budgets' | 'funds', 'acquisition') + dòng, ĐKCB theo phiếu
   acquisitionOptions() { return this.get<AcquisitionOptions>('/api/admin/acquisition/options'); }
   lookupAcqBibs(keyword: string) { return this.post<AcqBib[]>('/api/admin/acquisition/bibs/Lookup', { keyword }); }
+  searchAcqBibs(body: AcqBibSearch) { return this.post<CrudPage<AcqBibRow>>('/api/admin/acquisition/bibs/Search', body); }
+  acqBibTypes() { return this.get<{ id: number; name: string }[]>('/api/admin/acquisition/bibs/Types'); }
   orderLines(publicId: string) { return this.get<OrderLine[]>(`/api/admin/acquisition/orders/Lines/${publicId}`); }
   saveOrderLine(publicId: string, body: OrderLineInput) { return this.post<OrderLine>(`/api/admin/acquisition/orders/SaveLine/${publicId}`, body); }
   removeOrderLine(linePublicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/acquisition/orders/Lines/${linePublicId}`)); }

@@ -26,6 +26,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddTenantReplicaBootstrap<AcquisitionDbContext>(configuration);
         services.AddScoped<ITenantSeeder, AcquisitionTenantSeeder>();
         services.AddScoped<BibReplicaBackfill>();
+        services.AddHostedService<BibSnapshotSync>();
 
         // Biểu ghi chưa có trong bản sao → hỏi catalog; ĐKCB theo phiếu nhận → holdings (/internal, service token).
         services.AddElibServiceTokens();

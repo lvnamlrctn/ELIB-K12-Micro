@@ -178,9 +178,40 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public string? PublishYear { get; set; }
     public string? Isbns { get; set; }
 
+    /// <summary>Loại biểu ghi (loại tài liệu) ở catalog — lọc "Loại tài liệu" khi tra trùng.</summary>
+    public long? BibTypeId { get; set; }
+
+    public string? BibTypeName { get; set; }
+
+    /// <summary>Nhan đề / tác giả / nhà xuất bản viết thường, bỏ dấu (<see cref="Fold"/>) — tra trùng không phân biệt dấu như ELIB-LRC.</summary>
+    public string TitleKey { get; set; } = "";
+
+    public string AuthorKey { get; set; } = "";
+    public string PublisherKey { get; set; } = "";
+
+    /// <summary>
+    /// Đã ghi từ BibChanged sau khi bản sao có loại biểu ghi + khoá tìm kiếm. False = dòng có từ trước — job đồng bộ lúc khởi động chép lại
+    /// từ catalog (cả khi cùng version) rồi đặt true.
+    /// </summary>
+    public bool Synced { get; set; }
+
     /// <summary>Ngày biên mục ở catalog (null = chưa rõ) — "thư mục sách mới" sắp theo ngày này, không theo ngày chép bản sao.</summary>
     public DateTimeOffset? CatalogedAt { get; set; }
 
     public bool Deleted { get; set; }
     public long Version { get; set; }
+
+    /// <summary>Chữ thường không dấu (đ → d), gộp khoảng trắng — "de men" khớp "Dế mèn" (như Marc.Fold của catalog).</summary>
+    public static string Fold(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var decomposed = text.Normalize(System.Text.NormalizationForm.FormD);
+        var builder = new System.Text.StringBuilder(decomposed.Length);
+        foreach (var ch in decomposed)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.NonSpacingMark) continue;
+            builder.Append(ch is 'đ' or 'Đ' ? 'd' : char.ToLowerInvariant(ch));
+        }
+        return string.Join(' ', builder.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
 }

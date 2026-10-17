@@ -9,16 +9,26 @@ import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
+import { HasUnsavedChanges, LeaveConfirm, UnsavedConfirm } from '../../shared/unsaved';
 import { itemStatus } from '../holdings/items';
 import { LABEL_BARCODES_KEY } from '../holdings/labels';
+import { BibLookupDialog } from './bib-lookup-dialog';
 import { BibSource } from './bib-source';
 import { PAYMENT_METHODS, loadCurrencies, today } from './orders';
 
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
 
+/** Form thông tin đơn ở trang chi tiết (ELIB-LRC: card 4 cột + "Lưu lại"). */
 interface ReceiptForm {
-  publicId: string | null; name: string; receivedOn: string; sourceId: number | null; supplierId: number | null; budgetId: number | null;
+  name: string; receivedOn: string; sourceId: number | null; supplierId: number | null; budgetId: number | null;
   fundId: number | null; storeId: number | null; paymentStatus: number; paymentMethod: number; note: string;
+}
+
+function toForm(r: Receipt): ReceiptForm {
+  return {
+    name: r.name ?? '', receivedOn: r.receivedOn, sourceId: r.sourceId, supplierId: r.supplierId, budgetId: r.budgetId, fundId: r.fundId,
+    storeId: r.storeId, paymentStatus: r.paymentStatus, paymentMethod: r.paymentMethod, note: r.note ?? '',
+  };
 }
 
 /** Trạng thái thanh toán: 0 chưa thanh toán, 2 đã thanh toán. */
@@ -36,11 +46,14 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
   selector: 'app-acq-receipts',
   imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
-    <div class="mb-5 flex justify-between items-center">
+    <div class="mb-5 flex justify-between items-center gap-2 flex-wrap">
       <h4 class="page-title">{{ 'ACQ_RECEIPT.TITLE' | translate }}</h4>
-      @if (session.can('AB_RECEIPTS:add')) {
-        <button class="btn-primary" (click)="edit(null)"><span class="material-icons text-[18px]">add</span> {{ 'ACQ_RECEIPT.ADD' | translate }}</button>
-      }
+      <div class="flex gap-2">
+        <a routerLink="/ab-receipts/lookup" class="btn-secondary"><span class="material-icons text-[18px]">manage_search</span> {{ 'ACQ_LOOKUP.TITLE' | translate }}</a>
+        @if (session.can('AB_RECEIPTS:add')) {
+          <button class="btn-primary" (click)="startCreate()"><span class="material-icons text-[18px]">add</span> {{ 'ACQ_RECEIPT.ADD' | translate }}</button>
+        }
+      </div>
     </div>
     <div class="panel flex flex-wrap gap-3 items-end">
       <div class="flex-1 min-w-[220px]">
@@ -81,7 +94,8 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
               <tr class="hover:bg-gray-50/50">
                 <td class="td"><a [routerLink]="['/ab-receipts', r.publicId]" class="font-mono font-medium text-blue-700 hover:underline">#{{ r.id }}</a></td>
                 <td class="td">{{ r.receivedOn | ldate: 'dd/MM/yyyy' }}</td>
-                <td class="td">{{ r.name ?? '' }}<div class="text-[11px] text-gray-400">{{ r.sourceName ?? '' }}</div></td>
+                <td class="td"><a [routerLink]="['/ab-receipts', r.publicId]" class="text-blue-700 hover:underline">{{ r.name || ('ACQ_RECEIPT.NO_NAME' | translate) }}</a>
+                  <div class="text-[11px] text-gray-400">{{ r.sourceName ?? '' }}</div></td>
                 <td class="td">{{ r.supplierName ?? '—' }}</td>
                 <td class="td text-right">{{ r.quantity | lnumber }}<div class="text-[11px] text-gray-400">{{ 'ACQ.LINES_N' | translate: { count: r.lineCount } }}</div></td>
                 <td class="td text-right">{{ r.total | lnumber: '1.0-0' }}</td>
@@ -90,7 +104,7 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
                 <td class="td">
                   <div class="flex items-center justify-center gap-1.5">
                     @if (!r.completedAt && session.can('AB_RECEIPTS:edit')) {
-                      <button class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate" (click)="edit(r)"><span class="material-icons text-[18px]">edit</span></button>
+                      <a class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate" [routerLink]="['/ab-receipts', r.publicId]"><span class="material-icons text-[18px]">edit</span></a>
                     }
                     @if (!r.completedAt && session.can('AB_RECEIPTS:delete')) {
                       <button class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" [title]="'COMMON.DELETE' | translate" (click)="deleting.set(r)"><span class="material-icons text-[18px]">delete</span></button>
@@ -107,30 +121,20 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
       @if (page(); as p) { <app-paginator [total]="p.totalCount" [pageIndex]="pageIndex" [pageSize]="pageSize" (pageChange)="onPage($event)" /> }
     </div>
 
-    @if (form(); as f) {
-      <app-modal [title]="(f.publicId ? 'COMMON.MODAL_EDIT_TITLE' : 'ACQ_RECEIPT.ADD') | translate" widthClass="max-w-2xl" (closed)="form.set(null)">
-        <div class="grid grid-cols-2 gap-4">
-          <div><label for="rf-on" class="form-label">{{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }} *</label><input id="rf-on" type="date" class="input" [(ngModel)]="f.receivedOn" /></div>
-          <div><label for="rf-name" class="form-label">{{ 'ACQ_RECEIPT.NAME' | translate }}</label><input id="rf-name" class="input" maxlength="250" [(ngModel)]="f.name" /></div>
-          <div><label for="rf-src" class="form-label">{{ 'ACQ.SOURCE' | translate }}</label>
-            <select id="rf-src" class="input" [(ngModel)]="f.sourceId"><option [ngValue]="null">—</option>@for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label for="rf-sup" class="form-label">{{ 'ACQ.SUPPLIER' | translate }}</label>
-            <select id="rf-sup" class="input" [(ngModel)]="f.supplierId"><option [ngValue]="null">—</option>@for (o of options().suppliers; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label for="rf-bud" class="form-label">{{ 'ACQ.BUDGET' | translate }}</label>
-            <select id="rf-bud" class="input" [(ngModel)]="f.budgetId"><option [ngValue]="null">—</option>@for (o of options().budgets; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label for="rf-fund" class="form-label">{{ 'ACQ.FUND' | translate }}</label>
-            <select id="rf-fund" class="input" [(ngModel)]="f.fundId"><option [ngValue]="null">—</option>@for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-          <div><label for="rf-store" class="form-label">{{ 'ACQ_RECEIPT.STORE' | translate }}</label>
-            <select id="rf-store" class="input" [(ngModel)]="f.storeId"><option [ngValue]="null">—</option>@for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
-          <div><label for="rf-ps" class="form-label">{{ 'ACQ.PAYMENT_STATUS' | translate }}</label>
-            <select id="rf-ps" class="input" [(ngModel)]="f.paymentStatus">@for (s of paymentStatuses; track s.code) { <option [ngValue]="s.code">{{ s.name | translate }}</option> }</select></div>
-          <div><label for="rf-pm" class="form-label">{{ 'ACQ.PAYMENT_METHOD' | translate }}</label>
-            <select id="rf-pm" class="input" [(ngModel)]="f.paymentMethod">@for (m of paymentMethods; track m.code) { <option [ngValue]="m.code">{{ m.name | translate }}</option> }</select></div>
-          <div class="col-span-2"><label for="rf-note" class="form-label">{{ 'COMMON.NOTE' | translate }}</label><input id="rf-note" class="input" maxlength="500" [(ngModel)]="f.note" /></div>
-        </div>
+    @if (creating(); as c) {
+      <!-- Như ELIB-LRC: tạo đơn chỉ cần tên + ngày nhận, các thông tin còn lại và tài liệu nhập ở trang chi tiết. -->
+      <app-modal [title]="'ACQ_RECEIPT.CREATE_TITLE' | translate" widthClass="max-w-md" (closed)="creating.set(null)">
+        <form id="rc-form" class="space-y-4" (ngSubmit)="create(c)">
+          <div><label for="rc-name" class="form-label">{{ 'ACQ_RECEIPT.NAME' | translate }} <span class="text-red-500">*</span></label>
+            <input id="rc-name" name="name" class="input" maxlength="250" required [(ngModel)]="c.name" [class.!border-red-400]="c.touched && !c.name.trim()" /></div>
+          <div><label for="rc-on" class="form-label">{{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }}</label>
+            <input id="rc-on" name="on" type="date" class="input" [(ngModel)]="c.receivedOn" /></div>
+          <p class="text-xs text-gray-500">{{ 'ACQ_RECEIPT.CREATE_HINT' | translate }}</p>
+        </form>
         <ng-container footer>
-          <button type="button" class="btn-secondary" (click)="form.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
-          <button type="button" class="btn-primary" [disabled]="busy()" (click)="save(f)">{{ 'COMMON.SAVE' | translate }}</button>
+          <button type="button" class="btn-secondary" (click)="creating.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="submit" form="rc-form" class="btn-primary" [disabled]="busy()">
+            {{ 'ACQ_RECEIPT.NEXT' | translate }} <span class="material-icons text-[18px]" [class.animate-spin]="busy()">{{ busy() ? 'autorenew' : 'arrow_forward' }}</span></button>
         </ng-container>
       </app-modal>
     }
@@ -142,11 +146,10 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
 export class Receipts implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
   protected readonly session = inject(Session);
   private readonly client = this.api.crud<Receipt>('receipts', 'acquisition');
 
-  protected readonly paymentStatuses = PAYMENT_STATUSES;
-  protected readonly paymentMethods = PAYMENT_METHODS;
   protected keyword = '';
   protected completed: boolean | null = null;
   protected fundId: number | null = null;
@@ -159,8 +162,7 @@ export class Receipts implements OnInit {
   protected pageSize = 10;
   protected readonly page = signal<CrudPage<Receipt> | null>(null);
   protected readonly options = signal<AcquisitionOptions>(EMPTY_OPTIONS);
-  protected readonly stores = signal<StoreOption[]>([]);
-  protected readonly form = signal<ReceiptForm | null>(null);
+  protected readonly creating = signal<{ name: string; receivedOn: string; touched: boolean } | null>(null);
   protected readonly deleting = signal<Receipt | null>(null);
   protected readonly loading = signal(false);
   protected readonly busy = signal(false);
@@ -168,7 +170,6 @@ export class Receipts implements OnInit {
   ngOnInit(): void {
     void this.load();
     this.api.acquisitionOptions().then((o) => this.options.set(o), () => undefined);
-    this.api.storeOptions().then((s) => this.stores.set(s), () => undefined);
   }
 
   protected statusOf(r: Receipt) {
@@ -186,30 +187,22 @@ export class Receipts implements OnInit {
     void this.load();
   }
 
-  protected edit(r: Receipt | null): void {
-    this.form.set({
-      publicId: r?.publicId ?? null, name: r?.name ?? '', receivedOn: r?.receivedOn ?? today(), sourceId: r?.sourceId ?? null,
-      supplierId: r?.supplierId ?? null, budgetId: r?.budgetId ?? null, fundId: r?.fundId ?? null, storeId: r?.storeId ?? null,
-      paymentStatus: r?.paymentStatus ?? 0, paymentMethod: r?.paymentMethod ?? 0, note: r?.note ?? '',
-    });
+  protected startCreate(): void {
+    this.creating.set({ name: '', receivedOn: today(), touched: false });
   }
 
-  protected async save(f: ReceiptForm): Promise<void> {
-    if (!f.receivedOn) {
-      this.toastr.warning('ACQ_RECEIPT.RECEIVED_ON_REQUIRED');
+  /** "Tiếp theo" (ELIB-LRC): tạo đơn với tên + ngày nhận (trống = hôm nay) rồi mở trang chi tiết để điền phần còn lại. */
+  protected async create(c: { name: string; receivedOn: string; touched: boolean }): Promise<void> {
+    c.touched = true;
+    if (!c.name.trim()) {
+      this.toastr.warning('ACQ_RECEIPT.NAME_REQUIRED');
       return;
     }
-    const body = {
-      receivedOn: f.receivedOn, name: f.name.trim() || null, sourceId: f.sourceId, supplierId: f.supplierId, budgetId: f.budgetId, fundId: f.fundId,
-      storeId: f.storeId, paymentStatus: f.paymentStatus, paymentMethod: f.paymentMethod, note: f.note.trim() || null,
-    };
     this.busy.set(true);
     try {
-      if (f.publicId) await this.client.update(f.publicId, body);
-      else await this.client.add(body);
-      this.toastr.success('COMMON.SAVE_SUCCESS');
-      this.form.set(null);
-      await this.load();
+      const created = await this.client.add({ name: c.name.trim(), receivedOn: c.receivedOn || today(), paymentStatus: 0, paymentMethod: 0 });
+      this.creating.set(null);
+      void this.router.navigate(['/ab-receipts', created.publicId]);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
@@ -247,6 +240,17 @@ export class Receipts implements OnInit {
   }
 }
 
+/** Các nút thêm tài liệu kiểu ELIB-LRC. */
+type AddMode = 'lookup' | 'new' | 'z3950' | 'marc' | 'order';
+
+const ADD_TITLES: Record<AddMode, string> = {
+  lookup: 'ACQ_RECEIPT.ADD_LOOKUP', new: 'ACQ_RECEIPT.ADD_SINGLE', z3950: 'ACQ_RECEIPT.ADD_Z3950', marc: 'ACQ_RECEIPT.ADD_MARC',
+  order: 'ACQ_RECEIPT.ADD_FROM_ORDER_BTN',
+};
+
+/** bib null = đang chọn biểu ghi; có bib = bước thông tin dòng (số lượng, đơn giá, loại tiền, tỷ giá). */
+interface AddLineState { mode: AddMode; bib: AcqBib | null; quantity: number; price: number | null; currency: string; rate: number; }
+
 interface RegisterForm {
   line: ReceiptLine; mode: 'batch' | 'single'; quantity: number; prefix: string; digits: number; startNumber: number | null; barcode: string;
   storeId: number | null;
@@ -258,26 +262,22 @@ interface RegisterForm {
  */
 @Component({
   selector: 'app-acq-receipt-detail',
-  imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource],
+  imports: [FormsModule, RouterLink, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource, BibLookupDialog, UnsavedConfirm],
   template: `
-    <div class="mb-5 flex flex-wrap gap-3 justify-between items-center">
-      <div>
-        <a routerLink="/ab-receipts" class="text-sm text-blue-600 hover:underline">← {{ 'ACQ_RECEIPT.TITLE' | translate }}</a>
-        @if (receipt(); as r) {
-          <h4 class="page-title">#{{ r.id }} {{ r.name ?? '' }} <span [class]="statusOf(r).badge + ' align-middle'">{{ statusOf(r).label | translate }}</span></h4>
-          <div class="text-sm text-gray-500">
-            {{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }} {{ r.receivedOn | ldate: 'dd/MM/yyyy' }}
-            @if (r.sourceName) { · {{ r.sourceName }} } @if (r.supplierName) { · {{ r.supplierName }} }
-            @if (storeName(r.storeId); as s) { · {{ 'ACQ_RECEIPT.STORE' | translate }}: {{ s }} }
-            @if (r.note) { · {{ r.note }} }
-            · {{ 'ACQ.TOTAL' | translate }}: {{ r.total | lnumber: '1.0-0' }} · {{ paymentStatusName(r.paymentStatus) | translate }} · {{ paymentMethodName(r.paymentMethod) | translate }}
-          </div>
-        }
+    <div class="mb-4 flex flex-wrap gap-3 justify-between items-center">
+      <div class="flex items-center gap-3">
+        <a routerLink="/ab-receipts" class="btn-secondary !py-1.5"><span class="material-icons text-[18px]">arrow_back</span> {{ 'ACQ_RECEIPT.BACK' | translate }}</a>
+        <h4 class="page-title !mb-0">{{ 'ACQ_RECEIPT.DETAIL_TITLE' | translate }}
+          @if (receipt(); as r) { <span [class]="statusOf(r).badge + ' align-middle ml-1'">{{ statusOf(r).label | translate }}</span> }</h4>
       </div>
       @if (receipt(); as r) {
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
+          <a routerLink="/ab-receipts/lookup" class="btn-secondary"><span class="material-icons text-[18px]">manage_search</span> {{ 'ACQ_LOOKUP.TITLE' | translate }}</a>
+          @if (session.can('AB_RECEIPTS:edit')) {
+            <button class="btn-primary" [disabled]="busy()" (click)="saveHead()"><span class="material-icons text-[18px]">save</span> {{ 'ACQ_RECEIPT.SAVE' | translate }}</button>
+          }
           @if (!r.completedAt && session.can('AB_RECEIPTS:edit')) {
-            <button class="btn-primary" [disabled]="busy() || !lines().length" (click)="complete()">
+            <button class="btn-secondary" [disabled]="busy() || !lines().length" (click)="complete()">
               <span class="material-icons text-[18px]">lock</span> {{ 'ACQ_RECEIPT.COMPLETE' | translate }}</button>
           }
           @if (r.completedAt && session.can('AB_RECEIPTS:delete')) {
@@ -289,40 +289,78 @@ interface RegisterForm {
 
     @if (receipt()?.completedAt) { <div class="alert-info !block mb-4 text-sm">{{ 'ACQ_RECEIPT.LOCKED_HINT' | translate }}</div> }
     @if (!itemsAvailable()) { <div class="alert-error !block mb-4 text-sm">{{ 'ACQ_RECEIPT.HOLDINGS_DOWN' | translate }}</div> }
-    @if (receipt() && session.can('AB_RECEIPTS:edit')) {
-      <div class="panel flex flex-wrap items-end gap-3">
-        <div><label for="rd-ps" class="field-label">{{ 'ACQ.PAYMENT_STATUS' | translate }}</label>
-          <select id="rd-ps" class="input" [(ngModel)]="payment.status">@for (s of paymentStatuses; track s.code) { <option [ngValue]="s.code">{{ s.name | translate }}</option> }</select></div>
-        <div><label for="rd-pm" class="field-label">{{ 'ACQ.PAYMENT_METHOD' | translate }}</label>
-          <select id="rd-pm" class="input" [(ngModel)]="payment.method">@for (m of paymentMethods; track m.code) { <option [ngValue]="m.code">{{ m.name | translate }}</option> }</select></div>
-        <button type="button" class="btn-secondary" [disabled]="busy()" (click)="savePayment()"><span class="material-icons text-[18px]">payments</span> {{ 'COMMON.SAVE' | translate }}</button>
-        <span class="text-[11px] text-gray-400 pb-2">{{ 'ACQ_RECEIPT.PAYMENT_HINT' | translate }}</span>
-      </div>
+
+    @if (receipt(); as r) {
+      @if (head; as h) {
+        <!-- Thông tin đơn (ELIB-LRC: card 4 cột). Đơn đã hoàn tất: chỉ sửa được thanh toán. -->
+        <div class="panel">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <fieldset class="contents" [disabled]="!editable()">
+              <div><label for="rh-code" class="form-label">{{ 'ACQ_RECEIPT.CODE' | translate }}</label><input id="rh-code" class="input bg-gray-50 font-mono" [value]="'#' + r.id" readonly /></div>
+              <div class="sm:col-span-2"><label for="rh-name" class="form-label">{{ 'ACQ_RECEIPT.NAME' | translate }} <span class="text-red-500">*</span></label>
+                <input id="rh-name" class="input" maxlength="250" [(ngModel)]="h.name" (ngModelChange)="dirty = true" [class.!border-red-400]="!h.name.trim()" /></div>
+              <div><label for="rh-on" class="form-label">{{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }}</label>
+                <input id="rh-on" type="date" class="input" [(ngModel)]="h.receivedOn" (ngModelChange)="dirty = true" /></div>
+              <div><label for="rh-src" class="form-label">{{ 'ACQ.SOURCE' | translate }}</label>
+                <select id="rh-src" class="input" [(ngModel)]="h.sourceId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
+                  @for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+              <div><label for="rh-fund" class="form-label">{{ 'ACQ_RECEIPT.FUND' | translate }}</label>
+                <select id="rh-fund" class="input" [(ngModel)]="h.fundId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
+                  @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+              <div><label for="rh-bud" class="form-label">{{ 'ACQ.BUDGET' | translate }}</label>
+                <select id="rh-bud" class="input" [(ngModel)]="h.budgetId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
+                  @for (o of options().budgets; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+              <div><label for="rh-sup" class="form-label">{{ 'ACQ.SUPPLIER' | translate }}</label>
+                <select id="rh-sup" class="input" [(ngModel)]="h.supplierId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
+                  @for (o of options().suppliers; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
+              <div><label for="rh-store" class="form-label">{{ 'ACQ_RECEIPT.STORE' | translate }}</label>
+                <select id="rh-store" class="input" [(ngModel)]="h.storeId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
+                  @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
+            </fieldset>
+            <fieldset class="contents" [disabled]="!session.can('AB_RECEIPTS:edit')">
+              <div><label for="rh-pm" class="form-label">{{ 'ACQ.PAYMENT_METHOD' | translate }}</label>
+                <select id="rh-pm" class="input" [(ngModel)]="h.paymentMethod" (ngModelChange)="dirty = true">@for (m of paymentMethods; track m.code) { <option [ngValue]="m.code">{{ m.name | translate }}</option> }</select></div>
+              <div><label for="rh-ps" class="form-label">{{ 'ACQ.PAYMENT_STATUS' | translate }}</label>
+                <select id="rh-ps" class="input" [(ngModel)]="h.paymentStatus" (ngModelChange)="dirty = true">@for (s of paymentStatuses; track s.code) { <option [ngValue]="s.code">{{ s.name | translate }}</option> }</select></div>
+            </fieldset>
+            <fieldset class="contents" [disabled]="!editable()">
+              <div class="sm:col-span-2"><label for="rh-note" class="form-label">{{ 'COMMON.NOTE' | translate }}</label>
+                <input id="rh-note" class="input" maxlength="500" [(ngModel)]="h.note" (ngModelChange)="dirty = true" /></div>
+            </fieldset>
+            <div class="sm:col-span-2 flex items-end text-sm text-gray-600 pb-2">{{ 'ACQ.TOTAL' | translate }}: <b class="ml-1">{{ r.total | lnumber: '1.0-0' }}</b>
+              <span class="ml-3 text-gray-400">{{ 'ACQ.LINES_N' | translate: { count: r.lineCount } }}</span></div>
+          </div>
+        </div>
+      }
     }
 
-    @if (editable()) {
-      <div class="panel">
-        <div class="flex gap-2 mb-3">
-          <button type="button" [class]="tab === 'bib' ? 'btn-primary' : 'btn-secondary'" (click)="tab = 'bib'">{{ 'ACQ_RECEIPT.ADD_BY_BIB' | translate }}</button>
-          <button type="button" [class]="tab === 'order' ? 'btn-primary' : 'btn-secondary'" (click)="tab = 'order'; findReceivable()">{{ 'ACQ_RECEIPT.ADD_FROM_ORDER' | translate }}</button>
-        </div>
-        @if (tab === 'bib') {
-          <div class="grid grid-cols-1 lg:grid-cols-5 gap-3 items-end">
-            <div class="lg:col-span-2"><label for="rl-bib" class="form-label">{{ 'ACQ.BIB' | translate }} *</label>
-              <app-acq-bib-source inputId="rl-bib" [selected]="add.bib" (picked)="add.bib = $event" /></div>
-            <div><label for="rl-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="rl-qty" type="number" min="1" class="input" [(ngModel)]="add.quantity" /></div>
-            <div><label for="rl-price" class="form-label">{{ 'ACQ.PRICE' | translate }}</label>
-              <div class="flex gap-1"><input id="rl-price" type="number" min="0" step="any" class="input" [(ngModel)]="add.price" />
-                @if (currencies().length) {
-                  <select class="input w-24" [attr.aria-label]="'ACQ.CURRENCY' | translate" [(ngModel)]="add.currency" (ngModelChange)="onCurrency()">
-                    @for (c of currencies(); track c.code) { <option [ngValue]="c.code">{{ c.code }}</option> }
-                  </select>
-                } @else { <input class="input w-20 uppercase" maxlength="10" [attr.aria-label]="'ACQ.CURRENCY' | translate" [(ngModel)]="add.currency" /> }
-                <input type="number" min="0" step="any" class="input w-24" [attr.aria-label]="'ACQ.RATE' | translate" [title]="'ACQ.RATE' | translate" [(ngModel)]="add.rate" /></div></div>
-            <button type="button" class="btn-primary justify-center" [disabled]="busy() || !add.bib" (click)="addLine()">
-              <span class="material-icons text-[18px]">playlist_add</span> {{ 'ACQ_RECEIPT.ADD_LINE' | translate }}</button>
+    @if (adding(); as a) {
+      <app-modal [title]="addTitle(a.mode) | translate" [widthClass]="a.mode === 'lookup' || a.mode === 'order' ? 'max-w-6xl' : 'max-w-3xl'" (closed)="adding.set(null)">
+        @if (a.bib; as b) {
+          <!-- Bước 2 (ELIB-LRC): số lượng, đơn giá, loại tiền, tỷ giá rồi "Thêm mới". -->
+          <div class="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 mb-4">
+            <div class="font-medium text-gray-800">{{ b.title }}</div>
+            <div class="text-[12px] text-gray-500">MFN {{ b.mfn }}@if (b.author) { · {{ b.author }} }@if (b.publishYear) { · {{ b.publishYear }} }</div>
+            @if (lineOf(b); as existing) { <div class="text-[12px] text-amber-700 mt-1">{{ 'ACQ_RECEIPT.WILL_OVERWRITE' | translate: { qty: existing.quantity } }}</div> }
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div><label for="ra-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="ra-qty" type="number" min="1" class="input" [(ngModel)]="a.quantity" /></div>
+            <div><label for="ra-price" class="form-label">{{ 'ACQ.PRICE' | translate }}</label><input id="ra-price" type="number" min="0" step="any" class="input" [(ngModel)]="a.price" /></div>
+            <div><label for="ra-cur" class="form-label">{{ 'ACQ.CURRENCY' | translate }}</label>
+              @if (currencies().length) {
+                <select id="ra-cur" class="input" [(ngModel)]="a.currency" (ngModelChange)="onCurrency(a)">
+                  @for (c of currencies(); track c.code) { <option [ngValue]="c.code">{{ c.code }}</option> }
+                </select>
+              } @else { <input id="ra-cur" class="input uppercase" maxlength="10" [(ngModel)]="a.currency" /> }</div>
+            <div><label for="ra-rate" class="form-label">{{ 'ACQ.RATE' | translate }}</label><input id="ra-rate" type="number" min="0" step="any" class="input" [(ngModel)]="a.rate" /></div>
           </div>
         } @else {
+          @switch (a.mode) {
+            @case ('lookup') { <app-acq-bib-lookup (picked)="a.bib = $event" /> }
+            @case ('new') { <app-acq-bib-source inputId="ra-new" [only]="['new']" [selected]="null" (picked)="a.bib = $event" /> }
+            @case ('z3950') { <app-acq-bib-source inputId="ra-z" [only]="['z3950']" [selected]="null" (picked)="a.bib = $event" /> }
+            @case ('marc') { <app-acq-bib-source inputId="ra-marc" [only]="['file', 'paste']" [selected]="null" (picked)="a.bib = $event" /> }
+            @case ('order') {
           <div class="flex flex-wrap gap-2 items-end mb-2">
             <div class="flex-1 min-w-[200px]"><label for="rv-kw" class="field-label">{{ 'ACQ_RECEIPT.RECEIVABLE_SEARCH' | translate }}</label>
               <input id="rv-kw" class="input" [(ngModel)]="receivableKeyword" (keydown.enter)="findReceivable()" /></div>
@@ -338,13 +376,17 @@ interface RegisterForm {
                 @for (o of receivable()?.items ?? []; track o.orderLinePublicId) {
                   <tr class="hover:bg-gray-50/50">
                     <td class="td font-mono text-[13px]">#{{ o.orderId }}</td>
-                    <td class="td">{{ o.title }}<div class="text-[11px] text-gray-400">{{ o.orderName }}@if (o.author) { · {{ o.author }} }</div></td>
+                    <td class="td">{{ o.title }}<div class="text-[11px] text-gray-400">{{ o.orderName }}@if (o.author) { · {{ o.author }} }</div>
+                      @if (orderLineExisting(o); as existing) {
+                        <div class="text-[11px] text-amber-700">{{ 'ACQ_RECEIPT.WILL_OVERWRITE' | translate: { qty: existing.quantity } }}</div>
+                      }</td>
                     <td class="td text-right">{{ o.remaining | lnumber }} / {{ o.quantity | lnumber }}</td>
                     <td class="td">
                       @if (o.mfn) { <span class="font-mono text-[13px]">{{ o.mfn }}</span> }
                       @else { <input type="number" class="input py-1" [placeholder]="'ACQ_RECEIPT.MFN_PH' | translate" [attr.aria-label]="'MFN ' + o.title" [(ngModel)]="pickMfn[o.orderLinePublicId]" /> }
                     </td>
-                    <td class="td"><input type="number" min="1" [max]="o.remaining" class="input py-1" [attr.aria-label]="'ACQ_RECEIPT.COPIES' | translate" [(ngModel)]="pickQty[o.orderLinePublicId]" /></td>
+                    <td class="td"><input type="number" min="1" class="input py-1" [attr.aria-label]="'ACQ_RECEIPT.COPIES' | translate"
+                      [placeholder]="'' + defaultOrderQty(o)" [(ngModel)]="pickQty[o.orderLinePublicId]" /></td>
                     <td class="td"><button type="button" class="btn-primary !py-1" [disabled]="busy()" (click)="addFromOrder(o)">{{ 'ACQ_RECEIPT.RECEIVE' | translate }}</button></td>
                   </tr>
                 } @empty {
@@ -354,13 +396,36 @@ interface RegisterForm {
             </table>
           </div>
           @if (receivable(); as p) { <app-paginator [total]="p.totalCount" [pageIndex]="receivablePage" [pageSize]="10" (pageChange)="receivablePage = $event.pageIndex; loadReceivable()" /> }
+            }
+          }
         }
-      </div>
+        <ng-container footer>
+          @if (a.bib && a.mode !== 'order') {
+            <button type="button" class="btn-secondary mr-auto" (click)="a.bib = null">{{ 'ACQ_RECEIPT.PICK_OTHER' | translate }}</button>
+          }
+          <button type="button" class="btn-secondary" (click)="adding.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          @if (a.bib && a.mode !== 'order') {
+            <button type="button" class="btn-primary" [disabled]="busy()" (click)="addLine(a)"><span class="material-icons text-[18px]">playlist_add</span> {{ 'ACQ_RECEIPT.ADD_NEW' | translate }}</button>
+          }
+        </ng-container>
+      </app-modal>
     }
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative mb-5">
       @if (loading()) { <app-loading /> }
-      <div class="px-5 py-3 border-b border-gray-100 font-semibold text-gray-800">{{ 'ACQ.LINES_N' | translate: { count: lines().length } }}</div>
+      <div class="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2">
+        <span class="font-semibold text-gray-800 mr-auto">{{ 'ACQ_RECEIPT.LINES_TITLE' | translate }} · {{ 'ACQ.LINES_N' | translate: { count: lines().length } }}</span>
+        <!-- Thêm tài liệu: hàng nút như ELIB-LRC. -->
+        @if (editable()) {
+          <button type="button" class="btn-primary !py-1.5 !px-3" (click)="openAdd('lookup')"><span class="material-icons text-[18px]">manage_search</span> {{ 'ACQ_RECEIPT.ADD_LOOKUP' | translate }}</button>
+          @if (session.can('CATALOG_BIBS:add')) {
+            <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="openAdd('new')"><span class="material-icons text-[18px]">add_circle</span> {{ 'ACQ_RECEIPT.ADD_SINGLE' | translate }}</button>
+            <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="openAdd('z3950')"><span class="material-icons text-[18px]">travel_explore</span> {{ 'ACQ_RECEIPT.ADD_Z3950' | translate }}</button>
+            <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="openAdd('marc')"><span class="material-icons text-[18px]">upload_file</span> {{ 'ACQ_RECEIPT.ADD_MARC' | translate }}</button>
+          }
+          <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="openAdd('order')"><span class="material-icons text-[18px]">shopping_cart</span> {{ 'ACQ_RECEIPT.ADD_FROM_ORDER_BTN' | translate }}</button>
+        }
+      </div>
       <div class="overflow-x-auto w-full">
         <table class="w-full text-left border-collapse min-w-[900px]">
           <thead><tr>
@@ -477,9 +542,10 @@ interface RegisterForm {
         </ng-container>
       </app-modal>
     }
+    <app-unsaved-confirm [state]="leave" />
   `,
 })
-export class ReceiptDetail implements OnInit {
+export class ReceiptDetail implements OnInit, HasUnsavedChanges {
   readonly id = input.required<string>();
 
   private readonly api = inject(Api);
@@ -488,10 +554,13 @@ export class ReceiptDetail implements OnInit {
 
   protected readonly paymentStatuses = PAYMENT_STATUSES;
   protected readonly paymentMethods = PAYMENT_METHODS;
-  protected payment = { status: 0, method: 0 };
-  protected tab: 'bib' | 'order' = 'bib';
-  protected add: { bib: AcqBib | null; quantity: number; price: number | null; currency: string; rate: number } =
-    { bib: null, quantity: 1, price: null, currency: 'VND', rate: 1 };
+  /** Form thông tin đơn (bản nháp — "Lưu lại" mới ghi); dirty = có thay đổi chưa lưu (hỏi lại khi rời trang). */
+  protected head: ReceiptForm | null = null;
+  protected dirty = false;
+  protected readonly leave = new LeaveConfirm();
+  protected readonly options = signal<AcquisitionOptions>(EMPTY_OPTIONS);
+  /** Hộp thoại thêm tài liệu đang mở (một trong các nút kiểu ELIB-LRC) và bước "thông tin dòng" khi đã có biểu ghi. */
+  protected readonly adding = signal<AddLineState | null>(null);
   protected receivableKeyword = '';
   protected receivablePage = 1;
   protected pickQty: Record<string, number> = {};
@@ -519,31 +588,72 @@ export class ReceiptDetail implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.api.storeOptions().then((s) => this.stores.set(s), () => undefined);
+    this.api.acquisitionOptions().then((o) => this.options.set(o), () => undefined);
     void loadCurrencies(this.api).then((c) => this.currencies.set(c));
     await this.load();
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.dirty;
+  }
+
+  confirmLeave(): Promise<boolean> {
+    return this.leave.ask();
+  }
+
+  /**
+   * "Lưu lại" (ELIB-LRC): đơn đang lập ghi toàn bộ thông tin đơn; đơn đã hoàn tất (khoá) chỉ ghi thanh toán — chốt thanh toán không cần
+   * mở lại đơn.
+   */
+  protected async saveHead(): Promise<void> {
+    const h = this.head;
+    const r = this.receipt();
+    if (!h || !r) return;
+    if (r.completedAt) {
+      await this.run(async () => {
+        await this.api.setReceiptPayment(this.id(), { paymentStatus: Number(h.paymentStatus), paymentMethod: Number(h.paymentMethod) });
+        this.dirty = false;
+        this.toastr.success('COMMON.SAVE_SUCCESS');
+      });
+      return;
+    }
+    if (!h.name.trim()) {
+      this.toastr.warning('ACQ_RECEIPT.NAME_REQUIRED');
+      return;
+    }
+    await this.run(async () => {
+      await this.api.crud<Receipt>('receipts', 'acquisition').update(this.id(), {
+        receivedOn: h.receivedOn || today(), name: h.name.trim(), sourceId: h.sourceId, supplierId: h.supplierId, budgetId: h.budgetId,
+        fundId: h.fundId, storeId: h.storeId, paymentStatus: Number(h.paymentStatus), paymentMethod: Number(h.paymentMethod), note: h.note.trim() || null,
+      });
+      this.dirty = false;
+      this.toastr.success('COMMON.SAVE_SUCCESS');
+    });
+  }
+
+  protected openAdd(mode: AddMode): void {
+    const last = this.adding();
+    this.adding.set({ mode, bib: null, quantity: 1, price: 0, currency: last?.currency ?? 'VND', rate: last?.rate ?? 1 });
+    if (mode === 'order') this.findReceivable();
+  }
+
+  protected addTitle(mode: AddMode): string {
+    return ADD_TITLES[mode];
+  }
+
+  /** Dòng đã có của biểu ghi này — chọn lại thì ghi đè (như ELIB-LRC). */
+  protected lineOf(b: AcqBib): ReceiptLine | null {
+    return this.lines().find((l) => l.bibPublicId === b.bibPublicId) ?? null;
   }
 
   protected statusOf(r: Receipt) {
     return receiptStatus(r);
   }
 
-  protected paymentStatusName(code: number): string {
-    return (PAYMENT_STATUSES.find((s) => s.code === code) ?? PAYMENT_STATUSES[0]).name;
-  }
-
-  protected paymentMethodName(code: number): string {
-    return (PAYMENT_METHODS.find((m) => m.code === code) ?? PAYMENT_METHODS[0]).name;
-  }
-
   /** Đổi tiền tệ → tỷ giá gợi ý theo danh mục tiền tệ của đơn vị (sửa tay được). */
-  protected onCurrency(): void {
-    const c = this.currencies().find((x) => x.code === this.add.currency);
-    if (c) this.add.rate = c.exchangeRate;
-  }
-
-  protected storeName(id: number | null): string | null {
-    const s = id === null ? null : this.stores().find((x) => x.id === id);
-    return s ? `${s.code} — ${s.name}` : null;
+  protected onCurrency(a: AddLineState): void {
+    const c = this.currencies().find((x) => x.code === a.currency);
+    if (c) a.rate = c.exchangeRate;
   }
 
   protected status(i: ReceiptItem) {
@@ -554,18 +664,34 @@ export class ReceiptDetail implements OnInit {
     return this.lines().find((l) => l.publicId === i.linePublicId)?.title ?? `MFN ${i.mfn}`;
   }
 
-  protected async addLine(): Promise<void> {
-    if (!this.add.bib) return;
+  /** "Thêm mới": thêm dòng (biểu ghi đã có trong đơn thì ghi đè dòng đó), đóng hộp thoại. */
+  protected async addLine(a: AddLineState): Promise<void> {
+    if (!a.bib) return;
+    const overwrite = !!this.lineOf(a.bib);
     await this.saveLine({
-      mfn: this.add.bib.mfn, quantity: Number(this.add.quantity) || 0, price: this.add.price === null || (this.add.price as unknown) === '' ? null : Number(this.add.price),
-      currency: this.add.currency.trim() || null, rate: this.add.rate === null || (this.add.rate as unknown) === '' ? 1 : Number(this.add.rate),
-    }, () => (this.add = { bib: null, quantity: 1, price: null, currency: this.add.currency, rate: this.add.rate }));
+      mfn: a.bib.mfn, quantity: Number(a.quantity) || 0, price: a.price === null || (a.price as unknown) === '' ? null : Number(a.price),
+      currency: a.currency.trim() || null, rate: a.rate === null || (a.rate as unknown) === '' ? 1 : Number(a.rate),
+    }, () => {
+      this.adding.set(null);
+      this.toastr.success(overwrite ? 'ACQ_RECEIPT.LINE_OVERWRITTEN' : 'ACQ_RECEIPT.LINE_ADDED');
+    });
+  }
+
+  /** Dòng đã có trong phiếu cho biểu ghi của dòng đặt — nhận lại thì ghi đè dòng đó (số bản là tổng mới, không cộng dồn). */
+  protected orderLineExisting(o: ReceivableLine): ReceiptLine | null {
+    return this.lines().find((l) => (o.bibPublicId && l.bibPublicId === o.bibPublicId) || (o.mfn !== null && l.mfn === o.mfn)) ?? null;
+  }
+
+  /** Số bản mặc định: số còn chờ nhận; đã có dòng trong phiếu thì cộng số bản của dòng đó để ghi đè không làm giảm. */
+  protected defaultOrderQty(o: ReceivableLine): number {
+    return (this.orderLineExisting(o)?.quantity ?? 0) + o.remaining;
   }
 
   protected async addFromOrder(o: ReceivableLine): Promise<void> {
+    const qty = this.pickQty[o.orderLinePublicId];
     await this.saveLine({
       orderLinePublicId: o.orderLinePublicId, mfn: o.mfn ?? this.pickMfn[o.orderLinePublicId] ?? null,
-      quantity: Number(this.pickQty[o.orderLinePublicId] ?? o.remaining) || 0,
+      quantity: Number(qty === null || qty === undefined || (qty as unknown) === '' ? this.defaultOrderQty(o) : qty) || 0,
     }, () => void this.loadReceivable());
   }
 
@@ -659,14 +785,6 @@ export class ReceiptDetail implements OnInit {
     });
   }
 
-  /** Chốt thanh toán: làm được cả khi phiếu đã hoàn tất (không đụng dòng và ĐKCB). */
-  protected async savePayment(): Promise<void> {
-    await this.run(async () => {
-      await this.api.setReceiptPayment(this.id(), { paymentStatus: Number(this.payment.status), paymentMethod: Number(this.payment.method) });
-      this.toastr.success('COMMON.SAVE_SUCCESS');
-    });
-  }
-
   protected async reopen(): Promise<void> {
     await this.run(() => this.api.reopenReceipt(this.id()));
   }
@@ -695,7 +813,8 @@ export class ReceiptDetail implements OnInit {
     try {
       const [receipt, view] = await Promise.all([this.api.crud<Receipt>('receipts', 'acquisition').get(this.id()), this.api.receiptLines(this.id())]);
       this.receipt.set(receipt);
-      this.payment = { status: receipt.paymentStatus, method: receipt.paymentMethod };
+      // Giữ bản nháp đang sửa dở khi tải lại sau thêm dòng / đăng ký ĐKCB.
+      if (!this.dirty) this.head = toForm(receipt);
       this.lines.set(view.lines);
       this.items.set(view.items);
       this.itemsAvailable.set(view.itemsAvailable);

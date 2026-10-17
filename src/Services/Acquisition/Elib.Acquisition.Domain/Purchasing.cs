@@ -288,6 +288,14 @@ public sealed class ReceiptLine : TenantEntity
         return line;
     }
 
+    /// <summary>Chọn lại biểu ghi đã có trong phiếu "từ đơn đặt": dòng chưa gắn đơn đặt thì gắn; gắn dòng đặt khác thì từ chối.</summary>
+    public void AttachOrderLine(long orderLineId)
+    {
+        if (OrderLineId is { } current && current != orderLineId)
+            throw new ConflictException("LINE_OTHER_ORDER", $"Biểu ghi MFN {Mfn} đã có trong phiếu theo một dòng đơn đặt khác — sửa ở dòng đó.");
+        OrderLineId = orderLineId;
+    }
+
     public void Update(BibSnapshot? bib, int quantity, decimal? price, string? currency, decimal? rate)
     {
         if (bib is not null)

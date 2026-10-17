@@ -171,25 +171,16 @@ public sealed class ReceiptResource(
         receipt.EnsureEditable();
 
         ReceiptLine line;
+        string action;
         if (request.LinePublicId is { } linePublicId)
         {
             line = await Db.Set<ReceiptLine>().FirstOrDefaultAsync(l => l.PublicId == linePublicId && l.ReceiptId == receipt.Id, ct)
                 ?? throw new NotFoundException("Dòng phiếu nhận", linePublicId);
-            if (request.Quantity < line.Quantity)
-            {
-                // Khoá số lượng theo ĐKCB: không giảm xuống dưới số đã đăng ký (hỏi holdings — không trả lời được thì không cho giảm).
-                var registered = (await holdings.ListAsync(tenant.RequireTenantId(), receipt.PublicId, ct)).Count(i => i.LinePublicId == line.PublicId);
-                if (request.Quantity < registered)
-                    throw new BusinessRuleException("QUANTITY_BELOW_REGISTERED",
-                        $"Dòng MFN {line.Mfn} đã đăng ký {registered} ĐKCB — số bản nhận không được nhỏ hơn (xoá bớt ĐKCB trước).");
-            }
-            if (line.OrderLineId is { } orderLineId) await EnsureOrderRemainingAsync(orderLineId, request.Quantity, line.Id, ct);
-            line.Update(null, request.Quantity, request.Price, request.Currency, request.Rate);
+            await EditLineAsync(receipt, line, request.Quantity, request.Price, request.Currency, request.Rate, ct);
+            action = "sửa";
         }
         else
         {
-            if (await Db.Set<ReceiptLine>().CountAsync(l => l.ReceiptId == receipt.Id, ct) >= MaxLines)
-                throw new BusinessRuleException("LINES_TOO_MANY", $"Một phiếu nhận tối đa {MaxLines:N0} dòng.");
             OrderLine? orderLine = null;
             if (request.OrderLinePublicId is { } orderLinePublicId)
             {
@@ -199,26 +190,39 @@ public sealed class ReceiptResource(
                 order.EnsureLinesEditable();
                 if (orderLine.CancelReason is not null)
                     throw new BusinessRuleException("ORDER_LINE_CANCELLED", $"Dòng đặt \"{orderLine.Title}\" đã huỷ ({orderLine.CancelReason}).");
-                await EnsureOrderRemainingAsync(orderLine.Id, request.Quantity, null, ct);
             }
             var mfn = request.Mfn ?? orderLine?.Mfn
                 ?? throw new BusinessRuleException("MFN_REQUIRED", orderLine is null
                     ? "Chọn biểu ghi của tài liệu nhận."
                     : $"Dòng đặt \"{orderLine.Title}\" chưa có biểu ghi — biên mục rồi chọn biểu ghi (MFN) cho dòng nhận.");
             var bib = await bibs.RequireAsync(mfn, ct);
-            if (await Db.Set<ReceiptLine>().AnyAsync(l => l.ReceiptId == receipt.Id && l.BibPublicId == bib.BibPublicId, ct))
-                throw new ConflictException("LINE_EXISTS", $"Biểu ghi MFN {bib.Mfn} đã có trong phiếu — sửa số bản ở dòng đó.");
-            line = ReceiptLine.Create(receipt.Id, bib, request.Quantity, request.Price ?? orderLine?.Price, request.Currency ?? orderLine?.Currency,
-                request.Rate ?? orderLine?.Rate, orderLine?.Id);
-            line.PublicId = Guid.CreateVersion7(); // event phát trước khi lưu — dòng cần sẵn PublicId
-            Db.Set<ReceiptLine>().Add(line);
+            var (price, currency, rate) = (request.Price ?? orderLine?.Price, request.Currency ?? orderLine?.Currency, request.Rate ?? orderLine?.Rate);
+            var existing = await Db.Set<ReceiptLine>().FirstOrDefaultAsync(l => l.ReceiptId == receipt.Id && l.BibPublicId == bib.BibPublicId, ct);
+            if (existing is not null)
+            {
+                // Như ELIB-LRC (SaveDetail theo phiếu + biểu ghi): chọn lại biểu ghi đã có trong phiếu → ghi đè dòng đó, cùng kiểm tra như sửa dòng.
+                if (orderLine is not null) existing.AttachOrderLine(orderLine.Id);
+                line = existing;
+                await EditLineAsync(receipt, line, request.Quantity, price, currency, rate, ct);
+                action = "ghi đè";
+            }
+            else
+            {
+                if (await Db.Set<ReceiptLine>().CountAsync(l => l.ReceiptId == receipt.Id, ct) >= MaxLines)
+                    throw new BusinessRuleException("LINES_TOO_MANY", $"Một phiếu nhận tối đa {MaxLines:N0} dòng.");
+                if (orderLine is not null) await EnsureOrderRemainingAsync(orderLine.Id, request.Quantity, null, ct);
+                line = ReceiptLine.Create(receipt.Id, bib, request.Quantity, price, currency, rate, orderLine?.Id);
+                line.PublicId = Guid.CreateVersion7(); // event phát trước khi lưu — dòng cần sẵn PublicId
+                Db.Set<ReceiptLine>().Add(line);
+                action = "thêm";
+            }
         }
 
         receipt.Touch();
         await PublishAsync(receipt, deleted: false, ct);
         if (AuditSink is not null)
             await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Receipt), EntityName, receipt.PublicId, CrudChange.Updated,
-                $"Phiếu nhận số {receipt.Id}: {(request.LinePublicId is null ? "thêm" : "sửa")} dòng MFN {line.Mfn} × {line.Quantity}"), ct);
+                $"Phiếu nhận số {receipt.Id}: {action} dòng MFN {line.Mfn} × {line.Quantity}"), ct);
         await Db.SaveChangesAsync(ct);
         return await LineRows(Db.Set<ReceiptLine>().AsNoTracking().Where(l => l.Id == line.Id)).SingleAsync(ct);
     }
@@ -306,6 +310,21 @@ public sealed class ReceiptResource(
                 $"Phiếu nhận số {receipt.Id}: {what}"), ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(receipt);
+    }
+
+    /// <summary>Sửa số bản / đơn giá của dòng đã có: không giảm dưới số ĐKCB đã đăng ký, không vượt số còn lại của dòng đơn đặt.</summary>
+    private async Task EditLineAsync(Receipt receipt, ReceiptLine line, int quantity, decimal? price, string? currency, decimal? rate, CancellationToken ct)
+    {
+        if (quantity < line.Quantity)
+        {
+            // Khoá số lượng theo ĐKCB: không giảm xuống dưới số đã đăng ký (hỏi holdings — không trả lời được thì không cho giảm).
+            var registered = (await holdings.ListAsync(tenant.RequireTenantId(), receipt.PublicId, ct)).Count(i => i.LinePublicId == line.PublicId);
+            if (quantity < registered)
+                throw new BusinessRuleException("QUANTITY_BELOW_REGISTERED",
+                    $"Dòng MFN {line.Mfn} đã đăng ký {registered} ĐKCB — số bản nhận không được nhỏ hơn (xoá bớt ĐKCB trước).");
+        }
+        if (line.OrderLineId is { } orderLineId) await EnsureOrderRemainingAsync(orderLineId, quantity, line.Id, ct);
+        line.Update(null, quantity, price, currency, rate);
     }
 
     private async Task EnsureOrderRemainingAsync(long orderLineId, int quantity, long? exceptLineId, CancellationToken ct)

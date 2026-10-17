@@ -3,7 +3,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Elib.Acquisition.Application;
+using Elib.Acquisition.Domain;
+using Elib.Acquisition.Infrastructure;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events.Acquisition;
 using Elib.Contracts.Events.Catalog;
@@ -155,7 +160,11 @@ public sealed class AcquisitionApiTests : IClassFixture<AcquisitionApiFactory>, 
         var state = LastState(receipt.PublicId);
         Assert.Equal((receipt.Id, new DateOnly(2026, 9, 20), 7L, false), (state.Code, state.ReceivedOn, state.StoreId!.Value, state.Completed));
         Assert.Equal((line.PublicId, 3), (Assert.Single(state.Lines).LinePublicId, state.Lines[0].Quantity));
-        Assert.Equal("LINE_EXISTS", await ErrorCode(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"), new ReceiptLineRequest(Mfn: bib.Mfn), Json)));
+        // Chọn lại biểu ghi đã có trong phiếu (như ELIB-LRC) → ghi đè dòng đó, không thêm dòng mới.
+        var overwritten = await Read<ReceiptLineDto>(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"),
+            new ReceiptLineRequest(Mfn: bib.Mfn, Quantity: 3, Price: 50000m, Currency: "vnd"), Json));
+        Assert.Equal((line.PublicId, 3, 50000m, "VND"), (overwritten.PublicId, overwritten.Quantity, overwritten.Price, overwritten.Currency));
+        Assert.Single((await Read<ReceiptLinesView>(await staff.GetAsync(U($"/api/receipts/Lines/{receipt.PublicId}")))).Lines);
 
         Task<HttpResponseMessage> Register(RegisterReceiptItemsRequest r) => staff.PostAsJsonAsync(U($"/api/receipts/RegisterItems/{line.PublicId}"), r, Json);
         var batch = await Read<List<RegisteredItem>>(await Register(new RegisterReceiptItemsRequest(Quantity: 2, Prefix: "CP")));
@@ -168,6 +177,8 @@ public sealed class AcquisitionApiTests : IClassFixture<AcquisitionApiFactory>, 
         // Không giảm số bản dưới số ĐKCB đã đăng ký; không bỏ dòng còn ĐKCB; không xoá phiếu còn ĐKCB.
         Assert.Equal("QUANTITY_BELOW_REGISTERED", await ErrorCode(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"),
             new ReceiptLineRequest(LinePublicId: line.PublicId, Quantity: 1), Json)));
+        Assert.Equal("QUANTITY_BELOW_REGISTERED", await ErrorCode(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"),
+            new ReceiptLineRequest(Mfn: bib.Mfn, Quantity: 1), Json))); // ghi đè cũng không giảm dưới số ĐKCB
         Assert.Equal("LINE_HAS_ITEMS", await ErrorCode(await staff.DeleteAsync(U($"/api/receipts/Lines/{line.PublicId}"))));
         Assert.Equal("RECEIPT_HAS_ITEMS", await ErrorCode(await staff.DeleteAsync(U($"/api/receipts/Delete/{receipt.PublicId}"))));
         await Read<ReceiptLineDto>(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"), new ReceiptLineRequest(LinePublicId: line.PublicId, Quantity: 2), Json));
@@ -288,5 +299,82 @@ public sealed class AcquisitionApiTests : IClassFixture<AcquisitionApiFactory>, 
         Assert.Empty(await Read<List<BibOption>>(await other.PostAsJsonAsync(U("/api/bibs/Lookup"), new CrudSearch { Keyword = "vang bóng" }, Json)));
         Assert.Equal(HttpStatusCode.Forbidden, (await Staff(NewTenant(licensed: false)).PostAsJsonAsync(U("/api/receipts/Search"), new ReceiptSearch(), Json)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.PostAsJsonAsync(U("/api/orders/Search"), new PurchaseOrderSearch(), Json)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Duplicate_check_search_filters_like_lrc_ignores_accents_and_flags_bibs_already_received_or_ordered()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        async Task<BibChanged> Publish(string title, string author, string publisher, string year, long typeId, string typeName)
+        {
+            var bib = Bib(tenantId, title) with { Author = author, Publisher = publisher, PublishYear = year, BibTypeId = typeId, BibTypeName = typeName };
+            await _factory.PublishAsync(bib);
+            await _factory.WaitConsumedAsync(bib);
+            return bib;
+        }
+        var demen = await Publish("Dế mèn phiêu lưu ký", "Tô Hoài", "NXB Kim Đồng", "2019", 1, "Sách");
+        var vochong = await Publish("Vợ chồng A Phủ", "Tô Hoài", "NXB Văn học", "2020", 1, "Sách");
+        var tapchi = await Publish("Tạp chí Thiếu nhi", "Nhiều tác giả", "NXB Kim Đồng", "2020", 2, "Tạp chí");
+
+        var receipt = await Read<ReceiptDto>(await staff.PostAsJsonAsync(U("/api/receipts/Add"), new ReceiptRequest(new DateOnly(2026, 10, 1), "Đợt 1"), Json));
+        await Read<ReceiptLineDto>(await staff.PostAsJsonAsync(U($"/api/receipts/SaveLine/{receipt.PublicId}"), new ReceiptLineRequest(Mfn: demen.Mfn), Json));
+        var order = await Read<PurchaseOrderDto>(await staff.PostAsJsonAsync(U("/api/orders/Add"), new PurchaseOrderRequest("Đặt", new DateOnly(2026, 10, 1)), Json));
+        await Read<OrderLineDto>(await staff.PostAsJsonAsync(U($"/api/orders/SaveLine/{order.PublicId}"), new OrderLineRequest(Mfn: vochong.Mfn, Quantity: 2), Json));
+
+        async Task<CrudPage<BibSearchRow>> Search(BibSearchRequest r) =>
+            await Read<CrudPage<BibSearchRow>>(await staff.PostAsJsonAsync(U("/api/bibs/Search"), r, Json));
+
+        // Không dấu, không phân biệt hoa thường; sắp MFN giảm dần.
+        var byAuthor = await Search(new BibSearchRequest(Author: "to hoai"));
+        Assert.Equal([vochong.Mfn, demen.Mfn], byAuthor.Items.Select(b => b.Mfn));
+        var flags = byAuthor.Items.ToDictionary(b => b.Mfn, b => (b.HasReceipt, b.HasOrder));
+        Assert.Equal((true, false), flags[demen.Mfn]);
+        Assert.Equal((false, true), flags[vochong.Mfn]);
+        Assert.Equal(demen.Mfn, Assert.Single((await Search(new BibSearchRequest(Title: "DE MEN"))).Items).Mfn);
+        Assert.Equal([tapchi.Mfn, demen.Mfn], (await Search(new BibSearchRequest(Publisher: "kim dong"))).Items.Select(b => b.Mfn));
+        Assert.Equal(tapchi.Mfn, Assert.Single((await Search(new BibSearchRequest(BibTypeId: 2))).Items).Mfn);
+        Assert.Equal([tapchi.Mfn, vochong.Mfn], (await Search(new BibSearchRequest(PublishYear: "2020"))).Items.Select(b => b.Mfn));
+        Assert.Equal(vochong.Mfn, Assert.Single((await Search(new BibSearchRequest(MfnFrom: vochong.Mfn, MfnTo: vochong.Mfn))).Items).Mfn);
+        Assert.Equal(("Sách", "NXB Văn học", "2020"), (byAuthor.Items[0].BibTypeName, byAuthor.Items[0].Publisher, byAuthor.Items[0].PublishYear));
+
+        // Phân trang 10 dòng mặc định, trang 2.
+        var paged = await Search(new BibSearchRequest(Author: "to hoai", PageIndex: 2, PageSize: 1));
+        Assert.Equal((2, demen.Mfn), (paged.TotalCount, Assert.Single(paged.Items).Mfn));
+
+        var types = await Read<List<BibTypeOption>>(await staff.GetAsync(U("/api/bibs/Types")));
+        Assert.Equal([new BibTypeOption(1, "Sách"), new BibTypeOption(2, "Tạp chí")], types);
+
+        // Đơn vị khác không thấy; cán bộ không có quyền đơn đặt/phiếu nhận bị chặn.
+        Assert.Equal(0, (await Read<CrudPage<BibSearchRow>>(await Staff(NewTenant()).PostAsJsonAsync(U("/api/bibs/Search"), new BibSearchRequest(Author: "to hoai"), Json))).TotalCount);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId, "SUPPLIERS:view").PostAsJsonAsync(U("/api/bibs/Search"), new BibSearchRequest(), Json)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Startup_sync_fills_type_and_search_keys_of_replica_rows_written_before_the_upgrade()
+    {
+        var tenantId = NewTenant();
+        var inCatalog = Bib(tenantId, "Số đỏ") with { BibTypeId = 5, BibTypeName = "Sách", Version = 3 };
+        _factory.CatalogBibs.Bibs[(tenantId, inCatalog.Mfn)] = inCatalog;
+        var gone = Bib(tenantId, "Giông tố");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            using var _ = scope.ServiceProvider.GetRequiredService<ITenantContext>().Use(tenantId);
+            var db = scope.ServiceProvider.GetRequiredService<ICrudDbContext>();
+            // Dòng cũ: cùng version với catalog, chưa có loại / khoá tìm (Synced = false).
+            db.Set<BibSnapshot>().Add(new BibSnapshot { BibPublicId = inCatalog.BibPublicId, Mfn = inCatalog.Mfn, Title = "Số đỏ", Version = 3 });
+            db.Set<BibSnapshot>().Add(new BibSnapshot { BibPublicId = gone.BibPublicId, Mfn = gone.Mfn, Title = "Giông tố", Author = "Vũ Trọng Phụng", Version = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        var sync = _factory.Services.GetServices<IHostedService>().OfType<BibSnapshotSync>().Single();
+        Assert.Equal(0, await sync.RunOnceAsync(CancellationToken.None));
+
+        var staff = Staff(tenantId);
+        var typed = Assert.Single((await Read<CrudPage<BibSearchRow>>(await staff.PostAsJsonAsync(U("/api/bibs/Search"), new BibSearchRequest(BibTypeId: 5), Json))).Items);
+        Assert.Equal(inCatalog.Mfn, typed.Mfn);
+        // Biểu ghi catalog không trả về: khoá tìm tự tính từ dữ liệu đang có.
+        Assert.Equal(gone.Mfn, Assert.Single((await Read<CrudPage<BibSearchRow>>(await staff.PostAsJsonAsync(U("/api/bibs/Search"),
+            new BibSearchRequest(Author: "vu trong phung"), Json))).Items).Mfn);
     }
 }

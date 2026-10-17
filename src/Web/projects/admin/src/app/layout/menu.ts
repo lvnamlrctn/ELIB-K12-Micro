@@ -133,6 +133,7 @@ export class Menu {
         children: [
           { title: 'MENU.AB_ORDERS', icon: 'shopping_cart', link: '/ab-orders', perm: 'AB_ORDERS' },
           { title: 'MENU.AB_RECEIPTS', icon: 'receipt_long', link: '/ab-receipts', perm: 'AB_RECEIPTS' },
+          { title: 'MENU.AB_RECEIPT_LOOKUP', icon: 'manage_search', link: '/ab-receipts/lookup', perm: 'AB_RECEIPTS' },
           { title: 'MENU.ACQ_REPORTS', icon: 'assessment', link: '/ab-reports', perm: 'AB_RECEIPTS' },
           { title: 'MENU.AB_SOURCES', icon: 'source', link: '/ab-sources', perm: 'AB_SOURCES' },
           { title: 'MENU.SUPPLIERS', icon: 'local_shipping', link: '/suppliers', perm: 'SUPPLIERS' },

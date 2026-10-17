@@ -105,9 +105,24 @@ namespace Elib.Acquisition.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("author");
 
+                    b.Property<string>("AuthorKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("author_key");
+
                     b.Property<Guid>("BibPublicId")
                         .HasColumnType("uuid")
                         .HasColumnName("bib_public_id");
+
+                    b.Property<long?>("BibTypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bib_type_id");
+
+                    b.Property<string>("BibTypeName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("bib_type_name");
 
                     b.Property<DateTimeOffset?>("CatalogedAt")
                         .HasColumnType("timestamp with time zone")
@@ -136,6 +151,16 @@ namespace Elib.Acquisition.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("publisher");
 
+                    b.Property<string>("PublisherKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("publisher_key");
+
+                    b.Property<bool>("Synced")
+                        .HasColumnType("boolean")
+                        .HasColumnName("synced");
+
                     b.Property<long>("TenantId")
                         .HasColumnType("bigint")
                         .HasColumnName("tenant_id");
@@ -145,6 +170,12 @@ namespace Elib.Acquisition.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("title");
+
+                    b.Property<string>("TitleKey")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("title_key");
 
                     b.Property<long>("Version")
                         .HasColumnType("bigint")
@@ -165,6 +196,9 @@ namespace Elib.Acquisition.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "Mfn")
                         .HasDatabaseName("ix_bib_snapshots_tenant_id_mfn");
+
+                    b.HasIndex("TenantId", "Synced")
+                        .HasDatabaseName("ix_bib_snapshots_tenant_id_synced");
 
                     b.ToTable("bib_snapshots", (string)null);
                 });

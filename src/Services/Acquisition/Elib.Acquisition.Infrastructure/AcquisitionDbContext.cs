@@ -63,7 +63,12 @@ public sealed class AcquisitionDbContext(DbContextOptions<AcquisitionDbContext> 
             e.Property(x => x.Publisher).HasMaxLength(500);
             e.Property(x => x.PublishYear).HasMaxLength(4);
             e.Property(x => x.Isbns).HasMaxLength(1000);
+            e.Property(x => x.BibTypeName).HasMaxLength(250);
+            e.Property(x => x.TitleKey).HasMaxLength(1000);
+            e.Property(x => x.AuthorKey).HasMaxLength(500);
+            e.Property(x => x.PublisherKey).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.CatalogedAt });
+            e.HasIndex(x => new { x.TenantId, x.Synced });
             e.HasIndex(x => new { x.TenantId, x.BibPublicId }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Mfn });
         });

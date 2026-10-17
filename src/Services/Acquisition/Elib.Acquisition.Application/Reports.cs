@@ -57,9 +57,13 @@ public sealed record AcquisitionListRow(
 /// <summary><see cref="Quantity"/> / <see cref="Amount"/> tính trên toàn bộ kết quả lọc, không chỉ trang hiện tại.</summary>
 public sealed record AcquisitionListPage(IReadOnlyList<AcquisitionListRow> Items, int Total, int PageIndex, int PageSize, int Quantity, decimal Amount);
 
-/// <summary>Tra cứu đơn nhận theo dòng (monolith: LookupLines): mô tả ISBD rút gọn của tài liệu, đơn nhận, nguồn, kho.</summary>
+/// <summary>
+/// Tra cứu đơn nhận theo dòng (monolith: LookupLines): mô tả ISBD rút gọn của tài liệu, đơn nhận, nguồn, kho.
+/// <see cref="ReceiptPublicId"/>: mở chi tiết đơn từ cột "Mã đơn".
+/// </summary>
 public sealed record ReceiptLookupRow(
-    long Mfn, long ReceiptId, string Isbd, DateTimeOffset CreatedAt, DateOnly ReceivedOn, string? SourceName, long? StoreId, string? StoreName, Guid BibPublicId);
+    long Mfn, long ReceiptId, string Isbd, DateTimeOffset CreatedAt, DateOnly ReceivedOn, string? SourceName, long? StoreId, string? StoreName, Guid BibPublicId,
+    Guid ReceiptPublicId = default);
 
 public sealed record StoreAllocationReport(IReadOnlyList<HoldingsStoreCount> Items, int Total);
 
@@ -98,7 +102,7 @@ public sealed class AcquisitionReports(ICrudDbContext db, IHoldingsReceiptItems 
 
     private sealed record LookupRaw(
         long Mfn, long ReceiptId, string Title, string? Author, string? Publisher, string? PublishYear, DateTimeOffset CreatedAt, DateOnly ReceivedOn,
-        string? SourceName, long? StoreId, Guid BibPublicId);
+        string? SourceName, long? StoreId, Guid BibPublicId, Guid ReceiptPublicId);
 
     private static (int Page, int Size) Paging(AcquisitionReportRequest r) => (Math.Max(1, r.PageIndex), Math.Clamp(r.PageSize, 1, MaxPageSize));
 
@@ -211,10 +215,12 @@ public sealed class AcquisitionReports(ICrudDbContext db, IHoldingsReceiptItems 
         .OrderByDescending(x => x.Receipt.CreatedAt).ThenByDescending(x => x.Line.Id)
         .Select(x => new LookupRaw(x.Line.Mfn, x.Receipt.Id, x.Bib == null ? x.Line.Title : x.Bib.Title, x.Bib == null ? x.Line.Author : x.Bib.Author,
             x.Bib == null ? null : x.Bib.Publisher, x.Bib == null ? null : x.Bib.PublishYear, x.Receipt.CreatedAt, x.Receipt.ReceivedOn,
-            db.Set<AcquisitionSource>().Where(s => s.Id == x.Receipt.SourceId).Select(s => s.Name).FirstOrDefault(), x.Receipt.StoreId, x.Line.BibPublicId));
+            db.Set<AcquisitionSource>().Where(s => s.Id == x.Receipt.SourceId).Select(s => s.Name).FirstOrDefault(), x.Receipt.StoreId, x.Line.BibPublicId,
+            x.Receipt.PublicId));
 
     private static ReceiptLookupRow ToLookup(LookupRaw x) =>
-        new(x.Mfn, x.ReceiptId, Isbd(x.Title, x.Author, x.Publisher, x.PublishYear), x.CreatedAt, x.ReceivedOn, x.SourceName, x.StoreId, null, x.BibPublicId);
+        new(x.Mfn, x.ReceiptId, Isbd(x.Title, x.Author, x.Publisher, x.PublishYear), x.CreatedAt, x.ReceivedOn, x.SourceName, x.StoreId, null, x.BibPublicId,
+            x.ReceiptPublicId);
 
     /// <summary>Mô tả ISBD rút gọn: "Nhan đề / Tác giả .- NXB, Năm".</summary>
     public static string Isbd(string? title, string? author, string? publisher, string? year)
