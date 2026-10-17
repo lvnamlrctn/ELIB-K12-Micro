@@ -27,6 +27,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<StoreOuts>();
         services.AddScoped<BarcodeReRegistration>();
         services.AddScoped<StoreReports>();
+        services.AddScoped<PlatformItemStatsService>();
         return services;
     }
 }

@@ -49,6 +49,7 @@ export const routes: Routes = [
       { path: 'tenant', loadComponent: () => import('./pages/system/tenants-list').then((m) => m.TenantsList), canActivate: [systemGuard], title: 'TENANT_ADMIN.TITLE' },
       { path: 'tenant/create', loadComponent: () => import('./pages/system/tenant-create').then((m) => m.TenantCreate), canActivate: [systemGuard], title: 'TENANT_ADMIN.CREATE' },
       { path: 'tenant/:id', loadComponent: () => import('./pages/system/tenant-detail').then((m) => m.TenantDetail), canActivate: [systemGuard], title: 'TENANT_ADMIN.TITLE' },
+      { path: 'platform-stats', loadComponent: () => import('./pages/system/platform-stats').then((m) => m.PlatformStats), canActivate: [systemGuard], title: 'PLATFORM_STATS.TITLE' },
       {
         path: 'platform-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs), canActivate: [systemGuard],
         data: { scope: 'platform' }, title: 'AUDIT.TITLE_PLATFORM',

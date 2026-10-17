@@ -43,6 +43,7 @@ export class Menu {
     if (this.session.isSystem()) {
       return [
         { title: 'MENU.DASHBOARD', icon: 'dashboard', link: '/' },
+        { title: 'MENU.PLATFORM_STATS', icon: 'insights', link: '/platform-stats' },
         {
           title: 'MENU.SYSTEM',
           icon: 'dns',

@@ -93,6 +93,30 @@ public sealed class HoldingsApiTests : IClassFixture<HoldingsApiFactory>, IAsync
     }
 
     [Fact]
+    public async Task Platform_admin_counts_printed_items_per_tenant_and_tenant_staff_cannot()
+    {
+        var a = NewTenant();
+        var b = NewTenant();
+        var staffA = Staff(a);
+        var staffB = Staff(b);
+        await Read<List<ItemDto>>(await Register(staffA, (await PublishBib(a, "Dế mèn phiêu lưu ký")).Mfn, 3, "TK"));
+        await Read<List<ItemDto>>(await Register(staffA, (await PublishBib(a, "Đất rừng phương Nam")).Mfn, 2, "TK"));
+        await Read<List<ItemDto>>(await Register(staffB, (await PublishBib(b, "Tắt đèn")).Mfn, 1, "TK"));
+
+        var system = _factory.CreateClient().WithClaims(TestClaims.SuperAdmin);
+        async Task<List<ItemPlatformStats>> Stats(PlatformStatsRequest request) =>
+            await Read<List<ItemPlatformStats>>(await system.PostAsJsonAsync(U("/api/system/stats/items"), request, Json));
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        Assert.Equal([new ItemPlatformStats(a, 2, 5, 5, 0, 5, 0, 0, 0, 0), new ItemPlatformStats(b, 1, 1, 1, 0, 1, 0, 0, 0, 0)],
+            await Stats(new PlatformStatsRequest([a, b], today, today)));
+        // Kỳ đã qua: không có bản đăng ký mới, số bản hiện có giữ nguyên.
+        Assert.Equal(new ItemPlatformStats(a, 2, 5, 0, 0, 5, 0, 0, 0, 0), Assert.Single(await Stats(new PlatformStatsRequest([a], today.AddDays(-30), today.AddDays(-1)))));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await staffA.PostAsJsonAsync(U("/api/system/stats/items"), new PlatformStatsRequest(), Json)).StatusCode);
+    }
+
+    [Fact]
     public async Task Labels_carry_ddc_and_cutter_in_requested_order()
     {
         var tenantId = NewTenant();

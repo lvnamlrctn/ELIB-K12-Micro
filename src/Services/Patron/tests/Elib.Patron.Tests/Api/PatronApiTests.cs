@@ -483,6 +483,32 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
     }
 
     [Fact]
+    public async Task Platform_admin_counts_readers_per_tenant_and_tenant_staff_cannot()
+    {
+        var a = Interlocked.Increment(ref _nextTenantId);
+        var b = Interlocked.Increment(ref _nextTenantId);
+        var staffA = Staff(a);
+        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(-1);
+        await Read<ReaderDto>(await AddReader(staffA, new ReaderRequest("TK-01", null, "An")));
+        await Read<ReaderDto>(await AddReader(staffA, new ReaderRequest("TK-02", null, "Bình", IssueDate: yesterday.AddYears(-1), ExpireDate: yesterday)));
+        var locked = await Read<ReaderDto>(await AddReader(staffA, new ReaderRequest("TK-03", null, "Chi")));
+        await Read<ReaderDto>(await staffA.PostAsJsonAsync(U($"/api/readers/Lock/{locked.PublicId}"), new LockReaderRequest("Mất thẻ"), Json));
+        await Read<ReaderDto>(await AddReader(Staff(b), new ReaderRequest("TK-01", null, "Dũng")));
+
+        var system = _factory.CreateClient().WithClaims(TestClaims.SuperAdmin);
+        async Task<List<ReaderPlatformStats>> Stats(PlatformStatsRequest request) =>
+            await Read<List<ReaderPlatformStats>>(await system.PostAsJsonAsync(U("/api/system/stats/readers"), request, Json));
+
+        var today = yesterday.AddDays(1);
+        var now = await Stats(new PlatformStatsRequest([a, b], today, today));
+        Assert.Equal([new ReaderPlatformStats(a, 3, 1, 1, 3), new ReaderPlatformStats(b, 1, 0, 0, 1)], now);
+        // Kỳ trước hôm nay: không có bạn đọc mới, số hiện tại giữ nguyên.
+        Assert.Equal(new ReaderPlatformStats(a, 3, 1, 1, 0), Assert.Single(await Stats(new PlatformStatsRequest([a], null, yesterday))));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await staffA.PostAsJsonAsync(U("/api/system/stats/readers"), new PlatformStatsRequest(), Json)).StatusCode);
+    }
+
+    [Fact]
     public async Task Extra_face_photos_are_limited_unique_and_private_to_the_tenant()
     {
         var staff = Staff(Interlocked.Increment(ref _nextTenantId));

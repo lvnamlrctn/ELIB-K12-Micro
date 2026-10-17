@@ -100,6 +100,9 @@ public static class PatronEndpoints
             var (bytes, name) = await s.ErrorFileAsync(id, ct);
             return Results.File(bytes, CrudExcel.ContentType, name);
         });
+        // Thống kê toàn hệ thống — chỉ quản trị nền tảng (gateway /api/system/patron/** → /api/system/**).
+        app.MapPost("/api/system/stats/readers", (PlatformStatsRequest request, PlatformReaderStatsService s, CancellationToken ct) => s.ReadersAsync(request, ct))
+            .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
         readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
         readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
             => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));

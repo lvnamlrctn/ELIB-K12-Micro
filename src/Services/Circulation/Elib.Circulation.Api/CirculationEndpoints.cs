@@ -21,6 +21,10 @@ public static class CirculationEndpoints
     {
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
+        // Thống kê toàn hệ thống — chỉ quản trị nền tảng (gateway /api/system/circulation/** → /api/system/**).
+        app.MapPost("/api/system/stats/circulation", (PlatformStatsRequest request, PlatformCirculationStatsService s, CancellationToken ct) => s.BuildAsync(request, ct))
+            .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
+
         api.MapCrud<CircPlaceResource>("/circ-places", "CIRC_PLACES").WithTags("CircPlaces");
         api.MapCrud<LoanPolicyResource>("/loan-policies", "CIRC_POLICIES").WithTags("LoanPolicies");
         api.MapCrud<FineReasonResource>("/fine-reasons", "FINE_REASONS").WithTags("FineReasons")

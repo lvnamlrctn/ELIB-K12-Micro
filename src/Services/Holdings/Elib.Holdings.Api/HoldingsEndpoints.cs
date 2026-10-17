@@ -21,6 +21,10 @@ public static class HoldingsEndpoints
     {
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
+        // Thống kê toàn hệ thống — chỉ quản trị nền tảng (gateway /api/system/holdings/** → /api/system/**).
+        app.MapPost("/api/system/stats/items", (PlatformStatsRequest request, PlatformItemStatsService s, CancellationToken ct) => s.ItemsAsync(request, ct))
+            .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
+
         api.MapCrud<StoreTypeResource>("/store-types", "STORE_TYPES").WithTags("StoreTypes");
         api.MapCrud<StoreResource>("/stores", "STORES").WithTags("Stores");
 

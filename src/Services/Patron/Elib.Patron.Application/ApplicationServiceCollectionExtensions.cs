@@ -14,6 +14,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<ReaderResource>();
         services.AddScoped<ReaderImportService>();
         services.AddScoped<FaceRecognition>();
+        services.AddScoped<PlatformReaderStatsService>();
         services.AddSingleton<IReaderImportDispatcher, ReaderImportDispatcher>();
         return services;
     }

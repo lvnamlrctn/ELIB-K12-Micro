@@ -22,6 +22,16 @@ export interface LicenseInput { moduleCode: string; status?: LicenseStatus; vali
 export interface License { moduleCode: string; moduleName: string; status: LicenseStatus; validFrom: string | null; validTo: string | null; effectiveToday: boolean; }
 export interface ProvisioningStep { service: string; status: StepStatus; error: string | null; updatedAt: string; }
 export interface TenantSummary { publicId: string; id: number; code: string; name: string; subdomain: string; status: TenantState; }
+/** Thống kê toàn hệ thống: tenantIds rỗng = mọi đơn vị; from/to "yyyy-MM-dd" (giờ VN) cho số liệu trong kỳ. */
+export interface PlatformStatsRequest { tenantIds: number[]; from: string | null; to: string | null; }
+export interface ReaderPlatformStats { tenantId: number; total: number; locked: number; expired: number; added: number; }
+export interface LoanPlatformStats { tenantId: number; loans: number; returns: number; readersServed: number; lost: number; onLoan: number; overdue: number; }
+export interface FinePlatformStats { tenantId: number; tickets: number; total: number; discount: number; paid: number; remaining: number; }
+export interface CirculationPlatformStats { loans: LoanPlatformStats[]; fines: FinePlatformStats[]; }
+export interface ItemPlatformStats {
+  tenantId: number; titles: number; copies: number; added: number; available: number; unshelved: number; onLoan: number; outOfStore: number;
+  lost: number; liquidated: number;
+}
 export interface Tenant extends TenantSummary {
   timeZone: string; parentOrgId: number | null; version: number;
   provisioningStartedAt: string | null; provisioningError: string | null;
@@ -620,6 +630,19 @@ export class Api {
   tenants(search?: string, status?: TenantState | '', page = 1) {
     return this.get<PagedResult<TenantSummary>>('/api/system/tenant/tenants', { search, status: status || undefined, page, pageSize: 20 });
   }
+  /** Mọi đơn vị (tải từng trang 200) — bộ lọc của thống kê toàn hệ thống. */
+  async allTenants(): Promise<TenantSummary[]> {
+    const all: TenantSummary[] = [];
+    for (let page = 1; ; page++) {
+      const r = await this.get<PagedResult<TenantSummary>>('/api/system/tenant/tenants', { page, pageSize: 200 });
+      all.push(...r.items);
+      if (r.items.length === 0 || all.length >= r.total) return all;
+    }
+  }
+  // Thống kê toàn hệ thống (host hệ thống): mỗi service một endpoint, một dòng cho mỗi đơn vị có số liệu.
+  platformReaderStats(body: PlatformStatsRequest) { return this.post<ReaderPlatformStats[]>('/api/system/patron/stats/readers', body); }
+  platformCirculationStats(body: PlatformStatsRequest) { return this.post<CirculationPlatformStats>('/api/system/circulation/stats/circulation', body); }
+  platformItemStats(body: PlatformStatsRequest) { return this.post<ItemPlatformStats[]>('/api/system/holdings/stats/items', body); }
   async tenantCount(status?: TenantState) {
     return (await this.get<PagedResult<TenantSummary>>('/api/system/tenant/tenants', { status, page: 1, pageSize: 1 })).total;
   }

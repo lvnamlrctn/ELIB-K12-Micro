@@ -16,6 +16,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<HoldResource>();
         services.AddCrudResource<PhotocopyResource>();
         services.AddScoped<CirculationReports>();
+        services.AddScoped<PlatformCirculationStatsService>();
         services.AddScoped<Replicas>();
         services.AddScoped<LoanPublisher>();
         services.AddScoped<ReaderNotifier>();
