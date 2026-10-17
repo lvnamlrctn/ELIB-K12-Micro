@@ -3254,6 +3254,7 @@
     "STORE": "Kho",
     "REPORT_TYPE": "Loại báo cáo",
     "RT_LABELS": "In nhãn môn loại",
+    "RT_LABELS_QTY": "In nhãn môn loại theo số lượng",
     "RT_ALLOCATION": "Báo cáo phân bổ kho",
     "RT_LIST": "Danh mục sách bổ sung",
     "RT_NEWBOOKS": "Thư mục giới thiệu sách mới",
@@ -3290,6 +3291,7 @@
     "RECEIPT": "Đơn nhận",
     "DOCUMENT": "Tài liệu",
     "COPIES": "Số bản",
+    "CLASS": "Phân loại",
     "NO_STORE": "(Chưa chọn kho)",
     "CATALOGED_ON": "Ngày biên mục"
   },

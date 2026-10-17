@@ -37,6 +37,20 @@ public static class SearchEndpoints
         opac.MapGet("/bibs/{publicId:guid}/similar", (Guid publicId, int? size, OpacSearch s, CancellationToken ct) => s.SimilarAsync(publicId, size ?? 8, ct));
         opac.MapGet("/suggest", (string? q, OpacSearch s, CancellationToken ct) => s.SuggestAsync(q, ct));
 
+        // OAI-PMH 2.0: harvest metadata công khai (thư viện quốc gia, cổng liên thông…) — không dùng ApiResponse<T> vì schema XML cố định.
+        opac.MapMethods("/oai", ["GET", "POST"], async (HttpContext http, OaiPmh oai, CancellationToken ct) =>
+        {
+            string? Get(string key)
+            {
+                if (http.Request.HasFormContentType && http.Request.Form.TryGetValue(key, out var v)) return v.FirstOrDefault();
+                return http.Request.Query.TryGetValue(key, out var q) ? q.FirstOrDefault() : null;
+            }
+            var baseUrl = $"{http.Request.Scheme}://{http.Request.Host}{http.Request.Path}";
+            var xml = await oai.HandleAsync(baseUrl, Get("verb"), Get("identifier"), Get("metadataPrefix"), Get("from"), Get("until"), Get("set"),
+                Get("resumptionToken"), ct);
+            return Results.Text(xml.Declaration + "\n" + xml.ToString(), "text/xml", System.Text.Encoding.UTF8);
+        }).WithTags("Oai");
+
         // Quản trị chỉ mục: trạng thái, dựng lại (chạy nền — đơn vị nhiều biểu ghi mất vài phút).
         var index = app.MapGroup("/api/index").WithTags("Index").RequireAuthorization(new RequiresModuleAttribute(Module));
         index.MapGet("/Status", [Permission("SEARCH_INDEX", "view")] (IndexRebuilder r, CancellationToken ct) => r.StatusAsync(ct));

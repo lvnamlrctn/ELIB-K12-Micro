@@ -3254,6 +3254,7 @@
     "STORE": "Store",
     "REPORT_TYPE": "Report type",
     "RT_LABELS": "Print class labels",
+    "RT_LABELS_QTY": "Print class labels by quantity",
     "RT_ALLOCATION": "Store allocation report",
     "RT_LIST": "Acquisition list",
     "RT_NEWBOOKS": "New books catalogue",
@@ -3290,6 +3291,7 @@
     "RECEIPT": "Receipt",
     "DOCUMENT": "Document",
     "COPIES": "Copies",
+    "CLASS": "Class",
     "NO_STORE": "(No store)",
     "CATALOGED_ON": "Cataloged on"
   },

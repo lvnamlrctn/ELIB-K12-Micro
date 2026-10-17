@@ -15,7 +15,11 @@ export const ACQ_PRINT_MAX_ROWS = 5000;
 
 export interface AcqPrintJob {
   title: string; subtitle: string; headers: string[]; rows: string[][]; total: string[] | null; right: number[]; truncated: boolean;
+  /** Phân bổ kho: in theo từng kho (một bảng + dòng tổng riêng) thay vì một bảng chung — bỏ qua `rows` khi có. */
+  sections?: AcqPrintSection[];
 }
+
+export interface AcqPrintSection { heading: string; rows: string[][]; total: string[]; }
 
 interface Header { parent: string; library: string; }
 
@@ -41,6 +45,8 @@ interface Header { parent: string; library: string; }
     th { background: #f1f1f1; text-align: center; }
     td.r { text-align: right; white-space: nowrap; }
     tr.total td { font-weight: 700; }
+    h2.section { font-size: 14px; margin: 14px 0 4px; break-after: avoid; }
+    table + h2.section { margin-top: 18px; }
     .signs { display: flex; justify-content: space-between; margin-top: 24px; text-align: center; break-inside: avoid; }
     .signs .date { font-style: italic; margin-bottom: 2px; }
     .signs div div:first-child { font-weight: 700; }
@@ -72,17 +78,35 @@ interface Header { parent: string; library: string; }
         </div>
         <h1>{{ j.title }}</h1>
         @if (j.subtitle) { <div class="sub">{{ j.subtitle }}</div> }
-        <table>
-          <thead><tr><th style="width:44px">{{ 'ACQ.NO' | translate }}</th>@for (h of j.headers; track $index) { <th>{{ h }}</th> }</tr></thead>
-          <tbody>
-            @for (r of j.rows; track $index) {
-              <tr><td class="r">{{ $index + 1 }}</td>@for (c of r; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
-            }
-            @if (j.total; as t) {
-              <tr class="total"><td></td>@for (c of t; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
-            }
-          </tbody>
-        </table>
+        @if (j.sections; as secs) {
+          @for (s of secs; track s.heading) {
+            <h2 class="section">{{ s.heading }}</h2>
+            <table>
+              <thead><tr><th style="width:44px">{{ 'ACQ.NO' | translate }}</th>@for (h of j.headers; track $index) { <th>{{ h }}</th> }</tr></thead>
+              <tbody>
+                @for (r of s.rows; track $index) {
+                  <tr><td class="r">{{ $index + 1 }}</td>@for (c of r; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
+                }
+                <tr class="total"><td></td>@for (c of s.total; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
+              </tbody>
+            </table>
+          }
+          @if (j.total; as t) {
+            <table><tbody><tr class="total"><td></td>@for (c of t; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr></tbody></table>
+          }
+        } @else {
+          <table>
+            <thead><tr><th style="width:44px">{{ 'ACQ.NO' | translate }}</th>@for (h of j.headers; track $index) { <th>{{ h }}</th> }</tr></thead>
+            <tbody>
+              @for (r of j.rows; track $index) {
+                <tr><td class="r">{{ $index + 1 }}</td>@for (c of r; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
+              }
+              @if (j.total; as t) {
+                <tr class="total"><td></td>@for (c of t; track $index) { <td [class.r]="j.right.includes($index)">{{ c }}</td> }</tr>
+              }
+            </tbody>
+          </table>
+        }
         @if (j.truncated) { <p class="no-print text-amber-700 mt-2">{{ 'ACQ_REPORT.PRINT_TRUNCATED' | translate: { max: maxRows } }}</p> }
         <div class="signs">
           <div><div class="space"></div></div>

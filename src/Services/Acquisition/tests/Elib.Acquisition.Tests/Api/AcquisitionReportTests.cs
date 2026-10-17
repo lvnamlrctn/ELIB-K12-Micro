@@ -243,6 +243,38 @@ public sealed class AcquisitionReportTests : IClassFixture<AcquisitionApiFactory
         Assert.Equal("Sách cũ", book.Worksheet(1).Cell(7, 3).GetString());
     }
 
+    [Fact]
+    public async Task Label_quantities_group_receipt_lines_by_bib_and_carry_classification()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var mfn = Interlocked.Increment(ref _nextMfn);
+        var bib = new BibChanged
+        {
+            TenantId = tenantId, BibPublicId = Guid.CreateVersion7(), Mfn = mfn, Title = "Dế Mèn phiêu lưu ký", Author = "Tô Hoài",
+            Publisher = "NXB Kim Đồng", PublishYear = "2020", Status = 2, Ddc = "895.9223", Cutter = "D250",
+        };
+        await _factory.PublishAsync(bib);
+        await _factory.WaitConsumedAsync(bib);
+
+        // Hai phiếu nhận khác nhau cùng biểu ghi: số lượng gộp theo biểu ghi, không theo dòng/phiếu — dùng khi chưa có ĐKCB cụ thể.
+        var receipt1 = await AddReceipt(staff, new ReceiptRequest(new DateOnly(2026, 10, 15), "Nhận sách thiếu nhi"));
+        await AddLine(staff, receipt1, new ReceiptLineRequest(Mfn: mfn, Quantity: 3, Price: 45000m));
+        var receipt2 = await AddReceipt(staff, new ReceiptRequest(new DateOnly(2026, 10, 16), "Nhận bổ sung"));
+        await AddLine(staff, receipt2, new ReceiptLineRequest(Mfn: mfn, Quantity: 2, Price: 45000m));
+
+        var rows = await Read<List<LabelQuantityRow>>(await Post(staff, "LabelQuantities", new AcquisitionReportRequest()));
+        var row = Assert.Single(rows);
+        Assert.Equal((mfn, "Dế Mèn phiêu lưu ký", "Tô Hoài", "895.9223", "D250", 5), (row.Mfn, row.Title, row.Author, row.Ddc, row.Cutter, row.Quantity));
+
+        var filtered = await Read<List<LabelQuantityRow>>(await Post(staff, "LabelQuantities", new AcquisitionReportRequest { From = new DateOnly(2026, 10, 16) }));
+        Assert.Equal(2, Assert.Single(filtered).Quantity); // chỉ phiếu thứ hai khớp khoảng ngày
+
+        // Chỉ người có quyền xem phiếu nhận.
+        var orderOnly = Staff(tenantId, "AB_ORDERS:view");
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(orderOnly, "LabelQuantities", new AcquisitionReportRequest())).StatusCode);
+    }
+
     // Hợp đồng JSON với holdings (/internal/tenants/{id}/receipt-items/Report): holdings có test với cùng hai chuỗi này (ReceiptReportApiTests).
     public const string WireRequest = """{"receiptPublicIds":["00000000-0000-0000-0000-000000000001"],"storeId":7,"skip":10,"take":20,"mfnFrom":5,"mfnTo":null,"title":"kieu","author":null,"publisher":null,"publishYear":null}""";
     public const string WirePage = """{"items":[{"barcode":"AA0001","mfn":12,"receiptPublicId":null,"linePublicId":null,"storeId":1,"storeName":"Kho 1","title":"T","author":null,"publisher":null,"publishYear":null,"ddc":"895","registeredOn":"2026-10-01"}],"total":1}""";

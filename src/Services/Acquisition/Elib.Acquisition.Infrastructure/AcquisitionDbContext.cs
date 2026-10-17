@@ -63,6 +63,8 @@ public sealed class AcquisitionDbContext(DbContextOptions<AcquisitionDbContext> 
             e.Property(x => x.Publisher).HasMaxLength(500);
             e.Property(x => x.PublishYear).HasMaxLength(4);
             e.Property(x => x.Isbns).HasMaxLength(1000);
+            e.Property(x => x.Ddc).HasMaxLength(50);
+            e.Property(x => x.Cutter).HasMaxLength(50);
             e.Property(x => x.BibTypeName).HasMaxLength(250);
             e.Property(x => x.TitleKey).HasMaxLength(1000);
             e.Property(x => x.AuthorKey).HasMaxLength(500);

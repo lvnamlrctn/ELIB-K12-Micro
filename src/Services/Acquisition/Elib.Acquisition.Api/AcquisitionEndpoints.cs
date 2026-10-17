@@ -51,6 +51,8 @@ public static class AcquisitionEndpoints
             => r.LookupLinesAsync(request, ct));
         g.MapPost("/LookupLinesExport", [Permission("AB_RECEIPTS", "view")] async ([FromServices] AcquisitionReports r, AcquisitionReportRequest request,
             CancellationToken ct) => File(await r.LookupLinesExportAsync(request, ct)));
+        g.MapPost("/LabelQuantities", [Permission("AB_RECEIPTS", "view")] ([FromServices] AcquisitionReports r, AcquisitionReportRequest request, CancellationToken ct)
+            => r.LabelQuantitiesAsync(request, ct));
         g.MapPost("/StoreAllocation", [Permission("AB_RECEIPTS", "view")] ([FromServices] AcquisitionReports r, AcquisitionReportRequest request, CancellationToken ct)
             => r.StoreAllocationAsync(request, ct));
         g.MapPost("/StoreAllocationExport", [Permission("AB_RECEIPTS", "view")] async ([FromServices] AcquisitionReports r, AcquisitionReportRequest request,

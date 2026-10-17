@@ -12,6 +12,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<OpacSearch>();
         services.AddScoped<SearchStats>();
         services.AddScoped<Z3950Search>();
+        services.AddScoped<OaiPmh>();
         services.AddCrudResource<Z3950ServerResource>();
         return services;
     }

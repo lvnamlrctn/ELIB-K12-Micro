@@ -53,6 +53,8 @@ public sealed class BibSnapshots(ICrudDbContext db, ICatalogBibs catalog, ITenan
         snapshot.Publisher = Cut(e.Publisher, 500);
         snapshot.PublishYear = Cut(e.PublishYear, 4);
         snapshot.Isbns = e.Isbns.Count > 0 ? Cut(string.Join(", ", e.Isbns), 1000) : null;
+        snapshot.Ddc = Cut(e.Ddc, 50);
+        snapshot.Cutter = Cut(e.Cutter, 50);
         snapshot.BibTypeId = e.BibTypeId;
         snapshot.BibTypeName = Cut(e.BibTypeName, 250);
         snapshot.TitleKey = Cut(BibSnapshot.Fold(e.Title), 1000) ?? "";

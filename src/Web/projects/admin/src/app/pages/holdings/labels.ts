@@ -9,7 +9,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 
 /** sessionStorage: nhãn cần in — màn chọn nhãn ghi trước khi mở trang in. */
-const PRINT_KEY = 'elib.print.labels';
+export const PRINT_KEY = 'elib.print.labels';
 export const HEADER_PREF = 'labels.header';
 /** sessionStorage: danh sách ĐKCB do màn khác (đơn nhận) chuyển sang để in nhãn ngay — đọc một lần rồi xoá. */
 export const LABEL_BARCODES_KEY = 'elib.labels.barcodes';
@@ -26,7 +26,7 @@ export type LabelKind = 'barcode' | 'spine';
 /** Dòng tiêu đề in đầu nhãn gáy (cơ quan chủ quản / tên thư viện) — nhớ theo tài khoản. */
 interface LabelHeader { parent: string; library: string; }
 
-interface LabelJob { kind: LabelKind; labels: ItemLabel[]; header: LabelHeader; skip: number; }
+export interface LabelJob { kind: LabelKind; labels: ItemLabel[]; header: LabelHeader; skip: number; }
 
 /**
  * In nhãn (ELIB-LRC: In mã vạch + In nhãn môn loại): chọn ĐKCB (quét/dán danh sách, khoảng ĐKCB, biểu ghi, kho, trạng thái) → in nhãn mã vạch

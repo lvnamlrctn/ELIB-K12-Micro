@@ -178,6 +178,11 @@ public sealed class BibSnapshot : Entity, ITenantOwned
     public string? PublishYear { get; set; }
     public string? Isbns { get; set; }
 
+    /// <summary>Ký hiệu phân loại DDC (082$a) / ký hiệu tác giả (Cutter) — in nhãn gáy/môn loại theo số lượng (chưa có ĐKCB cụ thể).</summary>
+    public string? Ddc { get; set; }
+
+    public string? Cutter { get; set; }
+
     /// <summary>Loại biểu ghi (loại tài liệu) ở catalog — lọc "Loại tài liệu" khi tra trùng.</summary>
     public long? BibTypeId { get; set; }
 

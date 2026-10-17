@@ -36,6 +36,14 @@ public static class InfrastructureServiceCollectionExtensions
         AddSource(services, configuration, HttpSearchSources.Circulation, "Circulation:Url");
         services.AddScoped<ISearchSources, HttpSearchSources>();
 
+        // OAI-PMH: cổng harvest metadata công khai cho hệ thống ngoài.
+        services.Configure<OaiPmhOptions>(configuration.GetSection(OaiPmhOptions.Section));
+
+        // Dọn SearchQuery (lượt tìm dùng cho báo cáo chất lượng tìm kiếm) quá hạn lưu — monolith: SearchObservationPurgeJob.
+        services.Configure<SearchQueryRetentionOptions>(configuration.GetSection(SearchQueryRetentionOptions.SectionName));
+        services.AddSingleton<SearchQueryPurgeJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<SearchQueryPurgeJob>());
+
         // Tra cứu liên thư viện: Z39.50 (TCP) / SRU (HTTP) ra máy chủ ngoài — chỉ địa chỉ công khai (Z3950:AllowPrivateNetworks).
         services.Configure<Z3950Options>(configuration.GetSection(Z3950Options.SectionName));
         var allowPrivate = configuration.GetValue<bool>($"{Z3950Options.SectionName}:{nameof(Z3950Options.AllowPrivateNetworks)}");

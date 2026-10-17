@@ -73,6 +73,9 @@ public sealed record AccessionRow(
 
 public sealed record NewBookRow(long Mfn, string Title, string? Author, string? Publisher, string? PublishYear, DateOnly? CatalogedOn);
 
+/// <summary>Số lượng theo biểu ghi — in nhãn gáy/môn loại trước khi đăng ký ĐKCB cụ thể (không có mã vạch).</summary>
+public sealed record LabelQuantityRow(long Mfn, string Title, string? Author, string? Ddc, string? Cutter, int Quantity);
+
 /// <summary>File Excel của các báo cáo bổ sung — tên thư viện lấy từ bản sao đơn vị trong DB của acquisition.</summary>
 public sealed class AcquisitionExcel(ICrudDbContext db, ITenantContext tenant, TimeProvider clock) : ReportExcel(clock)
 {
@@ -231,6 +234,34 @@ public sealed class AcquisitionReports(ICrudDbContext db, IHoldingsReceiptItems 
         var pub = new[] { publisher, year }.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
         if (pub.Count > 0) parts.Add(".- " + string.Join(", ", pub));
         return string.Join(' ', parts);
+    }
+
+    // ── 2b. In nhãn theo số lượng mỗi biểu ghi ───────────────────────────────
+
+    public const int MaxLabelBibs = 2000;
+
+    /// <summary>
+    /// Số lượng theo biểu ghi của các dòng khớp bộ lọc (monolith: CatalogueReceiptController.LookupLinesForLabel) — in nhãn gáy/môn loại
+    /// (DDC/Cutter) theo SỐ LƯỢNG đã đặt/nhận, dùng khi chưa đăng ký ĐKCB cụ thể nên không có mã vạch thật. Tối đa <see cref="MaxLabelBibs"/>
+    /// biểu ghi mỗi lần — vượt thì thu hẹp bộ lọc.
+    /// </summary>
+    public async Task<IReadOnlyList<LabelQuantityRow>> LabelQuantitiesAsync(AcquisitionReportRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var grouped = await Lines(request).GroupBy(x => x.Line.BibPublicId)
+            .Select(g => new
+            {
+                Mfn = g.Max(x => x.Line.Mfn),
+                Title = g.Max(x => x.Bib == null ? x.Line.Title : x.Bib.Title),
+                Author = g.Max(x => x.Bib == null ? x.Line.Author : x.Bib.Author),
+                Ddc = g.Max(x => x.Bib == null ? null : x.Bib.Ddc),
+                Cutter = g.Max(x => x.Bib == null ? null : x.Bib.Cutter),
+                Quantity = g.Sum(x => x.Line.Quantity),
+            })
+            .OrderBy(x => x.Mfn).Take(MaxLabelBibs + 1).ToListAsync(ct);
+        if (grouped.Count > MaxLabelBibs)
+            throw new BusinessRuleException("REPORT_TOO_WIDE", $"Bộ lọc khớp quá {MaxLabelBibs:N0} biểu ghi — thu hẹp khoảng ngày hoặc bộ lọc.");
+        return [.. grouped.Select(x => new LabelQuantityRow(x.Mfn, x.Title ?? "", x.Author, x.Ddc, x.Cutter, x.Quantity))];
     }
 
     // ── 3. Phân bổ kho ───────────────────────────────────────────────────────

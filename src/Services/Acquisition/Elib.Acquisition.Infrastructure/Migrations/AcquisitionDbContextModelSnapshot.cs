@@ -128,6 +128,16 @@ namespace Elib.Acquisition.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cataloged_at");
 
+                    b.Property<string>("Cutter")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("cutter");
+
+                    b.Property<string>("Ddc")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ddc");
+
                     b.Property<bool>("Deleted")
                         .HasColumnType("boolean")
                         .HasColumnName("deleted");

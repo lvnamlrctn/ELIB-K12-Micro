@@ -2,11 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import {
-  AcqAccessionRow, AcqAllocation, AcqListPage, AcqLookupRow, AcqNewBookRow, AcqReportName, AcqReportRequest, Api, saveFile,
+  AcqAccessionRow, AcqLabelQuantityRow, AcqListPage, AcqLookupRow, AcqNewBookRow, AcqReportName, AcqReportRequest, Api, ItemLabel, saveFile,
 } from '../../core/api';
+import { Preferences } from '../../core/preferences';
 import { ToastrService } from '../../shared/toastr';
-import { LABEL_BARCODES_KEY } from '../holdings/labels';
-import { ACQ_PRINT_KEY, ACQ_PRINT_MAX_ROWS, AcqPrintJob } from './report-print';
+import { HEADER_PREF, LABEL_BARCODES_KEY, LabelJob, PRINT_KEY as LABEL_PRINT_KEY } from '../holdings/labels';
+import { ACQ_PRINT_KEY, ACQ_PRINT_MAX_ROWS, AcqPrintJob, AcqPrintSection } from './report-print';
 
 export type AcqReportKind = 'list' | 'lookup' | 'allocation' | 'register' | 'newbooks';
 
@@ -21,6 +22,9 @@ export const ACQ_REPORTS: { kind: AcqReportKind; label: string; report: AcqRepor
 
 type Paged<R> = { items: R[]; total?: number; totalCount?: number };
 
+/** Trần số nhãn môn loại in theo số lượng (như Holdings.ItemResource.MaxLabels cho nhãn theo ĐKCB). */
+const MAX_CLASS_LABELS = 2000;
+
 /**
  * Xuất Excel, in theo mẫu giấy (report-print) và in nhãn theo bộ lọc báo cáo bổ sung — dùng chung cho trang "Báo cáo bổ sung" và trang
  * "Tra cứu đơn nhận" (nút "Báo cáo" + "Loại báo cáo" như ELIB-LRC). Lỗi ném lên nơi gọi (toast ở đó).
@@ -31,6 +35,7 @@ export class AcqReportActions {
   private readonly router = inject(Router);
   private readonly toastr = inject(ToastrService);
   private readonly i18n = inject(TranslateService);
+  private readonly prefs = inject(Preferences);
 
   async export(kind: AcqReportKind, body: AcqReportRequest): Promise<void> {
     const r = ACQ_REPORTS.find((x) => x.kind === kind)!;
@@ -40,7 +45,7 @@ export class AcqReportActions {
   /** Lấy hết các trang (trần ACQ_PRINT_MAX_ROWS dòng) rồi mở trang in theo mẫu giấy. storeName: tên kho của dòng tra cứu. */
   async print(kind: AcqReportKind, body: AcqReportRequest, storeName: (r: AcqLookupRow) => string): Promise<void> {
     const job = await this.buildPrintJob(kind, body, storeName);
-    if (!job.rows.length) {
+    if (!job.rows.length && !job.sections?.length) {
       this.toastr.warning('ACQ_REPORT.NOTHING_TO_PRINT');
       return;
     }
@@ -69,6 +74,34 @@ export class AcqReportActions {
       return;
     }
     void this.router.navigateByUrl('/print-labels');
+  }
+
+  /**
+   * In nhãn gáy/môn loại theo SỐ LƯỢNG mỗi biểu ghi khớp bộ lọc (monolith: LookupLinesForLabel) — dùng khi sách chưa được đăng ký ĐKCB
+   * cụ thể nên chưa có mã vạch thật; mỗi biểu ghi in đúng số lượng đã đặt/nhận. Dùng lại trang in nhãn chung (kind "spine").
+   */
+  async printClassLabels(body: AcqReportRequest): Promise<void> {
+    const rows = await this.api.acqReport<AcqLabelQuantityRow[]>('LabelQuantities', body);
+    const labels: ItemLabel[] = [];
+    rows.forEach((r, bi) => {
+      for (let i = 0; i < r.quantity && labels.length < MAX_CLASS_LABELS; i++)
+        labels.push({ barcode: `mfn-${r.mfn}-${bi}-${i}`, mfn: r.mfn, title: r.title, author: r.author, publishYear: null, ddc: r.ddc, cutter: r.cutter, storeCode: null, storeName: null });
+    });
+    if (!labels.length) {
+      this.toastr.warning('ACQ_REPORT.NOTHING_TO_PRINT');
+      return;
+    }
+    if (labels.length >= MAX_CLASS_LABELS) this.toastr.warning('ACQ_REPORT.LABELS_TRUNCATED', { max: MAX_CLASS_LABELS });
+    let header = { parent: '', library: '' };
+    this.prefs.watch<{ parent: string; library: string }>(HEADER_PREF, (h) => { header = { parent: h?.parent ?? '', library: h?.library ?? '' }; });
+    const job: LabelJob = { kind: 'spine', labels, header, skip: 0 };
+    try {
+      sessionStorage.setItem(LABEL_PRINT_KEY, JSON.stringify(job));
+    } catch {
+      this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
+      return;
+    }
+    void this.router.navigateByUrl('/print/labels');
   }
 
   private async allPages<R>(name: AcqReportName, body: AcqReportRequest, total: (p: Paged<R>) => number): Promise<{ rows: R[]; truncated: boolean; first: Paged<R> }> {
@@ -111,18 +144,50 @@ export class AcqReportActions {
         };
       }
       case 'allocation': {
-        const a = await this.api.acqReport<AcqAllocation>(t.report, body);
+        // Bản in theo mẫu giấy như ELIB-LRC: từng kho → từng biểu ghi (NXB, ký hiệu DDC, số lượng) — lấy lại từ Sổ ĐKCB (đã có đủ chi
+        // tiết theo bản sách) thay vì báo cáo tổng StoreAllocation (chỉ có tổng số mỗi kho).
+        const all = await this.allPages<AcqAccessionRow>('AccessionRegister', body, (p) => p.totalCount ?? 0);
+        const byStore = new Map<string, AcqAccessionRow[]>();
+        for (const row of all.rows) {
+          const key = row.storeName ?? tr('ACQ_REPORT.NO_STORE');
+          const group = byStore.get(key);
+          if (group) group.push(row); else byStore.set(key, [row]);
+        }
+        const headers = [tr('ITEMS_PAGE.TITLE_COL'), tr('ITEMS_PAGE.AUTHOR'), tr('ACQ.PUBLISHER'), tr('ACQ_REPORT.CLASS'), tr('ACQ_REPORT.COPIES')];
+        const sections: AcqPrintSection[] = [...byStore.entries()].sort((a, b) => a[0].localeCompare(b[0], 'vi')).map(([store, storeRows]) => {
+          const byBib = new Map<number, { row: AcqAccessionRow; count: number }>();
+          for (const row of storeRows) {
+            const entry = byBib.get(row.mfn);
+            if (entry) entry.count++; else byBib.set(row.mfn, { row, count: 1 });
+          }
+          const rows = [...byBib.values()].map(({ row, count }) => [`${row.title ?? ''} (MFN ${row.mfn})`, row.author ?? '', row.publisher ?? '', row.ddc ?? '', num(count)]);
+          return { heading: `${store} (${num(storeRows.length)})`, rows, total: [tr('STORE_STATS.TOTAL'), '', '', '', num(storeRows.length)] };
+        });
         return {
-          ...base, truncated: false, right: [1], headers: [tr('ITEMS_PAGE.STORE'), tr('ACQ_REPORT.COPIES')],
-          rows: a.items.map((x) => [x.storeName ?? tr('ACQ_REPORT.NO_STORE'), num(x.copies)]), total: [tr('STORE_STATS.TOTAL'), num(a.total)],
+          ...base, truncated: all.truncated, right: [4], headers, rows: [], sections,
+          total: [tr('STORE_STATS.TOTAL'), '', '', '', num(all.rows.length)],
         };
       }
       case 'register': {
-        const all = await this.allPages<AcqAccessionRow>(t.report, body, (p) => p.totalCount ?? 0);
+        // "Mặc định lọc theo năm hiện tại" khi chưa chọn bộ lọc nào (như ELIB-LRC) — tránh in cả sổ ĐKCB nhiều năm; chỉ áp dụng khi in,
+        // không đổi bộ lọc trên màn hình.
+        const hasOtherFilter = !!(body.receiptCodeFrom || body.receiptCodeTo || body.storeId || body.supplierId || body.receiptName
+          || body.completed !== null || body.sourceId || body.fundId || body.createdBy || body.createdFrom || body.createdTo
+          || body.mfnFrom || body.mfnTo || body.title || body.author || body.publisher || body.publishYear);
+        const printBody = !body.from && !body.to && !hasOtherFilter
+          ? { ...body, from: `${new Date().getFullYear()}-01-01`, to: `${new Date().getFullYear()}-12-31` }
+          : body;
+        const all = await this.allPages<AcqAccessionRow>(t.report, printBody, (p) => p.totalCount ?? 0);
         return {
-          ...base, truncated: all.truncated, right: [5],
-          headers: [tr('ITEMS_PAGE.BARCODE'), tr('ITEMS_PAGE.TITLE_COL'), tr('ITEMS_PAGE.AUTHOR'), tr('ITEMS_PAGE.STORE'), tr('ACQ_RECEIPT.RECEIVED_ON'), tr('ACQ.PRICE')],
-          rows: all.rows.map((x) => [x.barcode, `${x.title ?? ''} (MFN ${x.mfn})`, x.author ?? '', x.storeName ?? '', date(x.date), x.price === null ? '' : num(x.price, 2) + ' ' + (x.currency ?? '')]),
+          ...base, subtitle: range(printBody.from ?? '', printBody.to ?? ''), truncated: all.truncated, right: [8],
+          headers: [
+            tr('ITEMS_PAGE.BARCODE'), tr('ITEMS_PAGE.TITLE_COL'), tr('ITEMS_PAGE.AUTHOR'), tr('ACQ.PUBLISHER'), tr('ACQ.YEAR'), tr('ACQ_REPORT.CLASS'),
+            tr('ITEMS_PAGE.STORE'), tr('ACQ_RECEIPT.RECEIVED_ON'), tr('ACQ.PRICE'),
+          ],
+          rows: all.rows.map((x) => [
+            x.barcode, `${x.title ?? ''} (MFN ${x.mfn})`, x.author ?? '', x.publisher ?? '', x.publishYear ?? '', x.ddc?.charAt(0) ?? '',
+            x.storeName ?? '', date(x.date), x.price === null ? '' : num(x.price, 2) + ' ' + (x.currency ?? ''),
+          ]),
         };
       }
       case 'newbooks': {

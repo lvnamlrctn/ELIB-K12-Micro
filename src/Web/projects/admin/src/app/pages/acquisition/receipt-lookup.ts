@@ -12,10 +12,11 @@ import { AcqReportActions, AcqReportKind } from './acq-report-actions';
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
 
 /** "Loại báo cáo" của nút "Báo cáo" (ELIB-LRC: ab-receipt-lookup) — mỗi loại in/xuất theo đúng bộ lọc đang nhập. */
-type ReportType = 'labels' | 'allocation' | 'list' | 'newbooks' | 'register';
+type ReportType = 'labels' | 'labelsQty' | 'allocation' | 'list' | 'newbooks' | 'register';
 
 const REPORT_TYPES: { code: ReportType; label: string }[] = [
   { code: 'labels', label: 'ACQ_LOOKUP.RT_LABELS' },
+  { code: 'labelsQty', label: 'ACQ_LOOKUP.RT_LABELS_QTY' },
   { code: 'allocation', label: 'ACQ_LOOKUP.RT_ALLOCATION' },
   { code: 'list', label: 'ACQ_LOOKUP.RT_LIST' },
   { code: 'newbooks', label: 'ACQ_LOOKUP.RT_NEWBOOKS' },
@@ -173,10 +174,11 @@ export class ReceiptLookup implements OnInit {
   /** "Báo cáo" theo Loại báo cáo: in nhãn môn loại (ĐKCB theo bộ lọc), bản in phân bổ kho / danh mục / sổ ĐKCB, Excel thư mục sách mới. */
   protected async report(): Promise<void> {
     const body = this.body();
-    const kinds: Record<Exclude<ReportType, 'labels' | 'newbooks'>, AcqReportKind> = { allocation: 'allocation', list: 'list', register: 'register' };
+    const kinds: Record<Exclude<ReportType, 'labels' | 'labelsQty' | 'newbooks'>, AcqReportKind> = { allocation: 'allocation', list: 'list', register: 'register' };
     await this.act(() => {
       switch (this.reportType) {
         case 'labels': return this.actions.printLabels(body);
+        case 'labelsQty': return this.actions.printClassLabels(body);
         case 'newbooks': return this.actions.export('newbooks', body);
         default: return this.actions.print(kinds[this.reportType], body, (x) => this.storeName(x));
       }

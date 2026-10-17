@@ -301,7 +301,7 @@ export interface AcqReportRequest {
   mfnFrom: number | null; mfnTo: number | null; title: string | null; author: string | null; publisher: string | null; publishYear: string | null;
   pageIndex: number; pageSize: number;
 }
-export type AcqReportName = 'AcquisitionList' | 'LookupLines' | 'StoreAllocation' | 'AccessionRegister' | 'NewBooks';
+export type AcqReportName = 'AcquisitionList' | 'LookupLines' | 'StoreAllocation' | 'AccessionRegister' | 'NewBooks' | 'LabelQuantities';
 export interface AcqListRow {
   receiptId: number; receiptName: string | null; receivedOn: string; mfn: number; title: string; author: string | null; quantity: number;
   price: number | null; currency: string | null; rate: number; total: number;
@@ -320,6 +320,8 @@ export interface AcqAccessionRow {
 }
 /** catalogedOn null = biểu ghi không rõ ngày biên mục (xếp cuối). */
 export interface AcqNewBookRow { mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null; catalogedOn: string | null; }
+/** Số lượng theo biểu ghi (chưa có ĐKCB cụ thể) — in nhãn gáy/môn loại theo số lượng đã đặt/nhận. */
+export interface AcqLabelQuantityRow { mfn: number; title: string; author: string | null; ddc: string | null; cutter: string | null; quantity: number; }
 
 // ── Lưu thông (service circulation) ──
 /** Khung giờ làm việc của điểm lưu thông: day 1 = thứ Hai … 7 = Chủ nhật, giờ "HH:mm". */

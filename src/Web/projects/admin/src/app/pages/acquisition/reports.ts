@@ -71,6 +71,9 @@ const emptyRequest = (): AcqReportRequest => ({
         @if (tab() === 'register' && (session.can('PRINT_LABEL:view') || session.can('CATALOG_BIBS:view'))) {
           <button class="btn-secondary" [disabled]="busy()" (click)="printLabels()"><span class="material-icons text-[18px]">label</span> {{ 'ACQ_RECEIPT.PRINT_LABELS' | translate }}</button>
         }
+        @if (session.can('PRINT_LABEL:view') || session.can('CATALOG_BIBS:view')) {
+          <button class="btn-secondary" [disabled]="busy()" (click)="printClassLabels()"><span class="material-icons text-[18px]">label</span> {{ 'ACQ_LOOKUP.RT_LABELS_QTY' | translate }}</button>
+        }
         <button class="btn-secondary" [disabled]="busy()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'ACQ_REPORT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
@@ -268,6 +271,11 @@ export class AcquisitionReports implements OnInit {
   /** In nhãn cho các ĐKCB của sổ đăng ký cá biệt đang lọc (tối đa ACQ_PRINT_MAX_ROWS dòng). */
   protected async printLabels(): Promise<void> {
     await this.act(() => this.actions.printLabels(this.body()));
+  }
+
+  /** In nhãn môn loại theo số lượng mỗi biểu ghi khớp bộ lọc — dùng khi chưa đăng ký ĐKCB cụ thể (chưa có mã vạch). */
+  protected async printClassLabels(): Promise<void> {
+    await this.act(() => this.actions.printClassLabels(this.body()));
   }
 
   private async act(action: () => Promise<void>): Promise<void> {
