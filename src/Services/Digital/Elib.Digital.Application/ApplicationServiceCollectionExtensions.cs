@@ -16,6 +16,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<PolicyDigitalByCollectionResource>();
         services.AddCrudResource<EbookItemResource>();
         services.AddCrudResource<EbookFileResource>();
+        services.AddScoped<OpacItems>();
+        services.AddScoped<OpacCatalogs>();
         return services;
     }
 }

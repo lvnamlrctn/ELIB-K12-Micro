@@ -173,4 +173,44 @@ public sealed class DigitalApiTests(DigitalApiFactory factory) : DigitalTestBase
             U("/api/items/Add"), new EbookItemFields("Số đỏ (số hoá)", LinkedBibPublicId: option.BibPublicId), Json));
         Assert.Equal(option.BibPublicId, item.LinkedBibPublicId);
     }
+
+    [Fact]
+    public async Task Opac_only_shows_published_items_and_hides_hidden_ones()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var collection = await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(U("/api/collections/Add"), new EbookCollectionRequest("Văn học"), Json));
+        var published = await Read<EbookItemDto>(await staff.PostAsJsonAsync(
+            U("/api/items/Add"), new EbookItemFields("Dế Mèn phiêu lưu ký", CollectionId: collection.Id, Author: "Tô Hoài"), Json));
+        var hidden = await Read<EbookItemDto>(await staff.PostAsJsonAsync(
+            U("/api/items/Add"), new EbookItemFields("Bản thảo chưa duyệt", Status: IHasStatus.Inactive), Json));
+
+        var opac = Opac(tenantId);
+        var found = await Read<CrudPage<OpacItemSummary>>(await opac.PostAsJsonAsync(U("/api/opac/items/Search"), new OpacItemSearch("dế mèn"), Json));
+        Assert.Equal(published.PublicId, Assert.Single(found.Items).PublicId);
+
+        var detail = await Read<OpacItemDetail>(await opac.GetAsync(U($"/api/opac/items/{published.PublicId}")));
+        Assert.Equal((published.Title, collection.Name), (detail.Title, detail.CollectionName));
+
+        Assert.Equal(404, (int)(await opac.GetAsync(U($"/api/opac/items/{hidden.PublicId}"))).StatusCode);
+
+        // Đơn vị khác không thấy tài liệu của đơn vị này.
+        Assert.Equal(0, (await Read<CrudPage<OpacItemSummary>>(
+            await Opac(NewTenant()).PostAsJsonAsync(U("/api/opac/items/Search"), new OpacItemSearch(), Json))).TotalCount);
+    }
+
+    [Fact]
+    public async Task Opac_catalog_trees_only_list_active_nodes_with_child_counts()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var root = await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(U("/api/collections/Add"), new EbookCollectionRequest("Khoa học"), Json));
+        await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(U("/api/collections/Add"), new EbookCollectionRequest("Vật lý", ParentId: root.Id), Json));
+        var hidden = await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(U("/api/collections/Add"), new EbookCollectionRequest("Ẩn"), Json));
+        await staff.PutAsJsonAsync(U("/api/collections/ChangeStatus"), new ChangeStatusRequest(hidden.PublicId, IHasStatus.Inactive), Json);
+
+        var tree = await Read<List<OpacCatalogNode>>(await Opac(tenantId).GetAsync(U("/api/opac/collections")));
+        Assert.DoesNotContain(tree, n => n.Id == hidden.Id);
+        Assert.True(Assert.Single(tree, n => n.Id == root.Id).HasChildren);
+    }
 }

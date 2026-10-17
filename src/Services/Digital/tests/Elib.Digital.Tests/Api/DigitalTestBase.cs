@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events;
 using Elib.Contracts.Events.Patron;
@@ -10,6 +12,7 @@ namespace Elib.Digital.Tests.Api;
 /// <summary>Dữ liệu và client dùng chung cho các test API của digital (mỗi test một đơn vị riêng).</summary>
 public abstract class DigitalTestBase(DigitalApiFactory factory) : IClassFixture<DigitalApiFactory>, IAsyncLifetime
 {
+    private const string GatewayKey = "test-gateway-key-0123456789abcdef";
     protected static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
     private static long _nextTenantId = 9000;
     private static long _nextUserId = 19000;
@@ -39,6 +42,15 @@ public abstract class DigitalTestBase(DigitalApiFactory factory) : IClassFixture
     /// <summary>Token bạn đọc (OPAC tự phục vụ) — card_no/reader_id như token thật do identity phát.</summary>
     protected HttpClient ReaderClient(long tenantId, string cardNo, Guid readerPublicId) =>
         Factory.CreateClient().WithClaims(TestClaims.Reader(tenantId, cardNo, readerPublicId));
+
+    /// <summary>Bạn đọc ẩn danh trên OPAC — gateway gắn đơn vị theo host, ký bằng chữ ký nội bộ (test đặt cùng khoá).</summary>
+    protected HttpClient Opac(long tenantId)
+    {
+        var client = Factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString(CultureInfo.InvariantCulture));
+        client.DefaultRequestHeaders.Add("X-Gw-Signature", GatewaySignature.Compute(GatewayKey, tenantId));
+        return client;
+    }
 
     protected static async Task<T> Read<T>(HttpResponseMessage response)
     {
