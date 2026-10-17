@@ -14,6 +14,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<EbookDigTypeResource>();
         services.AddCrudResource<PolicyDigitalResource>();
         services.AddCrudResource<PolicyDigitalByCollectionResource>();
+        services.AddCrudResource<EbookItemResource>();
+        services.AddCrudResource<EbookFileResource>();
         return services;
     }
 }

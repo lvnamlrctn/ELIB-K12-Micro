@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Application;
 using Elib.Digital.Domain;
@@ -111,5 +112,65 @@ public sealed class DigitalApiTests(DigitalApiFactory factory) : DigitalTestBase
             U("/api/policies-by-collection/Add"), new PolicyDigitalByCollectionRequest(null, collection.Id + 999), Json))).Code);
         Assert.Equal("POLICY_EXISTS", (await Error(await staff.PostAsJsonAsync(
             U("/api/policies-by-collection/Add"), new PolicyDigitalByCollectionRequest(null, collection.Id), Json))).Code);
+    }
+
+    private static string CoverUrl(long tenantId, string purpose = "ebook-cover") =>
+        $"/s3/media-public/{tenantId}/{purpose}/2026/10/{Guid.NewGuid():N}.jpg";
+
+    [Fact]
+    public async Task Collection_cover_url_must_belong_to_the_own_tenant_and_purpose()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+
+        var withCover = await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(
+            U("/api/collections/Add"), new EbookCollectionRequest("Có bìa", CoverUrl: CoverUrl(tenantId)), Json));
+        Assert.NotNull(withCover.CoverUrl);
+
+        Assert.Equal("COVER_URL_INVALID", (await Error(await staff.PostAsJsonAsync(
+            U("/api/collections/Add"), new EbookCollectionRequest("Bìa đơn vị khác", CoverUrl: CoverUrl(tenantId + 1)), Json))).Code);
+        Assert.Equal("COVER_URL_INVALID", (await Error(await staff.PostAsJsonAsync(
+            U("/api/collections/Add"), new EbookCollectionRequest("Bìa sai mục đích", CoverUrl: CoverUrl(tenantId, "bib-cover")), Json))).Code);
+    }
+
+    [Fact]
+    public async Task Ebook_items_validate_foreign_keys_and_block_delete_while_files_exist()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var collection = await Read<EbookCollectionDto>(await staff.PostAsJsonAsync(U("/api/collections/Add"), new EbookCollectionRequest("Văn học"), Json));
+
+        Assert.Equal("COLLECTION_NOT_FOUND", (await Error(await staff.PostAsJsonAsync(
+            U("/api/items/Add"), new EbookItemFields("Tắt đèn", CollectionId: collection.Id + 999), Json))).Code);
+
+        var item = await Read<EbookItemDto>(await staff.PostAsJsonAsync(U("/api/items/Add"),
+            new EbookItemFields("Tắt đèn", CollectionId: collection.Id, Author: "Ngô Tất Tố", Free: true, AllowDownload: true, CoverUrl: CoverUrl(tenantId)),
+            Json));
+        Assert.Equal(("Tắt đèn", collection.Id, collection.Name, true, IHasStatus.Active), (item.Title, item.CollectionId, item.CollectionName, item.Free, item.Status));
+
+        var file = await Read<EbookFileDto>(await staff.PostAsJsonAsync(U("/api/files/Add"),
+            new EbookFileRequest(item.PublicId, Guid.CreateVersion7(), FileExt: "pdf", FileType: "application/pdf", FileSize: 1048576), Json));
+        Assert.Equal(item.PublicId, file.EbookItemPublicId);
+
+        Assert.Equal("EBOOK_ITEM_HAS_FILES", (await Error(await staff.DeleteAsync(U($"/api/items/Delete/{item.PublicId}")))).Code);
+
+        Assert.Equal(204, (int)(await staff.DeleteAsync(U($"/api/files/Delete/{file.PublicId}"))).StatusCode);
+        Assert.Equal(204, (int)(await staff.DeleteAsync(U($"/api/items/Delete/{item.PublicId}"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Bib_options_proxies_to_catalog_for_the_print_book_link_picker()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var option = new BibLinkOption(Guid.CreateVersion7(), "Số đỏ", "Vũ Trọng Phụng", "NXB Văn học", "1936");
+        Factory.CatalogBibs.Results.Add(option);
+
+        var found = await Read<List<BibLinkOption>>(await staff.GetAsync(U("/api/items/bib-options?q=so+do")));
+        Assert.Equal(option, Assert.Single(found));
+
+        var item = await Read<EbookItemDto>(await staff.PostAsJsonAsync(
+            U("/api/items/Add"), new EbookItemFields("Số đỏ (số hoá)", LinkedBibPublicId: option.BibPublicId), Json));
+        Assert.Equal(option.BibPublicId, item.LinkedBibPublicId);
     }
 }

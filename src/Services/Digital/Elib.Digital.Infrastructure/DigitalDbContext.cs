@@ -33,6 +33,7 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.Property(x => x.Name).HasMaxLength(250);
             e.Property(x => x.Language).HasMaxLength(10);
             e.Property(x => x.Link).HasMaxLength(500);
+            e.Property(x => x.CoverUrl).HasMaxLength(EbookCover.MaxUrlLength);
             e.HasIndex(x => new { x.TenantId, x.ParentId });
         });
 
@@ -79,6 +80,38 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
         {
             e.ToTable("policy_digital_by_collections");
             e.HasIndex(x => new { x.TenantId, x.CollectionId, x.ReaderTypeId }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        modelBuilder.Entity<EbookItem>(e =>
+        {
+            e.ToTable("ebook_items");
+            e.Property(x => x.Title).HasMaxLength(1000);
+            e.Property(x => x.Author).HasMaxLength(500);
+            e.Property(x => x.Publisher).HasMaxLength(500);
+            e.Property(x => x.PublishDate).HasMaxLength(50);
+            e.Property(x => x.Keyword).HasMaxLength(1000);
+            e.Property(x => x.OtherTitle).HasMaxLength(1000);
+            e.Property(x => x.Page).HasMaxLength(50);
+            e.Property(x => x.OldAuthor).HasMaxLength(500);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.Property(x => x.ErrorMessage).HasMaxLength(2000);
+            e.Property(x => x.CoverUrl).HasMaxLength(EbookCover.MaxUrlLength);
+            e.HasIndex(x => new { x.TenantId, x.CollectionId });
+            e.HasIndex(x => new { x.TenantId, x.SubjectId });
+            e.HasIndex(x => new { x.TenantId, x.TopicId });
+            e.HasIndex(x => new { x.TenantId, x.LinkedBibPublicId });
+        });
+
+        modelBuilder.Entity<EbookFile>(e =>
+        {
+            e.ToTable("ebook_files");
+            e.Property(x => x.Type).HasMaxLength(50);
+            e.Property(x => x.FileType).HasMaxLength(50);
+            e.Property(x => x.FileExt).HasMaxLength(20);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.Source).HasMaxLength(250);
+            e.Property(x => x.CheckSumAlgorithm).HasMaxLength(50);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId });
         });
 
         modelBuilder.AddTenantReplica();

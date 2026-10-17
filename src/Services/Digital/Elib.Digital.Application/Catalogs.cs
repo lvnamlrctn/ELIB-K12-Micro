@@ -1,8 +1,10 @@
 using System.Linq.Expressions;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Elib.Digital.Application;
 
@@ -117,29 +119,33 @@ public abstract class TreeCatalogResource<TSelf, TEntity, TRequest, TDto>(ICrudD
 
 public sealed record EbookCollectionRequest(
     string Name, long? ParentId = null, int? SortOrder = null, int? Status = null, string? Language = null, string? Link = null,
-    bool AllowDownload = false, bool Share = false, Guid? CoverFileId = null) : ITreeCatalogRequest;
+    bool AllowDownload = false, bool Share = false, string? CoverUrl = null) : ITreeCatalogRequest;
 
 public sealed record EbookCollectionDto(
     long Id, Guid PublicId, string Name, long? ParentId, int Level, int SortOrder, int Status, string? Language, string? Link, bool AllowDownload,
-    bool Share, Guid? CoverFileId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    bool Share, string? CoverUrl, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Bộ sưu tập tài liệu số (LRC: EbookCollectionController, quyền DIGITAL_COLLECTIONS).</summary>
-public sealed class EbookCollectionResource(ICrudDbContext db)
+public sealed class EbookCollectionResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options)
     : TreeCatalogResource<EbookCollectionResource, EbookCollection, EbookCollectionRequest, EbookCollectionDto>(db)
 {
+    private readonly DigitalOptions _options = options.Value;
+
     protected override string EntityName => "Bộ sưu tập";
 
     protected override string? Describe(EbookCollection entity) => entity.Name;
 
     protected override Expression<Func<EbookCollection, EbookCollectionDto>> Projection => x => new EbookCollectionDto(
-        x.Id, x.PublicId, x.Name, x.ParentId, x.Level, x.SortOrder, x.Status, x.Language, x.Link, x.AllowDownload, x.Share, x.CoverFileId,
+        x.Id, x.PublicId, x.Name, x.ParentId, x.Level, x.SortOrder, x.Status, x.Language, x.Link, x.AllowDownload, x.Share, x.CoverUrl,
         x.CreatedAt, x.UpdatedAt);
 
-    protected override EbookCollection NewEntity(EbookCollectionRequest request) =>
-        EbookCollection.Create(request.Name, request.Language, request.Link, request.AllowDownload, request.Share, request.CoverFileId);
+    protected override EbookCollection NewEntity(EbookCollectionRequest request) => EbookCollection.Create(
+        request.Name, request.Language, request.Link, request.AllowDownload, request.Share, request.CoverUrl, _options.MediaPublicPrefix,
+        tenant.RequireTenantId());
 
-    protected override void ApplyFields(EbookCollection entity, EbookCollectionRequest request) =>
-        entity.Update(request.Name, request.Language, request.Link, request.AllowDownload, request.Share, request.CoverFileId);
+    protected override void ApplyFields(EbookCollection entity, EbookCollectionRequest request) => entity.Update(
+        request.Name, request.Language, request.Link, request.AllowDownload, request.Share, request.CoverUrl, _options.MediaPublicPrefix,
+        tenant.RequireTenantId());
 }
 
 public sealed record EbookSubjectRequest(

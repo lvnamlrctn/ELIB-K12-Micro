@@ -37,7 +37,15 @@ public sealed record MediaPurpose(string Code, string Name, bool Public, IReadOn
     public static readonly MediaPurpose BibCover =
         new("bib-cover", "Ảnh bìa", Public: true, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover];
+    /// <summary>Ảnh bìa bộ sưu tập/tài liệu số — công khai trên OPAC (digital giữ URL, cùng khuôn BibCover).</summary>
+    public static readonly MediaPurpose EbookCover =
+        new("ebook-cover", "Ảnh bìa tài liệu số", Public: true, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
+
+    /// <summary>Nội dung tài liệu số — riêng tư, chỉ xem qua URL có hạn sau khi digital tự kiểm quyền mượn/chính sách.</summary>
+    public static readonly MediaPurpose EbookFile =
+        new("ebook-file", "Tệp tài liệu số", Public: false, ["application/pdf"], 200 * MB, SystemOnly: false);
+
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))

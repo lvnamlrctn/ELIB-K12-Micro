@@ -102,6 +102,12 @@ public static class CatalogEndpoints
                 return new StatePage<BibChanged>(items, items.Count == size ? items[^1].Mfn : null);
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        // Ô chọn liên kết biểu ghi in của service khác (digital…) — tra trực tiếp, không có bản sao nên không cần trang hoá theo MFN.
+        app.MapGet("/internal/tenants/{tenantId:long}/bibs/search", async (long tenantId, string? q, int? take, ITenantContext tenant, BibResource r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.SearchStatesAsync(q, take ?? 20, ct);
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }
 

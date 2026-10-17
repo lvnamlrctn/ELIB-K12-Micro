@@ -4,7 +4,9 @@ using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Messaging;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Application;
+using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Patron;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -49,6 +51,33 @@ public sealed class HttpReplicaSources(IHttpClientFactory clients) : IReplicaSou
             if (!response.IsSuccessStatusCode)
                 throw new BusinessRuleException("REPLICA_UNAVAILABLE", $"Chưa có dữ liệu {what} ở tài liệu số và service gốc báo lỗi {(int)response.StatusCode} — thử lại sau.", 503);
             return await response.Content.ReadFromJsonAsync<T>(ct);
+        }
+    }
+}
+
+/// <summary>Tìm biểu ghi sách in ở catalog qua /internal (service token) — ô chọn liên kết, không giữ bản sao.</summary>
+public sealed class HttpCatalogBibLookup(IHttpClientFactory clients, ITenantContext tenant) : ICatalogBibLookup
+{
+    public const string Catalog = "elib-catalog";
+
+    public async Task<IReadOnlyList<BibLinkOption>> SearchAsync(string? keyword, CancellationToken ct)
+    {
+        var url = $"internal/tenants/{tenant.RequireTenantId()}/bibs/search?q={Uri.EscapeDataString(keyword ?? "")}";
+        HttpResponseMessage response;
+        try
+        {
+            response = await clients.CreateClient(Catalog).GetAsync(new Uri(url, UriKind.Relative), ct);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BusinessRuleException("CATALOG_UNAVAILABLE", "Không kết nối được biên mục để tìm biểu ghi liên kết — thử lại sau.", 503);
+        }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+                throw new BusinessRuleException("CATALOG_UNAVAILABLE", $"Biên mục báo lỗi {(int)response.StatusCode} khi tìm biểu ghi — thử lại sau.", 503);
+            var bibs = await response.Content.ReadFromJsonAsync<List<BibChanged>>(ct) ?? [];
+            return [.. bibs.Select(b => new BibLinkOption(b.BibPublicId, b.Title, b.Author, b.Publisher, b.PublishYear))];
         }
     }
 }

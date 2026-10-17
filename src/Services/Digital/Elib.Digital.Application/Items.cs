@@ -1,0 +1,148 @@
+using System.Linq.Expressions;
+using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Domain;
+using Elib.BuildingBlocks.Tenancy;
+using Elib.Digital.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace Elib.Digital.Application;
+
+/// <summary>Cấu hình riêng của digital — tiền tố công khai của media (ảnh bìa), đúng khuôn Catalog's CatalogOptions.</summary>
+public sealed class DigitalOptions
+{
+    public const string SectionName = "Digital";
+
+    public string MediaPublicPrefix { get; set; } = "/s3/media-public";
+}
+
+/// <summary>Một biểu ghi sách in tìm được ở catalog — ô chọn liên kết của màn thêm/sửa tài liệu số (quyết định #2).</summary>
+public sealed record BibLinkOption(Guid BibPublicId, string Title, string? Author, string? Publisher, string? PublishYear);
+
+/// <summary>Tìm biểu ghi sách in ở catalog để liên kết — chỉ tra cứu hiển thị, không giữ bản sao (quyết định #2 của plan).</summary>
+public interface ICatalogBibLookup
+{
+    Task<IReadOnlyList<BibLinkOption>> SearchAsync(string? keyword, CancellationToken ct);
+}
+
+public sealed class EbookItemSearch : CrudSearch
+{
+    public long? CollectionId { get; set; }
+    public long? SubjectId { get; set; }
+    public long? TopicId { get; set; }
+    public long? TypeId { get; set; }
+}
+
+public sealed record EbookItemDto(
+    long Id, Guid PublicId, int Status, long? CollectionId, string? CollectionName, long? SubjectId, long? TopicId, long? TypeId, string Title,
+    string? Author, string? Publisher, string? PublishDate, string? Keyword, string? OtherTitle, string? Page, string? OldAuthor, string? Xml,
+    string? Language, bool Free, bool AllowDownload, int? PrintCopies, int? OfflineDays, int? Show, int? IndexContent, int? Share, int? FileVersion,
+    DateTimeOffset? IndexedAt, string? ErrorMessage, int TotalView, int TotalDownload, DateTimeOffset? Submited, DateTimeOffset? LastUpdate,
+    string? CoverUrl, Guid? LinkedBibPublicId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+/// <summary>Tài liệu số (LRC: EbookItemController, quyền DIGITAL_ITEMS) — trang quản trị bespoke (có file đính kèm + liên kết sách in).</summary>
+public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock)
+    : CrudResource<EbookItemResource, EbookItem, EbookItemSearch, EbookItemFields, EbookItemDto>(db)
+{
+    private readonly DigitalOptions _options = options.Value;
+
+    protected override string EntityName => "Tài liệu số";
+
+    protected override string? Describe(EbookItem entity) => entity.Title;
+
+    protected override Expression<Func<EbookItem, EbookItemDto>> Projection => x => new EbookItemDto(
+        x.Id, x.PublicId, x.Status, x.CollectionId, Db.Set<EbookCollection>().Where(c => c.Id == x.CollectionId).Select(c => c.Name).FirstOrDefault(),
+        x.SubjectId, x.TopicId, x.TypeId, x.Title, x.Author, x.Publisher, x.PublishDate, x.Keyword, x.OtherTitle, x.Page, x.OldAuthor, x.Xml,
+        x.Language, x.Free, x.AllowDownload, x.PrintCopies, x.OfflineDays, x.Show, x.IndexContent, x.Share, x.FileVersion, x.IndexedAt, x.ErrorMessage,
+        x.TotalView, x.TotalDownload, x.Submited, x.LastUpdate, x.CoverUrl, x.LinkedBibPublicId, x.CreatedAt, x.UpdatedAt);
+
+    protected override EbookItem Create(EbookItemFields request) =>
+        EbookItem.Create(request, _options.MediaPublicPrefix, tenant.RequireTenantId(), clock.GetUtcNow());
+
+    protected override void Update(EbookItem entity, EbookItemFields request) =>
+        entity.Update(request, _options.MediaPublicPrefix, tenant.RequireTenantId(), clock.GetUtcNow());
+
+    protected override IQueryable<EbookItem> Filter(IQueryable<EbookItem> query, EbookItemSearch search)
+    {
+        if (search.CollectionId is { } collection) query = query.Where(x => x.CollectionId == collection);
+        if (search.SubjectId is { } subject) query = query.Where(x => x.SubjectId == subject);
+        if (search.TopicId is { } topic) query = query.Where(x => x.TopicId == topic);
+        if (search.TypeId is { } type) query = query.Where(x => x.TypeId == type);
+        if (search.Term is not { } term) return query;
+#pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang lower() của SQL
+        return query.Where(x => x.Title.ToLower().Contains(term) || (x.Author != null && x.Author.ToLower().Contains(term)));
+#pragma warning restore CA1862, CA1304, CA1311
+    }
+
+    protected override async Task ValidateAsync(EbookItem entity, CancellationToken ct)
+    {
+        if (entity.CollectionId is { } collection && !await Db.Set<EbookCollection>().AnyAsync(x => x.Id == collection, ct))
+            throw new BusinessRuleException("COLLECTION_NOT_FOUND", "Bộ sưu tập đã chọn không còn.");
+        if (entity.SubjectId is { } subject && !await Db.Set<EbookSubject>().AnyAsync(x => x.Id == subject, ct))
+            throw new BusinessRuleException("SUBJECT_NOT_FOUND", "Môn loại đã chọn không còn.");
+        if (entity.TopicId is { } topic && !await Db.Set<EbookTopic>().AnyAsync(x => x.Id == topic, ct))
+            throw new BusinessRuleException("TOPIC_NOT_FOUND", "Chủ đề đã chọn không còn.");
+        if (entity.TypeId is { } type && !await Db.Set<EbookDigType>().AnyAsync(x => x.Id == type, ct))
+            throw new BusinessRuleException("DIG_TYPE_NOT_FOUND", "Loại tài liệu số đã chọn không còn.");
+    }
+
+    protected override async Task EnsureDeletableAsync(EbookItem entity, CancellationToken ct)
+    {
+        if (await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == entity.Id, ct))
+            throw new ConflictException("EBOOK_ITEM_HAS_FILES", $"Tài liệu số '{entity.Title}' còn file đính kèm — xoá file trước.");
+    }
+}
+
+public sealed record EbookFileRequest(
+    Guid EbookItemPublicId, Guid MediaFileId, string? Type = null, bool IsConvert = false, string? FileType = null, double? FileSize = null,
+    string? FileExt = null, string? Description = null, string? Source = null, int? FormatId = null, string? CheckSumAlgorithm = null, int SortOrder = 0);
+
+public sealed record EbookFileDto(
+    long Id, Guid PublicId, Guid EbookItemPublicId, Guid MediaFileId, string? Type, bool IsConvert, string? FileType, double? FileSize, string? FileExt,
+    string? Description, string? Source, int? FormatId, string? CheckSumAlgorithm, int SortOrder, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+public sealed class EbookFileSearch : CrudSearch
+{
+    public Guid? EbookItemPublicId { get; set; }
+}
+
+/// <summary>
+/// File đính kèm của tài liệu số (LRC: EbookFileController, cùng quyền DIGITAL_ITEMS — file là con của tài liệu số, không có quyền riêng).
+/// Nội dung đã upload trực tiếp lên media từ trình quản trị (purpose <c>ebook-file</c>) trước khi gọi Add — chỉ lưu tham chiếu ở đây.
+/// </summary>
+public sealed class EbookFileResource(ICrudDbContext db) : CrudResource<EbookFileResource, EbookFile, EbookFileSearch, EbookFileRequest, EbookFileDto>(db)
+{
+    protected override string EntityName => "File tài liệu số";
+
+    protected override string? Describe(EbookFile entity) => entity.FileExt is { } ext ? $"file #{entity.Id}.{ext}" : $"file #{entity.Id}";
+
+    protected override Expression<Func<EbookFile, EbookFileDto>> Projection => x => new EbookFileDto(
+        x.Id, x.PublicId, Db.Set<EbookItem>().Where(i => i.Id == x.EbookItemId).Select(i => i.PublicId).FirstOrDefault(), x.MediaFileId, x.Type,
+        x.IsConvert, x.FileType, x.FileSize, x.FileExt, x.Description, x.Source, x.FormatId, x.CheckSumAlgorithm, x.SortOrder, x.CreatedAt, x.UpdatedAt);
+
+    // Thêm cần tra tài liệu số theo PublicId trong request — override CreateAsync, Create đồng bộ không được gọi. Sửa không đổi
+    // tài liệu số/file đã chọn (chọn sai thì xoá thêm lại), chỉ áp các trường mô tả.
+    protected override EbookFile Create(EbookFileRequest request) => throw new NotSupportedException();
+
+    protected override void Update(EbookFile entity, EbookFileRequest request) => entity.Update(ToFields(request));
+
+    protected override async Task<EbookFile> CreateAsync(EbookFileRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var itemId = await Db.Set<EbookItem>().Where(i => i.PublicId == request.EbookItemPublicId).Select(i => i.Id).FirstOrDefaultAsync(ct);
+        if (itemId == 0) throw new NotFoundException("Tài liệu số", request.EbookItemPublicId);
+        return EbookFile.Create(itemId, request.MediaFileId, ToFields(request));
+    }
+
+    protected override IQueryable<EbookFile> Filter(IQueryable<EbookFile> query, EbookFileSearch search)
+    {
+        if (search.EbookItemPublicId is not { } publicId) return query;
+        var itemId = Db.Set<EbookItem>().Where(i => i.PublicId == publicId).Select(i => i.Id).FirstOrDefault();
+        return query.Where(x => x.EbookItemId == itemId);
+    }
+
+    protected override IOrderedQueryable<EbookFile> Order(IQueryable<EbookFile> query) => query.OrderBy(x => x.SortOrder).ThenBy(x => x.Id);
+
+    private static EbookFileFields ToFields(EbookFileRequest r) =>
+        new(r.Type, r.IsConvert, r.FileType, r.FileSize, r.FileExt, r.Description, r.Source, r.FormatId, r.CheckSumAlgorithm, r.SortOrder);
+}

@@ -217,6 +217,20 @@ public sealed partial class BibResource(ICrudDbContext db, IPublishEndpoint publ
         return events;
     }
 
+    public const int MaxSearchOptions = 50;
+
+    /// <summary>
+    /// Biểu ghi khớp từ khoá, đúng dạng event <see cref="BibChanged"/> — service khác (digital…) gọi qua /internal cho ô chọn liên kết
+    /// biểu ghi in, không giữ bản sao nên tra trực tiếp mỗi lần.
+    /// </summary>
+    public async Task<IReadOnlyList<BibChanged>> SearchStatesAsync(string? keyword, int take, CancellationToken ct)
+    {
+        var bibs = await Query(new BibSearch { Keyword = keyword }).Take(Math.Clamp(take, 1, MaxSearchOptions)).ToListAsync(ct);
+        var events = new List<BibChanged>(bibs.Count);
+        foreach (var bib in bibs) events.Add(await ToEventAsync(bib, deleted: false, ct));
+        return events;
+    }
+
     private async Task PublishAsync(Bib bib, bool deleted, CancellationToken ct)
     {
         if (bib.PublicId == Guid.Empty) bib.PublicId = Guid.CreateVersion7(); // biểu ghi mới: interceptor chỉ gán khi còn trống

@@ -30,6 +30,7 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
     public FakePermissionSource Permissions { get; } = new();
     public FakeLicenseSource Licenses { get; } = new();
     public FakeReplicaSources Sources { get; } = new();
+    public FakeCatalogBibLookup CatalogBibs { get; } = new();
 
     /// <summary>Đồng hồ của service — test tua tới để có lượt hết hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
@@ -62,6 +63,8 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<TimeProvider>(Clock);
             services.RemoveAll<IReplicaSources>();
             services.AddSingleton<IReplicaSources>(Sources);
+            services.RemoveAll<ICatalogBibLookup>();
+            services.AddSingleton<ICatalogBibLookup>(CatalogBibs);
         });
     }
 
@@ -148,6 +151,15 @@ public sealed class FakeReplicaSources : IReplicaSources
 
     public Task<ReaderChanged?> ReaderAsync(long tenantId, string cardNo, CancellationToken ct) =>
         Task.FromResult(Readers.TryGetValue((tenantId, cardNo.ToUpperInvariant()), out var r) ? r : null);
+}
+
+/// <summary>Catalog giả cho ô chọn liên kết sách in — test đặt sẵn danh sách biểu ghi "tìm được".</summary>
+public sealed class FakeCatalogBibLookup : ICatalogBibLookup
+{
+    public List<BibLinkOption> Results { get; } = [];
+
+    public Task<IReadOnlyList<BibLinkOption>> SearchAsync(string? keyword, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<BibLinkOption>>(Results);
 }
 
 public sealed class TestClock(DateTimeOffset start) : TimeProvider

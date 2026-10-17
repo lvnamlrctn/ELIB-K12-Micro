@@ -77,24 +77,27 @@ public sealed class EbookCollection : TreeCatalogItem
     public bool AllowDownload { get; private set; }
     public bool Share { get; private set; }
 
-    /// <summary>Ảnh bìa bộ sưu tập (LRC: Images) — id file ở media, không lưu đường dẫn thô.</summary>
-    public Guid? CoverFileId { get; private set; }
+    /// <summary>Ảnh bìa bộ sưu tập (LRC: Images) — URL công khai đã upload qua media, xem <see cref="EbookCover"/>.</summary>
+    public string? CoverUrl { get; private set; }
 
-    public static EbookCollection Create(string name, string? language, string? link, bool allowDownload, bool share, Guid? coverFileId)
+    /// <summary><paramref name="tenantId"/>: TenantId do interceptor gán khi lưu — chưa có lúc Create nên lấy từ <c>ITenantContext</c> ở Resource.</summary>
+    public static EbookCollection Create(
+        string name, string? language, string? link, bool allowDownload, bool share, string? coverUrl, string mediaPublicPrefix, long tenantId)
     {
         var collection = new EbookCollection();
-        collection.Update(name, language, link, allowDownload, share, coverFileId);
+        collection.Update(name, language, link, allowDownload, share, coverUrl, mediaPublicPrefix, tenantId);
         return collection;
     }
 
-    public void Update(string name, string? language, string? link, bool allowDownload, bool share, Guid? coverFileId)
+    public void Update(
+        string name, string? language, string? link, bool allowDownload, bool share, string? coverUrl, string mediaPublicPrefix, long tenantId)
     {
         Rename(name);
         Language = TextRules.Optional(language, 10, "LANGUAGE_INVALID", "Ngôn ngữ");
         Link = TextRules.Optional(link, 500, "LINK_INVALID", "Liên kết");
         AllowDownload = allowDownload;
         Share = share;
-        CoverFileId = coverFileId;
+        CoverUrl = EbookCover.Validate(coverUrl, mediaPublicPrefix, tenantId);
     }
 }
 

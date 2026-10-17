@@ -120,9 +120,10 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("allow_download");
 
-                    b.Property<Guid?>("CoverFileId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("cover_file_id");
+                    b.Property<string>("CoverUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cover_url");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -298,6 +299,327 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("ebook_dig_types", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Digital.Domain.EbookFile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CheckSumAlgorithm")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("check_sum_algorithm");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("EbookItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ebook_item_id");
+
+                    b.Property<string>("FileExt")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("file_ext");
+
+                    b.Property<double?>("FileSize")
+                        .HasColumnType("double precision")
+                        .HasColumnName("file_size");
+
+                    b.Property<string>("FileType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("file_type");
+
+                    b.Property<int?>("FormatId")
+                        .HasColumnType("integer")
+                        .HasColumnName("format_id");
+
+                    b.Property<bool>("IsConvert")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_convert");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("MediaFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_file_id");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("source");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ebook_files");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_files_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_ebook_files_tenant_id");
+
+                    b.HasIndex("TenantId", "EbookItemId")
+                        .HasDatabaseName("ix_ebook_files_tenant_id_ebook_item_id");
+
+                    b.ToTable("ebook_files", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Digital.Domain.EbookItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AllowDownload")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_download");
+
+                    b.Property<string>("Author")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("author");
+
+                    b.Property<long?>("CollectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("collection_id");
+
+                    b.Property<string>("CoverUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cover_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("error_message");
+
+                    b.Property<int?>("FileVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("file_version");
+
+                    b.Property<bool>("Free")
+                        .HasColumnType("boolean")
+                        .HasColumnName("free");
+
+                    b.Property<int?>("IndexContent")
+                        .HasColumnType("integer")
+                        .HasColumnName("index_content");
+
+                    b.Property<DateTimeOffset?>("IndexedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("indexed_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Keyword")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("keyword");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language");
+
+                    b.Property<DateTimeOffset?>("LastUpdate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_update");
+
+                    b.Property<Guid?>("LinkedBibPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_bib_public_id");
+
+                    b.Property<int?>("OfflineDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("offline_days");
+
+                    b.Property<string>("OldAuthor")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("old_author");
+
+                    b.Property<string>("OtherTitle")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("other_title");
+
+                    b.Property<string>("Page")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("page");
+
+                    b.Property<int?>("PrintCopies")
+                        .HasColumnType("integer")
+                        .HasColumnName("print_copies");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<string>("PublishDate")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("publish_date");
+
+                    b.Property<string>("Publisher")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("publisher");
+
+                    b.Property<int?>("Share")
+                        .HasColumnType("integer")
+                        .HasColumnName("share");
+
+                    b.Property<int?>("Show")
+                        .HasColumnType("integer")
+                        .HasColumnName("show");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long?>("SubjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("subject_id");
+
+                    b.Property<DateTimeOffset?>("Submited")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submited");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("title");
+
+                    b.Property<long?>("TopicId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("topic_id");
+
+                    b.Property<int>("TotalDownload")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_download");
+
+                    b.Property<int>("TotalView")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_view");
+
+                    b.Property<long?>("TypeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("type_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text")
+                        .HasColumnName("xml");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ebook_items");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_items_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_ebook_items_tenant_id");
+
+                    b.HasIndex("TenantId", "CollectionId")
+                        .HasDatabaseName("ix_ebook_items_tenant_id_collection_id");
+
+                    b.HasIndex("TenantId", "LinkedBibPublicId")
+                        .HasDatabaseName("ix_ebook_items_tenant_id_linked_bib_public_id");
+
+                    b.HasIndex("TenantId", "SubjectId")
+                        .HasDatabaseName("ix_ebook_items_tenant_id_subject_id");
+
+                    b.HasIndex("TenantId", "TopicId")
+                        .HasDatabaseName("ix_ebook_items_tenant_id_topic_id");
+
+                    b.ToTable("ebook_items", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Digital.Domain.EbookSubject", b =>

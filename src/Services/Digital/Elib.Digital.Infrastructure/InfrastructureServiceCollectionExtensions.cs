@@ -31,6 +31,11 @@ public static class InfrastructureServiceCollectionExtensions
         AddSource(services, configuration, HttpReplicaSources.Patron, "Patron:Url");
         services.AddScoped<IReplicaSources, HttpReplicaSources>();
 
+        // Ô chọn liên kết sách in (quyết định #2) — tra cứu trực tiếp catalog, không giữ bản sao.
+        AddSource(services, configuration, HttpCatalogBibLookup.Catalog, "Catalog:Url");
+        services.AddScoped<ICatalogBibLookup, HttpCatalogBibLookup>();
+        services.Configure<DigitalOptions>(configuration.GetSection(DigitalOptions.SectionName));
+
         services.AddElibMessaging<DigitalDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<DigitalDbContext>();
