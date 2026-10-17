@@ -81,6 +81,13 @@
     <Project Path="src/Services/Acquisition/Elib.Acquisition.Infrastructure/Elib.Acquisition.Infrastructure.csproj" />
     <Project Path="src/Services/Acquisition/tests/Elib.Acquisition.Tests/Elib.Acquisition.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Digital/">
+    <Project Path="src/Services/Digital/Elib.Digital.Api/Elib.Digital.Api.csproj" />
+    <Project Path="src/Services/Digital/Elib.Digital.Application/Elib.Digital.Application.csproj" />
+    <Project Path="src/Services/Digital/Elib.Digital.Domain/Elib.Digital.Domain.csproj" />
+    <Project Path="src/Services/Digital/Elib.Digital.Infrastructure/Elib.Digital.Infrastructure.csproj" />
+    <Project Path="src/Services/Digital/tests/Elib.Digital.Tests/Elib.Digital.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Media/">
     <Project Path="src/Services/Media/Elib.Media.Api/Elib.Media.Api.csproj" />
     <Project Path="src/Services/Media/Elib.Media.Application/Elib.Media.Application.csproj" />
