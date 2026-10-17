@@ -3,6 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { MarcField, MarcFieldDef, MarcSubfieldDef } from '../core/api';
 
+/** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
+export const BLANK_FIELDS: MarcField[] = [
+  { tag: '020', ind1: ' ', ind2: ' ', subfields: [{ code: 'a', value: '' }] },
+  { tag: '100', ind1: '0', ind2: ' ', subfields: [{ code: 'a', value: '' }] },
+  { tag: '245', ind1: '1', ind2: '0', subfields: [{ code: 'a', value: '' }, { code: 'c', value: '' }] },
+  { tag: '260', ind1: ' ', ind2: ' ', subfields: [{ code: 'a', value: '' }, { code: 'b', value: '' }, { code: 'c', value: '' }] },
+];
+
 /**
  * Soạn các trường MARC21 (monolith: shared/marc-editor) — mỗi trường một khối: nhãn, hai chỉ thị, các trường con $a, $b…
  * Tên trường/trường con lấy từ từ điển MARC21 của service catalog. <see cref="template"/>: soạn biểu mẫu biên mục

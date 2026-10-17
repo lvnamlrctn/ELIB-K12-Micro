@@ -21,13 +21,20 @@ export async function isbnDupes(api: Api, fields: MarcField[]): Promise<IsbnMatc
   return isbn ? api.checkIsbn(isbn) : [];
 }
 
-/** Tạo biểu ghi ở catalog (ẩn trên OPAC tới khi biên mục viên bật) và trả về như biểu ghi chọn cho dòng đơn. */
-export async function createCatalogBib(api: Api, leader: string | null, fields: MarcField[], bibTypeId: number | null): Promise<AcqBib> {
-  const bib = await api.crud<Bib>('bibs', 'catalog').add({ bibTypeId, leader: leader?.trim() || null, fields, status: STATUS_INACTIVE });
+/** Biểu ghi catalog → biểu ghi chọn cho dòng đơn. */
+export function toAcqBib(bib: Bib): AcqBib {
   return {
     bibPublicId: bib.publicId, mfn: bib.mfn, title: bib.title, author: bib.author, publisher: bib.publisher, publishYear: bib.publishYear,
     isbns: bib.isbns.length ? bib.isbns.join(', ') : null,
   };
+}
+
+/** Tạo biểu ghi ở catalog (mặc định ẩn trên OPAC tới khi biên mục viên bật) và trả về như biểu ghi chọn cho dòng đơn. */
+export async function createCatalogBib(api: Api, leader: string | null, fields: MarcField[], bibTypeId: number | null,
+                                       extra: { worksheetId?: number | null; status?: number } = {}): Promise<AcqBib> {
+  return toAcqBib(await api.crud<Bib>('bibs', 'catalog').add({
+    bibTypeId, worksheetId: extra.worksheetId ?? null, leader: leader?.trim() || null, fields, status: extra.status ?? STATUS_INACTIVE,
+  }));
 }
 
 const SOURCES: { code: Source; label: string; icon: string }[] = [

@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -13,6 +14,7 @@ import { HasUnsavedChanges, LeaveConfirm, UnsavedConfirm } from '../../shared/un
 import { itemStatus } from '../holdings/items';
 import { LABEL_BARCODES_KEY } from '../holdings/labels';
 import { BibLookupDialog } from './bib-lookup-dialog';
+import { BibMarcNew } from './bib-marc-new';
 import { BibSource } from './bib-source';
 import { PAYMENT_METHODS, loadCurrencies, today } from './orders';
 
@@ -252,7 +254,7 @@ const ADD_TITLES: Record<AddMode, string> = {
 interface AddLineState { mode: AddMode; bib: AcqBib | null; quantity: number; price: number | null; currency: string; rate: number; }
 
 interface RegisterForm {
-  line: ReceiptLine; mode: 'batch' | 'single'; quantity: number; prefix: string; digits: number; startNumber: number | null; barcode: string;
+  line: ReceiptLine; mode: 'batch' | 'single'; prefix: string; digits: number; startNumber: number | null; barcode: string;
   storeId: number | null;
 }
 
@@ -262,7 +264,7 @@ interface RegisterForm {
  */
 @Component({
   selector: 'app-acq-receipt-detail',
-  imports: [FormsModule, RouterLink, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource, BibLookupDialog, UnsavedConfirm],
+  imports: [FormsModule, RouterLink, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource, BibLookupDialog, BibMarcNew, NgTemplateOutlet, UnsavedConfirm],
   template: `
     <div class="mb-4 flex flex-wrap gap-3 justify-between items-center">
       <div class="flex items-center gap-3">
@@ -335,7 +337,7 @@ interface RegisterForm {
     }
 
     @if (adding(); as a) {
-      <app-modal [title]="addTitle(a.mode) | translate" [widthClass]="a.mode === 'lookup' || a.mode === 'order' ? 'max-w-6xl' : 'max-w-3xl'" (closed)="adding.set(null)">
+      <app-modal [title]="addTitle(a.mode) | translate" [widthClass]="a.mode === 'lookup' || a.mode === 'order' || (a.mode === 'new' && !a.bib) ? 'max-w-6xl' : 'max-w-3xl'" (closed)="closeAdding()">
         @if (a.bib; as b) {
           <!-- Bước 2 (ELIB-LRC): số lượng, đơn giá, loại tiền, tỷ giá rồi "Thêm mới". -->
           <div class="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 mb-4">
@@ -344,20 +346,17 @@ interface RegisterForm {
             @if (lineOf(b); as existing) { <div class="text-[12px] text-amber-700 mt-1">{{ 'ACQ_RECEIPT.WILL_OVERWRITE' | translate: { qty: existing.quantity } }}</div> }
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div><label for="ra-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="ra-qty" type="number" min="1" class="input" [(ngModel)]="a.quantity" /></div>
-            <div><label for="ra-price" class="form-label">{{ 'ACQ.PRICE' | translate }}</label><input id="ra-price" type="number" min="0" step="any" class="input" [(ngModel)]="a.price" /></div>
-            <div><label for="ra-cur" class="form-label">{{ 'ACQ.CURRENCY' | translate }}</label>
-              @if (currencies().length) {
-                <select id="ra-cur" class="input" [(ngModel)]="a.currency" (ngModelChange)="onCurrency(a)">
-                  @for (c of currencies(); track c.code) { <option [ngValue]="c.code">{{ c.code }}</option> }
-                </select>
-              } @else { <input id="ra-cur" class="input uppercase" maxlength="10" [(ngModel)]="a.currency" /> }</div>
-            <div><label for="ra-rate" class="form-label">{{ 'ACQ.RATE' | translate }}</label><input id="ra-rate" type="number" min="0" step="any" class="input" [(ngModel)]="a.rate" /></div>
+            <ng-container *ngTemplateOutlet="lineFields; context: { $implicit: a }" />
           </div>
         } @else {
           @switch (a.mode) {
             @case ('lookup') { <app-acq-bib-lookup (picked)="a.bib = $event" /> }
-            @case ('new') { <app-acq-bib-source inputId="ra-new" [only]="['new']" [selected]="null" (picked)="a.bib = $event" /> }
+            @case ('new') {
+              <!-- Thêm sách lẻ (ELIB-LRC): biên mục MARC + thông tin dòng trên cùng một màn, "Thêm mới" tạo biểu ghi rồi thêm dòng. -->
+              <app-acq-bib-marc-new (created)="a.bib = $event; addLine(a)">
+                <ng-container *ngTemplateOutlet="lineFields; context: { $implicit: a }" />
+              </app-acq-bib-marc-new>
+            }
             @case ('z3950') { <app-acq-bib-source inputId="ra-z" [only]="['z3950']" [selected]="null" (picked)="a.bib = $event" /> }
             @case ('marc') { <app-acq-bib-source inputId="ra-marc" [only]="['file', 'paste']" [selected]="null" (picked)="a.bib = $event" /> }
             @case ('order') {
@@ -403,13 +402,29 @@ interface RegisterForm {
           @if (a.bib && a.mode !== 'order') {
             <button type="button" class="btn-secondary mr-auto" (click)="a.bib = null">{{ 'ACQ_RECEIPT.PICK_OTHER' | translate }}</button>
           }
-          <button type="button" class="btn-secondary" (click)="adding.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-secondary" (click)="closeAdding()">{{ 'COMMON.CANCEL' | translate }}</button>
           @if (a.bib && a.mode !== 'order') {
             <button type="button" class="btn-primary" [disabled]="busy()" (click)="addLine(a)"><span class="material-icons text-[18px]">playlist_add</span> {{ 'ACQ_RECEIPT.ADD_NEW' | translate }}</button>
+          } @else if (a.mode === 'new') {
+            <button type="button" class="btn-primary" [disabled]="busy() || marcNew()?.busy()" (click)="marcNew()?.submit()">
+              <span class="material-icons text-[18px]" [class.animate-spin]="marcNew()?.busy()">{{ marcNew()?.busy() ? 'autorenew' : 'playlist_add' }}</span> {{ 'ACQ_RECEIPT.ADD_NEW' | translate }}</button>
           }
         </ng-container>
       </app-modal>
     }
+
+    <!-- Thông tin dòng dùng chung: bước 2 sau khi chọn biểu ghi và form "Thêm sách lẻ". -->
+    <ng-template #lineFields let-a>
+      <div><label for="ra-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="ra-qty" type="number" min="1" class="input" [(ngModel)]="a.quantity" /></div>
+      <div><label for="ra-price" class="form-label">{{ 'ACQ.PRICE' | translate }}</label><input id="ra-price" type="number" min="0" step="any" class="input" [(ngModel)]="a.price" /></div>
+      <div><label for="ra-cur" class="form-label">{{ 'ACQ.CURRENCY' | translate }}</label>
+        @if (currencies().length) {
+          <select id="ra-cur" class="input" [(ngModel)]="a.currency" (ngModelChange)="onCurrency(a)">
+            @for (c of currencies(); track c.code) { <option [ngValue]="c.code">{{ c.code }}</option> }
+          </select>
+        } @else { <input id="ra-cur" class="input uppercase" maxlength="10" [(ngModel)]="a.currency" /> }</div>
+      <div><label for="ra-rate" class="form-label">{{ 'ACQ.RATE' | translate }}</label><input id="ra-rate" type="number" min="0" step="any" class="input" [(ngModel)]="a.rate" /></div>
+    </ng-template>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative mb-5">
       @if (loading()) { <app-loading /> }
@@ -459,8 +474,11 @@ interface RegisterForm {
                 <td class="td">
                   @if (editable()) {
                     <div class="flex justify-end gap-1">
-                      @if (l.registered !== null && l.registered < l.quantity) {
-                        <button class="btn-primary !py-1" (click)="openRegister(l)"><span class="material-icons text-[16px]">qr_code</span> {{ 'ACQ_RECEIPT.REGISTER' | translate }}</button>
+                      @if (l.registered !== null) {
+                        <!-- Đăng ký cá biệt (ELIB-LRC: nút biểu tượng qr_code màu chàm); đủ số bản của dòng thì khoá. -->
+                        <button class="icon-btn text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed" [disabled]="l.registered >= l.quantity"
+                                [title]="(l.registered >= l.quantity ? 'ACQ_RECEIPT.REGISTER_FULL' : 'ACQ_RECEIPT.REGISTER') | translate" (click)="openRegister(l)">
+                          <span class="material-icons text-[18px]">qr_code</span></button>
                       }
                       <button class="icon-btn text-gray-400 hover:text-blue-600" [title]="'ACQ_RECEIPT.EDIT_QTY' | translate" (click)="editingQty.set(l.publicId); qtyDraft = l.quantity"><span class="material-icons text-[18px]">edit</span></button>
                       @if (!l.registered) {
@@ -514,7 +532,15 @@ interface RegisterForm {
 
     @if (register(); as g) {
       <app-modal [title]="'ACQ_RECEIPT.REGISTER_TITLE' | translate: { mfn: g.line.mfn }" widthClass="max-w-lg" (closed)="register.set(null)">
-        <div class="text-sm text-gray-600 mb-3">{{ g.line.title }} — {{ 'ACQ_RECEIPT.REMAINING_N' | translate: { count: g.line.quantity - (g.line.registered ?? 0) } }}</div>
+        <!-- ELIB-LRC: MFN · số lượng theo đơn nhận · còn lại; không đăng ký quá số bản của dòng. -->
+        <div class="grid grid-cols-3 gap-3 mb-3 bg-gray-50 rounded-lg border border-gray-200 p-3">
+          <div><div class="text-[11px] font-semibold text-gray-500 uppercase">MFN</div><div class="text-sm font-mono">{{ g.line.mfn }}</div></div>
+          <div><div class="text-[11px] font-semibold text-gray-500 uppercase">{{ 'ACQ_RECEIPT.COPIES' | translate }}</div><div class="text-sm">{{ g.line.quantity | lnumber }}</div></div>
+          <div><div class="text-[11px] font-semibold text-gray-500 uppercase">{{ 'ACQ_RECEIPT.REMAINING' | translate }}</div>
+            <div class="text-sm font-semibold" [class]="remainingOf(g.line) > 0 ? 'text-emerald-600' : 'text-red-600'">{{ remainingOf(g.line) | lnumber }}</div></div>
+          <div class="col-span-3 text-[12px] text-gray-600">{{ g.line.title }}@if (g.line.author) { — {{ g.line.author }} }</div>
+        </div>
+        @if (remainingOf(g.line) <= 0) { <div class="alert-info !block mb-3 text-sm">{{ 'ACQ_RECEIPT.REGISTER_FULL' | translate }}</div> }
         <div class="flex gap-2 mb-3">
           <button type="button" [class]="g.mode === 'batch' ? 'btn-primary' : 'btn-secondary'" (click)="g.mode = 'batch'">{{ 'ACQ_RECEIPT.MODE_BATCH' | translate }}</button>
           <button type="button" [class]="g.mode === 'single' ? 'btn-primary' : 'btn-secondary'" (click)="g.mode = 'single'">{{ 'ACQ_RECEIPT.MODE_SINGLE' | translate }}</button>
@@ -523,7 +549,9 @@ interface RegisterForm {
           @if (g.mode === 'batch') {
             <div><label for="rg-pre" class="form-label">{{ 'ACQ_RECEIPT.PREFIX' | translate }}</label><input id="rg-pre" class="input font-mono uppercase" maxlength="20" [(ngModel)]="g.prefix" (change)="previewNext(g)" /></div>
             <div><label for="rg-dig" class="form-label">{{ 'ACQ_RECEIPT.DIGITS' | translate }}</label><input id="rg-dig" type="number" min="1" max="18" class="input" [(ngModel)]="g.digits" (change)="previewNext(g)" /></div>
-            <div><label for="rg-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label><input id="rg-qty" type="number" min="1" class="input" [(ngModel)]="g.quantity" /></div>
+            <div><label for="rg-qty" class="form-label">{{ 'ACQ_RECEIPT.COPIES' | translate }} *</label>
+              <input id="rg-qty" type="number" class="input bg-gray-100 text-gray-600 cursor-not-allowed" readonly [value]="remainingOf(g.line)" />
+              <p class="text-[11px] text-gray-400 mt-0.5">{{ 'ACQ_RECEIPT.QTY_LOCKED_NOTE' | translate }}</p></div>
             <div><label for="rg-start" class="form-label">{{ 'ACQ_RECEIPT.START_NUMBER' | translate }}</label><input id="rg-start" type="number" min="1" class="input" [(ngModel)]="g.startNumber" /></div>
             @if (nextBarcode(); as next) { <div class="col-span-2 text-[12px] text-gray-500">{{ 'ACQ_RECEIPT.NEXT_BARCODE' | translate: { barcode: next } }}</div> }
           } @else {
@@ -538,7 +566,8 @@ interface RegisterForm {
         }
         <ng-container footer>
           <button type="button" class="btn-secondary" (click)="register.set(null)">{{ 'COMMON.CLOSE' | translate }}</button>
-          <button type="button" class="btn-primary" [disabled]="busy()" (click)="submitRegister(g)">{{ 'ACQ_RECEIPT.REGISTER' | translate }}</button>
+          <button type="button" class="btn-primary" [disabled]="busy() || remainingOf(g.line) <= 0" (click)="submitRegister(g)">
+            <span class="material-icons text-[18px]">qr_code</span> {{ 'ACQ_RECEIPT.REGISTER' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -561,6 +590,7 @@ export class ReceiptDetail implements OnInit, HasUnsavedChanges {
   protected readonly options = signal<AcquisitionOptions>(EMPTY_OPTIONS);
   /** Hộp thoại thêm tài liệu đang mở (một trong các nút kiểu ELIB-LRC) và bước "thông tin dòng" khi đã có biểu ghi. */
   protected readonly adding = signal<AddLineState | null>(null);
+  protected readonly marcNew = viewChild(BibMarcNew);
   protected receivableKeyword = '';
   protected receivablePage = 1;
   protected pickQty: Record<string, number> = {};
@@ -594,7 +624,19 @@ export class ReceiptDetail implements OnInit, HasUnsavedChanges {
   }
 
   hasUnsavedChanges(): boolean {
-    return this.dirty;
+    return this.dirty || this.marcDirty();
+  }
+
+  /** "Thêm sách lẻ" đang soạn dở biểu ghi MARC (chưa tạo ở catalog). */
+  private marcDirty(): boolean {
+    const a = this.adding();
+    return !!a && a.mode === 'new' && !a.bib && !!this.marcNew()?.isDirty();
+  }
+
+  /** Đóng hộp thoại thêm tài liệu; đang soạn dở biểu ghi MARC thì hỏi lại (ELIB-LRC). */
+  protected async closeAdding(): Promise<void> {
+    if (this.marcDirty() && !(await this.leave.ask())) return;
+    this.adding.set(null);
   }
 
   confirmLeave(): Promise<boolean> {
@@ -721,7 +763,7 @@ export class ReceiptDetail implements OnInit, HasUnsavedChanges {
 
   protected openRegister(l: ReceiptLine): void {
     const form: RegisterForm = {
-      line: l, mode: 'batch', quantity: l.quantity - (l.registered ?? 0), prefix: '', digits: 6, startNumber: null, barcode: '',
+      line: l, mode: 'batch', prefix: '', digits: 6, startNumber: null, barcode: '',
       storeId: this.receipt()?.storeId ?? null,
     };
     this.registered.set(null);
@@ -737,19 +779,29 @@ export class ReceiptDetail implements OnInit, HasUnsavedChanges {
     }
   }
 
+  /** Số bản còn được đăng ký của dòng (số lượng theo đơn nhận trừ ĐKCB đã đăng ký). */
+  protected remainingOf(l: ReceiptLine): number {
+    return Math.max(0, l.quantity - (l.registered ?? 0));
+  }
+
+  /** Đăng ký theo lô luôn đúng số còn lại (ELIB-LRC khoá ô số lượng) — không thể vượt số bản của đơn nhận. */
   protected async submitRegister(g: RegisterForm): Promise<void> {
+    const remaining = this.remainingOf(g.line);
+    if (remaining <= 0) {
+      this.toastr.warning('ACQ_RECEIPT.REGISTER_FULL');
+      return;
+    }
     this.busy.set(true);
     try {
       const done = await this.api.registerReceiptItems(g.line.publicId, g.mode === 'single'
         ? { barcode: g.barcode.trim(), storeId: g.storeId }
-        : { quantity: Number(g.quantity) || 0, prefix: g.prefix.trim() || null, digits: Number(g.digits) || 6, startNumber: g.startNumber || null, storeId: g.storeId });
+        : { quantity: remaining, prefix: g.prefix.trim() || null, digits: Number(g.digits) || 6, startNumber: g.startNumber || null, storeId: g.storeId });
       this.registered.set(done);
       this.toastr.success('ACQ_RECEIPT.REGISTERED_N', { count: done.length });
       await this.load();
       const line = this.lines().find((l) => l.publicId === g.line.publicId);
       if (line) {
         g.line = line;
-        g.quantity = line.quantity - (line.registered ?? 0);
         g.barcode = '';
         g.startNumber = null;
         void this.previewNext(g);

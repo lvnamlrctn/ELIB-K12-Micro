@@ -1,20 +1,26 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Api, Bib, errorMessage } from '../../core/api';
+import { Api, Bib, MarcField, errorMessage } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
+
+/** ISBN đầu tiên (020$a không trống) của các trường đang soạn. */
+export function firstIsbn(fields: MarcField[]): string | null {
+  return fields.find((f) => f.tag === '020')?.subfields?.find((s) => s.code === 'a' && s.value.trim())?.value.trim() ?? null;
+}
 
 /**
  * Ảnh bìa của biểu ghi (monolith: Bib.Images + "Lấy ảnh bìa theo ISBN"): upload ảnh, tra theo ISBN ở Google Books / Open Library, hoặc dán
  * đường dẫn ảnh. Ảnh ngoài được media lấy về kho của hệ thống trước (CSP chỉ cho hiện ảnh cùng origin; bạn đọc không gọi ra bên thứ ba).
- * Lưu riêng với MARC — đổi ảnh không cần lưu lại biểu ghi.
+ * Lưu riêng với MARC — đổi ảnh không cần lưu lại biểu ghi. Biểu ghi chưa tạo (bib = null, "Thêm sách lẻ" ở phiếu nhận): ảnh chọn được giữ
+ * lại và phát qua `pending` để nơi gọi gắn vào biểu ghi ngay sau khi tạo (như ELIB-LRC).
  */
 @Component({
   selector: 'app-bib-cover',
   imports: [FormsModule, TranslatePipe],
   template: `
-    <div class="px-5 py-4 border-t border-gray-100 flex gap-4 items-start flex-wrap">
-      @if (preview() ?? bib().coverUrl; as url) {
+    <div class="flex gap-4 items-start flex-wrap" [class]="boxClass()">
+      @if (preview() ?? current(); as url) {
         <img [src]="url" [alt]="'BIB_COVER.ALT' | translate" referrerpolicy="no-referrer" class="w-24 h-32 object-cover rounded border border-gray-200 bg-gray-50" />
       } @else {
         <div class="w-24 h-32 rounded border border-dashed border-gray-300 text-gray-400 flex flex-col items-center justify-center text-xs">
@@ -37,7 +43,7 @@ import { ToastrService } from '../../shared/toastr';
             <button type="button" class="btn-secondary !py-1.5" [disabled]="busy() || !isbn()" (click)="lookup()"
                     [title]="(isbn() ? 'BIB_COVER.FIND_TIP' : 'BIB_COVER.NO_ISBN') | translate">
               <span class="material-icons text-[18px]">travel_explore</span> {{ 'BIB_COVER.FIND' | translate }}</button>
-            @if (bib().coverUrl) {
+            @if (current()) {
               <button type="button" class="btn-outline-danger" [disabled]="busy()" (click)="save(null)">{{ 'BIB_COVER.REMOVE' | translate }}</button>
             }
           </div>
@@ -52,20 +58,33 @@ import { ToastrService } from '../../shared/toastr';
   `,
 })
 export class BibCover {
-  readonly bib = input.required<Bib>();
+  readonly bib = input<Bib | null>(null);
+  /** ISBN để tra ảnh khi biểu ghi chưa lưu (020$a đang soạn). */
+  readonly isbnHint = input<string | null>(null);
   readonly editable = input(false);
+  /** Khung: viền trên (cuối trang biên mục) hoặc khung riêng (đầu form "Thêm sách lẻ"). */
+  readonly boxClass = input('px-5 py-4 border-t border-gray-100');
   readonly changed = output<Bib>();
+  /** Ảnh chờ gắn vào biểu ghi chưa tạo (null = bỏ). */
+  readonly pending = output<string | null>();
 
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
 
   protected readonly busy = signal(false);
   protected readonly preview = signal<string | null>(null);
+  protected readonly pendingUrl = signal<string | null>(null);
   protected url = '';
+
+  protected current(): string | null {
+    const bib = this.bib();
+    return bib ? bib.coverUrl ?? null : this.pendingUrl();
+  }
 
   /** ISBN đầu tiên đã lưu của biểu ghi. */
   protected isbn(): string | null {
-    return this.bib().isbns[0] ?? null;
+    const bib = this.bib();
+    return bib ? bib.isbns[0] ?? null : this.isbnHint()?.trim() || null;
   }
 
   protected async upload(event: Event): Promise<void> {
@@ -119,9 +138,17 @@ export class BibCover {
   }
 
   protected async save(url: string | null): Promise<void> {
+    const bib = this.bib();
+    if (!bib) {
+      this.pendingUrl.set(url);
+      this.preview.set(null);
+      this.url = '';
+      this.pending.emit(url);
+      return;
+    }
     this.busy.set(true);
     try {
-      const saved = await this.api.setBibCover(this.bib().publicId, url);
+      const saved = await this.api.setBibCover(bib.publicId, url);
       this.preview.set(null);
       this.url = '';
       this.changed.emit(saved);

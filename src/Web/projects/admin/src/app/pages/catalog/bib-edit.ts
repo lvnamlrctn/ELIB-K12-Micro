@@ -6,22 +6,14 @@ import { Api, Bib, BibType, CrudClient, IsbnMatch, MarcField, MarcFieldDef, Marc
 import { Language } from '../../core/i18n';
 import { MarcDrafts } from '../../core/marc-draft';
 import { Session } from '../../core/session';
-import { MarcEditor } from '../../shared/marc-editor';
+import { BLANK_FIELDS, MarcEditor } from '../../shared/marc-editor';
 import { ToastrService } from '../../shared/toastr';
 import { Loading } from '../../shared/ui';
 import { HasUnsavedChanges, LeaveConfirm, UnsavedConfirm } from '../../shared/unsaved';
 import { BibItems } from '../holdings/bib-items';
-import { BibCover } from './bib-cover';
+import { BibCover, firstIsbn } from './bib-cover';
 import { BibHistory } from './bib-history';
 import { MarcPick } from './marc-tools';
-
-/** Trường khi chưa có biểu mẫu nào (monolith: defaultMarcFields). */
-const BLANK_FIELDS: MarcField[] = [
-  { tag: '020', ind1: ' ', ind2: ' ', subfields: [{ code: 'a', value: '' }] },
-  { tag: '100', ind1: '0', ind2: ' ', subfields: [{ code: 'a', value: '' }] },
-  { tag: '245', ind1: '1', ind2: '0', subfields: [{ code: 'a', value: '' }, { code: 'c', value: '' }] },
-  { tag: '260', ind1: ' ', ind2: ' ', subfields: [{ code: 'a', value: '' }, { code: 'b', value: '' }, { code: 'c', value: '' }] },
-];
 
 /**
  * Biên mục một biểu ghi (monolith: /admin/catalog-bibs/new, /admin/catalog-bibs/edit/:mfn). Rời trang (chuyển màn, đóng tab) khi còn
@@ -75,6 +67,12 @@ const BLANK_FIELDS: MarcField[] = [
         </div>
       </div>
 
+      <!-- Ảnh bìa ở trên trình soạn MARC (ELIB-LRC); biểu ghi mới: ảnh chờ, gắn ngay sau khi lưu. -->
+      @if (bib() || session.can('CATALOG_BIBS:edit')) {
+        <app-bib-cover [bib]="bib()" [isbnHint]="isbnOf(fields())" [editable]="session.can('CATALOG_BIBS:edit')" boxClass="px-5 py-4 border-b border-gray-100"
+                       (changed)="bib.set($event)" (pending)="pendingCover = $event" />
+      }
+
       <div class="p-5 bg-gray-50/50">
         <app-marc-editor [(fields)]="fields" [defs]="defs()" [suggest]="suggest" />
       </div>
@@ -90,7 +88,6 @@ const BLANK_FIELDS: MarcField[] = [
       }
 
       @if (bib(); as b) {
-        <app-bib-cover [bib]="b" [editable]="session.can('CATALOG_BIBS:edit')" (changed)="bib.set($event)" />
         @if (hasHoldings()) { <app-bib-items [mfn]="b.mfn" /> }
       }
 
@@ -137,6 +134,8 @@ export class BibEdit implements OnInit, HasUnsavedChanges {
   protected readonly picking = signal(false);
   protected readonly showHistory = signal(false);
   protected reason = '';
+  /** Ảnh bìa chọn trước khi biểu ghi mới được lưu. */
+  protected pendingCover: string | null = null;
   /** Gợi ý từ điển cho trình soạn MARC. */
   protected readonly suggest = (kind: string, q: string) => this.api.dictionarySuggest(kind, q);
   protected bibTypeId: number | null = null;
@@ -251,8 +250,16 @@ export class BibEdit implements OnInit, HasUnsavedChanges {
       this.dupes.set([]);
       const body = { bibTypeId: this.bibTypeId, worksheetId: this.worksheetId(), leader: this.leader.trim() || null, fields: this.fields(), status: this.status };
       const current = this.bib();
-      const saved = current ? await this.client.update(current.publicId, body, this.reason.trim() || null) : await this.client.add(body);
+      let saved = current ? await this.client.update(current.publicId, body, this.reason.trim() || null) : await this.client.add(body);
       this.reason = '';
+      if (isNew && this.pendingCover) {
+        try {
+          saved = await this.api.setBibCover(saved.publicId, this.pendingCover);
+          this.pendingCover = null;
+        } catch (e) {
+          this.toastr.error(errorMessage(e)); // biểu ghi đã lưu — gắn lại ảnh ở khung ảnh bìa
+        }
+      }
       if (isNew) this.toastr.success('BIB_EDITOR.SAVED_NEW', { mfn: saved.mfn });
       else this.toastr.success('BIB_EDITOR.UPDATED');
       this.bib.set(saved);
@@ -281,6 +288,10 @@ export class BibEdit implements OnInit, HasUnsavedChanges {
     this.fields.set(structuredClone(r.fields));
     this.dupes.set([]);
     this.toastr.success('BIB_EDITOR.FIELDS_LOADED', { count: r.fields.length });
+  }
+
+  protected isbnOf(fields: MarcField[]): string | null {
+    return firstIsbn(fields);
   }
 
   private hasData(): boolean {
