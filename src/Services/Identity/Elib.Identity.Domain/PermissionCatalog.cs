@@ -36,6 +36,9 @@ public static class PermissionCatalog
     private const string AcquisitionLicense = "ACQUISITION";
     private const string SearchGroup = "Tra cứu";
     private const string SearchLicense = "SEARCH";
+    private const string DigitalGroup = "Tài liệu số";
+    private const string DigitalParams = "Tài liệu số / Tham số tài liệu số";
+    private const string DigitalLicense = "DIGITAL";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -99,6 +102,15 @@ public static class PermissionCatalog
         new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
         new("SEARCH_STATS", "Thống kê tra cứu", SearchGroup, [View], SearchLicense),
         new("Z3950_CONFIGS", "Máy chủ Z39.50 (liên thư viện)", SearchGroup, Crud, SearchLicense),
+
+        new("DIGITAL_ITEMS", "Tài liệu số", DigitalGroup, Crud, DigitalLicense),
+        new("DIGITAL_LOANS", "Mượn/trả/đặt trước tài liệu số", DigitalGroup, [View, Edit], DigitalLicense),
+        new("DIGITAL_COLLECTIONS", "Bộ sưu tập", DigitalParams, Crud, DigitalLicense),
+        new("DIGITAL_SUBJECTS", "Môn loại", DigitalParams, Crud, DigitalLicense),
+        new("DIGITAL_TOPICS", "Chủ đề", DigitalParams, Crud, DigitalLicense),
+        new("DIGITAL_DIG_TYPES", "Loại tài liệu số", DigitalParams, Crud, DigitalLicense),
+        new("DIGITAL_POLICIES", "Chính sách tài liệu số", DigitalParams, Crud, DigitalLicense),
+        new("DIGITAL_POLICIES_BY_COLLECTION", "Chính sách theo bộ sưu tập", DigitalParams, Crud, DigitalLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

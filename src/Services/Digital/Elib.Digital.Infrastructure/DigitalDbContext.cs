@@ -27,6 +27,60 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.HasIndex(x => new { x.TenantId, x.CardNo });
         });
 
+        modelBuilder.Entity<EbookCollection>(e =>
+        {
+            e.ToTable("ebook_collections");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.Property(x => x.Link).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.ParentId });
+        });
+
+        modelBuilder.Entity<EbookSubject>(e =>
+        {
+            e.ToTable("ebook_subjects");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Ddc).HasMaxLength(50);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.Property(x => x.Link).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.ParentId });
+        });
+
+        modelBuilder.Entity<EbookTopic>(e =>
+        {
+            e.ToTable("ebook_topics");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Keyword).HasMaxLength(500);
+            e.Property(x => x.PageTitle).HasMaxLength(250);
+            e.Property(x => x.MetaDescription).HasMaxLength(500);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.Property(x => x.Ddc).HasMaxLength(50);
+            e.HasIndex(x => new { x.TenantId, x.ParentId });
+        });
+
+        modelBuilder.Entity<EbookDigType>(e =>
+        {
+            e.ToTable("ebook_dig_types");
+            e.Property(x => x.Code).HasMaxLength(EbookDigType.MaxCodeLength);
+            e.Property(x => x.DescriptionVn).HasMaxLength(EbookDigType.MaxDescriptionLength);
+            e.Property(x => x.DescriptionEn).HasMaxLength(EbookDigType.MaxDescriptionLength);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        modelBuilder.Entity<PolicyDigital>(e =>
+        {
+            e.ToTable("policy_digitals");
+            e.HasIndex(x => new { x.TenantId, x.ReaderTypeId }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        modelBuilder.Entity<PolicyDigitalByCollection>(e =>
+        {
+            e.ToTable("policy_digital_by_collections");
+            e.HasIndex(x => new { x.TenantId, x.CollectionId, x.ReaderTypeId }).IsUnique().HasFilter("is_deleted = false");
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
