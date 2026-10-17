@@ -3,7 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CirculationApi, HoldDto, HoldStatus, LoanDto, ReaderPanel } from '../core/circulation';
-import { LDatePipe, Language } from '../core/i18n';
+import { LDatePipe, Language, LNumberPipe } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
 import { ReaderCard } from './reader-card';
@@ -11,7 +11,7 @@ import { ReaderCard } from './reader-card';
 /** Tài khoản bạn đọc: chưa đăng nhập → nút đăng nhập; đã đăng nhập → thông tin thẻ, đổi mật khẩu, đăng xuất. */
 @Component({
   selector: 'opac-account',
-  imports: [FormsModule, LDatePipe, TranslatePipe, ReaderCard],
+  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, ReaderCard],
   template: `
     <div class="max-w-3xl mx-auto px-4 py-8">
       @if (!auth.loggedIn()) {
@@ -90,6 +90,14 @@ import { ReaderCard } from './reader-card';
           <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
             <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.MY_LIBRARY.MY_LOANS' | translate }}</h2>
             @if (panel(); as p) {
+              @if (!p.canBorrow && p.blockReason) {
+                <div class="mb-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{{ p.blockReason }}</div>
+              }
+              @if (p.unpaidFines > 0) {
+                <div class="mb-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm px-3 py-2">
+                  {{ 'OPAC.MY_LIBRARY.UNPAID_FINES' | translate: { amount: (p.unpaidFines | lnumber: '1.0-0') } }}
+                </div>
+              }
               @if (p.currentLoans.length) {
                 <ul class="divide-y divide-slate-100">
                   @for (loan of p.currentLoans; track loan.publicId) {

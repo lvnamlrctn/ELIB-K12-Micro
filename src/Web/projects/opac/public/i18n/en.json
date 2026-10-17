@@ -258,6 +258,7 @@
       "E_CARD_HINT": "Show the barcode or QR code at the library desk instead of your plastic card.",
       "MY_LOANS": "Current loans",
       "NO_LOANS": "You have no items currently on loan.",
+      "UNPAID_FINES": "Unpaid fines {{amount}} VND",
       "DUE_DATE": "Due",
       "RENEW": "Renew",
       "RENEWED_N": "renewed {{count}} time(s)",

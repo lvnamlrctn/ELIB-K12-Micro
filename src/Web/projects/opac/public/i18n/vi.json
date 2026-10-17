@@ -258,6 +258,7 @@
       "E_CARD_HINT": "Đưa mã vạch hoặc mã QR cho quầy thư viện quét thay thẻ nhựa.",
       "MY_LOANS": "Sách đang mượn",
       "NO_LOANS": "Bạn đọc không có tài liệu nào đang mượn.",
+      "UNPAID_FINES": "Còn nợ tiền phạt {{amount}} đ",
       "DUE_DATE": "Hạn trả",
       "RENEW": "Gia hạn",
       "RENEWED_N": "đã gia hạn {{count}} lần",
