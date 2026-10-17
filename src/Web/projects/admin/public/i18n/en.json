@@ -447,6 +447,9 @@
     "SELECT_PROF": "Select academic rank",
     "CONFIRM_PASSWORD": "Confirm Password",
     "PASSWORD_MISMATCH": "Passwords do not match",
+    "PASSWORD_ADD_HINT": "OPAC sign-in password — leave empty to set it later; the reader must change it at first sign-in.",
+    "PASSWORD_EDIT_HINT": "Leave empty to keep the current OPAC password.",
+    "PASSWORD_NOT_SAVED": "Profile saved, but the password was not set",
     "EXPORT_TITLE": "Select Export Fields",
     "EXPORT_SELECT_ALL": "Select All",
     "EXPORT_FIELDS_LOADING": "Loading field list...",
@@ -1684,7 +1687,10 @@
     "PREVIEW": "Preview",
     "RUN": "Run import",
     "OPAC_CARDNO": "OPAC password = card number for new readers",
-    "OPAC_CARDNO_HINT": "New readers sign in to the OPAC with their card number and must change the password on first sign-in. Existing passwords are kept."
+    "OPAC_CARDNO_HINT": "New readers sign in to the OPAC with their card number and must change the password on first sign-in. Existing passwords are kept.",
+    "BY_NAME": "Name",
+    "BY_CODE": "Code",
+    "BY_CODE_HINT": "By code: the column holds an existing catalog id (no name lookup, nothing is created)."
   },
   "READER_BATCH": {
     "EDIT": "Batch edit",

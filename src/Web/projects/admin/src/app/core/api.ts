@@ -509,6 +509,8 @@ export interface ReaderImportOptions {
   headerRow: number; columns: Record<string, number>; overwrite: boolean; readerTypeId: number | null; autoCreateRefs: boolean;
   /** Bạn đọc mới đăng nhập OPAC bằng mật khẩu = số thẻ (bắt đổi ở lần đầu). */
   opacCardNoPassword: boolean;
+  /** Cột Lớp/Khoá/Đơn vị chứa số id có sẵn thay cho tên (ELIB-LRC: nhập "theo mã"). */
+  classByCode: boolean; courseByCode: boolean; orgByCode: boolean;
 }
 /** failed/errors: bạn đọc bỏ qua vì vi phạm quy tắc (ví dụ hạn thẻ trước ngày cấp). */
 export interface ReaderBatchResult { count: number; failed: number; errors: string[] | null; jobId: string | null; }

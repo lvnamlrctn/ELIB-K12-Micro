@@ -79,6 +79,23 @@ const MAX_BYTES = 20 * 1024 * 1024;
                   <option [ngValue]="null">{{ 'READER_IMPORT.TYPE_FROM_FILE' | translate }}</option>
                   @for (t of catalogs.types(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
                 </select>
+                <!-- Như ELIB-LRC: cột Lớp/Khoá học/Đơn vị theo Tên (tra tên) hay theo Mã (ô chứa thẳng số id có sẵn, không tra tên). -->
+                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  @for (o of byCodeOptions; track o.key) {
+                    <div role="group" [attr.aria-label]="o.label | translate">
+                      <span class="block text-gray-500 mb-1">{{ o.label | translate }}</span>
+                      <div class="flex border border-gray-300 rounded-lg overflow-hidden">
+                        <button type="button" class="flex-1 py-1.5 transition-colors" [attr.aria-pressed]="!byCode[o.key]"
+                                [class]="!byCode[o.key] ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+                                (click)="byCode[o.key] = false">{{ 'READER_IMPORT.BY_NAME' | translate }}</button>
+                        <button type="button" class="flex-1 py-1.5 border-l border-gray-300 transition-colors" [attr.aria-pressed]="byCode[o.key]"
+                                [class]="byCode[o.key] ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+                                (click)="byCode[o.key] = true">{{ 'READER_IMPORT.BY_CODE' | translate }}</button>
+                      </div>
+                    </div>
+                  }
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">{{ 'READER_IMPORT.BY_CODE_HINT' | translate }}</p>
               </div>
               <div class="space-y-2 text-sm">
                 <label class="flex items-start gap-2 cursor-pointer select-none">
@@ -189,6 +206,12 @@ export class ReaderImport {
   protected autoCreate = false;
   protected opacCardNo = false;
   protected readerTypeId: number | null = null;
+  protected readonly byCode = { classByCode: false, courseByCode: false, orgByCode: false };
+  protected readonly byCodeOptions = [
+    { key: 'classByCode', label: 'READER.ACADEMIC_CLASS' },
+    { key: 'courseByCode', label: 'READER.COURSE' },
+    { key: 'orgByCode', label: 'READER.ORG' },
+  ] as const;
 
   protected readonly running = computed(() => ['Queued', 'Running'].includes(this.job()?.status ?? ''));
   protected readonly finished = computed(() => ['Done', 'Failed'].includes(this.job()?.status ?? ''));
@@ -242,7 +265,7 @@ export class ReaderImport {
     await this.run(async () => {
       this.job.set(await this.api.previewReaderImport(file, {
         headerRow: columns.headerRow, columns: mapping, overwrite: this.overwrite, readerTypeId: this.readerTypeId, autoCreateRefs: this.autoCreate,
-        opacCardNoPassword: this.opacCardNo,
+        opacCardNoPassword: this.opacCardNo, ...this.byCode,
       }));
       this.step.set(3);
     });

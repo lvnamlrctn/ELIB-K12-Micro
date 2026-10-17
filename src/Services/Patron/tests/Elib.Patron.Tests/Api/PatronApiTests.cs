@@ -442,6 +442,41 @@ public sealed class PatronApiTests : IClassFixture<PatronApiFactory>, IAsyncLife
         Assert.Equal(["6IM-003", "7IM-002", "8IM-005"], Enumerable.Range(2, 3).Select(r => errorSheet.Cell(r, 1).GetString() + errorSheet.Cell(r, 3).GetString()));
         Assert.Contains("Khoa Hoá", errorSheet.Row(4).CellsUsed().Last().GetString(), StringComparison.Ordinal);
 
+        // Lớp/Khoá/Đơn vị "theo mã" (ELIB-LRC): ô là số id có sẵn — tên hoặc id không có đều báo lỗi, không tự tạo.
+        using var byCodeBook = new XLWorkbook();
+        var byCodeSheet = byCodeBook.AddWorksheet("DS");
+        object[][] byCodeRows =
+        [
+            ["Ma the", "Ten", "Lop", "Khoa", "Don vi"],
+            ["IM-010", "Giang", binh.ClassId!.Value, binh.CourseId!.Value, 41],
+            ["IM-011", "Hà", "10A9", "", ""],     // tên lớp khi chọn theo mã
+            ["IM-012", "Khánh", "", "", "Khoa Lý"], // tên đơn vị khi chọn theo mã
+            ["IM-013", "Lan", 999999, "", ""],    // id không có
+        ];
+        for (var r = 0; r < byCodeRows.Length; r++)
+            for (var col = 0; col < byCodeRows[r].Length; col++) byCodeSheet.Cell(r + 1, col + 1).Value = byCodeRows[r][col].ToString();
+        using var byCodeStream = new MemoryStream();
+        byCodeBook.SaveAs(byCodeStream);
+        var byCodeOptions = new ReaderImportOptions(1, new Dictionary<string, int> { ["cardno"] = 1, ["firstname"] = 2, ["class"] = 3, ["course"] = 4, ["org"] = 5 },
+            AutoCreateRefs: true, ClassByCode: true, CourseByCode: true, OrgByCode: true);
+        var byCode = await Read<ReaderImportJobDto>(await staff.PostAsync(U("/api/readers/Import/Jobs"), new MultipartFormDataContent
+        {
+            { new ByteArrayContent(byCodeStream.ToArray()), "file", "theo-ma.xlsx" },
+            { new StringContent(JsonSerializer.Serialize(byCodeOptions, Json)), "options" },
+        }));
+        Assert.Equal((4, 1, 3), (byCode.Total, byCode.ToCreate, byCode.ErrorCount));
+        Assert.Equal([3, 4, 5], byCode.Errors.Select(e => e.Row));
+        Assert.All(byCode.Errors, e => Assert.Contains("mã", e.Message, StringComparison.Ordinal));
+        await staff.PostAsync(U($"/api/readers/Import/Jobs/{byCode.Id}/Start"), null);
+        var byCodeDone = await PatronApiFactory.WaitForAsync(async () =>
+        {
+            var current = await Read<ReaderImportJobDto>(await staff.GetAsync(U($"/api/readers/Import/Jobs/{byCode.Id}")));
+            return current.Status is "Done" or "Failed" ? current : null;
+        }, "lượt nhập theo mã chạy xong");
+        Assert.Equal(("Done", 1), (byCodeDone.Status, byCodeDone.Created));
+        var giang = Assert.Single((await Read<CrudPage<ReaderDto>>(await staff.PostAsJsonAsync(U("/api/readers/Search"), new ReaderSearch { CardNo = "IM-010" }, Json))).Items);
+        Assert.Equal((binh.ClassId, binh.CourseId, (long?)41), (giang.ClassId, giang.CourseId, giang.OrgId));
+
         // Không có quyền thêm bạn đọc → không xem được cột/lượt nhập.
         var viewer = Staff(tenantId, "READERS:view");
         Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(U($"/api/readers/Import/Jobs/{job.Id}"))).StatusCode);

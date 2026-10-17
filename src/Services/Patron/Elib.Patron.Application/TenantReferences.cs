@@ -44,5 +44,14 @@ public sealed class ReferenceLookup(IReadOnlyList<ReferenceItem> items)
         };
     }
 
+    /// <summary>Chỉ nhận số id có trong danh mục (nhập "theo mã" của ELIB-LRC — ô chứa thẳng id, không tra tên). Trống → null.</summary>
+    public long? ResolveId(string? text, string field)
+    {
+        var value = text?.Trim();
+        if (string.IsNullOrEmpty(value)) return null;
+        return long.TryParse(value, out var id) && _names.ContainsKey(id) ? id
+            : throw new BusinessRuleException("IMPORT_REF_NOT_FOUND", $"{field} mã '{value}' không có trong danh mục.");
+    }
+
     private static string Key(string name) => string.Join(' ', name.Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
 }

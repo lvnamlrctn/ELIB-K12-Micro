@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudClient, ExtraPhoto, Reader, STATUS_ACTIVE, errorMessage } from '../../core/api';
 import { CameraCapture, CapturedPhoto, shrinkImage } from '../../shared/camera';
+import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
@@ -18,7 +19,8 @@ const BLANK: ReaderForm = {
 /**
  * Thêm/sửa bạn đọc — các trường và thứ tự như form của ELIB-LRC (pages/admin/reader): mã thẻ, CCCD, UID thẻ chip, loại, họ, tên, ngày
  * sinh, giới tính, khoá, lớp, dân tộc, trình độ, học hàm, đơn vị, liên hệ, ngày cấp/hết hạn. Ảnh thẻ lưu ngay khi chọn (media, riêng tư).
- * Khác LRC: mật khẩu OPAC đặt ở hộp thoại riêng (identity) — không đi cùng hồ sơ.
+ * Mật khẩu OPAC (ô Mật khẩu / Nhập lại như LRC) nằm ở identity — không đi cùng hồ sơ: đặt bằng API tài khoản bạn đọc sau khi lưu hồ sơ, chỉ
+ * khi có nhập và cán bộ có quyền READERS:edit.
  * Khoá dịch giữ như ELIB-LRC: READER.FIRST_NAME là ô "Họ" (lastName), READER.LAST_NAME là ô "Tên" (firstName).
  */
 @Component({
@@ -113,6 +115,16 @@ const BLANK: ReaderForm = {
             <p class="text-xs text-gray-500 mt-1">{{ 'READER.EXPIRE_EMPTY_HINT' | translate }}</p></div>
           <div class="sm:col-span-2 lg:col-span-3"><label class="form-label" for="r-addr">{{ 'READER.ADDRESS' | translate }}</label>
             <input id="r-addr" name="addr" class="input" [(ngModel)]="f.address" /></div>
+          @if (canSetPassword) {
+            <div><label class="form-label" for="r-pw">{{ 'READER.PASSWORD' | translate }}</label>
+              <input id="r-pw" name="pw" type="password" class="input" autocomplete="new-password" maxlength="128" [(ngModel)]="password"
+                     [placeholder]="f.publicId ? '••••••••' : ''" /></div>
+            <div><label class="form-label" for="r-pw2">{{ 'READER.CONFIRM_PASSWORD' | translate }}</label>
+              <input id="r-pw2" name="pw2" type="password" class="input" autocomplete="new-password" maxlength="128" [(ngModel)]="confirm"
+                     [placeholder]="f.publicId ? '••••••••' : ''" [class.!border-red-400]="!!confirm && confirm !== password" />
+              @if (confirm && confirm !== password) { <p class="text-xs text-red-600 mt-1">{{ 'READER.PASSWORD_MISMATCH' | translate }}</p> }</div>
+            <p class="text-xs text-gray-500 self-end pb-2">{{ (f.publicId ? 'READER.PASSWORD_EDIT_HINT' : 'READER.PASSWORD_ADD_HINT') | translate }}</p>
+          }
           @if (c.groups().length) {
             <fieldset class="sm:col-span-2 lg:col-span-3">
               <legend class="form-label">{{ 'READER_HISTORY.GROUPS' | translate }}</legend>
@@ -179,6 +191,10 @@ export class ReaderFormDialog implements OnInit {
   protected readonly groupIds = signal<number[]>([]);
   private initialGroups: number[] = [];
   protected reason = '';
+  /** Mật khẩu OPAC — giữ riêng, không nằm trong payload hồ sơ gửi patron. */
+  protected password = '';
+  protected confirm = '';
+  protected readonly canSetPassword = inject(Session).can('READERS:edit');
 
   ngOnInit(): void {
     const r = this.reader();
@@ -246,6 +262,17 @@ export class ReaderFormDialog implements OnInit {
       this.toastr.warning('READER.REQUIRED_CARD_NAME');
       return;
     }
+    const password = this.canSetPassword ? this.password : '';
+    if (password || this.confirm) {
+      if (password.length < 6 || !password.trim()) {
+        this.toastr.warning('READER.RESET_PASSWORD_MIN');
+        return;
+      }
+      if (password !== this.confirm) {
+        this.toastr.warning('READER.PASSWORD_MISMATCH');
+        return;
+      }
+    }
     this.saving.set(true);
     try {
       const { publicId, ...body } = this.f;
@@ -261,6 +288,15 @@ export class ReaderFormDialog implements OnInit {
           await this.api.setReaderPhoto(saved.publicId, uploaded.id);
         } catch (e) {
           this.toastr.error(errorMessage(e)); // hồ sơ đã lưu — chỉ ảnh lỗi, thêm lại khi sửa bạn đọc
+        }
+      }
+      if (password) {
+        try {
+          await this.api.setReaderPassword(saved.publicId, password, false);
+        } catch (e) {
+          // Hồ sơ đã lưu — chỉ mật khẩu lỗi, đặt lại ở nút Mật khẩu trên danh sách.
+          this.toastr.warning('READER.PASSWORD_NOT_SAVED');
+          this.toastr.error(errorMessage(e));
         }
       }
       this.toastr.success(publicId ? 'READER.SAVED_UPDATE' : 'READER.SAVED_ADD');

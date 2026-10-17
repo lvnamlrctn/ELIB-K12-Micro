@@ -12,6 +12,8 @@ type PolicyForm = Omit<LoanPolicy, 'id' | 'publicId' | 'bibTypeRules'> & { bibTy
 
 const KIND_BORROW = 1;
 const KIND_READING = 2;
+/** LoanPolicy.DefaultHoldDays — ô số ngày giữ sách để trống. */
+const DEFAULT_HOLD_DAYS = 2;
 
 /**
  * Điểm lưu thông như ELIB-LRC (/admin/circ-places): cây điểm lưu thông → chính sách theo loại bạn đọc. Chọn điểm: thông tin, giờ làm việc,
@@ -453,7 +455,7 @@ export class CircPlaces implements OnInit {
     await this.run(async () => {
       const body = {
         ...p, maxLoans: blank(p.maxLoans), maxRenewals: blank(p.maxRenewals), maxHolds: blank(p.maxHolds),
-        finePerDay: p.finePerDay ?? 0, techFee: p.techFee ?? 0, shippingFee: p.shippingFee ?? 0,
+        finePerDay: p.finePerDay ?? 0, techFee: p.techFee ?? 0, shippingFee: p.shippingFee ?? 0, holdDays: blank(p.holdDays) ?? DEFAULT_HOLD_DAYS,
         bibTypeRules: p.bibTypeRules.map((r) => ({ ...r, loanDays: blank(r.loanDays), maxLoans: blank(r.maxLoans), maxRenewals: blank(r.maxRenewals), maxHolds: blank(r.maxHolds) })),
       };
       const saved = await this.policiesApi.update(current.publicId, body);

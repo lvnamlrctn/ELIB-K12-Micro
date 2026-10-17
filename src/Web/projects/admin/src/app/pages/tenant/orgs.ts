@@ -61,6 +61,7 @@ interface OrgForm {
           <thead>
             <tr>
               <th class="th">{{ 'ORG.NAME' | translate }}</th>
+              <th class="th w-20 !text-center">ID</th>
               <th class="th w-24 !text-center">{{ 'ORG.LEVEL' | translate }}</th>
               <th class="th w-24 !text-center">{{ 'ORG.ORDER' | translate }}</th>
               <th class="th w-36 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
@@ -88,6 +89,8 @@ interface OrgForm {
                     <span class="text-sm text-gray-800 font-medium">{{ n.name }}</span>
                   </div>
                 </td>
+                <!-- Số id — điền cột Đơn vị khi nhập bạn đọc "theo mã" (như ELIB-LRC). -->
+                <td class="py-2.5 px-4 text-center font-mono text-xs text-gray-500">{{ n.id }}</td>
                 <td class="py-2.5 px-4 text-center">
                   <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                         [class]="row.depth === 0 ? 'bg-blue-100 text-blue-700' : row.depth === 1 ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'">
@@ -125,7 +128,7 @@ interface OrgForm {
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="py-14 text-center text-gray-500 text-sm">
+                <td colspan="7" class="py-14 text-center text-gray-500 text-sm">
                   <span class="material-icons text-4xl text-gray-300 mb-2 block">corporate_fare</span>
                   {{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}
                 </td>

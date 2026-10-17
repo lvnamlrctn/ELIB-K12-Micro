@@ -447,6 +447,9 @@
     "SELECT_PROF": "Chọn học hàm",
     "CONFIRM_PASSWORD": "Nhập lại mật khẩu",
     "PASSWORD_MISMATCH": "Mật khẩu không khớp",
+    "PASSWORD_ADD_HINT": "Mật khẩu đăng nhập OPAC — để trống thì chưa đặt; bạn đọc phải đổi ở lần đăng nhập đầu.",
+    "PASSWORD_EDIT_HINT": "Để trống nếu giữ mật khẩu OPAC hiện tại.",
+    "PASSWORD_NOT_SAVED": "Đã lưu hồ sơ nhưng chưa đặt được mật khẩu",
     "EXPORT_TITLE": "Chọn trường muốn xuất",
     "EXPORT_SELECT_ALL": "Chọn tất cả",
     "EXPORT_FIELDS_LOADING": "Đang tải danh sách trường...",
@@ -1684,7 +1687,10 @@
     "PREVIEW": "Xem trước",
     "RUN": "Chạy nhập",
     "OPAC_CARDNO": "Mật khẩu OPAC = số thẻ cho bạn đọc mới",
-    "OPAC_CARDNO_HINT": "Bạn đọc mới đăng nhập OPAC bằng số thẻ và phải đổi mật khẩu ở lần đầu. Bạn đọc đã có mật khẩu giữ nguyên."
+    "OPAC_CARDNO_HINT": "Bạn đọc mới đăng nhập OPAC bằng số thẻ và phải đổi mật khẩu ở lần đầu. Bạn đọc đã có mật khẩu giữ nguyên.",
+    "BY_NAME": "Tên",
+    "BY_CODE": "Mã",
+    "BY_CODE_HINT": "Theo mã: cột chứa số id có sẵn trong danh mục (không tra tên, không tự tạo)."
   },
   "READER_BATCH": {
     "EDIT": "Sửa hàng loạt",

@@ -16,9 +16,11 @@ namespace Elib.Patron.Application;
 /// <see cref="ReaderTypeId"/>: loại bạn đọc cho cả file (thay cột Loại bạn đọc). <see cref="Overwrite"/>: số thẻ đã có thì cập nhật, ô trống giữ
 /// giá trị cũ. <see cref="AutoCreateRefs"/>: lớp/khoá chưa có thì tạo mới (đơn vị/dân tộc/trình độ thuộc service tenant — phải có sẵn).
 /// <see cref="OpacCardNoPassword"/>: bạn đọc mới được đăng nhập OPAC bằng mật khẩu = số thẻ (identity đặt qua event, bắt đổi lần đầu).
+/// <see cref="ClassByCode"/>/<see cref="CourseByCode"/>/<see cref="OrgByCode"/> (ELIB-LRC: classByCode, courseByCode, orgByCode): cột Lớp/Khoá/Đơn
+/// vị chứa thẳng số id có sẵn trong danh mục thay cho tên — không tra tên, không tự tạo.
 /// </summary>
 public sealed record ReaderImportOptions(int HeaderRow, IReadOnlyDictionary<string, int> Columns, bool Overwrite = false, long? ReaderTypeId = null,
-    bool AutoCreateRefs = false, bool OpacCardNoPassword = false);
+    bool AutoCreateRefs = false, bool OpacCardNoPassword = false, bool ClassByCode = false, bool CourseByCode = false, bool OrgByCode = false);
 
 public sealed record ImportHeader(int Index, string Title);
 
@@ -213,7 +215,7 @@ public sealed partial class ReaderResource
             {
                 try
                 {
-                    var resolved = await ResolveImportNamesAsync(p.Request, o.AutoCreateRefs, create: false, ct);
+                    var resolved = await ResolveImportNamesAsync(p.Request, o, create: false, ct);
                     Reader.Create(ToData(isUpdate ? resolved : WithImportDefaults(resolved))); // quy tắc của hồ sơ (email, ngày, độ dài…)
                 }
                 catch (BusinessRuleException ex)
@@ -235,7 +237,7 @@ public sealed partial class ReaderResource
     public async Task<bool> ApplyImportRowAsync(ReaderImportPlan plan, ReaderImportOptions o, CancellationToken ct)
     {
         await LoadCatalogIdsAsync(ct);
-        var request = await ResolveImportNamesAsync(plan.Request!, o.AutoCreateRefs, create: true, ct);
+        var request = await ResolveImportNamesAsync(plan.Request!, o, create: true, ct);
         var existing = await Set.FirstOrDefaultAsync(x => x.CardNo == plan.CardNo, ct);
         Reader reader;
         if (existing is null)
@@ -296,17 +298,21 @@ public sealed partial class ReaderResource
 
     /// <summary>
     /// Tên loại/lớp/khoá (patron) và đơn vị/dân tộc/trình độ/học hàm (tenant) → id. Lớp/khoá chưa có: tự tạo nếu được phép
-    /// (<paramref name="create"/> = false khi xem trước — chỉ kiểm tra).
+    /// (<paramref name="create"/> = false khi xem trước — chỉ kiểm tra). Lớp/khoá/đơn vị "theo mã": ô là số id có sẵn.
     /// </summary>
-    private async Task<ReaderRequest> ResolveImportNamesAsync(ReaderRequest r, bool autoCreate, bool create, CancellationToken ct) => r with
+    private async Task<ReaderRequest> ResolveImportNamesAsync(ReaderRequest r, ReaderImportOptions o, bool create, CancellationToken ct) => r with
     {
         ReaderTypeId = r.ReaderTypeId ?? NameId(_typeIds!, r.ReaderTypeName, "Loại bạn đọc"),
         ReaderTypeName = null,
-        ClassId = r.ClassId ?? await CatalogIdAsync<SchoolClass>(_classIds!, r.ClassName, "Lớp", autoCreate, create, ct),
+        ClassId = r.ClassId ?? (o.ClassByCode ? CodeId(_classIds!, r.ClassName, "Lớp")
+            : await CatalogIdAsync<SchoolClass>(_classIds!, r.ClassName, "Lớp", o.AutoCreateRefs, create, ct)),
         ClassName = null,
-        CourseId = r.CourseId ?? await CatalogIdAsync<Course>(_courseIds!, r.CourseName, "Khoá", autoCreate, create, ct),
+        CourseId = r.CourseId ?? (o.CourseByCode ? CodeId(_courseIds!, r.CourseName, "Khoá")
+            : await CatalogIdAsync<Course>(_courseIds!, r.CourseName, "Khoá", o.AutoCreateRefs, create, ct)),
         CourseName = null,
-        OrgId = r.OrgId ?? await ReferenceIdAsync(ReferenceKinds.Orgs, r.OrgName, "Đơn vị", ct),
+        OrgId = r.OrgId ?? (o.OrgByCode
+            ? (string.IsNullOrWhiteSpace(r.OrgName) ? null : (await ReferencesAsync(ReferenceKinds.Orgs, ct)).ResolveId(r.OrgName, "Đơn vị"))
+            : await ReferenceIdAsync(ReferenceKinds.Orgs, r.OrgName, "Đơn vị", ct)),
         EthnicityId = r.EthnicityId ?? await ReferenceIdAsync(ReferenceKinds.Ethnicities, r.EthnicityName, "Dân tộc", ct),
         DegreeId = r.DegreeId ?? await ReferenceIdAsync(ReferenceKinds.Degrees, r.DegreeName, "Trình độ", ct),
         AcademicTitleId = r.AcademicTitleId ?? await ReferenceIdAsync(ReferenceKinds.AcademicTitles, r.AcademicTitleName, "Học hàm", ct),
@@ -318,6 +324,15 @@ public sealed partial class ReaderResource
         if (string.IsNullOrWhiteSpace(name)) return null;
         return ids.TryGetValue(CatalogKey(name), out var id) ? id
             : throw new BusinessRuleException("IMPORT_REF_NOT_FOUND", $"{label} '{name.Trim()}' chưa có trong danh mục — thêm ở Tham số bạn đọc trước.");
+    }
+
+    /// <summary>Ô "theo mã": số id phải có trong danh mục (đã tải) — không tra tên, không tự tạo.</summary>
+    private static long? CodeId(Dictionary<string, long> ids, string? code, string label)
+    {
+        var value = code?.Trim();
+        if (string.IsNullOrEmpty(value)) return null;
+        return long.TryParse(value, out var id) && ids.ContainsValue(id) ? id
+            : throw new BusinessRuleException("IMPORT_REF_NOT_FOUND", $"{label} mã '{value}' không có trong danh mục.");
     }
 
     private async Task<long?> CatalogIdAsync<T>(Dictionary<string, long> ids, string? name, string label, bool autoCreate, bool create, CancellationToken ct)
