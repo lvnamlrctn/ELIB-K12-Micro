@@ -15,6 +15,8 @@ public static class EbookTemplates
 {
     public const string HoldReady = "EBOOK_HOLD_READY";
     public const string LoanExpired = "EBOOK_LOAN_EXPIRED";
+    public const string SubmissionApproved = "EBOOK_SUBMISSION_APPROVED";
+    public const string SubmissionRejected = "EBOOK_SUBMISSION_REJECTED";
 }
 
 internal static class EbookDates

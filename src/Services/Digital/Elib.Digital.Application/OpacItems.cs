@@ -95,6 +95,9 @@ public sealed record OpacCatalogNode(long Id, string Name, long? ParentId, int L
     public bool HasChildren => ChildCount > 0;
 }
 
+/// <summary>Loại tài liệu số — chỉ mã + mô tả, cho dropdown của form nộp tài liệu bạn đọc trên OPAC (ẩn danh, không cần cây).</summary>
+public sealed record OpacDigType(long Id, string Code, string? DescriptionVn);
+
 /// <summary>Cây bộ sưu tập/môn loại/chủ đề công khai — menu duyệt của OPAC (ẩn danh).</summary>
 public sealed class OpacCatalogs(ICrudDbContext db)
 {
@@ -103,6 +106,10 @@ public sealed class OpacCatalogs(ICrudDbContext db)
     public Task<IReadOnlyList<OpacCatalogNode>> SubjectsAsync(CancellationToken ct) => TreeAsync<EbookSubject>(ct);
 
     public Task<IReadOnlyList<OpacCatalogNode>> TopicsAsync(CancellationToken ct) => TreeAsync<EbookTopic>(ct);
+
+    public async Task<IReadOnlyList<OpacDigType>> DigTypesAsync(CancellationToken ct) =>
+        await db.Set<EbookDigType>().AsNoTracking().OrderBy(x => x.SortOrder).ThenBy(x => x.Id)
+            .Select(x => new OpacDigType(x.Id, x.Code, x.DescriptionVn)).ToListAsync(ct);
 
     private async Task<IReadOnlyList<OpacCatalogNode>> TreeAsync<T>(CancellationToken ct) where T : TreeCatalogItem
     {

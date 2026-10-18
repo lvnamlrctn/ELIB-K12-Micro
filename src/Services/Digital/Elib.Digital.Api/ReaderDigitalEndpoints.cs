@@ -58,6 +58,14 @@ public static class ReaderDigitalEndpoints
             return Results.NoContent();
         });
 
+        // Nộp tài liệu — xin vé (digital xin hộ media) → trình duyệt PUT thẳng → hoàn tất (SubmitAsync tự gọi media complete).
+        reader.MapPost("/document-submissions/upload-ticket", (SubmissionUploadRequest request, DocumentSubmissionResource r, CancellationToken ct) =>
+            r.RequestUploadAsync(request, ct));
+        reader.MapPost("/document-submissions", async (ReaderSubmitRequest request, ClaimsPrincipal principal, DocumentSubmissionResource r, CancellationToken ct) =>
+            Results.Created((string?)null, (await r.SubmitAsync(ReaderId(principal), request, ct)).ForReader()));
+        reader.MapGet("/document-submissions", async (ClaimsPrincipal principal, DocumentSubmissionResource r, CancellationToken ct) =>
+            (await r.MyListAsync(ReaderId(principal), ct)).Select(x => x.ForReader()));
+
         return app;
     }
 

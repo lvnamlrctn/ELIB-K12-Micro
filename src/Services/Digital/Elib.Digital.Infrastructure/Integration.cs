@@ -82,6 +82,66 @@ public sealed class HttpCatalogBibLookup(IHttpClientFactory clients, ITenantCont
     }
 }
 
+/// <summary>
+/// Xin vé upload/hoàn tất hộ bạn đọc ở media qua /internal (service token) — bạn đọc không có đường gọi /api/files/uploads
+/// (chỉ cán bộ), nên digital xin hộ (quyết định #3 của plan giai đoạn 2). Dùng chung client "elib-media" với HttpMediaFileAccess.
+/// </summary>
+public sealed class HttpMediaUploadTicket(IHttpClientFactory clients, ITenantContext tenant) : IMediaUploadTicket
+{
+    private sealed record UploadRequestBody(string Purpose, string FileName, string ContentType, long Size);
+    private sealed record TicketResponse(Guid FileId, string UploadUrl, DateTimeOffset ExpiresAt, long MaxBytes);
+
+    public async Task<MediaUploadTicket> RequestAsync(string purpose, string fileName, string contentType, long size, CancellationToken ct)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var url = $"internal/tenants/{tenantId}/files/uploads";
+        HttpResponseMessage response;
+        try
+        {
+            response = await clients.CreateClient(HttpMediaFileAccess.Media)
+                .PostAsJsonAsync(new Uri(url, UriKind.Relative), new UploadRequestBody(purpose, fileName, contentType, size), ct);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Không kết nối được kho file để xin vé upload — thử lại sau.", 503);
+        }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+                throw new BusinessRuleException("MEDIA_UNAVAILABLE", $"Kho file báo lỗi {(int)response.StatusCode} khi xin vé upload — thử lại sau.", 503);
+            var dto = await response.Content.ReadFromJsonAsync<TicketResponse>(ct)
+                ?? throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Kho file trả về dữ liệu không hợp lệ.", 503);
+            return new MediaUploadTicket(dto.FileId, dto.UploadUrl, dto.ExpiresAt, dto.MaxBytes);
+        }
+    }
+
+    public async Task CompleteAsync(Guid fileId, CancellationToken ct)
+    {
+        var tenantId = tenant.RequireTenantId();
+        var url = $"internal/tenants/{tenantId}/files/{fileId}/complete";
+        HttpResponseMessage response;
+        try
+        {
+            response = await clients.CreateClient(HttpMediaFileAccess.Media).PostAsync(new Uri(url, UriKind.Relative), content: null, ct);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Không kết nối được kho file để hoàn tất upload — thử lại sau.", 503);
+        }
+        using (response)
+        {
+            if (response.StatusCode == HttpStatusCode.NotFound) throw new NotFoundException("File", fileId);
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = await response.Content.ReadFromJsonAsync<ErrorBody>(ct);
+                throw new BusinessRuleException(detail?.Code ?? "MEDIA_UNAVAILABLE", detail?.Detail ?? "Không hoàn tất được upload.", (int)response.StatusCode);
+            }
+        }
+    }
+
+    private sealed record ErrorBody(string? Code, string? Detail);
+}
+
 /// <summary>Xin URL có hạn của file tài liệu số ở media qua /internal (service token) — digital đã tự kiểm quyền trước khi gọi.</summary>
 public sealed class HttpMediaFileAccess(IHttpClientFactory clients, ITenantContext tenant) : IMediaFileAccess
 {

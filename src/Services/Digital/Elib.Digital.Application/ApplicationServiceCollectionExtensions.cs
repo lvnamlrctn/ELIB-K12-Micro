@@ -26,6 +26,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<EbookReviewResource>();
         services.AddScoped<OpacReviews>();
         services.AddScoped<ReaderFavorites>();
+        services.AddCrudResource<DocumentSubmissionResource>();
         return services;
     }
 }

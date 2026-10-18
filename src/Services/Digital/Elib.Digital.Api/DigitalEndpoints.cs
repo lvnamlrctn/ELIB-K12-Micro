@@ -48,6 +48,17 @@ public static class DigitalEndpoints
         reservations.MapGet("/GetById/{publicId:guid}", [Permission("DIGITAL_LOANS", "view")] (Guid publicId, EbookReservationResource r, CancellationToken ct)
             => r.GetAsync(publicId, ct));
 
+        // Duyệt tài liệu bạn đọc nộp — thủ thư chỉ tra cứu + Duyệt/Từ chối, không Add/Update trực tiếp (bạn đọc tự nộp qua OPAC).
+        var submissions = api.MapGroup("/document-submissions").WithTags("DocumentSubmissions");
+        submissions.MapPost("/Search", [Permission("DIGITAL_SUBMISSIONS", "view")] (DocumentSubmissionSearch search, DocumentSubmissionResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        submissions.MapGet("/GetById/{publicId:guid}", [Permission("DIGITAL_SUBMISSIONS", "view")] (Guid publicId, DocumentSubmissionResource r, CancellationToken ct)
+            => r.GetAsync(publicId, ct));
+        submissions.MapPost("/{publicId:guid}/Approve", [Permission("DIGITAL_SUBMISSIONS", "edit")] (Guid publicId, DocumentSubmissionResource r, ICurrentActor actor, CancellationToken ct)
+            => r.ApproveAsync(publicId, actor.Id, ct));
+        submissions.MapPost("/Reject", [Permission("DIGITAL_SUBMISSIONS", "edit")] (RejectSubmissionRequest request, DocumentSubmissionResource r, ICurrentActor actor, CancellationToken ct)
+            => r.RejectAsync(request, actor.Id, ct));
+
         return app;
     }
 }

@@ -40,6 +40,9 @@ public static class InfrastructureServiceCollectionExtensions
         AddSource(services, configuration, HttpMediaFileAccess.Media, "Media:Url");
         services.AddScoped<IMediaFileAccess, HttpMediaFileAccess>();
 
+        // Xin vé upload/hoàn tất hộ bạn đọc nộp tài liệu (quyết định #3 của plan giai đoạn 2) — dùng chung client "elib-media".
+        services.AddScoped<IMediaUploadTicket, HttpMediaUploadTicket>();
+
         services.AddElibMessaging<DigitalDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<DigitalDbContext>();

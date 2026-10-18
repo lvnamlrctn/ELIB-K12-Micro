@@ -145,6 +145,19 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.HasIndex(x => new { x.TenantId, x.ReaderPublicId });
         });
 
+        modelBuilder.Entity<DocumentSubmission>(e =>
+        {
+            e.ToTable("document_submissions");
+            e.Property(x => x.Title).HasMaxLength(DocumentSubmission.MaxTitleLength);
+            e.Property(x => x.Author).HasMaxLength(DocumentSubmission.MaxAuthorLength);
+            e.Property(x => x.Abstract).HasMaxLength(DocumentSubmission.MaxAbstractLength);
+            e.Property(x => x.FileName).HasMaxLength(DocumentSubmission.MaxFileNameLength);
+            e.Property(x => x.FileExt).HasMaxLength(DocumentSubmission.MaxFileExtLength);
+            e.Property(x => x.RejectReason).HasMaxLength(DocumentSubmission.MaxReasonLength);
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.Status });
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

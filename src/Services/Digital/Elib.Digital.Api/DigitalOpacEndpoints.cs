@@ -39,6 +39,8 @@ public static class DigitalOpacEndpoints
         opac.MapGet("/collections", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.CollectionsAsync(ct));
         opac.MapGet("/subjects", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.SubjectsAsync(ct));
         opac.MapGet("/topics", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.TopicsAsync(ct));
+        // Cho dropdown loại tài liệu của form nộp tài liệu bạn đọc — không cần đăng nhập để xem danh mục trước khi vào form.
+        opac.MapGet("/dig-types", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.DigTypesAsync(ct));
 
         return app;
     }

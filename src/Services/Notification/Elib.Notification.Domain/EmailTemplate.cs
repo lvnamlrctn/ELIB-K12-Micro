@@ -73,6 +73,8 @@ public static class DefaultTemplates
     // Tài liệu số (digital gửi theo mã).
     public const string EbookHoldReady = "EBOOK_HOLD_READY";
     public const string EbookLoanExpired = "EBOOK_LOAN_EXPIRED";
+    public const string EbookSubmissionApproved = "EBOOK_SUBMISSION_APPROVED";
+    public const string EbookSubmissionRejected = "EBOOK_SUBMISSION_REJECTED";
 
     public sealed record Definition(string Code, string Name, string Subject, string Body);
 
@@ -134,6 +136,16 @@ public static class DefaultTemplates
             <p>Xin chào {{ full_name }},</p>
             <p>Tài liệu số <strong>{{ title }}</strong> bạn mượn đã hết hạn truy cập lúc {{ expired_at }}.</p>
             <p>Bạn có thể mượn lại nếu vẫn cần đọc tài liệu này.</p>
+            """),
+        new(EbookSubmissionApproved, "Tài liệu nộp đã được duyệt", "Tài liệu bạn nộp đã được duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> bạn nộp đã được thủ thư duyệt và đưa vào thư viện số.</p>
+            """),
+        new(EbookSubmissionRejected, "Tài liệu nộp bị từ chối", "Tài liệu bạn nộp chưa được duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu <strong>{{ title }}</strong> bạn nộp chưa được duyệt. Lý do: {{ reason }}.</p>
             """),
     ];
 

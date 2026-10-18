@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Authorization;
+using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Persistence;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events.Patron;
@@ -32,6 +33,7 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
     public FakeReplicaSources Sources { get; } = new();
     public FakeCatalogBibLookup CatalogBibs { get; } = new();
     public FakeMediaFileAccess Media { get; } = new();
+    public FakeMediaUploadTicket Uploads { get; } = new();
 
     /// <summary>Đồng hồ của service — test tua tới để có lượt hết hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
@@ -68,6 +70,8 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<ICatalogBibLookup>(CatalogBibs);
             services.RemoveAll<IMediaFileAccess>();
             services.AddSingleton<IMediaFileAccess>(Media);
+            services.RemoveAll<IMediaUploadTicket>();
+            services.AddSingleton<IMediaUploadTicket>(Uploads);
         });
     }
 
@@ -174,6 +178,27 @@ public sealed class FakeMediaFileAccess : IMediaFileAccess
     {
         Requested.Enqueue(mediaFileId);
         return Task.FromResult(new EbookFileUrl($"https://media.test/signed/{mediaFileId:N}", DateTimeOffset.UtcNow.AddMinutes(5)));
+    }
+}
+
+/// <summary>Vé upload giả cho nộp tài liệu bạn đọc — trả vé cố định, CompleteAsync luôn thành công trừ khi test đặt trước lỗi.</summary>
+public sealed class FakeMediaUploadTicket : IMediaUploadTicket
+{
+    public ConcurrentQueue<string> RequestedPurposes { get; } = new();
+    public ConcurrentQueue<Guid> Completed { get; } = new();
+    public bool RejectComplete { get; set; }
+
+    public Task<MediaUploadTicket> RequestAsync(string purpose, string fileName, string contentType, long size, CancellationToken ct)
+    {
+        RequestedPurposes.Enqueue(purpose);
+        return Task.FromResult(new MediaUploadTicket(Guid.CreateVersion7(), "https://media.test/upload/fake", DateTimeOffset.UtcNow.AddMinutes(10), 50 * 1024 * 1024));
+    }
+
+    public Task CompleteAsync(Guid fileId, CancellationToken ct)
+    {
+        if (RejectComplete) throw new BusinessRuleException("MEDIA_TYPE_INVALID", "Nội dung file không hợp lệ (giả lập test).");
+        Completed.Enqueue(fileId);
+        return Task.CompletedTask;
     }
 }
 
