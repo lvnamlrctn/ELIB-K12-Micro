@@ -195,6 +195,7 @@
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Không tìm thấy tài liệu (có thể đã bị ẩn hoặc xoá).",
+      "HAS_DIGITAL_COPY": "Có bản điện tử — Đọc ngay",
       "COVER_OF": "Bìa",
       "PROCESSING": "Đang xử lý, chưa phục vụ",
       "TAB_INFO": "Thông tin",
@@ -306,7 +307,20 @@
       "MY_LOANS": "Tài liệu số đang mượn",
       "NO_LOANS": "Bạn đọc không có tài liệu số nào đang mượn.",
       "MY_RESERVATIONS": "Đặt trước tài liệu số",
-      "NO_RESERVATIONS": "Bạn đọc không có đặt trước nào."
+      "NO_RESERVATIONS": "Bạn đọc không có đặt trước nào.",
+      "FAVORITE": "Thêm vào yêu thích",
+      "UNFAVORITE": "Bỏ yêu thích",
+      "REVIEWS": "Đánh giá",
+      "NO_REVIEWS": "Chưa có đánh giá nào.",
+      "ANONYMOUS": "Bạn đọc",
+      "WRITE_REVIEW": "Viết đánh giá",
+      "YOUR_NAME": "Tên của bạn (không bắt buộc)",
+      "NO_RATING": "Không chấm điểm",
+      "YOUR_REVIEW": "Chia sẻ cảm nhận của bạn…",
+      "SUBMIT_REVIEW": "Gửi đánh giá",
+      "REVIEW_SUBMITTED": "Đã gửi đánh giá, chờ thư viện duyệt.",
+      "MY_FAVORITES": "Tài liệu số yêu thích",
+      "NO_FAVORITES": "Bạn đọc chưa yêu thích tài liệu số nào."
     },
     "LOGIN": {
       "SIGNING_IN": "Đang đăng nhập…"

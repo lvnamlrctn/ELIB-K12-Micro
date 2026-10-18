@@ -175,6 +175,26 @@ public sealed class DigitalApiTests(DigitalApiFactory factory) : DigitalTestBase
     }
 
     [Fact]
+    public async Task Opac_finds_the_published_item_linked_to_a_print_bib_but_not_an_unpublished_or_unlinked_one()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var bibPublicId = Guid.CreateVersion7();
+        var item = await Read<EbookItemDto>(await staff.PostAsJsonAsync(U("/api/items/Add"), new EbookItemFields("Số đỏ (số hoá)", LinkedBibPublicId: bibPublicId), Json));
+        await staff.PutAsJsonAsync(U("/api/items/ChangeStatus"), new ChangeStatusRequest(item.PublicId, IHasStatus.Active), Json);
+
+        var opac = Opac(tenantId);
+        var found = await Read<EbookByBibSummary>(await opac.GetAsync(U($"/api/opac/items/by-bib/{bibPublicId}")));
+        Assert.Equal((item.PublicId, item.Title), (found.PublicId, found.Title));
+
+        Assert.Equal(204, (int)(await opac.GetAsync(U($"/api/opac/items/by-bib/{Guid.CreateVersion7()}"))).StatusCode);
+
+        var hiddenBib = Guid.CreateVersion7();
+        await staff.PostAsJsonAsync(U("/api/items/Add"), new EbookItemFields("Ẩn", LinkedBibPublicId: hiddenBib, Status: IHasStatus.Inactive), Json);
+        Assert.Equal(204, (int)(await opac.GetAsync(U($"/api/opac/items/by-bib/{hiddenBib}"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Opac_only_shows_published_items_and_hides_hidden_ones()
     {
         var tenantId = NewTenant();

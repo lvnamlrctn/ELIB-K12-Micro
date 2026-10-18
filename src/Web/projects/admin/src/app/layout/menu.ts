@@ -148,6 +148,7 @@ export class Menu {
         children: [
           { title: 'MENU.DIGITAL_ITEMS', icon: 'menu_book', link: '/digital-items', perm: 'DIGITAL_ITEMS' },
           { title: 'MENU.DIGITAL_LOANS', icon: 'swap_vert', link: '/digital-loans', perm: 'DIGITAL_LOANS' },
+          { title: 'MENU.DIGITAL_REVIEWS', icon: 'reviews', link: '/digital-reviews', perm: 'DIGITAL_REVIEWS' },
           { title: 'MENU.DIGITAL_COLLECTIONS', icon: 'collections_bookmark', link: '/digital-collections', perm: 'DIGITAL_COLLECTIONS' },
           { title: 'MENU.DIGITAL_SUBJECTS', icon: 'category', link: '/digital-subjects', perm: 'DIGITAL_SUBJECTS' },
           { title: 'MENU.DIGITAL_TOPICS', icon: 'sell', link: '/digital-topics', perm: 'DIGITAL_TOPICS' },

@@ -28,6 +28,14 @@ public static class DigitalOpacEndpoints
             reviews.SubmitAsync(publicId, submission, ct));
         opac.MapGet("/items/{publicId:guid}/reviews", (Guid publicId, OpacReviews reviews, CancellationToken ct) => reviews.PublishedAsync(publicId, ct));
 
+        // Liên kết ngược từ trang chi tiết sách in (catalog) — "Có bản điện tử". Null (204) nếu không có/chưa xuất bản, không 404
+        // (không phải lỗi — phần lớn sách in không có bản điện tử liên kết).
+        opac.MapGet("/items/by-bib/{bibPublicId:guid}", async (Guid bibPublicId, OpacItems items, CancellationToken ct) =>
+        {
+            var found = await items.FindByLinkedBibAsync(bibPublicId, ct);
+            return found is null ? Results.NoContent() : Results.Ok(found);
+        });
+
         opac.MapGet("/collections", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.CollectionsAsync(ct));
         opac.MapGet("/subjects", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.SubjectsAsync(ct));
         opac.MapGet("/topics", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.TopicsAsync(ct));

@@ -22,6 +22,10 @@ public sealed record OpacItemDetail(
     string? CollectionName, long? SubjectId, string? SubjectName, long? TopicId, string? TopicName, bool TopicRequiresLogin, long? TypeId,
     string? TypeName, Guid? LinkedBibPublicId, IReadOnlyList<OpacFileSummary> Files);
 
+/// <summary>Tóm tắt tài liệu số liên kết với một biểu ghi sách in — cho banner "Có bản điện tử" ở trang chi tiết sách in (một chiều,
+/// quyết định #6 của plan giai đoạn 2).</summary>
+public sealed record EbookByBibSummary(Guid PublicId, string Title, bool Free);
+
 /// <summary>
 /// Duyệt/tìm tài liệu số trên OPAC (ẩn danh, công khai theo host đơn vị) — tự phục vụ bằng chính dữ liệu của digital (quyết định #1 của
 /// plan, không qua search service). Chỉ tài liệu Status=Active (LRC: "Xuất bản") hiện ra; ẩn/đã xoá → không tìm thấy.
@@ -77,6 +81,12 @@ public sealed class OpacItems(ICrudDbContext db)
             item.Language, item.CoverUrl, item.Free, item.AllowDownload, item.PrintCopies, item.CollectionId, collectionName, item.SubjectId,
             subjectName, item.TopicId, topic?.Name, topic?.RequiresLogin ?? false, item.TypeId, typeName, item.LinkedBibPublicId, files);
     }
+
+    /// <summary>Tài liệu số liên kết với một biểu ghi sách in (nếu có và đã Xuất bản) — cho trang chi tiết sách in ở catalog hiện
+    /// banner "Có bản điện tử". Null nếu không có liên kết hoặc tài liệu chưa xuất bản.</summary>
+    public Task<EbookByBibSummary?> FindByLinkedBibAsync(Guid bibPublicId, CancellationToken ct) =>
+        db.Set<EbookItem>().AsNoTracking().Where(x => x.LinkedBibPublicId == bibPublicId && x.Status == IHasStatus.Active)
+            .Select(x => new EbookByBibSummary(x.PublicId, x.Title, x.Free)).FirstOrDefaultAsync(ct);
 }
 
 /// <summary>Một mục trong cây danh mục công khai (bộ sưu tập/môn loại/chủ đề) — chỉ mục đang hoạt động, dùng làm facet duyệt trên OPAC.</summary>

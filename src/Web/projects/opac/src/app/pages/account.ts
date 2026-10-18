@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CirculationApi, HoldDto, HoldStatus, LoanDto, ReaderPanel } from '../core/circulation';
-import { DigitalApi, DigitalLoan, DigitalReservation, DigitalReservationStatus } from '../core/digital';
+import { DigitalApi, DigitalFavorite, DigitalLoan, DigitalReservation, DigitalReservationStatus } from '../core/digital';
 import { LDatePipe, Language, LNumberPipe } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
@@ -236,6 +236,28 @@ import { ReaderCard } from './reader-card';
               <p class="text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_RESERVATIONS' | translate }}</p>
             }
           </section>
+
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.DIGITAL.MY_FAVORITES' | translate }}</h2>
+            @if (digitalFavoritesError(); as err) { <p class="text-red-600 text-sm mb-3" role="alert">{{ err }}</p> }
+            @if (digitalFavorites().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (fav of digitalFavorites(); track fav.ebookItemPublicId) {
+                  <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                      <a [routerLink]="['/thu-vien-so', fav.ebookItemPublicId]" class="font-medium text-slate-900 hover:text-blue-700 truncate">{{ fav.title }}</a>
+                      @if (fav.author) { <div class="text-sm text-slate-500">{{ fav.author }}</div> }
+                    </div>
+                    <button type="button" [disabled]="digitalBusyId() === fav.ebookItemPublicId"
+                            class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50 shrink-0"
+                            (click)="removeDigitalFavorite(fav)">{{ 'OPAC.DIGITAL.UNFAVORITE' | translate }}</button>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_FAVORITES' | translate }}</p>
+            }
+          </section>
         }
       }
     </div>
@@ -271,6 +293,8 @@ export class Account implements OnInit {
   protected readonly digitalLoansError = signal<string | null>(null);
   protected readonly digitalReservations = signal<DigitalReservation[]>([]);
   protected readonly digitalReservationsError = signal<string | null>(null);
+  protected readonly digitalFavorites = signal<DigitalFavorite[]>([]);
+  protected readonly digitalFavoritesError = signal<string | null>(null);
   protected readonly digitalBusyId = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
@@ -292,6 +316,7 @@ export class Account implements OnInit {
     if (this.library.has('DIGITAL')) {
       this.loadDigitalLoans();
       this.loadDigitalReservations();
+      this.loadDigitalFavorites();
     }
   }
 
@@ -385,6 +410,27 @@ export class Account implements OnInit {
       this.digitalReservations.set(await this.digital.myReservations());
     } catch (e) {
       this.digitalReservationsError.set(this.language.apiError(e));
+    }
+  }
+
+  protected async removeDigitalFavorite(fav: DigitalFavorite): Promise<void> {
+    this.digitalBusyId.set(fav.ebookItemPublicId);
+    this.digitalFavoritesError.set(null);
+    try {
+      await this.digital.removeFavorite(fav.ebookItemPublicId);
+      this.digitalFavorites.update((fs) => fs.filter((f) => f.ebookItemPublicId !== fav.ebookItemPublicId));
+    } catch (e) {
+      this.digitalFavoritesError.set(this.language.apiError(e));
+    } finally {
+      this.digitalBusyId.set(null);
+    }
+  }
+
+  private async loadDigitalFavorites(): Promise<void> {
+    try {
+      this.digitalFavorites.set(await this.digital.myFavorites());
+    } catch (e) {
+      this.digitalFavoritesError.set(this.language.apiError(e));
     }
   }
 

@@ -113,6 +113,35 @@ export const DIGITAL_POLICIES: CrudConfig = {
   modalWidth: 'max-w-lg',
 };
 
+/** Đánh giá tài liệu số (LRC: EbookReview, quyền DIGITAL_REVIEWS) — bạn đọc gửi ẩn danh qua OPAC, thủ thư duyệt bằng cột trạng thái. */
+export const DIGITAL_REVIEWS: CrudConfig = {
+  title: 'DIGITAL_REVIEWS_PAGE.TITLE',
+  resource: 'reviews',
+  service: 'digital',
+  perm: 'DIGITAL_REVIEWS',
+  searchLabel: 'COMMON.SEARCH',
+  searchPlaceholder: '',
+  columns: [
+    { key: 'itemTitle', label: 'DIGITAL_REVIEWS_PAGE.ITEM' },
+    { key: 'rating', label: 'DIGITAL_REVIEWS_PAGE.RATING', width: '90px' },
+    { key: 'displayName', label: 'DIGITAL_REVIEWS_PAGE.DISPLAY_NAME' },
+    { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' },
+  ],
+  fields: [
+    {
+      key: 'ebookItemPublicId', label: 'DIGITAL_REVIEWS_PAGE.ITEM', type: 'select', required: true,
+      optionsFrom: async (api) =>
+        (await api.crud<{ publicId: string; title: string }>('items', 'digital').searchAll()).map((i) => ({ value: i.publicId, label: i.title })),
+    },
+    { key: 'rating', label: 'DIGITAL_REVIEWS_PAGE.RATING', type: 'number', half: true },
+    { key: 'displayName', label: 'DIGITAL_REVIEWS_PAGE.DISPLAY_NAME', type: 'text', half: true },
+    { key: 'email', label: 'DIGITAL_REVIEWS_PAGE.EMAIL', type: 'text', half: true },
+    { key: 'content', label: 'DIGITAL_REVIEWS_PAGE.CONTENT', type: 'textarea' },
+  ],
+  defaults: { ebookItemPublicId: null, rating: null, displayName: null, email: null, content: null },
+  modalWidth: 'max-w-xl',
+};
+
 /** Chính sách tài liệu số theo loại bạn đọc × bộ sưu tập (LRC: PolicyDigitalByCollection, quyền DIGITAL_POLICIES_BY_COLLECTION). */
 export const DIGITAL_POLICIES_BY_COLLECTION: CrudConfig = {
   title: 'DIGITAL_CAT.POLICIES_BY_COLLECTION_TITLE',

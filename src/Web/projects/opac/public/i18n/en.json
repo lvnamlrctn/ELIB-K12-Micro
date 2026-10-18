@@ -195,6 +195,7 @@
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Document not found (it may have been hidden or removed).",
+      "HAS_DIGITAL_COPY": "Digital copy available — Read now",
       "COVER_OF": "Cover of",
       "PROCESSING": "Being processed, not yet available",
       "TAB_INFO": "Details",
@@ -306,7 +307,20 @@
       "MY_LOANS": "Digital items on loan",
       "NO_LOANS": "You have no digital items currently on loan.",
       "MY_RESERVATIONS": "Digital reservations",
-      "NO_RESERVATIONS": "You have no active reservations."
+      "NO_RESERVATIONS": "You have no active reservations.",
+      "FAVORITE": "Add to favorites",
+      "UNFAVORITE": "Remove from favorites",
+      "REVIEWS": "Reviews",
+      "NO_REVIEWS": "No reviews yet.",
+      "ANONYMOUS": "Reader",
+      "WRITE_REVIEW": "Write a review",
+      "YOUR_NAME": "Your name (optional)",
+      "NO_RATING": "No rating",
+      "YOUR_REVIEW": "Share your thoughts…",
+      "SUBMIT_REVIEW": "Submit review",
+      "REVIEW_SUBMITTED": "Review submitted, pending approval.",
+      "MY_FAVORITES": "Favorite digital items",
+      "NO_FAVORITES": "You have no favorite digital items."
     },
     "LOGIN": {
       "SIGNING_IN": "Signing in…"

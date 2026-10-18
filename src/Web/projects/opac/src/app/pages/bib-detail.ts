@@ -4,6 +4,7 @@ import { Title } from '@angular/platform-browser';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CirculationApi, HoldDto, HoldStatus } from '../core/circulation';
+import { DigitalApi, DigitalByBibSummary } from '../core/digital';
 import { LDatePipe, Language } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth } from '../core/reader-auth';
@@ -51,6 +52,10 @@ type Tab = 'info' | 'isbd' | 'marc';
                   @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">{{ 'OPAC.COMMON.AVAILABLE_OF' | translate: { available: b.available, copies: b.copies } }}</span> }
                   @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ (onLoan(b) ? 'OPAC.SEARCH.ALL_BORROWED' : 'OPAC.BOOK_DETAIL.PROCESSING') | translate }}</span> }
                 </div>
+                @if (digitalMatch(); as d) {
+                  <a [routerLink]="['/thu-vien-so', d.publicId]" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-sm hover:bg-blue-100">
+                    <span class="material-icons text-[18px]">menu_book</span>{{ 'OPAC.BOOK_DETAIL.HAS_DIGITAL_COPY' | translate }}</a>
+                }
               </div>
             </div>
 
@@ -194,6 +199,7 @@ export class BibDetail {
   protected readonly auth = inject(ReaderAuth);
   protected readonly router = inject(Router);
   private readonly circulation = inject(CirculationApi);
+  private readonly digital = inject(DigitalApi);
   private readonly language = inject(Language);
 
   readonly publicId = input.required<string>();
@@ -216,6 +222,8 @@ export class BibDetail {
   protected readonly myHold = signal<HoldDto | null>(null);
   protected readonly holdBusy = signal(false);
   protected readonly holdError = signal<string | null>(null);
+
+  protected readonly digitalMatch = signal<DigitalByBibSummary | null>(null);
 
   constructor() {
     effect(() => void this.load(this.publicId()));
@@ -319,6 +327,8 @@ export class BibDetail {
       this.bib.set(bib);
       this.title.setTitle(`${bib.title} — ${this.library.name()}`);
       this.api.similar(publicId).then((s) => this.similar.set(s), () => this.similar.set([]));
+      if (this.library.has('DIGITAL')) this.digital.findByLinkedBib(bib.publicId).then((d) => this.digitalMatch.set(d), () => this.digitalMatch.set(null));
+      else this.digitalMatch.set(null);
     } catch {
       this.bib.set(null);
       this.notFound.set(true);

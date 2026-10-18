@@ -36,6 +36,11 @@ export interface DigitalReservation {
 export const DigitalLoanStatus = { Active: 1, Recalled: 2, Returned: 3, AutoExpired: 4 } as const;
 export const DigitalReservationStatus = { Pending: 1, Ready: 2, Fulfilled: 3, Cancelled: 4, Expired: 5 } as const;
 
+export interface DigitalReview { publicId: string; rating: number | null; displayName: string | null; content: string | null; createdAt: string; }
+export interface DigitalReviewSubmission { rating?: number | null; displayName?: string | null; content?: string | null; email?: string | null; }
+export interface DigitalFavorite { ebookItemPublicId: string; title: string; author: string | null; coverUrl: string | null; free: boolean; createdAt: string; }
+export interface DigitalByBibSummary { publicId: string; title: string; free: boolean; }
+
 /**
  * API tài liệu số của OPAC — ẩn danh dưới /api/opac/digital/browse/** (gateway → digital's /api/opac/**), cần đăng nhập bạn đọc
  * dưới /api/opac/digital/** còn lại (gateway → digital's /api/reader/**), đúng quyết định #7 của plan.
@@ -65,4 +70,20 @@ export class DigitalApi {
   cancelReservation(reservationPublicId: string) {
     return firstValueFrom(this.http.post<DigitalReservation>(`/api/opac/digital/reservations/${reservationPublicId}/Cancel`, {}));
   }
+
+  publishedReviews(itemPublicId: string) {
+    return firstValueFrom(this.http.get<DigitalReview[]>(`/api/opac/digital/browse/items/${itemPublicId}/reviews`));
+  }
+  submitReview(itemPublicId: string, submission: DigitalReviewSubmission) {
+    return firstValueFrom(this.http.post<DigitalReview>(`/api/opac/digital/browse/items/${itemPublicId}/reviews`, submission));
+  }
+
+  /** Tài liệu số liên kết với một biểu ghi sách in (null nếu không có — trang sách in chỉ hiện banner khi có). */
+  findByLinkedBib(bibPublicId: string) {
+    return firstValueFrom(this.http.get<DigitalByBibSummary | null>(`/api/opac/digital/browse/items/by-bib/${bibPublicId}`));
+  }
+
+  myFavorites() { return firstValueFrom(this.http.get<DigitalFavorite[]>('/api/opac/digital/favorites')); }
+  addFavorite(itemPublicId: string) { return firstValueFrom(this.http.post(`/api/opac/digital/favorites/${itemPublicId}`, {})); }
+  removeFavorite(itemPublicId: string) { return firstValueFrom(this.http.delete(`/api/opac/digital/favorites/${itemPublicId}`)); }
 }

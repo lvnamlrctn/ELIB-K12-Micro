@@ -201,6 +201,7 @@
     "DIGITAL_GROUP": "Tài liệu số",
     "DIGITAL_ITEMS": "Biểu ghi tài liệu số",
     "DIGITAL_LOANS": "Mượn/trả/đặt trước",
+    "DIGITAL_REVIEWS": "Đánh giá",
     "DIGITAL_COLLECTIONS": "Bộ sưu tập",
     "DIGITAL_SUBJECTS": "Môn loại",
     "DIGITAL_TOPICS": "Chủ đề",
@@ -3415,5 +3416,13 @@
     "STATUS_3": "Đã mượn",
     "STATUS_4": "Đã huỷ",
     "STATUS_5": "Hết hạn"
+  },
+  "DIGITAL_REVIEWS_PAGE": {
+    "TITLE": "Đánh giá tài liệu số",
+    "ITEM": "Tài liệu",
+    "RATING": "Số sao",
+    "DISPLAY_NAME": "Tên người đánh giá",
+    "EMAIL": "Email",
+    "CONTENT": "Nội dung"
   }
 }
