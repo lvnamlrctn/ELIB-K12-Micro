@@ -202,6 +202,7 @@
     "DIGITAL_ITEMS": "Biểu ghi tài liệu số",
     "DIGITAL_LOANS": "Mượn/trả/đặt trước",
     "DIGITAL_REVIEWS": "Đánh giá",
+    "DIGITAL_SUBMISSIONS": "Nộp tài liệu",
     "DIGITAL_COLLECTIONS": "Bộ sưu tập",
     "DIGITAL_SUBJECTS": "Môn loại",
     "DIGITAL_TOPICS": "Chủ đề",
@@ -3424,5 +3425,21 @@
     "DISPLAY_NAME": "Tên người đánh giá",
     "EMAIL": "Email",
     "CONTENT": "Nội dung"
+  },
+  "DIGITAL_SUBMISSIONS_PAGE": {
+    "TITLE": "Nộp tài liệu bạn đọc",
+    "TITLE_COL": "Tên tài liệu",
+    "DIG_TYPE": "Loại",
+    "ABSTRACT": "Tóm tắt",
+    "SUBMITTED_AT": "Ngày nộp",
+    "VIEW_FILE": "Xem file",
+    "APPROVE": "Duyệt",
+    "REJECT": "Từ chối",
+    "REJECT_TITLE": "Từ chối tài liệu nộp",
+    "APPROVE_SUCCESS": "Đã duyệt, tài liệu số đã được tạo (ở trạng thái Ẩn).",
+    "REJECT_SUCCESS": "Đã từ chối tài liệu nộp.",
+    "STATUS_1": "Chờ duyệt",
+    "STATUS_2": "Đã duyệt",
+    "STATUS_3": "Từ chối"
   }
 }

@@ -322,6 +322,30 @@
       "MY_FAVORITES": "Tài liệu số yêu thích",
       "NO_FAVORITES": "Bạn đọc chưa yêu thích tài liệu số nào."
     },
+    "SUBMIT_DOC": {
+      "TITLE": "Nộp tài liệu",
+      "NAV_LINK": "Nộp tài liệu của bạn",
+      "INTRO": "Chia sẻ luận văn, bài báo hoặc đề tài của bạn với thư viện số — thủ thư sẽ xem và duyệt trước khi công khai.",
+      "LOGIN_REQUIRED": "Đăng nhập bằng tài khoản bạn đọc để nộp tài liệu.",
+      "DOC_TITLE": "Tên tài liệu",
+      "AUTHOR": "Tác giả",
+      "DOC_TYPE": "Loại tài liệu",
+      "ABSTRACT": "Tóm tắt",
+      "FILE": "File tài liệu",
+      "FILE_HINT": "Chấp nhận PDF, DOC, DOCX — tối đa 50MB.",
+      "FILE_TYPE_INVALID": "Chỉ nhận file PDF, DOC hoặc DOCX.",
+      "FILE_TOO_LARGE": "File tối đa 50MB.",
+      "UPLOADING": "Đang tải lên…",
+      "SUBMIT": "Gửi tài liệu",
+      "SUBMIT_SUCCESS": "Đã gửi tài liệu, thư viện sẽ xem xét và duyệt.",
+      "MY_SUBMISSIONS": "Tài liệu đã nộp",
+      "NO_SUBMISSIONS": "Bạn chưa nộp tài liệu nào.",
+      "STATUS_1": "Chờ duyệt",
+      "STATUS_2": "Đã duyệt",
+      "STATUS_3": "Từ chối",
+      "VIEW_ITEM": "Xem trong thư viện số",
+      "REJECT_REASON": "Lý do: {{reason}}"
+    },
     "LOGIN": {
       "SIGNING_IN": "Đang đăng nhập…"
     },

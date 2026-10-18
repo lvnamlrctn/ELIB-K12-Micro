@@ -8,6 +8,7 @@ export const routes: Routes = [
   { path: 'tai-lieu/:publicId', loadComponent: () => import('./pages/bib-detail').then((m) => m.BibDetail) },
   { path: 'thu-vien-so', loadComponent: () => import('./pages/ebook-search').then((m) => m.EbookSearch), title: 'OPAC.HOME.SERVICE_DIGITAL' },
   { path: 'thu-vien-so/:publicId', loadComponent: () => import('./pages/ebook-detail').then((m) => m.EbookDetail) },
+  { path: 'nop-tai-lieu', loadComponent: () => import('./pages/submit-document').then((m) => m.SubmitDocument), title: 'OPAC.SUBMIT_DOC.TITLE' },
   { path: 'tai-khoan', loadComponent: () => import('./pages/account').then((m) => m.Account), title: 'OPAC.MY_LIBRARY.ACCOUNT_TITLE' },
   { path: 'tai-khoan/callback', loadComponent: () => import('./pages/account-callback').then((m) => m.AccountCallback) },
   { path: 'dat-phong', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_SPACE' } },

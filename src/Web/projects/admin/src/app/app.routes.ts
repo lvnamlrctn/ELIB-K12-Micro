@@ -186,6 +186,7 @@ export const routes: Routes = [
       catalog('digital-reviews', DIGITAL_REVIEWS),
       { path: 'digital-items', loadComponent: () => import('./pages/digital/items').then((m) => m.DigitalItems), canActivate: [tenantGuard, permissionGuard('DIGITAL_ITEMS')], title: 'DIGITAL_ITEMS_PAGE.TITLE' },
       { path: 'digital-loans', loadComponent: () => import('./pages/digital/loans').then((m) => m.DigitalLoans), canActivate: [tenantGuard, permissionGuard('DIGITAL_LOANS')], title: 'DIGITAL_LOANS_PAGE.TITLE' },
+      { path: 'digital-submissions', loadComponent: () => import('./pages/digital/submissions').then((m) => m.DigitalSubmissions), canActivate: [tenantGuard, permissionGuard('DIGITAL_SUBMISSIONS')], title: 'DIGITAL_SUBMISSIONS_PAGE.TITLE' },
       { path: 'phan-he/:code', loadComponent: () => import('./pages/module-placeholder').then((m) => m.ModulePlaceholder), canActivate: [tenantGuard] },
     ],
   },

@@ -202,6 +202,7 @@
     "DIGITAL_ITEMS": "Digital Items",
     "DIGITAL_LOANS": "Loans / Reservations",
     "DIGITAL_REVIEWS": "Reviews",
+    "DIGITAL_SUBMISSIONS": "Submissions",
     "DIGITAL_COLLECTIONS": "Collections",
     "DIGITAL_SUBJECTS": "Subjects",
     "DIGITAL_TOPICS": "Topics",
@@ -3424,5 +3425,21 @@
     "DISPLAY_NAME": "Reviewer name",
     "EMAIL": "Email",
     "CONTENT": "Content"
+  },
+  "DIGITAL_SUBMISSIONS_PAGE": {
+    "TITLE": "Reader document submissions",
+    "TITLE_COL": "Document title",
+    "DIG_TYPE": "Type",
+    "ABSTRACT": "Abstract",
+    "SUBMITTED_AT": "Submitted",
+    "VIEW_FILE": "View file",
+    "APPROVE": "Approve",
+    "REJECT": "Reject",
+    "REJECT_TITLE": "Reject submission",
+    "APPROVE_SUCCESS": "Approved — a hidden digital item was created.",
+    "REJECT_SUCCESS": "Submission rejected.",
+    "STATUS_1": "Pending",
+    "STATUS_2": "Approved",
+    "STATUS_3": "Rejected"
   }
 }

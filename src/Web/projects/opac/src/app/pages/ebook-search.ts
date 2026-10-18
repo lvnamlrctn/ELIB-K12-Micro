@@ -24,6 +24,8 @@ const PAGE_SIZE = 20;
                  [placeholder]="'OPAC.DIGITAL.SEARCH_PH' | translate" />
           <button type="submit" class="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium">{{ 'OPAC.SEARCH.SEARCH_BTN' | translate }}</button>
         </form>
+        <a routerLink="/nop-tai-lieu" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+          <span class="material-icons text-[18px]">upload_file</span>{{ 'OPAC.SUBMIT_DOC.NAV_LINK' | translate }}</a>
       </div>
     </section>
 

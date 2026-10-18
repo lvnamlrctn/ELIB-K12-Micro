@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -40,6 +40,21 @@ export interface DigitalReview { publicId: string; rating: number | null; displa
 export interface DigitalReviewSubmission { rating?: number | null; displayName?: string | null; content?: string | null; email?: string | null; }
 export interface DigitalFavorite { ebookItemPublicId: string; title: string; author: string | null; coverUrl: string | null; free: boolean; createdAt: string; }
 export interface DigitalByBibSummary { publicId: string; title: string; free: boolean; }
+
+export interface DigitalDigType { id: number; code: string; descriptionVn: string | null; }
+
+/** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Từ chối. */
+export interface DigitalSubmission {
+  publicId: string; title: string; author: string | null; digTypeId: number | null; digTypeCode: string | null; abstract: string | null;
+  fileName: string; status: number; rejectReason: string | null; createdItemPublicId: string | null; createdAt: string;
+}
+export const DigitalSubmissionStatus = { Pending: 1, Approved: 2, Rejected: 3 } as const;
+export interface DigitalSubmissionFields { title: string; author?: string | null; digTypeId?: number | null; abstract?: string | null; }
+
+async function putToStorage(uploadUrl: string, file: File): Promise<void> {
+  const response = await fetch(uploadUrl, { method: 'PUT', body: file, credentials: 'omit' });
+  if (!response.ok) throw new HttpErrorResponse({ status: response.status, error: { code: 'UPLOAD_FAILED', detail: `Upload failed (${response.status}).` } });
+}
 
 /**
  * API tài liệu số của OPAC — ẩn danh dưới /api/opac/digital/browse/** (gateway → digital's /api/opac/**), cần đăng nhập bạn đọc
@@ -86,4 +101,17 @@ export class DigitalApi {
   myFavorites() { return firstValueFrom(this.http.get<DigitalFavorite[]>('/api/opac/digital/favorites')); }
   addFavorite(itemPublicId: string) { return firstValueFrom(this.http.post(`/api/opac/digital/favorites/${itemPublicId}`, {})); }
   removeFavorite(itemPublicId: string) { return firstValueFrom(this.http.delete(`/api/opac/digital/favorites/${itemPublicId}`)); }
+
+  digTypes() { return firstValueFrom(this.http.get<DigitalDigType[]>('/api/opac/digital/browse/dig-types')); }
+  myDocumentSubmissions() { return firstValueFrom(this.http.get<DigitalSubmission[]>('/api/opac/digital/document-submissions')); }
+
+  /** Nộp tài liệu — xin vé → PUT thẳng vào kho (qua gateway's /s3/**, không đổi) → hoàn tất (digital tự gọi media complete). */
+  async submitDocument(file: File, fields: DigitalSubmissionFields): Promise<DigitalSubmission> {
+    const ticket = await firstValueFrom(this.http.post<{ fileId: string; uploadUrl: string }>(
+      '/api/opac/digital/document-submissions/upload-ticket', { fileName: file.name, contentType: file.type, size: file.size }));
+    await putToStorage(ticket.uploadUrl, file);
+    const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1) : null;
+    return firstValueFrom(this.http.post<DigitalSubmission>('/api/opac/digital/document-submissions',
+      { ...fields, mediaFileId: ticket.fileId, fileName: file.name, fileExt: ext, fileSize: file.size }));
+  }
 }

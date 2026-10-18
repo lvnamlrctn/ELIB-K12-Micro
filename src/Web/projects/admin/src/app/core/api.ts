@@ -472,6 +472,20 @@ export const EBOOK_RESERVATION_STATUSES: { code: number; name: string; badge: st
   { code: 5, name: 'DIGITAL_RESERVATION.STATUS_5', badge: 'badge-off' },
 ];
 
+/** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Từ chối. */
+export interface DocumentSubmission {
+  id: number; publicId: string; readerPublicId: string; cardNo: string | null; readerName: string | null; title: string; author: string | null;
+  digTypeId: number | null; digTypeCode: string | null; abstract: string | null; mediaFileId: string; fileName: string; fileExt: string | null;
+  fileSize: number; status: number; rejectReason: string | null; reviewedBy: number | null; reviewedAt: string | null;
+  createdItemPublicId: string | null; createdAt: string;
+}
+export interface DocumentSubmissionSearch extends CrudSearch { readerPublicId?: string | null; submissionStatus?: number | null; }
+export const DOCUMENT_SUBMISSION_STATUSES: { code: number; name: string; badge: string }[] = [
+  { code: 1, name: 'DIGITAL_SUBMISSIONS_PAGE.STATUS_1', badge: 'badge-warn' },
+  { code: 2, name: 'DIGITAL_SUBMISSIONS_PAGE.STATUS_2', badge: 'badge-on' },
+  { code: 3, name: 'DIGITAL_SUBMISSIONS_PAGE.STATUS_3', badge: 'badge-off' },
+];
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -1048,4 +1062,8 @@ export class Api {
   ebookBibOptions(q: string) { return this.get<BibLinkOption[]>('/api/admin/digital/items/bib-options', { q }); }
   recallEbookLoan(loanPublicId: string, reason: string) { return this.post<EbookLoan>('/api/admin/digital/loans/Recall', { loanPublicId, reason }); }
   recallAllEbookLoans(ebookItemPublicId: string, reason: string) { return this.post<number>('/api/admin/digital/loans/RecallAll', { ebookItemPublicId, reason }); }
+  approveDocumentSubmission(publicId: string) { return this.post<DocumentSubmission>(`/api/admin/digital/document-submissions/${publicId}/Approve`); }
+  rejectDocumentSubmission(submissionPublicId: string, reason: string) {
+    return this.post<DocumentSubmission>('/api/admin/digital/document-submissions/Reject', { submissionPublicId, reason });
+  }
 }

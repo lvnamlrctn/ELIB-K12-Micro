@@ -322,6 +322,30 @@
       "MY_FAVORITES": "Favorite digital items",
       "NO_FAVORITES": "You have no favorite digital items."
     },
+    "SUBMIT_DOC": {
+      "TITLE": "Submit a document",
+      "NAV_LINK": "Submit your document",
+      "INTRO": "Share your thesis, paper or research with the digital library — a librarian will review it before it's published.",
+      "LOGIN_REQUIRED": "Log in with your reader account to submit a document.",
+      "DOC_TITLE": "Document title",
+      "AUTHOR": "Author",
+      "DOC_TYPE": "Document type",
+      "ABSTRACT": "Abstract",
+      "FILE": "File",
+      "FILE_HINT": "PDF, DOC or DOCX accepted — up to 50MB.",
+      "FILE_TYPE_INVALID": "Only PDF, DOC or DOCX files are accepted.",
+      "FILE_TOO_LARGE": "File must be 50MB or smaller.",
+      "UPLOADING": "Uploading…",
+      "SUBMIT": "Submit document",
+      "SUBMIT_SUCCESS": "Document submitted — the library will review it.",
+      "MY_SUBMISSIONS": "Submitted documents",
+      "NO_SUBMISSIONS": "You haven't submitted any documents yet.",
+      "STATUS_1": "Pending",
+      "STATUS_2": "Approved",
+      "STATUS_3": "Rejected",
+      "VIEW_ITEM": "View in digital library",
+      "REJECT_REASON": "Reason: {{reason}}"
+    },
     "LOGIN": {
       "SIGNING_IN": "Signing in…"
     },
