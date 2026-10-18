@@ -10,6 +10,8 @@ public sealed class StorageTests
     [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1 }, "image/gif")]
     [InlineData(new byte[] { 0x52, 0x49, 0x46, 0x46, 1, 2, 3, 4, 0x57, 0x45, 0x42, 0x50, 0x56 }, "image/webp")]
     [InlineData(new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31 }, "application/pdf")]
+    [InlineData(new byte[] { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0 }, "application/msword")]
+    [InlineData(new byte[] { 0x50, 0x4B, 0x03, 0x04, 0 }, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")]
     public void Detects_supported_types_by_magic_bytes(byte[] header, string expected) =>
         Assert.Equal(expected, ContentSniffer.Detect(header));
 

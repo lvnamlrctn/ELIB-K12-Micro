@@ -89,6 +89,20 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         return await CreateTicketAsync(request.TenantId, purpose, request.FileName, request.ContentType, request.Size, ct);
     }
 
+    /// <summary>
+    /// Dịch vụ khác xin vé upload hộ bạn đọc đã tự xác thực (service token, không qua gateway) — chỉ mục đích đánh dấu
+    /// ServiceRequestable mới xin được (whitelist nhỏ, hiện chỉ document-submission của digital), để service khác không xin
+    /// được vé cho mục đích bất kỳ (ảnh thẻ, logo đơn vị…).
+    /// </summary>
+    public async Task<UploadTicketDto> RequestServiceUploadAsync(long tenantId, UploadRequest request, CancellationToken ct)
+    {
+        var purpose = MediaPurpose.Get(request.Purpose);
+        if (!purpose.ServiceRequestable)
+            throw new BusinessRuleException("MEDIA_SERVICE_NOT_ALLOWED", $"{purpose.Name} không cho dịch vụ khác xin vé hộ.", 403);
+        using var _ = tenant.Use(tenantId);
+        return await CreateTicketAsync(tenantId, purpose, request.FileName, request.ContentType, request.Size, ct);
+    }
+
     public async Task<MediaFileDto> CompleteAsync(Guid fileId, CancellationToken ct)
     {
         var file = await FindAsync(fileId, ct);

@@ -44,6 +44,14 @@ public static class MediaEndpoints
             using (tenant.Use(tenantId))
                 return await s.DownloadEbookFileAsync(id, ct);
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
+        // Nội bộ: digital xin vé upload hộ bạn đọc đã tự xác thực (nộp tài liệu qua OPAC) — chỉ mục đích ServiceRequestable
+        // (MediaService tự kiểm), và hoàn tất bằng chính CompleteSystemAsync đã có (chuyển ngữ cảnh đơn vị rồi complete như
+        // thường, không cần thêm một bản sao logic complete riêng).
+        app.MapPost("/internal/tenants/{tenantId:long}/files/uploads", (long tenantId, UploadRequest request, MediaService s, CancellationToken ct) =>
+            s.RequestServiceUploadAsync(tenantId, request, ct)).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapPost("/internal/tenants/{tenantId:long}/files/{id:guid}/complete", (long tenantId, Guid id, MediaService s, CancellationToken ct) =>
+            s.CompleteSystemAsync(tenantId, id, ct)).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }
 

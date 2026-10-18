@@ -19,7 +19,8 @@ public enum MediaFileStatus
 /// Mục đích upload quyết định bucket, loại file và dung lượng được phép (docs 05 §3: giới hạn theo loại).
 /// <see cref="SystemOnly"/>: chỉ quản trị nền tảng upload hộ đơn vị (logo đơn vị).
 /// </summary>
-public sealed record MediaPurpose(string Code, string Name, bool Public, IReadOnlyList<string> AllowedTypes, long MaxBytes, bool SystemOnly)
+public sealed record MediaPurpose(
+    string Code, string Name, bool Public, IReadOnlyList<string> AllowedTypes, long MaxBytes, bool SystemOnly, bool ServiceRequestable = false)
 {
     private const long MB = 1024 * 1024;
 
@@ -45,7 +46,15 @@ public sealed record MediaPurpose(string Code, string Name, bool Public, IReadOn
     public static readonly MediaPurpose EbookFile =
         new("ebook-file", "Tệp tài liệu số", Public: false, ["application/pdf"], 200 * MB, SystemOnly: false);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile];
+    /// <summary>Tài liệu bạn đọc tự nộp qua OPAC, chờ thủ thư duyệt (digital's DocumentSubmission) — riêng tư. ServiceRequestable:
+    /// digital xin vé hộ bạn đọc đã tự xác thực bằng service token (bạn đọc không có đường gọi /api/files/uploads trực tiếp,
+    /// endpoint đó chỉ dành cho cán bộ) — xem endpoint nội bộ /internal/tenants/{tenantId}/files/uploads.</summary>
+    public static readonly MediaPurpose DocumentSubmission = new(
+        "document-submission", "Tài liệu bạn đọc nộp", Public: false,
+        ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        50 * MB, SystemOnly: false, ServiceRequestable: true);
+
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile, DocumentSubmission];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -138,6 +147,8 @@ public sealed class MediaFile : Entity, ITenantOwned, IHasPublicId, IAuditable
         "image/gif" => ".gif",
         "image/webp" => ".webp",
         "application/pdf" => ".pdf",
+        "application/msword" => ".doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
         _ => "",
     };
 }

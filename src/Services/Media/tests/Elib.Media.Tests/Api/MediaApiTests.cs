@@ -259,6 +259,46 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Service_requests_an_upload_ticket_only_for_a_service_requestable_purpose()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+
+        var ticket = await Read<UploadTicketDto>(await service.PostAsJsonAsync(U($"/internal/tenants/{tenantId}/files/uploads"),
+            new UploadRequest("document-submission", "luan-van.pdf", "application/pdf", PdfBytes.Length)));
+        Assert.StartsWith($"/s3/media-private/{tenantId}/document-submission/", ticket.UploadUrl, StringComparison.Ordinal);
+        _factory.Storage.Upload(ticket.UploadUrl, PdfBytes);
+
+        var file = await Read<MediaFileDto>(await service.PostAsync(U($"/internal/tenants/{tenantId}/files/{ticket.FileId}/complete"), null));
+        Assert.Equal((MediaFileStatus.Ready, "application/pdf"), (file.Status, file.ContentType));
+
+        // Mục đích không ServiceRequestable (ebook-file) bị chặn ngay khi xin vé hộ.
+        var denied = await service.PostAsJsonAsync(U($"/internal/tenants/{tenantId}/files/uploads"),
+            new UploadRequest("ebook-file", "a.pdf", "application/pdf", 10));
+        Assert.Equal((HttpStatusCode.Forbidden, "MEDIA_SERVICE_NOT_ALLOWED"), (denied.StatusCode, await ErrorCode(denied)));
+
+        // Token cán bộ (không phải service) không gọi được endpoint nội bộ này.
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId).PostAsJsonAsync(U($"/internal/tenants/{tenantId}/files/uploads"),
+            new UploadRequest("document-submission", "a.pdf", "application/pdf", 10))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Docx_content_is_detected_by_magic_bytes_for_document_submission()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        byte[] docxBytes = [0x50, 0x4B, 0x03, 0x04, 1, 2, 3, 4];
+
+        var ticket = await Read<UploadTicketDto>(await service.PostAsJsonAsync(U($"/internal/tenants/{tenantId}/files/uploads"),
+            new UploadRequest("document-submission", "luan-van.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docxBytes.Length)));
+        _factory.Storage.Upload(ticket.UploadUrl, docxBytes);
+
+        var file = await Read<MediaFileDto>(await service.PostAsync(U($"/internal/tenants/{tenantId}/files/{ticket.FileId}/complete"), null));
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
+    }
+
+    [Fact]
     public async Task Staff_imports_bib_cover_from_url_into_public_bucket_after_content_check()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);
