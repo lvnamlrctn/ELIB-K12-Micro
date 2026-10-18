@@ -1,4 +1,4 @@
-# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, acquisition, circulation, search, gateway.
+# Môi trường DEV của nền tảng ELIB (GĐ0): Postgres, RabbitMQ, Mailpit, MinIO, Grafana (otel-lgtm), identity, tenant, notification, audit, media, patron, catalog, holdings, acquisition, circulation, search, digital, gateway.
 # Chỉ để kiểm thử tích hợp — production chạy trên Kubernetes (docs 06).
 #
 # Mọi secret lấy từ deploy/dev/.env (sinh bằng ./init-env.sh, KHÔNG commit). Xem deploy/dev/README.md.
@@ -42,6 +42,7 @@ services:
       ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD:?chạy ./init-env.sh trước}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD:?chạy ./init-env.sh trước}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD:?chạy ./init-env.sh trước}
+      DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -76,6 +77,7 @@ services:
       ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD}
+      DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -164,6 +166,7 @@ services:
       Identity__Clients__svc-acquisition__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-circulation__ClientSecret: ${SVC_CIRCULATION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-search__ClientSecret: ${SVC_SEARCH_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-digital__ClientSecret: ${SVC_DIGITAL_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -208,6 +211,7 @@ services:
       Provisioning__DeployedServices__5: circulation
       Provisioning__DeployedServices__6: search
       Provisioning__DeployedServices__7: acquisition
+      Provisioning__DeployedServices__8: digital
 
   notification:
     build:
@@ -404,6 +408,28 @@ services:
       Holdings__Url: http://holdings:8080
       Circulation__Url: http://circulation:8080
 
+  # GĐ2 (làm sớm): tài liệu số — danh mục/chính sách/biểu ghi + mượn/trả/đặt trước; bản sao bạn đọc (thiếu thì hỏi patron).
+  digital:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Digital/Elib.Digital.Api/Elib.Digital.Api.csproj
+        ASSEMBLY: Elib.Digital.Api
+    image: elib/digital:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__DigitalDb: Host=postgres;Database=elib_digital;Username=digital_app;Password=${DIGITAL_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_DIGITAL_SECRET}
+      Patron__Url: http://patron:8080
+      Catalog__Url: http://catalog:8080
+      Media__Url: http://media:8080
+
   admin-web:
     build:
       context: ../..
@@ -444,6 +470,7 @@ services:
       acquisition: { condition: service_started }
       circulation: { condition: service_started }
       search: { condition: service_started }
+      digital: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

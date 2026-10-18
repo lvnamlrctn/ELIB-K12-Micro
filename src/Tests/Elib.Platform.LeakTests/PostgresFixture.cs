@@ -7,6 +7,7 @@ using Elib.Media.Infrastructure;
 using Elib.Notification.Infrastructure;
 using Elib.Catalog.Infrastructure;
 using Elib.Circulation.Infrastructure;
+using Elib.Digital.Infrastructure;
 using Elib.Holdings.Infrastructure;
 using Elib.Search.Infrastructure;
 using Elib.Patron.Infrastructure;
@@ -69,6 +70,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new CirculationDbContext(Options<CirculationDbContext>(cs, t), t)),
         new("search", "elib_leak_search", ["search_bibs", "search_items", "search_sync_states", "search_queries", "z3950_servers"],
             (cs, t) => new SearchDbContext(Options<SearchDbContext>(cs, t), t)),
+        new("digital", "elib_leak_digital", ["ebook_collections", "ebook_subjects", "ebook_topics", "ebook_dig_types", "ebook_items",
+                "ebook_files", "policy_digitals", "policy_digital_by_collections", "ebook_item_loans", "ebook_item_reservations", "patron_replicas"],
+            (cs, t) => new DigitalDbContext(Options<DigitalDbContext>(cs, t), t)),
     ];
 
     public static ServiceDatabase Get(string service) => Services.Single(s => s.Service == service);

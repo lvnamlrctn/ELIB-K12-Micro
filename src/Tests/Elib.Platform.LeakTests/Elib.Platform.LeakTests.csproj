@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\Services\Acquisition\Elib.Acquisition.Infrastructure\Elib.Acquisition.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Circulation\Elib.Circulation.Infrastructure\Elib.Circulation.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Search\Elib.Search.Infrastructure\Elib.Search.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Digital\Elib.Digital.Infrastructure\Elib.Digital.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
