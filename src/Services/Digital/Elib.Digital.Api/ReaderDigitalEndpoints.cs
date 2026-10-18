@@ -43,6 +43,21 @@ public static class ReaderDigitalEndpoints
             async (Guid reservationId, ClaimsPrincipal principal, EbookReservationResource r, CancellationToken ct) =>
                 (await r.CancelAsync(reservationId, ct, ReaderId(principal))).ForReader());
 
+        reader.MapGet("/favorites", async (ClaimsPrincipal principal, ReaderFavorites favorites, CancellationToken ct) =>
+            await favorites.MyListAsync(ReaderId(principal), ct));
+
+        reader.MapPost("/favorites/{itemPublicId:guid}", async (Guid itemPublicId, ClaimsPrincipal principal, ReaderFavorites favorites, CancellationToken ct) =>
+        {
+            await favorites.AddAsync(itemPublicId, ReaderId(principal), ct);
+            return Results.NoContent();
+        });
+
+        reader.MapDelete("/favorites/{itemPublicId:guid}", async (Guid itemPublicId, ClaimsPrincipal principal, ReaderFavorites favorites, CancellationToken ct) =>
+        {
+            await favorites.RemoveAsync(itemPublicId, ReaderId(principal), ct);
+            return Results.NoContent();
+        });
+
         return app;
     }
 

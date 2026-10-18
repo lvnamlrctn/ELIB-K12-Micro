@@ -23,6 +23,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<EbookLoanResource>();
         services.AddCrudResource<EbookReservationResource>();
         services.AddScoped<EbookFileAccess>();
+        services.AddCrudResource<EbookReviewResource>();
+        services.AddScoped<OpacReviews>();
+        services.AddScoped<ReaderFavorites>();
         return services;
     }
 }

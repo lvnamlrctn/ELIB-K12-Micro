@@ -105,6 +105,7 @@ public static class PermissionCatalog
 
         new("DIGITAL_ITEMS", "Tài liệu số", DigitalGroup, Crud, DigitalLicense),
         new("DIGITAL_LOANS", "Mượn/trả/đặt trước tài liệu số", DigitalGroup, [View, Edit], DigitalLicense),
+        new("DIGITAL_REVIEWS", "Đánh giá tài liệu số", DigitalGroup, Crud, DigitalLicense),
         new("DIGITAL_COLLECTIONS", "Bộ sưu tập", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_SUBJECTS", "Môn loại", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_TOPICS", "Chủ đề", DigitalParams, Crud, DigitalLicense),

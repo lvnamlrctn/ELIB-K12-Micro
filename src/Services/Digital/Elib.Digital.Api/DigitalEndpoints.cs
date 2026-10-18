@@ -25,6 +25,7 @@ public static class DigitalEndpoints
         api.MapCrud<PolicyDigitalByCollectionResource>("/policies-by-collection", "DIGITAL_POLICIES_BY_COLLECTION").WithTags("PoliciesByCollection");
         var items = api.MapCrud<EbookItemResource>("/items", "DIGITAL_ITEMS").WithTags("Items");
         api.MapCrud<EbookFileResource>("/files", "DIGITAL_ITEMS").WithTags("Files");
+        api.MapCrud<EbookReviewResource>("/reviews", "DIGITAL_REVIEWS").WithTags("Reviews");
 
         // Ô chọn liên kết sách in của màn thêm/sửa tài liệu số (quyết định #2) — proxy sang catalog, không giữ bản sao.
         items.MapGet("/bib-options", [Permission("DIGITAL_ITEMS", "view")] (string? q, ICatalogBibLookup bibs, CancellationToken ct) =>

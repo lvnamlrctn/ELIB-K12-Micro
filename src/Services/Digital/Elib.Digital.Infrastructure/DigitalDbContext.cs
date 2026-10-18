@@ -129,6 +129,22 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
         });
 
+        modelBuilder.Entity<EbookReview>(e =>
+        {
+            e.ToTable("ebook_reviews");
+            e.Property(x => x.DisplayName).HasMaxLength(EbookReview.MaxDisplayNameLength);
+            e.Property(x => x.Content).HasMaxLength(EbookReview.MaxContentLength);
+            e.Property(x => x.Email).HasMaxLength(EbookReview.MaxEmailLength);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.Status });
+        });
+
+        modelBuilder.Entity<EbookFavorite>(e =>
+        {
+            e.ToTable("ebook_favorites");
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.ReaderPublicId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId });
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

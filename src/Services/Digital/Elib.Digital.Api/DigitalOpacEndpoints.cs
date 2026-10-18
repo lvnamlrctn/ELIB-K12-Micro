@@ -24,6 +24,10 @@ public static class DigitalOpacEndpoints
             (Guid publicId, Guid filePublicId, bool? download, ClaimsPrincipal principal, EbookFileAccess access, CancellationToken ct) =>
                 access.SignedUrlAsync(publicId, filePublicId, ReaderIdOrNull(principal), download ?? false, ct));
 
+        opac.MapPost("/items/{publicId:guid}/reviews", (Guid publicId, OpacReviewSubmission submission, OpacReviews reviews, CancellationToken ct) =>
+            reviews.SubmitAsync(publicId, submission, ct));
+        opac.MapGet("/items/{publicId:guid}/reviews", (Guid publicId, OpacReviews reviews, CancellationToken ct) => reviews.PublishedAsync(publicId, ct));
+
         opac.MapGet("/collections", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.CollectionsAsync(ct));
         opac.MapGet("/subjects", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.SubjectsAsync(ct));
         opac.MapGet("/topics", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.TopicsAsync(ct));

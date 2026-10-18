@@ -71,7 +71,8 @@ public sealed class PostgresFixture : IAsyncLifetime
         new("search", "elib_leak_search", ["search_bibs", "search_items", "search_sync_states", "search_queries", "z3950_servers"],
             (cs, t) => new SearchDbContext(Options<SearchDbContext>(cs, t), t)),
         new("digital", "elib_leak_digital", ["ebook_collections", "ebook_subjects", "ebook_topics", "ebook_dig_types", "ebook_items",
-                "ebook_files", "policy_digitals", "policy_digital_by_collections", "ebook_item_loans", "ebook_item_reservations", "patron_replicas"],
+                "ebook_files", "policy_digitals", "policy_digital_by_collections", "ebook_item_loans", "ebook_item_reservations", "patron_replicas",
+                "ebook_reviews", "ebook_favorites"],
             (cs, t) => new DigitalDbContext(Options<DigitalDbContext>(cs, t), t)),
     ];
 
