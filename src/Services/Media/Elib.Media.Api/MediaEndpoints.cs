@@ -37,6 +37,13 @@ public static class MediaEndpoints
                 return Results.File(content.Bytes, content.ContentType);
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        // Nội bộ: digital xin URL có hạn của file tài liệu số sau khi đã TỰ kiểm quyền truy cập (mượn/chính sách) — chỉ purpose
+        // ebook-file, không phải URL chung cho mọi loại file (tránh digital xin được URL của ảnh thẻ/tệp đính kèm service khác).
+        app.MapGet("/internal/tenants/{tenantId:long}/files/{id:guid}/download", async (long tenantId, Guid id, ITenantContext tenant, MediaService s, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await s.DownloadEbookFileAsync(id, ct);
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
         return app;
     }
 

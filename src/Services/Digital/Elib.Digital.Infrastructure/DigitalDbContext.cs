@@ -114,6 +114,21 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.HasIndex(x => new { x.TenantId, x.EbookItemId });
         });
 
+        modelBuilder.Entity<EbookItemLoan>(e =>
+        {
+            e.ToTable("ebook_item_loans");
+            e.Property(x => x.RecallReason).HasMaxLength(EbookItemLoan.MaxReasonLength);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+        });
+
+        modelBuilder.Entity<EbookItemReservation>(e =>
+        {
+            e.ToTable("ebook_item_reservations");
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

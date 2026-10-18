@@ -70,6 +70,10 @@ public static class DefaultTemplates
     public const string PrintHoldReady = "PRINT_HOLD_READY";
     public const string PrintHoldExpired = "PRINT_HOLD_EXPIRED";
 
+    // Tài liệu số (digital gửi theo mã).
+    public const string EbookHoldReady = "EBOOK_HOLD_READY";
+    public const string EbookLoanExpired = "EBOOK_LOAN_EXPIRED";
+
     public sealed record Definition(string Code, string Name, string Subject, string Body);
 
     public static readonly IReadOnlyList<Definition> All =
@@ -118,6 +122,18 @@ public static class DefaultTemplates
             <p>Xin chào {{ full_name }},</p>
             <p>Tài liệu <strong>{{ title }}</strong> giữ cho bạn đến hết ngày {{ expires_at }} nhưng bạn chưa đến mượn, nên đặt mượn đã bị huỷ.</p>
             <p>Bạn có thể đặt mượn lại nếu vẫn cần tài liệu này.</p>
+            """),
+        new(EbookHoldReady, "Tài liệu số đặt trước đã sẵn sàng", "Tài liệu số bạn đặt trước đã sẵn sàng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu số <strong>{{ title }}</strong> bạn đặt trước đã có chỗ đọc.</p>
+            <p>Vui lòng vào mượn trước <strong>{{ ready_expires_at }}</strong>; sau thời hạn này chỗ đọc sẽ chuyển cho bạn đọc khác.</p>
+            """),
+        new(EbookLoanExpired, "Tài liệu số đã hết hạn mượn", "Tài liệu số đã hết hạn mượn — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Tài liệu số <strong>{{ title }}</strong> bạn mượn đã hết hạn truy cập lúc {{ expired_at }}.</p>
+            <p>Bạn có thể mượn lại nếu vẫn cần đọc tài liệu này.</p>
             """),
     ];
 

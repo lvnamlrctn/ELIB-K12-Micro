@@ -186,6 +186,19 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         return new FileContent(bytes, file.ContentType);
     }
 
+    /// <summary>
+    /// URL có hạn của file tài liệu số cho digital (service token) — CHỈ file mục đích ebook-file đã xong, của đơn vị hiện tại.
+    /// Giới hạn theo mục đích để digital không xin được URL của ảnh thẻ/tệp đính kèm thuộc service khác. digital tự kiểm quyền mượn
+    /// trước khi gọi — ở đây chỉ kiểm file đúng loại và đã sẵn sàng.
+    /// </summary>
+    public async Task<DownloadDto> DownloadEbookFileAsync(Guid fileId, CancellationToken ct)
+    {
+        var file = await FindAsync(fileId, ct);
+        if (file.Status != MediaFileStatus.Ready || file.Purpose != MediaPurpose.EbookFile.Code) throw new NotFoundException("file", fileId);
+        var expiry = TimeSpan.FromMinutes(_options.DownloadUrlMinutes);
+        return new DownloadDto(await storage.PresignGetAsync(file.Bucket, file.ObjectKey, expiry), clock.GetUtcNow() + expiry);
+    }
+
     public const int MaxUrlsPerCall = 100;
 
     /// <summary>

@@ -1,5 +1,6 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Application;
 
 namespace Elib.Digital.Api;
@@ -28,6 +29,23 @@ public static class DigitalEndpoints
         // Ô chọn liên kết sách in của màn thêm/sửa tài liệu số (quyết định #2) — proxy sang catalog, không giữ bản sao.
         items.MapGet("/bib-options", [Permission("DIGITAL_ITEMS", "view")] (string? q, ICatalogBibLookup bibs, CancellationToken ct) =>
             bibs.SearchAsync(q, ct)).WithTags("Items");
+
+        // Lượt mượn/đặt trước: cán bộ chỉ tra cứu + thu hồi — bạn đọc tự mượn/trả/đặt trước/huỷ qua OPAC (ReaderDigitalEndpoints).
+        var loans = api.MapGroup("/loans").WithTags("Loans");
+        loans.MapPost("/Search", [Permission("DIGITAL_LOANS", "view")] (EbookLoanSearch search, EbookLoanResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        loans.MapGet("/GetById/{publicId:guid}", [Permission("DIGITAL_LOANS", "view")] (Guid publicId, EbookLoanResource r, CancellationToken ct)
+            => r.GetAsync(publicId, ct));
+        loans.MapPost("/Recall", [Permission("DIGITAL_LOANS", "edit")] (RecallLoanRequest request, EbookLoanResource r, ICurrentActor actor, CancellationToken ct)
+            => r.RecallAsync(request, actor.Id, ct));
+        loans.MapPost("/RecallAll", [Permission("DIGITAL_LOANS", "edit")] (RecallAllRequest request, EbookLoanResource r, ICurrentActor actor, CancellationToken ct)
+            => r.RecallAllAsync(request, actor.Id, ct));
+
+        var reservations = api.MapGroup("/reservations").WithTags("Reservations");
+        reservations.MapPost("/Search", [Permission("DIGITAL_LOANS", "view")] (EbookReservationSearch search, EbookReservationResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        reservations.MapGet("/GetById/{publicId:guid}", [Permission("DIGITAL_LOANS", "view")] (Guid publicId, EbookReservationResource r, CancellationToken ct)
+            => r.GetAsync(publicId, ct));
 
         return app;
     }

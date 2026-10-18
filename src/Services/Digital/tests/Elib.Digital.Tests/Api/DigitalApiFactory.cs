@@ -31,6 +31,7 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
     public FakeLicenseSource Licenses { get; } = new();
     public FakeReplicaSources Sources { get; } = new();
     public FakeCatalogBibLookup CatalogBibs { get; } = new();
+    public FakeMediaFileAccess Media { get; } = new();
 
     /// <summary>Đồng hồ của service — test tua tới để có lượt hết hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
@@ -65,6 +66,8 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IReplicaSources>(Sources);
             services.RemoveAll<ICatalogBibLookup>();
             services.AddSingleton<ICatalogBibLookup>(CatalogBibs);
+            services.RemoveAll<IMediaFileAccess>();
+            services.AddSingleton<IMediaFileAccess>(Media);
         });
     }
 
@@ -160,6 +163,18 @@ public sealed class FakeCatalogBibLookup : ICatalogBibLookup
 
     public Task<IReadOnlyList<BibLinkOption>> SearchAsync(string? keyword, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<BibLinkOption>>(Results);
+}
+
+/// <summary>Media giả cho URL file — trả một URL ký cố định (test chỉ cần biết digital đã tự kiểm quyền trước khi gọi tới đây).</summary>
+public sealed class FakeMediaFileAccess : IMediaFileAccess
+{
+    public ConcurrentQueue<Guid> Requested { get; } = new();
+
+    public Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, CancellationToken ct)
+    {
+        Requested.Enqueue(mediaFileId);
+        return Task.FromResult(new EbookFileUrl($"https://media.test/signed/{mediaFileId:N}", DateTimeOffset.UtcNow.AddMinutes(5)));
+    }
 }
 
 public sealed class TestClock(DateTimeOffset start) : TimeProvider

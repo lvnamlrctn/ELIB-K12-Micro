@@ -36,12 +36,18 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ICatalogBibLookup, HttpCatalogBibLookup>();
         services.Configure<DigitalOptions>(configuration.GetSection(DigitalOptions.SectionName));
 
+        // URL có hạn của file tài liệu số — tự kiểm quyền (mượn/chính sách) trước khi xin media.
+        AddSource(services, configuration, HttpMediaFileAccess.Media, "Media:Url");
+        services.AddScoped<IMediaFileAccess, HttpMediaFileAccess>();
+
         services.AddElibMessaging<DigitalDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<DigitalDbContext>();
             x.AddConsumer<ReaderChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
+        services.AddSingleton<EbookLoanExpiryJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<EbookLoanExpiryJob>());
         services.AddHealthChecks().AddDbContextCheck<DigitalDbContext>("db", tags: [ElibHealthTags.Ready]);
         return services;
     }

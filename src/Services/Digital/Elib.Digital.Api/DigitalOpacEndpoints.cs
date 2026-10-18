@@ -1,11 +1,13 @@
+using System.Security.Claims;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Application;
 
 namespace Elib.Digital.Api;
 
 /// <summary>
 /// OPAC tài liệu số, ẩn danh (gateway: /api/opac/digital/browse/** → /api/opac/**, công khai theo host đơn vị — license DIGITAL kiểm
-/// ở gateway, không kiểm lại ở đây, đúng khuôn Catalog/Search's nhóm /api/opac). Duyệt/tìm/chi tiết; mượn/trả/đặt trước ở lát sau
-/// (ReaderDigitalEndpoints, cần đăng nhập bạn đọc).
+/// ở gateway, không kiểm lại ở đây, đúng khuôn Catalog/Search's nhóm /api/opac). Duyệt/tìm/chi tiết/URL file; mượn/trả/đặt trước ở
+/// <see cref="ReaderDigitalEndpoints"/> (cần đăng nhập bạn đọc).
 /// </summary>
 public static class DigitalOpacEndpoints
 {
@@ -16,10 +18,19 @@ public static class DigitalOpacEndpoints
         opac.MapPost("/items/Search", (OpacItemSearch search, OpacItems items, CancellationToken ct) => items.SearchAsync(search, ct));
         opac.MapGet("/items/{publicId:guid}", (Guid publicId, OpacItems items, CancellationToken ct) => items.GetAsync(publicId, ct));
 
+        // URL đọc/tải file — token bạn đọc gắn kèm nếu có (route nằm trong READER_APIS) nhưng không bắt buộc: tài liệu miễn phí
+        // (Free) đọc được không cần đăng nhập, còn lại EbookFileAccess tự đòi quyền mượn.
+        opac.MapGet("/items/{publicId:guid}/files/{filePublicId:guid}/url",
+            (Guid publicId, Guid filePublicId, bool? download, ClaimsPrincipal principal, EbookFileAccess access, CancellationToken ct) =>
+                access.SignedUrlAsync(publicId, filePublicId, ReaderIdOrNull(principal), download ?? false, ct));
+
         opac.MapGet("/collections", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.CollectionsAsync(ct));
         opac.MapGet("/subjects", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.SubjectsAsync(ct));
         opac.MapGet("/topics", (OpacCatalogs catalogs, CancellationToken ct) => catalogs.TopicsAsync(ct));
 
         return app;
     }
+
+    private static Guid? ReaderIdOrNull(ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirstValue(ElibClaimTypes.ReaderId), out var id) ? id : null;
 }

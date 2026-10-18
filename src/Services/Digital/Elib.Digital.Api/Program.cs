@@ -22,6 +22,7 @@ if (app.Configuration.GetValue<bool>(DatabaseMigration.MigrateOnStartupKey))
 app.UseElibServiceDefaults();
 app.MapDigitalEndpoints();
 app.MapDigitalOpacEndpoints();
+app.MapReaderDigitalEndpoints();
 app.Run();
 
 /// <summary>Để WebApplicationFactory trong test tham chiếu được.</summary>

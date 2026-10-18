@@ -81,3 +81,34 @@ public sealed class HttpCatalogBibLookup(IHttpClientFactory clients, ITenantCont
         }
     }
 }
+
+/// <summary>Xin URL có hạn của file tài liệu số ở media qua /internal (service token) — digital đã tự kiểm quyền trước khi gọi.</summary>
+public sealed class HttpMediaFileAccess(IHttpClientFactory clients, ITenantContext tenant) : IMediaFileAccess
+{
+    public const string Media = "elib-media";
+
+    private sealed record DownloadResponse(string Url, DateTimeOffset? ExpiresAt);
+
+    public async Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, CancellationToken ct)
+    {
+        var url = $"internal/tenants/{tenant.RequireTenantId()}/files/{mediaFileId}/download";
+        HttpResponseMessage response;
+        try
+        {
+            response = await clients.CreateClient(Media).GetAsync(new Uri(url, UriKind.Relative), ct);
+        }
+        catch (HttpRequestException)
+        {
+            throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Không kết nối được kho file để lấy đường dẫn đọc — thử lại sau.", 503);
+        }
+        using (response)
+        {
+            if (response.StatusCode == HttpStatusCode.NotFound) throw new NotFoundException("File", mediaFileId);
+            if (!response.IsSuccessStatusCode)
+                throw new BusinessRuleException("MEDIA_UNAVAILABLE", $"Kho file báo lỗi {(int)response.StatusCode} khi lấy đường dẫn đọc — thử lại sau.", 503);
+            var dto = await response.Content.ReadFromJsonAsync<DownloadResponse>(ct)
+                ?? throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Kho file trả về dữ liệu không hợp lệ.", 503);
+            return new EbookFileUrl(dto.Url, dto.ExpiresAt);
+        }
+    }
+}

@@ -18,6 +18,11 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<EbookFileResource>();
         services.AddScoped<OpacItems>();
         services.AddScoped<OpacCatalogs>();
+        services.AddScoped<EbookReaderNotifier>();
+        services.AddScoped<EbookReservationAllocator>();
+        services.AddCrudResource<EbookLoanResource>();
+        services.AddCrudResource<EbookReservationResource>();
+        services.AddScoped<EbookFileAccess>();
         return services;
     }
 }
