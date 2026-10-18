@@ -4,7 +4,7 @@ import { User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
 import { firstValueFrom } from 'rxjs';
 
 /** API chỉ dành cho bạn đọc đã đăng nhập — chỉ các đường dẫn này mới được gắn token. */
-const READER_APIS = ['/api/opac/account/', '/api/opac/circulation/'];
+const READER_APIS = ['/api/opac/account/', '/api/opac/circulation/', '/api/opac/digital/'];
 
 export interface ReaderMe {
   readerPublicId: string; cardNo: string; fullName: string; email: string | null; expireDate: string | null;

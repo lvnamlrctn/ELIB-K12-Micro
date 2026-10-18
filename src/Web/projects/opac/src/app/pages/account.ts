@@ -1,8 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { CirculationApi, HoldDto, HoldStatus, LoanDto, ReaderPanel } from '../core/circulation';
+import { DigitalApi, DigitalLoan, DigitalReservation, DigitalReservationStatus } from '../core/digital';
 import { LDatePipe, Language, LNumberPipe } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
@@ -11,7 +13,7 @@ import { ReaderCard } from './reader-card';
 /** Tài khoản bạn đọc: chưa đăng nhập → nút đăng nhập; đã đăng nhập → thông tin thẻ, đổi mật khẩu, đăng xuất. */
 @Component({
   selector: 'opac-account',
-  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, ReaderCard],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, TranslatePipe, ReaderCard],
   template: `
     <div class="max-w-3xl mx-auto px-4 py-8">
       @if (!auth.loggedIn()) {
@@ -183,6 +185,58 @@ import { ReaderCard } from './reader-card';
             }
           </section>
         }
+
+        @if (library.has('DIGITAL')) {
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.DIGITAL.MY_LOANS' | translate }}</h2>
+            @if (digitalLoansError(); as err) { <p class="text-red-600 text-sm mb-3" role="alert">{{ err }}</p> }
+            @if (digitalLoans().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (loan of digitalLoans(); track loan.publicId) {
+                  <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                      <a [routerLink]="['/thu-vien-so', loan.ebookItemPublicId]" class="font-medium text-slate-900 hover:text-blue-700 truncate">{{ loan.title }}</a>
+                      <div class="text-sm text-slate-500">{{ loan.expiresAt ? (('OPAC.DIGITAL.ACCESS_UNTIL' | translate) + ' ' + (loan.expiresAt | ldate)) : ('OPAC.DIGITAL.NO_LIMIT' | translate) }}</div>
+                    </div>
+                    <button type="button" [disabled]="digitalBusyId() === loan.publicId"
+                            class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50 shrink-0"
+                            (click)="returnDigitalLoan(loan)">{{ 'OPAC.DIGITAL.RETURN' | translate }}</button>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_LOANS' | translate }}</p>
+            }
+          </section>
+
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.DIGITAL.MY_RESERVATIONS' | translate }}</h2>
+            @if (digitalReservationsError(); as err) { <p class="text-red-600 text-sm mb-3" role="alert">{{ err }}</p> }
+            @if (digitalReservations().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (resv of digitalReservations(); track resv.publicId) {
+                  <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                      <a [routerLink]="['/thu-vien-so', resv.ebookItemPublicId]" class="font-medium text-slate-900 hover:text-blue-700 truncate">{{ resv.title }}</a>
+                      <div class="text-sm text-slate-500">
+                        @if (resv.status === DigitalReservationStatus.Ready) {
+                          <span class="text-green-700">{{ 'OPAC.DIGITAL.RESERVATION_READY' | translate: { date: (resv.readyExpiresAt | ldate) } }}</span>
+                        } @else {
+                          {{ 'OPAC.DIGITAL.RESERVATION_WAITING' | translate: { position: resv.queuePosition } }}
+                        }
+                      </div>
+                    </div>
+                    <button type="button" [disabled]="digitalBusyId() === resv.publicId"
+                            class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50 shrink-0"
+                            (click)="cancelDigitalReservation(resv)">{{ 'OPAC.DIGITAL.CANCEL_RESERVATION' | translate }}</button>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_RESERVATIONS' | translate }}</p>
+            }
+          </section>
+        }
       }
     </div>
   `,
@@ -191,6 +245,7 @@ export class Account implements OnInit {
   protected readonly auth = inject(ReaderAuth);
   protected readonly library = inject(Library);
   private readonly circulation = inject(CirculationApi);
+  private readonly digital = inject(DigitalApi);
   private readonly language = inject(Language);
   protected readonly me = signal<ReaderMe | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -211,6 +266,13 @@ export class Account implements OnInit {
   protected readonly history = signal<LoanDto[]>([]);
   protected readonly historyLoading = signal(false);
 
+  protected readonly DigitalReservationStatus = DigitalReservationStatus;
+  protected readonly digitalLoans = signal<DigitalLoan[]>([]);
+  protected readonly digitalLoansError = signal<string | null>(null);
+  protected readonly digitalReservations = signal<DigitalReservation[]>([]);
+  protected readonly digitalReservationsError = signal<string | null>(null);
+  protected readonly digitalBusyId = signal<string | null>(null);
+
   async ngOnInit(): Promise<void> {
     if (!(await this.auth.restore())) return;
     try {
@@ -222,10 +284,15 @@ export class Account implements OnInit {
       }
       this.error.set(this.language.apiError(e));
     }
-    if (!this.library.has('CIRCULATION')) return;
-    this.loadLoans();
-    this.loadHolds();
-    this.loadHistory();
+    if (this.library.has('CIRCULATION')) {
+      this.loadLoans();
+      this.loadHolds();
+      this.loadHistory();
+    }
+    if (this.library.has('DIGITAL')) {
+      this.loadDigitalLoans();
+      this.loadDigitalReservations();
+    }
   }
 
   protected expired(m: ReaderMe): boolean {
@@ -276,6 +343,48 @@ export class Account implements OnInit {
       this.holds.set(await this.circulation.myHolds());
     } catch (e) {
       this.holdsError.set(this.language.apiError(e));
+    }
+  }
+
+  protected async returnDigitalLoan(loan: DigitalLoan): Promise<void> {
+    this.digitalBusyId.set(loan.publicId);
+    this.digitalLoansError.set(null);
+    try {
+      await this.digital.returnLoan(loan.publicId);
+      this.digitalLoans.update((ls) => ls.filter((l) => l.publicId !== loan.publicId));
+    } catch (e) {
+      this.digitalLoansError.set(this.language.apiError(e));
+    } finally {
+      this.digitalBusyId.set(null);
+    }
+  }
+
+  protected async cancelDigitalReservation(resv: DigitalReservation): Promise<void> {
+    this.digitalBusyId.set(resv.publicId);
+    this.digitalReservationsError.set(null);
+    try {
+      await this.digital.cancelReservation(resv.publicId);
+      this.digitalReservations.update((rs) => rs.filter((r) => r.publicId !== resv.publicId));
+    } catch (e) {
+      this.digitalReservationsError.set(this.language.apiError(e));
+    } finally {
+      this.digitalBusyId.set(null);
+    }
+  }
+
+  private async loadDigitalLoans(): Promise<void> {
+    try {
+      this.digitalLoans.set(await this.digital.myLoans());
+    } catch (e) {
+      this.digitalLoansError.set(this.language.apiError(e));
+    }
+  }
+
+  private async loadDigitalReservations(): Promise<void> {
+    try {
+      this.digitalReservations.set(await this.digital.myReservations());
+    } catch (e) {
+      this.digitalReservationsError.set(this.language.apiError(e));
     }
   }
 

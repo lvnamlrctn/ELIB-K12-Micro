@@ -13,11 +13,14 @@ public sealed record OpacItemSummary(
     Guid PublicId, string Title, string? Author, string? Publisher, string? PublishDate, string? CoverUrl, bool Free, bool AllowDownload,
     long? CollectionId, string? CollectionName);
 
+/// <summary>Một file đính kèm — chỉ đủ để OPAC xin URL đọc/tải qua <c>EbookFileAccess</c>, không lộ MediaFileId thô.</summary>
+public sealed record OpacFileSummary(Guid PublicId, string? FileExt, string? Description);
+
 public sealed record OpacItemDetail(
     Guid PublicId, string Title, string? Author, string? Publisher, string? PublishDate, string? Keyword, string? OtherTitle, string? Page,
     string? OldAuthor, string? Language, string? CoverUrl, bool Free, bool AllowDownload, int? PrintCopies, long? CollectionId,
     string? CollectionName, long? SubjectId, string? SubjectName, long? TopicId, string? TopicName, bool TopicRequiresLogin, long? TypeId,
-    string? TypeName, Guid? LinkedBibPublicId);
+    string? TypeName, Guid? LinkedBibPublicId, IReadOnlyList<OpacFileSummary> Files);
 
 /// <summary>
 /// Duyệt/tìm tài liệu số trên OPAC (ẩn danh, công khai theo host đơn vị) — tự phục vụ bằng chính dữ liệu của digital (quyết định #1 của
@@ -67,10 +70,12 @@ public sealed class OpacItems(ICrudDbContext db)
             ? await db.Set<EbookTopic>().AsNoTracking().Where(x => x.Id == t).Select(x => new { x.Name, x.RequiresLogin }).FirstOrDefaultAsync(ct) : null;
         var typeName = item.TypeId is { } ty
             ? await db.Set<EbookDigType>().AsNoTracking().Where(x => x.Id == ty).Select(x => x.Code).FirstOrDefaultAsync(ct) : null;
+        var files = await db.Set<EbookFile>().AsNoTracking().Where(f => f.EbookItemId == item.Id).OrderBy(f => f.SortOrder).ThenBy(f => f.Id)
+            .Select(f => new OpacFileSummary(f.PublicId, f.FileExt, f.Description)).ToListAsync(ct);
         return new OpacItemDetail(
             item.PublicId, item.Title, item.Author, item.Publisher, item.PublishDate, item.Keyword, item.OtherTitle, item.Page, item.OldAuthor,
             item.Language, item.CoverUrl, item.Free, item.AllowDownload, item.PrintCopies, item.CollectionId, collectionName, item.SubjectId,
-            subjectName, item.TopicId, topic?.Name, topic?.RequiresLogin ?? false, item.TypeId, typeName, item.LinkedBibPublicId);
+            subjectName, item.TopicId, topic?.Name, topic?.RequiresLogin ?? false, item.TypeId, typeName, item.LinkedBibPublicId, files);
     }
 }
 
