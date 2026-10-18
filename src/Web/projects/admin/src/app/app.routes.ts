@@ -11,13 +11,24 @@ import { Z3950_SERVERS } from './pages/search/catalogs';
 import { BOOK_OUT_UNITS, EXHIBITION_LOCATIONS, EXPORT_REASONS, STORES, STORE_TYPES } from './pages/holdings/catalogs';
 import { FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
 import { ACQ_SOURCES, BUDGETS, FUNDS, SUPPLIERS } from './pages/acquisition/catalogs';
+import { DIGITAL_COLLECTIONS, DIGITAL_DIG_TYPES, DIGITAL_POLICIES, DIGITAL_POLICIES_BY_COLLECTION, DIGITAL_SUBJECTS, DIGITAL_TOPICS } from './pages/digital/catalogs';
 import type { CrudConfig } from './shared/crud-page';
+import type { TreeCatalogConfig } from './shared/tree-catalog-page';
 import { unsavedChangesGuard } from './shared/unsaved';
 
 /** Màn danh mục chuẩn của host đơn vị — đường dẫn như admin cũ (/admin/nationalities, /admin/chuc-vus…). */
 const catalog = (path: string, config: CrudConfig) => ({
   path,
   loadComponent: () => import('./shared/crud-page').then((m) => m.CrudPage),
+  canActivate: [tenantGuard, permissionGuard(config.perm)],
+  data: { config },
+  title: config.title,
+});
+
+/** Danh mục cây tài liệu số (bộ sưu tập/môn loại/chủ đề) — như catalog() nhưng dùng TreeCatalogPage (có quan hệ cha/con). */
+const treeCatalog = (path: string, config: TreeCatalogConfig) => ({
+  path,
+  loadComponent: () => import('./shared/tree-catalog-page').then((m) => m.TreeCatalogPage),
   canActivate: [tenantGuard, permissionGuard(config.perm)],
   data: { config },
   title: config.title,
@@ -165,6 +176,15 @@ export const routes: Routes = [
         canActivate: [tenantGuard, permissionGuard('NOTIFICATION_LOGS')],
         title: 'NOTIFICATION_LOG.TITLE',
       },
+      // Tài liệu số (digital)
+      treeCatalog('digital-collections', DIGITAL_COLLECTIONS),
+      treeCatalog('digital-subjects', DIGITAL_SUBJECTS),
+      treeCatalog('digital-topics', DIGITAL_TOPICS),
+      catalog('digital-dig-types', DIGITAL_DIG_TYPES),
+      catalog('digital-policies', DIGITAL_POLICIES),
+      catalog('digital-policies-by-collection', DIGITAL_POLICIES_BY_COLLECTION),
+      { path: 'digital-items', loadComponent: () => import('./pages/digital/items').then((m) => m.DigitalItems), canActivate: [tenantGuard, permissionGuard('DIGITAL_ITEMS')], title: 'DIGITAL_ITEMS_PAGE.TITLE' },
+      { path: 'digital-loans', loadComponent: () => import('./pages/digital/loans').then((m) => m.DigitalLoans), canActivate: [tenantGuard, permissionGuard('DIGITAL_LOANS')], title: 'DIGITAL_LOANS_PAGE.TITLE' },
       { path: 'phan-he/:code', loadComponent: () => import('./pages/module-placeholder').then((m) => m.ModulePlaceholder), canActivate: [tenantGuard] },
     ],
   },

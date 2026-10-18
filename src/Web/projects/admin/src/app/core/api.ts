@@ -425,6 +425,53 @@ export interface SaveFineTicket {
   lines: FineLineChange[]; deletedLineIds: number[];
 }
 
+// ── Tài liệu số (service digital) ──
+export interface EbookItem {
+  id: number; publicId: string; status: number; collectionId: number | null; collectionName: string | null; subjectId: number | null;
+  topicId: number | null; typeId: number | null; title: string; author: string | null; publisher: string | null; publishDate: string | null;
+  keyword: string | null; otherTitle: string | null; page: string | null; oldAuthor: string | null; xml: string | null; language: string | null;
+  free: boolean; allowDownload: boolean; printCopies: number | null; offlineDays: number | null; totalView: number; totalDownload: number;
+  submited: string | null; lastUpdate: string | null; coverUrl: string | null; linkedBibPublicId: string | null;
+  createdAt: string; updatedAt: string | null;
+}
+export interface EbookItemSearch extends CrudSearch { collectionId?: number | null; subjectId?: number | null; topicId?: number | null; typeId?: number | null; }
+export interface EbookFile {
+  id: number; publicId: string; ebookItemPublicId: string; mediaFileId: string; type: string | null; isConvert: boolean; fileType: string | null;
+  fileSize: number | null; fileExt: string | null; description: string | null; source: string | null; formatId: number | null;
+  checkSumAlgorithm: string | null; sortOrder: number; createdAt: string; updatedAt: string | null;
+}
+export interface EbookFileSearch extends CrudSearch { ebookItemPublicId?: string | null; }
+/** Một biểu ghi sách in tìm được ở catalog — ô chọn liên kết của màn thêm/sửa tài liệu số. */
+export interface BibLinkOption { bibPublicId: string; title: string; author: string | null; publisher: string | null; publishYear: string | null; }
+
+/** status: 1 Đang mượn, 2 Đã thu hồi, 3 Đã trả, 4 Tự hết hạn. */
+export interface EbookLoan {
+  id: number; publicId: string; ebookItemId: number; ebookItemPublicId: string; title: string | null; readerPublicId: string;
+  cardNo: string | null; readerName: string | null; checkedOutAt: string; expiresAt: string | null; lastAccessAt: string | null;
+  status: number; recalledAt: string | null; recalledBy: number | null; recallReason: string | null;
+}
+export interface EbookLoanSearch extends CrudSearch { ebookItemPublicId?: string | null; readerPublicId?: string | null; loanStatus?: number | null; }
+export const EBOOK_LOAN_STATUSES: { code: number; name: string; badge: string }[] = [
+  { code: 1, name: 'DIGITAL_LOAN.STATUS_1', badge: 'badge-on' },
+  { code: 2, name: 'DIGITAL_LOAN.STATUS_2', badge: 'badge-warn' },
+  { code: 3, name: 'DIGITAL_LOAN.STATUS_3', badge: 'badge-off' },
+  { code: 4, name: 'DIGITAL_LOAN.STATUS_4', badge: 'badge-off' },
+];
+/** status: 1 Chờ, 2 Sẵn sàng, 3 Đã mượn, 4 Đã huỷ, 5 Hết hạn. */
+export interface EbookReservation {
+  id: number; publicId: string; ebookItemId: number; ebookItemPublicId: string; title: string | null; readerPublicId: string;
+  cardNo: string | null; readerName: string | null; requestedAt: string; status: number; readyAt: string | null; readyExpiresAt: string | null;
+  fulfilledAt: string | null; cancelledAt: string | null; queuePosition: number | null;
+}
+export interface EbookReservationSearch extends CrudSearch { ebookItemPublicId?: string | null; readerPublicId?: string | null; reservationStatus?: number | null; }
+export const EBOOK_RESERVATION_STATUSES: { code: number; name: string; badge: string }[] = [
+  { code: 1, name: 'DIGITAL_RESERVATION.STATUS_1', badge: 'badge-warn' },
+  { code: 2, name: 'DIGITAL_RESERVATION.STATUS_2', badge: 'badge-info' },
+  { code: 3, name: 'DIGITAL_RESERVATION.STATUS_3', badge: 'badge-on' },
+  { code: 4, name: 'DIGITAL_RESERVATION.STATUS_4', badge: 'badge-off' },
+  { code: 5, name: 'DIGITAL_RESERVATION.STATUS_5', badge: 'badge-off' },
+];
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -994,4 +1041,11 @@ export class Api {
   }
 
   deleteOrgWithChildren(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/tenant/orgs/DeleteWithChildren/${publicId}`)); }
+
+  // Tài liệu số (digital): danh mục cây/phẳng + tài liệu/file qua crud('collections'|'subjects'|'topics'|'dig-types'|'policies'|
+  // 'policies-by-collection'|'items'|'files', 'digital'); lượt mượn/đặt trước (quyền DIGITAL_LOANS) tra cứu qua crud('loans'|'reservations',
+  // 'digital').search() — chỉ thu hồi là thao tác nghiệp vụ riêng, không có Add/Update/Delete.
+  ebookBibOptions(q: string) { return this.get<BibLinkOption[]>('/api/admin/digital/items/bib-options', { q }); }
+  recallEbookLoan(loanPublicId: string, reason: string) { return this.post<EbookLoan>('/api/admin/digital/loans/Recall', { loanPublicId, reason }); }
+  recallAllEbookLoans(ebookItemPublicId: string, reason: string) { return this.post<number>('/api/admin/digital/loans/RecallAll', { ebookItemPublicId, reason }); }
 }

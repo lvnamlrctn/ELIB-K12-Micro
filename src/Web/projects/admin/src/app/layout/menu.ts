@@ -142,6 +142,21 @@ export class Menu {
         ],
       },
       {
+        title: 'MENU.DIGITAL_GROUP',
+        icon: 'menu_book',
+        module: 'DIGITAL',
+        children: [
+          { title: 'MENU.DIGITAL_ITEMS', icon: 'menu_book', link: '/digital-items', perm: 'DIGITAL_ITEMS' },
+          { title: 'MENU.DIGITAL_LOANS', icon: 'swap_vert', link: '/digital-loans', perm: 'DIGITAL_LOANS' },
+          { title: 'MENU.DIGITAL_COLLECTIONS', icon: 'collections_bookmark', link: '/digital-collections', perm: 'DIGITAL_COLLECTIONS' },
+          { title: 'MENU.DIGITAL_SUBJECTS', icon: 'category', link: '/digital-subjects', perm: 'DIGITAL_SUBJECTS' },
+          { title: 'MENU.DIGITAL_TOPICS', icon: 'sell', link: '/digital-topics', perm: 'DIGITAL_TOPICS' },
+          { title: 'MENU.DIGITAL_DIG_TYPES', icon: 'description', link: '/digital-dig-types', perm: 'DIGITAL_DIG_TYPES' },
+          { title: 'MENU.DIGITAL_POLICIES', icon: 'rule', link: '/digital-policies', perm: 'DIGITAL_POLICIES' },
+          { title: 'MENU.DIGITAL_POLICIES_BY_COLLECTION', icon: 'rule_folder', link: '/digital-policies-by-collection', perm: 'DIGITAL_POLICIES_BY_COLLECTION' },
+        ],
+      },
+      {
         title: 'MENU.STORE_MGMT',
         icon: 'store',
         module: 'HOLDINGS',
