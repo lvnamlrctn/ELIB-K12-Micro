@@ -58,6 +58,9 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     public int TotalView { get; private set; }
     public int TotalDownload { get; private set; }
 
+    public void RecordView() => TotalView++;
+    public void RecordDownload() => TotalDownload++;
+
     public DateTimeOffset? Submited { get; private set; }
 
     /// <summary>Lần cập nhật nội dung gần nhất (LRC: LastUpdate — khác UpdatedAt chung, LRC lưu cả hai riêng).</summary>

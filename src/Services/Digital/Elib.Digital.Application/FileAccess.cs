@@ -22,7 +22,7 @@ public sealed class EbookFileAccess(ICrudDbContext db, EbookLoanResource loans, 
 {
     public async Task<EbookFileUrl> SignedUrlAsync(Guid itemPublicId, Guid filePublicId, Guid? readerPublicId, bool download, CancellationToken ct)
     {
-        var item = await db.Set<EbookItem>().AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active, ct)
+        var item = await db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active, ct)
             ?? throw new NotFoundException("Tài liệu số", itemPublicId);
         var file = await db.Set<EbookFile>().AsNoTracking().FirstOrDefaultAsync(f => f.PublicId == filePublicId && f.EbookItemId == item.Id, ct)
             ?? throw new NotFoundException("File", filePublicId);
@@ -37,6 +37,9 @@ public sealed class EbookFileAccess(ICrudDbContext db, EbookLoanResource loans, 
                 throw new BusinessRuleException("EBOOK_NOT_BORROWED", "Bạn chưa mượn tài liệu này hoặc đã hết hạn mượn.", 403);
         }
 
-        return await media.SignedUrlAsync(file.MediaFileId, ct);
+        var url = await media.SignedUrlAsync(file.MediaFileId, ct);
+        if (download) item.RecordDownload(); else item.RecordView();
+        await db.SaveChangesAsync(ct);
+        return url;
     }
 }
