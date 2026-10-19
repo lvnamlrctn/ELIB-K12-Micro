@@ -374,6 +374,17 @@ export interface LoanSearch extends CrudSearch {
   cardNo?: string | null; barcode?: string | null; state?: string | null; circPlaceId?: number | null; storeId?: number | null;
   from?: string | null; to?: string | null;
 }
+/** Lượt vào/ra thư viện theo thẻ bạn đọc (monolith: CheckIn+CheckOut gộp một — đang ở trong khi checkedOutAt null). */
+export interface Visit {
+  id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; readerTypeName: string | null;
+  className: string | null; circPlaceId: number; circPlaceName: string | null; checkedInAt: string; checkedOutAt: string | null;
+  circPlaceOutId: number | null; circPlaceOutName: string | null;
+}
+/** Thẻ bạn đọc ở cổng: panel lưu thông (như quầy mượn trả) lồng tình trạng vào/ra hiện tại. */
+export interface GateStatus { reader: ReaderPanel; checkedIn: boolean; visitPublicId: string | null; checkedInAt: string | null; visitCount: number; }
+/** state: open | closed; circPlaceId khớp cả điểm vào hoặc ra; from/to: yyyy-MM-dd (ngày vào). */
+export interface VisitSearch extends CrudSearch { cardNo?: string | null; circPlaceId?: number | null; state?: string | null; from?: string | null; to?: string | null; }
+
 export interface CirculationReportRequest {
   reportType: number; from: string | null; to: string | null; circPlaceId: number | null; readerTypeId: number | null; className: string | null;
   pageIndex: number; pageSize: number;
@@ -964,6 +975,15 @@ export class Api {
   exportLoans(search: LoanSearch) {
     return blobRequest(firstValueFrom(this.http.post('/api/admin/circulation/loans/Export', search, { responseType: 'blob' })));
   }
+  // Vào/ra thư viện (quyền CHECK_IN_OUT)
+  gateStatus(cardNo: string, circPlaceId: number | null) { return this.post<GateStatus>('/api/admin/circulation/visits/Status', { cardNo, circPlaceId }); }
+  checkInGate(cardNo: string, circPlaceId: number) { return this.post<Visit>('/api/admin/circulation/visits/CheckIn', { cardNo, circPlaceId }); }
+  checkOutGate(visitPublicId: string, circPlaceId: number | null) { return this.post<Visit>('/api/admin/circulation/visits/CheckOut', { visitPublicId, circPlaceId }); }
+  searchVisits(search: VisitSearch) { return this.post<CrudPage<Visit>>('/api/admin/circulation/visits/Search', search); }
+  exportVisits(search: VisitSearch) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/circulation/visits/Export', search, { responseType: 'blob' })));
+  }
+  deleteVisit(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/visits/Delete/${publicId}`)); }
   // Báo cáo lưu thông (quyền CIRC_REPORT)
   circulationReport(body: CirculationReportRequest) { return this.post<CirculationReport>('/api/admin/circulation/reports/Search', body); }
   exportCirculationReport(body: CirculationReportRequest) {

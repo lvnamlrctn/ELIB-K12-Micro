@@ -2339,6 +2339,23 @@
     "DELETE_PLACE": "Delete desk \"{{name}}\"? Its desk policies are deleted too; loan history is kept.",
     "DELETE_POLICY": "Delete this policy? Patrons will fall back to a more general policy."
   },
+  "CHECK_IN_OUT_PAGE": {
+    "TITLE": "Check-in / Check-out",
+    "PLACE": "Circulation place",
+    "CARD": "Card number",
+    "CARD_PH": "Scan/enter card number...",
+    "SCAN_CARD": "Scan a reader's card to check in or out",
+    "INSIDE": "Inside",
+    "OUTSIDE": "Checked out",
+    "VISIT_COUNT": "Visit count",
+    "CHECKED_IN_AT": "Checked in at",
+    "SCAN_IN": "Check in",
+    "SCAN_OUT": "Check out",
+    "SCAN_IN_DONE": "{{name}} checked in",
+    "SCAN_OUT_DONE": "{{name}} checked out",
+    "RECENT": "Recent scans",
+    "HISTORY_LINK": "Check-in history"
+  },
   "BORROW_PAGE": {
     "TITLE": "Check out / Return",
     "PLACE": "Circulation desk",
@@ -2503,6 +2520,15 @@
     "LOANED_BY": "Lent by",
     "RETURNED_BY": "Received by",
     "BY": "by {{name}}"
+  },
+  "CHECKIN_HISTORY_PAGE": {
+    "TITLE": "Check-in history",
+    "CARD": "Card number",
+    "STATE": "State",
+    "PLACE_IN": "Place in",
+    "CHECKED_IN_AT": "Checked in at",
+    "PLACE_OUT": "Place out",
+    "CHECKED_OUT_AT": "Checked out at"
   },
   "CIRC_REPORT_PAGE": {
     "TYPE": {

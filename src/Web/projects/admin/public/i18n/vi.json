@@ -2339,6 +2339,23 @@
     "DELETE_PLACE": "Xoá điểm \"{{name}}\"? Các chính sách riêng của điểm cũng bị xoá; lịch sử mượn trả vẫn giữ.",
     "DELETE_POLICY": "Xoá chính sách này? Bạn đọc sẽ theo chính sách chung hơn."
   },
+  "CHECK_IN_OUT_PAGE": {
+    "TITLE": "Check-in / Check-out",
+    "PLACE": "Điểm lưu thông",
+    "CARD": "Số thẻ",
+    "CARD_PH": "Quét/nhập số thẻ...",
+    "SCAN_CARD": "Quét thẻ bạn đọc để vào hoặc ra",
+    "INSIDE": "Đang ở trong",
+    "OUTSIDE": "Đã ra",
+    "VISIT_COUNT": "Số lượt vào/ra",
+    "CHECKED_IN_AT": "Vào lúc",
+    "SCAN_IN": "Quét vào",
+    "SCAN_OUT": "Quét ra",
+    "SCAN_IN_DONE": "{{name}} đã vào thư viện",
+    "SCAN_OUT_DONE": "{{name}} đã ra thư viện",
+    "RECENT": "Vừa quét",
+    "HISTORY_LINK": "Lịch sử vào ra"
+  },
   "BORROW_PAGE": {
     "TITLE": "Mượn / Trả",
     "PLACE": "Điểm lưu thông",
@@ -2503,6 +2520,15 @@
     "LOANED_BY": "Người cho mượn",
     "RETURNED_BY": "Người nhận trả",
     "BY": "bởi {{name}}"
+  },
+  "CHECKIN_HISTORY_PAGE": {
+    "TITLE": "Lịch sử vào ra",
+    "CARD": "Số thẻ",
+    "STATE": "Tình trạng",
+    "PLACE_IN": "Điểm vào",
+    "CHECKED_IN_AT": "Giờ vào",
+    "PLACE_OUT": "Điểm ra",
+    "CHECKED_OUT_AT": "Giờ ra"
   },
   "CIRC_REPORT_PAGE": {
     "TYPE": {

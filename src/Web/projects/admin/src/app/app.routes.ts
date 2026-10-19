@@ -160,6 +160,8 @@ export const routes: Routes = [
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'PAGE_TITLE.FINE_TICKET' },
       { path: 'borrow', loadComponent: () => import('./pages/circulation/borrow').then((m) => m.Borrow), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'BORROW_PAGE.TITLE' },
       { path: 'loan-history', loadComponent: () => import('./pages/circulation/loan-history').then((m) => m.LoanHistory), canActivate: [tenantGuard, permissionGuard('LOAN_HISTORY')], title: 'LOAN_HISTORY_PAGE.TITLE' },
+      { path: 'check-in-out', loadComponent: () => import('./pages/circulation/check-in-out').then((m) => m.CheckInOut), canActivate: [tenantGuard, permissionGuard('CHECK_IN_OUT')], title: 'CHECK_IN_OUT_PAGE.TITLE' },
+      { path: 'checkin-history', loadComponent: () => import('./pages/circulation/checkin-history').then((m) => m.CheckinHistory), canActivate: [tenantGuard, permissionGuard('CHECK_IN_OUT')], title: 'CHECKIN_HISTORY_PAGE.TITLE' },
       {
         path: 'system-logs', loadComponent: () => import('./pages/audit-logs').then((m) => m.AuditLogs),
         canActivate: [tenantGuard, permissionGuard('SYSTEM_LOG')], data: { scope: 'tenant' }, title: 'AUDIT.TITLE_TENANT',
