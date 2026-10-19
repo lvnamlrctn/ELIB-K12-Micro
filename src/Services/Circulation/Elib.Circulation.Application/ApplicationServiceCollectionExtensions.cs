@@ -15,6 +15,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<FineTicketResource>();
         services.AddCrudResource<HoldResource>();
         services.AddCrudResource<PhotocopyResource>();
+        services.AddCrudResource<VisitResource>();
         services.AddScoped<CirculationReports>();
         services.AddScoped<PlatformCirculationStatsService>();
         services.AddScoped<Replicas>();

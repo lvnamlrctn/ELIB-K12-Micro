@@ -750,6 +750,115 @@ namespace Elib.Circulation.Infrastructure.Migrations
                     b.ToTable("item_replicas", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Circulation.Domain.LibraryVisit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CardNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("card_no");
+
+                    b.Property<DateTimeOffset>("CheckedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_in_at");
+
+                    b.Property<long?>("CheckedInBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("checked_in_by");
+
+                    b.Property<DateTimeOffset?>("CheckedOutAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_out_at");
+
+                    b.Property<long?>("CheckedOutBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("checked_out_by");
+
+                    b.Property<long>("CircPlaceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("circ_place_id");
+
+                    b.Property<long?>("CircPlaceOutId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("circ_place_out_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<Guid>("ReaderPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reader_public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_library_visits");
+
+                    b.HasIndex("CircPlaceId")
+                        .HasDatabaseName("ix_library_visits_circ_place_id");
+
+                    b.HasIndex("CircPlaceOutId")
+                        .HasDatabaseName("ix_library_visits_circ_place_out_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_library_visits_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_library_visits_tenant_id");
+
+                    b.HasIndex("TenantId", "CardNo")
+                        .HasDatabaseName("ix_library_visits_tenant_id_card_no");
+
+                    b.HasIndex("TenantId", "CheckedInAt")
+                        .HasDatabaseName("ix_library_visits_tenant_id_checked_in_at");
+
+                    b.HasIndex("TenantId", "ReaderPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_library_visits_tenant_id_reader_public_id")
+                        .HasFilter("checked_out_at IS NULL AND is_deleted = false");
+
+                    b.ToTable("library_visits", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Circulation.Domain.Loan", b =>
                 {
                     b.Property<long>("Id")
@@ -1780,6 +1889,22 @@ namespace Elib.Circulation.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fine_lines_fine_tickets_fine_ticket_id");
+                });
+
+            modelBuilder.Entity("Elib.Circulation.Domain.LibraryVisit", b =>
+                {
+                    b.HasOne("Elib.Circulation.Domain.CircPlace", null)
+                        .WithMany()
+                        .HasForeignKey("CircPlaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_library_visits_circ_places_circ_place_id");
+
+                    b.HasOne("Elib.Circulation.Domain.CircPlace", null)
+                        .WithMany()
+                        .HasForeignKey("CircPlaceOutId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_library_visits_circ_places_circ_place_out_id");
                 });
 
             modelBuilder.Entity("Elib.Circulation.Domain.LoanPolicy", b =>

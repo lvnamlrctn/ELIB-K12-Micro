@@ -192,6 +192,19 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.Status, x.ExpiresAt });
         });
 
+        modelBuilder.Entity<LibraryVisit>(e =>
+        {
+            e.ToTable("library_visits");
+            e.Ignore(x => x.IsOpen);
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            // Một bạn đọc chỉ có một lượt vào đang mở — quét 2 lần trả lại lượt đó (CheckInAsync), không tạo trùng.
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId }).IsUnique().HasFilter("checked_out_at IS NULL AND is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.CardNo });
+            e.HasIndex(x => new { x.TenantId, x.CheckedInAt });
+            e.HasOne<CircPlace>().WithMany().HasForeignKey(x => x.CircPlaceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<CircPlace>().WithMany().HasForeignKey(x => x.CircPlaceOutId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

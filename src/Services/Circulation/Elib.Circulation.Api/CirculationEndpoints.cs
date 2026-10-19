@@ -11,7 +11,8 @@ namespace Elib.Circulation.Api;
 /// <summary>
 /// Lưu thông (gateway: /api/admin/circulation/** → /api/**, cần license CIRCULATION). Mã quyền giữ như monolith:
 /// BORROW (mượn/trả), LOAN_HISTORY (lịch sử lưu thông), CIRC_POLICIES, CIRC_PLACES, FINES (phiếu phạt), FINE_REASONS (lý do phạt),
-/// REQUEST_BOOKS (đặt mượn), C_PHOTO (sao chụp), CIRC_REPORT (báo cáo lưu thông), SIP2LOG (trạm tự phục vụ SIP2 + nhật ký giao dịch).
+/// REQUEST_BOOKS (đặt mượn), C_PHOTO (sao chụp), CIRC_REPORT (báo cáo lưu thông), SIP2LOG (trạm tự phục vụ SIP2 + nhật ký giao dịch),
+/// CHECK_IN_OUT (vào/ra thư viện theo thẻ bạn đọc).
 /// </summary>
 public static class CirculationEndpoints
 {
@@ -116,6 +117,26 @@ public static class CirculationEndpoints
             => Results.File(await r.ExportAsync(search, ct), CrudExcel.ContentType, "lich-su-luu-thong.xlsx"));
         loans.MapGet("/GetById/{publicId:guid}", [PermissionAny("LOAN_HISTORY:view", "BORROW:view")] (Guid publicId, LoanResource r, CancellationToken ct)
             => r.GetAsync(publicId, ct));
+
+        // Vào/ra thư viện theo thẻ bạn đọc — không có Add/Update chung, chỉ Status/CheckIn/CheckOut ở cổng.
+        var visits = api.MapGroup("/visits").WithTags("Visits");
+        visits.MapPost("/Status", [Permission("CHECK_IN_OUT", "view")] (GateStatusRequest request, VisitResource r, CancellationToken ct)
+            => r.StatusAsync(request, ct));
+        visits.MapPost("/CheckIn", [Permission("CHECK_IN_OUT", "add")] (CheckInGateRequest request, VisitResource r, CancellationToken ct)
+            => r.CheckInAsync(request, ct));
+        visits.MapPost("/CheckOut", [Permission("CHECK_IN_OUT", "edit")] (CheckOutGateRequest request, VisitResource r, CancellationToken ct)
+            => r.CheckOutAsync(request, ct));
+        visits.MapPost("/Search", [Permission("CHECK_IN_OUT", "view")] (VisitSearch search, VisitResource r, CancellationToken ct)
+            => r.SearchAsync(search, ct));
+        visits.MapGet("/GetById/{publicId:guid}", [Permission("CHECK_IN_OUT", "view")] (Guid publicId, VisitResource r, CancellationToken ct)
+            => r.GetAsync(publicId, ct));
+        visits.MapPost("/Export", [Permission("CHECK_IN_OUT", "view")] async (VisitSearch search, VisitResource r, CancellationToken ct)
+            => Results.File(await r.ExportAsync(search, ct), CrudExcel.ContentType, "lich-su-vao-ra.xlsx"));
+        visits.MapDelete("/Delete/{publicId:guid}", [Permission("CHECK_IN_OUT", "delete")] async (Guid publicId, VisitResource r, CancellationToken ct) =>
+        {
+            await r.DeleteAsync(publicId, ct);
+            return Results.NoContent();
+        });
         return app;
     }
 }

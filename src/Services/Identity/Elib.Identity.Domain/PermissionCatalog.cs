@@ -98,6 +98,7 @@ public static class PermissionCatalog
         new("FINES", "Quản lý phạt", CirculationGroup, Crud, CirculationLicense),
         new("FINE_REASONS", "Lý do phạt", CirculationGroup, Crud, CirculationLicense),
         new("SIP2LOG", "Trạm tự phục vụ SIP2", CirculationGroup, Crud, CirculationLicense),
+        new("CHECK_IN_OUT", "Check-in / Check-out", CirculationGroup, Crud, CirculationLicense),
 
         new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
         new("SEARCH_STATS", "Thống kê tra cứu", SearchGroup, [View], SearchLicense),

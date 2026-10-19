@@ -101,6 +101,8 @@ public sealed class CircPlaceResource(ICrudDbContext db) : CrudResource<CircPlac
     {
         if (await Db.Set<Sip2Station>().AnyAsync(s => s.CircPlaceId == entity.Id, ct))
             throw new ConflictException("CIRC_PLACE_IN_USE", $"Điểm {entity.Code} đang có trạm tự phục vụ SIP2 — chuyển trạm sang điểm khác trước.");
+        if (await Db.Set<LibraryVisit>().AnyAsync(v => v.CircPlaceId == entity.Id || v.CircPlaceOutId == entity.Id, ct))
+            throw new ConflictException("CIRC_PLACE_IN_USE", $"Điểm {entity.Code} đã có lượt vào/ra thư viện — không xoá được.");
     }
 
     /// <summary>
