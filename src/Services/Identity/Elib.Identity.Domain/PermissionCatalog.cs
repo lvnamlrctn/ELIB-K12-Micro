@@ -39,6 +39,8 @@ public static class PermissionCatalog
     private const string DigitalGroup = "Tài liệu số";
     private const string DigitalParams = "Tài liệu số / Tham số tài liệu số";
     private const string DigitalLicense = "DIGITAL";
+    private const string SpaceGroup = "Không gian & đặt phòng";
+    private const string SpaceLicense = "SPACE";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -114,6 +116,16 @@ public static class PermissionCatalog
         new("DIGITAL_DIG_TYPES", "Loại tài liệu số", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_POLICIES", "Chính sách tài liệu số", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_POLICIES_BY_COLLECTION", "Chính sách theo bộ sưu tập", DigitalParams, Crud, DigitalLicense),
+
+        new("SPACE_BUILDINGS", "Toà nhà", SpaceGroup, Crud, SpaceLicense),
+        new("SPACE_FLOORS", "Tầng", SpaceGroup, Crud, SpaceLicense),
+        new("SPACE_ROOMS", "Không gian / phòng", SpaceGroup, Crud, SpaceLicense),
+        new("SPACE_HOURS", "Giờ mở cửa", SpaceGroup, [View, Edit], SpaceLicense),
+        new("SPACE_SETTINGS", "Tham số đặt phòng", SpaceGroup, [View, Edit], SpaceLicense),
+        new("SPACE_BOOKINGS", "Duyệt/check-in đặt phòng", SpaceGroup, [View, Edit], SpaceLicense),
+        new("SPACE_BANS", "Cấm đặt phòng", SpaceGroup, [View, Edit], SpaceLicense),
+        new("SPACE_REPORT", "Báo cáo đặt phòng", SpaceGroup, [View], SpaceLicense),
+        new("SPACE_ACCESS", "Kiểm soát cửa", SpaceGroup, Crud, SpaceLicense),
 
         new("USER", "Cán bộ quản lý thư viện", SystemGroup, [View, Add, Edit]),
         new("ROLE", "Phân quyền", SystemGroup, Crud),

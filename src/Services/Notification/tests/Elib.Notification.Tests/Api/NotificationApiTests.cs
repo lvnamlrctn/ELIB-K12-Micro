@@ -89,7 +89,9 @@ public sealed class NotificationApiTests : IClassFixture<NotificationApiFactory>
         Assert.Equal([DefaultTemplates.EbookHoldReady, DefaultTemplates.EbookLoanExpired, DefaultTemplates.EbookSubmissionApproved,
             DefaultTemplates.EbookSubmissionRejected, DefaultTemplates.LoginOtp, DefaultTemplates.PrintDueSoon,
             DefaultTemplates.PrintHoldExpired, DefaultTemplates.PrintHoldReady, DefaultTemplates.PrintOverdue, DefaultTemplates.ReaderPasswordReset,
-            DefaultTemplates.TestEmail], templates.Select(t => t.Code));
+            DefaultTemplates.SpaceBookingApproved, DefaultTemplates.SpaceBookingBanned, DefaultTemplates.SpaceBookingCancelled,
+            DefaultTemplates.SpaceBookingCreated, DefaultTemplates.SpaceBookingExpired, DefaultTemplates.SpaceBookingNoShow,
+            DefaultTemplates.SpaceBookingRejected, DefaultTemplates.TestEmail], templates.Select(t => t.Code));
         Assert.All(templates, t => Assert.True(t.IsBuiltIn));
 
         var restore = await Staff(tenantId).PostAsync(new Uri("/api/email-templates/RestoreDefaults", UriKind.Relative), null);

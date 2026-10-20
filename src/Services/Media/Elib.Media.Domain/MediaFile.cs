@@ -42,6 +42,10 @@ public sealed record MediaPurpose(
     public static readonly MediaPurpose EbookCover =
         new("ebook-cover", "Ảnh bìa tài liệu số", Public: true, ["image/png", "image/jpeg", "image/webp"], 2 * MB, SystemOnly: false);
 
+    /// <summary>Ảnh nền sơ đồ tầng (không gian & đặt phòng) — công khai trên OPAC (space giữ URL, cùng khuôn EbookCover).</summary>
+    public static readonly MediaPurpose SpaceFloorplan =
+        new("space-floorplan", "Ảnh sơ đồ tầng", Public: true, ["image/png", "image/jpeg", "image/webp"], 5 * MB, SystemOnly: false);
+
     /// <summary>Nội dung tài liệu số — riêng tư, chỉ xem qua URL có hạn sau khi digital tự kiểm quyền mượn/chính sách.</summary>
     public static readonly MediaPurpose EbookFile =
         new("ebook-file", "Tệp tài liệu số", Public: false, ["application/pdf"], 200 * MB, SystemOnly: false);
@@ -54,7 +58,7 @@ public sealed record MediaPurpose(
         ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         50 * MB, SystemOnly: false, ServiceRequestable: true);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile, DocumentSubmission];
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile, DocumentSubmission, SpaceFloorplan];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))

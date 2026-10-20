@@ -76,6 +76,15 @@ public static class DefaultTemplates
     public const string EbookSubmissionApproved = "EBOOK_SUBMISSION_APPROVED";
     public const string EbookSubmissionRejected = "EBOOK_SUBMISSION_REJECTED";
 
+    // Không gian & đặt phòng (space gửi theo mã).
+    public const string SpaceBookingCreated = "SPACE_BOOKING_CREATED";
+    public const string SpaceBookingApproved = "SPACE_BOOKING_APPROVED";
+    public const string SpaceBookingRejected = "SPACE_BOOKING_REJECTED";
+    public const string SpaceBookingExpired = "SPACE_BOOKING_EXPIRED";
+    public const string SpaceBookingCancelled = "SPACE_BOOKING_CANCELLED";
+    public const string SpaceBookingNoShow = "SPACE_BOOKING_NOSHOW";
+    public const string SpaceBookingBanned = "SPACE_BOOKING_BANNED";
+
     public sealed record Definition(string Code, string Name, string Subject, string Body);
 
     public static readonly IReadOnlyList<Definition> All =
@@ -146,6 +155,43 @@ public static class DefaultTemplates
             """
             <p>Xin chào {{ full_name }},</p>
             <p>Tài liệu <strong>{{ title }}</strong> bạn nộp chưa được duyệt. Lý do: {{ reason }}.</p>
+            """),
+        new(SpaceBookingCreated, "Đã gửi yêu cầu đặt phòng", "Đã gửi yêu cầu đặt phòng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Yêu cầu đặt <strong>{{ space_name }}</strong> từ {{ start_at }} đến {{ end_at }} đã được gửi, chờ thủ thư duyệt.</p>
+            """),
+        new(SpaceBookingApproved, "Đặt phòng đã được duyệt", "Đặt phòng đã được duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Lượt đặt <strong>{{ space_name }}</strong> từ {{ start_at }} đến {{ end_at }} đã được duyệt.</p>
+            <p>Vui lòng check-in đúng giờ — tới muộn quá giờ cho phép lượt đặt sẽ tự huỷ.</p>
+            """),
+        new(SpaceBookingRejected, "Đặt phòng bị từ chối", "Đặt phòng bị từ chối — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Lượt đặt <strong>{{ space_name }}</strong> từ {{ start_at }} đến {{ end_at }} chưa được duyệt. Lý do: {{ reject_reason }}.</p>
+            """),
+        new(SpaceBookingExpired, "Yêu cầu đặt phòng đã quá hạn duyệt", "Yêu cầu đặt phòng đã quá hạn duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Yêu cầu đặt <strong>{{ space_name }}</strong> từ {{ start_at }} đã quá giờ bắt đầu mà chưa được duyệt, nên tự động huỷ.</p>
+            """),
+        new(SpaceBookingCancelled, "Đã huỷ lượt đặt phòng", "Đã huỷ lượt đặt phòng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Lượt đặt <strong>{{ space_name }}</strong> từ {{ start_at }} đến {{ end_at }} đã được huỷ theo yêu cầu của bạn.</p>
+            """),
+        new(SpaceBookingNoShow, "Vắng mặt lượt đặt phòng", "Bạn đã vắng mặt lượt đặt phòng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Bạn không check-in lượt đặt <strong>{{ space_name }}</strong> lúc {{ start_at }} trong thời gian cho phép, nên lượt đặt đã bị huỷ.</p>
+            <p>Vắng mặt nhiều lần có thể khiến bạn bị tạm cấm đặt phòng.</p>
+            """),
+        new(SpaceBookingBanned, "Tạm cấm đặt phòng", "Bạn đã bị tạm cấm đặt phòng — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Do {{ reason }}, bạn tạm thời không đặt được phòng/không gian đến hết ngày <strong>{{ banned_until }}</strong>.</p>
             """),
     ];
 

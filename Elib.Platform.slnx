@@ -109,6 +109,13 @@
     <Project Path="src/Services/Notification/Elib.Notification.Infrastructure/Elib.Notification.Infrastructure.csproj" />
     <Project Path="src/Services/Notification/tests/Elib.Notification.Tests/Elib.Notification.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Space/">
+    <Project Path="src/Services/Space/Elib.Space.Api/Elib.Space.Api.csproj" />
+    <Project Path="src/Services/Space/Elib.Space.Application/Elib.Space.Application.csproj" />
+    <Project Path="src/Services/Space/Elib.Space.Domain/Elib.Space.Domain.csproj" />
+    <Project Path="src/Services/Space/Elib.Space.Infrastructure/Elib.Space.Infrastructure.csproj" />
+    <Project Path="src/Services/Space/tests/Elib.Space.Tests/Elib.Space.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Tenant/">
     <Project Path="src/Services/Tenant/Elib.Tenant.Api/Elib.Tenant.Api.csproj" />
     <Project Path="src/Services/Tenant/Elib.Tenant.Application/Elib.Tenant.Application.csproj" />

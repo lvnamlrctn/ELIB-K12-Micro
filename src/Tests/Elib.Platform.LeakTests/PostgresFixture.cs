@@ -8,6 +8,7 @@ using Elib.Notification.Infrastructure;
 using Elib.Catalog.Infrastructure;
 using Elib.Circulation.Infrastructure;
 using Elib.Digital.Infrastructure;
+using Elib.Space.Infrastructure;
 using Elib.Holdings.Infrastructure;
 using Elib.Search.Infrastructure;
 using Elib.Patron.Infrastructure;
@@ -74,6 +75,10 @@ public sealed class PostgresFixture : IAsyncLifetime
                 "ebook_files", "policy_digitals", "policy_digital_by_collections", "ebook_item_loans", "ebook_item_reservations", "patron_replicas",
                 "ebook_reviews", "ebook_favorites", "document_submissions"],
             (cs, t) => new DigitalDbContext(Options<DigitalDbContext>(cs, t), t)),
+        new("space", "elib_leak_space", ["map_buildings", "map_floors", "bookable_spaces", "patron_replicas",
+                "room_opening_hours", "room_special_days", "space_booking_settings", "room_bookings", "room_booking_members", "room_booking_bans",
+                "access_devices", "access_staff_cards", "access_commands", "access_scan_logs"],
+            (cs, t) => new SpaceDbContext(Options<SpaceDbContext>(cs, t), t)),
     ];
 
     public static ServiceDatabase Get(string service) => Services.Single(s => s.Service == service);
