@@ -3522,7 +3522,12 @@
     "NO_IMAGE": "Chưa có ảnh nền sơ đồ",
     "NO_URL": "Không lấy được ảnh đã tải lên.",
     "IMAGE_SAVED": "Đã lưu ảnh nền.",
-    "UNPLACED": "Chưa đặt vào sơ đồ"
+    "UNPLACED": "Chưa đặt vào sơ đồ",
+    "ADD_SPACE": "Thêm không gian",
+    "ADD_SPACE_HINT": "Bấm vào vị trí trên sơ đồ để đặt không gian mới.",
+    "NEW_SPACE": "Không gian mới",
+    "EDIT_SPACE": "Sửa nhanh không gian",
+    "FULL_CONFIG": "Cấu hình đầy đủ (nội quy, loại bạn đọc...)"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Yêu cầu đặt phòng",

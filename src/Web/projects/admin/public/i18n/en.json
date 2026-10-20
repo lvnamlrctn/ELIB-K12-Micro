@@ -3522,7 +3522,12 @@
     "NO_IMAGE": "No floor plan image yet",
     "NO_URL": "Could not read the uploaded image.",
     "IMAGE_SAVED": "Background image saved.",
-    "UNPLACED": "Not placed on the map"
+    "UNPLACED": "Not placed on the map",
+    "ADD_SPACE": "Add space",
+    "ADD_SPACE_HINT": "Click a spot on the map to place the new space there.",
+    "NEW_SPACE": "New space",
+    "EDIT_SPACE": "Quick edit space",
+    "FULL_CONFIG": "Full configuration (rules, allowed reader types...)"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Booking Requests",
