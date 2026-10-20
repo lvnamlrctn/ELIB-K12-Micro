@@ -557,6 +557,26 @@ export const SPACE_FIXTURE_TYPES: { value: string; label: string; icon: string }
   { value: 'OTHER', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_OTHER', icon: 'category' },
 ];
 
+/** Tủ đựng đồ trên sơ đồ tầng (monolith: PrintBook.Cabinet) — lưới Rows×Cols ngăn, đặt theo FloorId như SpaceFixture. */
+export interface SpaceLockerCabinet {
+  id: number; publicId: string; floorId: number; floorName: string | null; buildingId: number | null; buildingName: string | null;
+  code: string; name: string; rows: number; cols: number;
+  positionX: number | null; positionY: number | null; width: number | null; height: number | null;
+  colorHex: string | null; iconName: string | null; note: string | null; status: number; createdAt: string; updatedAt: string | null;
+}
+/** Ngăn trong tủ (monolith: PrintBook.CabinetCompartment) — sinh tự động theo Rows×Cols khi tạo/sửa tủ. */
+export interface SpaceLockerCompartment {
+  id: number; publicId: string; cabinetId: number; rowIndex: number; colIndex: number; code: string; name: string | null; note: string | null;
+  status: number; createdAt: string; updatedAt: string | null;
+}
+/** Lượt mượn/trả ngăn tủ (monolith: KeyOut+KeyIn gộp). loanStatus: 1 Đang mượn, 2 Đã trả — suy ra từ returnedAt. */
+export interface SpaceLockerLoan {
+  id: number; publicId: string; compartmentId: number; compartmentCode: string | null; cabinetId: number | null; cabinetCode: string | null;
+  readerPublicId: string; cardNo: string; readerName: string | null; borrowedAt: string; returnedAt: string | null; note: string | null;
+  loanStatus: number; createdAt: string;
+}
+export interface SpaceLockerLoanSearch extends CrudSearch { cardNo?: string | null; compartmentId?: number | null; loanStatus?: number | null; from?: string | null; to?: string | null; }
+
 export interface SpaceMember { readerPublicId: string; cardNo: string; name: string | null; }
 /** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Đang sử dụng, 4 Hoàn tất, 5 Đã huỷ, 6 Từ chối, 7 Không tới. */
 export interface SpaceBooking {
@@ -1221,6 +1241,17 @@ export class Api {
     return this.post<SpaceFixture>(`/api/admin/space/fixtures/${publicId}/Place`, body);
   }
   spaceStores() { return this.get<SpaceStoreOption[]>('/api/admin/space/stores'); }
+  placeLockerCabinet(publicId: string, body: { positionX: number | null; positionY: number | null; width: number | null; height: number | null }) {
+    return this.post<SpaceLockerCabinet>(`/api/admin/space/locker-cabinets/${publicId}/Place`, body);
+  }
+  lockerLoanSnapshot(cardNo: string) { return this.post<SpaceLockerLoan[]>('/api/admin/space/locker-loans/Snapshot', { cardNo }); }
+  borrowLocker(compartmentCode: string, cardNo: string, note: string | null = null) {
+    return this.post<SpaceLockerLoan>('/api/admin/space/locker-loans/Borrow', { compartmentCode, cardNo, note });
+  }
+  returnLocker(compartmentCode: string | null, loanPublicId: string | null = null) {
+    return this.post<SpaceLockerLoan>('/api/admin/space/locker-loans/Return', { compartmentCode, loanPublicId });
+  }
+  searchLockerLoans(body: SpaceLockerLoanSearch) { return this.post<CrudPage<SpaceLockerLoan>>('/api/admin/space/locker-loans/Search', body); }
 
   searchSpaceBookings(body: SpaceBookingSearch) { return this.post<CrudPage<SpaceBooking>>('/api/admin/space/bookings/Search', body); }
   spaceBooking(publicId: string) { return this.get<SpaceBooking>(`/api/admin/space/bookings/GetById/${publicId}`); }

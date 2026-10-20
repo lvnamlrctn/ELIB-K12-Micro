@@ -3519,7 +3519,6 @@
   "SPACE_FLOOR_MAP_PAGE": {
     "TITLE": "Sơ đồ tầng",
     "UPLOAD_IMAGE": "Tải ảnh nền",
-    "NO_IMAGE": "Chưa có ảnh nền sơ đồ",
     "NO_URL": "Không lấy được ảnh đã tải lên.",
     "IMAGE_SAVED": "Đã lưu ảnh nền.",
     "UNPLACED": "Chưa đặt vào sơ đồ",
@@ -3552,7 +3551,17 @@
     "CONDITION_1": "Sẵn sàng",
     "CONDITION_2": "Hoạt động",
     "CONDITION_3": "Bảo trì",
-    "FLOOR_UTILITIES": "Tiện ích tầng"
+    "FLOOR_UTILITIES": "Tiện ích tầng",
+    "TYPE_LOCKER": "Tủ đựng đồ",
+    "NEW_LOCKER": "Tủ đựng đồ mới",
+    "EDIT_LOCKER": "Sửa nhanh tủ đựng đồ",
+    "LOCKER_GRID": "Lưới {{rows}}×{{cols}} ngăn",
+    "LOCKER_ROWS": "Số dòng",
+    "LOCKER_COLS": "Số cột",
+    "LOCKER_COMPARTMENTS": "Ngăn tủ",
+    "LOCKER_SCAN_CARD": "Số thẻ bạn đọc (để mượn)",
+    "LOCKER_OCCUPIED": "Đang mượn",
+    "LOCKER_FREE": "Trống"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Yêu cầu đặt phòng",

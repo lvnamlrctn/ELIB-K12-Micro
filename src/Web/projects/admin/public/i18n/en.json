@@ -3519,7 +3519,6 @@
   "SPACE_FLOOR_MAP_PAGE": {
     "TITLE": "Floor Map",
     "UPLOAD_IMAGE": "Upload background",
-    "NO_IMAGE": "No floor plan image yet",
     "NO_URL": "Could not read the uploaded image.",
     "IMAGE_SAVED": "Background image saved.",
     "UNPLACED": "Not placed on the map",
@@ -3552,7 +3551,17 @@
     "CONDITION_1": "Ready",
     "CONDITION_2": "Working",
     "CONDITION_3": "Maintenance",
-    "FLOOR_UTILITIES": "Floor utilities"
+    "FLOOR_UTILITIES": "Floor utilities",
+    "TYPE_LOCKER": "Locker cabinet",
+    "NEW_LOCKER": "New locker cabinet",
+    "EDIT_LOCKER": "Quick edit locker cabinet",
+    "LOCKER_GRID": "{{rows}}×{{cols}} grid",
+    "LOCKER_ROWS": "Rows",
+    "LOCKER_COLS": "Columns",
+    "LOCKER_COMPARTMENTS": "Compartments",
+    "LOCKER_SCAN_CARD": "Reader card number (to borrow)",
+    "LOCKER_OCCUPIED": "Borrowed",
+    "LOCKER_FREE": "Free"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Booking Requests",
