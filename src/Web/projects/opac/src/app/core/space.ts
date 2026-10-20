@@ -16,6 +16,15 @@ export interface SpaceAvailability {
   maintenanceNote: string | null; busy: SpaceBusySlot[];
 }
 
+export interface SpaceBoardSlot { startAt: string; endAt: string; status: number; mine: boolean; readerLabel: string | null; }
+/** Một dòng = một phòng trong lưới đặt phòng (FloorBoard) — openTime/closeTime null khi đóng cửa hôm đó. */
+export interface SpaceBoardRoom {
+  id: number; publicId: string; name: string; code: string; capacity: number; rules: string | null; autoApprove: boolean;
+  maintenance: boolean; maintenanceNote: string | null; closed: boolean; closedReason: string | null;
+  openTime: string | null; closeTime: string | null; busy: SpaceBoardSlot[];
+}
+export interface SpaceFloorBoard { stepMinutes: number; openTime: string; closeTime: string; rooms: SpaceBoardRoom[]; }
+
 export interface SpaceMemberSummary { readerPublicId: string; cardNo: string; name: string | null; }
 /** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Đang sử dụng, 4 Hoàn tất, 5 Đã huỷ, 6 Từ chối, 7 Không tới. */
 export interface SpaceBookingSummary {
@@ -45,6 +54,11 @@ export class SpaceApi {
   }
   availability(spaceId: number, date: string) {
     return firstValueFrom(this.http.get<SpaceAvailability>(`/api/opac/space/browse/spaces/${spaceId}/availability`, { params: { date } }));
+  }
+  /** Lưới đặt phòng cả tầng trong ngày — ẩn danh (loggedIn=false) không đánh dấu "của bạn", đăng nhập thì có. */
+  board(floorId: number, date: string, loggedIn: boolean) {
+    const path = loggedIn ? '/api/opac/space' : '/api/opac/space/browse';
+    return firstValueFrom(this.http.get<SpaceFloorBoard>(`${path}/floors/${floorId}/board`, { params: { date } }));
   }
 
   myBookings() { return firstValueFrom(this.http.get<SpaceMyBooking[]>('/api/opac/space/bookings')); }

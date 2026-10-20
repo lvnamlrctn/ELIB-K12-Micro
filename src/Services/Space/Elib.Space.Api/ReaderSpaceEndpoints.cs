@@ -39,6 +39,9 @@ public static class ReaderSpaceEndpoints
             return member is null ? Results.NotFound() : Results.Ok(member);
         });
 
+        reader.MapGet("/floors/{floorId:long}/board", async (long floorId, DateOnly date, ClaimsPrincipal principal, BookingResource r, CancellationToken ct) =>
+            await r.BoardAsync(floorId, date, ReaderId(principal), ct));
+
         return app;
     }
 

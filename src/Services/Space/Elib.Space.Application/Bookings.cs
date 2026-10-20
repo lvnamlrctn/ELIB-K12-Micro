@@ -47,6 +47,15 @@ public sealed record BusySlot(DateTimeOffset StartAt, DateTimeOffset EndAt);
 public sealed record SpaceAvailability(bool Closed, TimeOnly? OpenTime, TimeOnly? CloseTime, string? ClosedReason, bool Maintenance,
     string? MaintenanceNote, IReadOnlyList<BusySlot> Busy);
 
+public sealed record BoardSlot(DateTimeOffset StartAt, DateTimeOffset EndAt, int Status, bool Mine, string? ReaderLabel);
+
+public sealed record BoardRoomDto(long Id, Guid PublicId, string Name, string Code, int Capacity, string? Rules, bool AutoApprove,
+    bool Maintenance, string? MaintenanceNote, bool Closed, string? ClosedReason, TimeOnly? OpenTime, TimeOnly? CloseTime,
+    IReadOnlyList<BoardSlot> Busy);
+
+/// <summary>Lưới đặt phòng một tầng theo ngày (monolith: FloorBoard) — mỗi phòng một dòng, cột là khung giờ StepMinutes.</summary>
+public sealed record FloorBoardDto(int StepMinutes, TimeOnly OpenTime, TimeOnly CloseTime, IReadOnlyList<BoardRoomDto> Rooms);
+
 /// <summary>
 /// Lượt đặt phòng/không gian (monolith: map.RoomBooking, quyền SPACE_BOOKINGS). Tạo/duyệt/từ chối/check-in/check-out/huỷ đều qua
 /// phương thức nghiệp vụ riêng — không có Add/Update chung, đúng khuôn LoanResource/DocumentSubmissionResource. Chưa gồm kiểm
@@ -57,6 +66,9 @@ public sealed class BookingResource(ICrudDbContext db, Replicas replicas, HoursR
 {
     /// <summary>Mở cửa sổ check-in trước giờ bắt đầu (cố định, không cấu hình — đúng bản gốc).</summary>
     public const int CheckInOpenMinutes = 15;
+
+    /// <summary>Bước lưới giờ cho màn đặt phòng OPAC (cố định, không cấu hình — đúng bản gốc).</summary>
+    public const int StepMinutes = 30;
 
     private static readonly int[] OpenStatuses = [RoomBookingStatus.Pending, RoomBookingStatus.Approved, RoomBookingStatus.CheckedIn];
 
@@ -280,6 +292,50 @@ public sealed class BookingResource(ICrudDbContext db, Replicas replicas, HoursR
         var busy = await Set.AsNoTracking().Where(x => x.SpaceId == spaceId && OpenStatuses.Contains(x.Status) && x.StartAt < dayEnd && x.EndAt > dayStart)
             .Select(x => new BusySlot(x.StartAt, x.EndAt)).ToListAsync(ct);
         return new SpaceAvailability(resolved.Closed, resolved.OpenTime, resolved.CloseTime, resolved.Reason, space.Maintenance, space.MaintenanceNote, busy);
+    }
+
+    /// <summary>
+    /// Lưới giờ mọi phòng của một tầng trong ngày (monolith: FloorBoard) — nền cho màn đặt phòng OPAC: cột giờ theo
+    /// <see cref="StepMinutes"/>, mỗi phòng một dòng, ô bận hiển thị theo trạng thái (Pending/Approved/CheckedIn).
+    /// readerPublicId null (duyệt ẩn danh) thì không đánh dấu "của bạn" và không lộ tên — chỉ tô theo trạng thái.
+    /// </summary>
+    public async Task<FloorBoardDto> BoardAsync(long floorId, DateOnly date, Guid? readerPublicId, CancellationToken ct)
+    {
+        var spaces = await Db.Set<BookableSpace>().AsNoTracking()
+            .Where(s => s.FloorId == floorId && s.Status == IHasStatus.Active).OrderBy(s => s.Name).ToListAsync(ct);
+        var dayStart = Local(date);
+        var dayEnd = Local(date.AddDays(1));
+        var spaceIds = spaces.Select(s => s.Id).ToList();
+        var bookings = await Set.AsNoTracking()
+            .Where(x => spaceIds.Contains(x.SpaceId) && OpenStatuses.Contains(x.Status) && x.StartAt < dayEnd && x.EndAt > dayStart)
+            .ToListAsync(ct);
+        var readerIds = bookings.Select(b => b.ReaderPublicId).Distinct().ToList();
+        var names = await Db.Set<PatronReplica>().AsNoTracking().Where(r => readerIds.Contains(r.ReaderPublicId))
+            .Select(r => new { r.ReaderPublicId, r.FullName }).ToDictionaryAsync(r => r.ReaderPublicId, r => r.FullName, ct);
+
+        var settingsRow = await settings.GetAsync(ct);
+        TimeOnly? minOpen = null;
+        TimeOnly? maxClose = null;
+        var rooms = new List<BoardRoomDto>();
+        foreach (var space in spaces)
+        {
+            var resolved = await hours.ResolveAsync(date, space.Category, ct);
+            if (!resolved.Closed && resolved.OpenTime is { } open && resolved.CloseTime is { } close)
+            {
+                minOpen = minOpen is null || open < minOpen ? open : minOpen;
+                maxClose = maxClose is null || close > maxClose ? close : maxClose;
+            }
+            var busy = bookings.Where(b => b.SpaceId == space.Id)
+                .Select(b =>
+                {
+                    var mine = readerPublicId is { } id && b.ReaderPublicId == id;
+                    var label = mine ? null : names.TryGetValue(b.ReaderPublicId, out var n) ? Mask(n) : null;
+                    return new BoardSlot(b.StartAt, b.EndAt, b.Status, mine, label);
+                }).OrderBy(b => b.StartAt).ToList();
+            rooms.Add(new BoardRoomDto(space.Id, space.PublicId, space.Name, space.Code, space.Capacity, space.Rules, space.AutoApprove,
+                space.Maintenance, space.MaintenanceNote, resolved.Closed, resolved.Reason, resolved.OpenTime, resolved.CloseTime, busy));
+        }
+        return new FloorBoardDto(StepMinutes, minOpen ?? settingsRow.DefaultOpenTime, maxClose ?? settingsRow.DefaultCloseTime, rooms);
     }
 
     public async Task<MemberDto?> LookupMemberAsync(string cardNo, Guid excludeReaderPublicId, CancellationToken ct)

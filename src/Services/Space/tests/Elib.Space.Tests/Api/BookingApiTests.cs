@@ -263,4 +263,33 @@ public sealed class BookingApiTests(SpaceApiFactory factory) : SpaceTestBase(fac
         var cancelled = await Read<BookingDto>(await ownerClient.DeleteAsync(U($"/api/reader/bookings/{booking.PublicId}")));
         Assert.Equal(RoomBookingStatus.Cancelled, cancelled.Status);
     }
+
+    /// <summary>Lưới đặt phòng OPAC (FloorBoard, màn đặt phòng mới) — ô bận đánh dấu "của bạn" đúng người, người khác thì không.</summary>
+    [Fact]
+    public async Task Board_marks_a_busy_slot_as_mine_only_for_the_booking_reader()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var space = await AddSpaceAsync(staff, floor.Id, "P111", capacity: 4, autoApprove: true);
+        var reader = Reader(tenantId, "hs-14");
+        var other = Reader(tenantId, "hs-15");
+        await Publish(reader, other);
+        var readerClient = ReaderClient(tenantId, "hs-14", reader.ReaderPublicId);
+        var otherClient = ReaderClient(tenantId, "hs-15", other.ReaderPublicId);
+        var day = Tomorrow();
+        var start = VnLocal(day, new TimeOnly(9, 0));
+        var end = VnLocal(day, new TimeOnly(10, 0));
+
+        await readerClient.PostAsJsonAsync(U("/api/reader/bookings"), new ReaderBookRequest(space.Id, start, end, 1, null, null), Json);
+
+        var board = await Read<FloorBoardDto>(await readerClient.GetAsync(U($"/api/reader/floors/{floor.Id}/board?date={day:yyyy-MM-dd}")));
+        var slot = Assert.Single(Assert.Single(board.Rooms).Busy);
+        Assert.True(slot.Mine);
+
+        var boardForOther = await Read<FloorBoardDto>(await otherClient.GetAsync(U($"/api/reader/floors/{floor.Id}/board?date={day:yyyy-MM-dd}")));
+        var slotForOther = Assert.Single(Assert.Single(boardForOther.Rooms).Busy);
+        Assert.False(slotForOther.Mine);
+    }
 }

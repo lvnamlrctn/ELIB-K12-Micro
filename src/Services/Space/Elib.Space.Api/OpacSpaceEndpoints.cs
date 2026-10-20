@@ -17,6 +17,7 @@ public static class OpacSpaceEndpoints
         opac.MapGet("/floors", (long? buildingId, FloorResource r, CancellationToken ct) => r.SearchAllAsync(new FloorSearch { BuildingId = buildingId }, ct));
         opac.MapGet("/spaces", (long? floorId, SpaceResource r, CancellationToken ct) => r.SearchAllAsync(new SpaceSearch { FloorId = floorId }, ct));
         opac.MapGet("/spaces/{spaceId:long}/availability", (long spaceId, DateOnly date, BookingResource r, CancellationToken ct) => r.AvailabilityAsync(spaceId, date, ct));
+        opac.MapGet("/floors/{floorId:long}/board", (long floorId, DateOnly date, BookingResource r, CancellationToken ct) => r.BoardAsync(floorId, date, null, ct));
 
         return app;
     }
