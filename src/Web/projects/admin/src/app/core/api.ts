@@ -520,6 +520,26 @@ export interface SpaceRoom {
   maintenanceNote: string | null; status: number; createdAt: string; updatedAt: string | null;
 }
 
+/** Vật dụng đặt trên sơ đồ tầng, không đặt được (monolith: map.MapObject, ngoài ROOM/STUDY_SPACE). */
+export interface SpaceFixture {
+  id: number; publicId: string; floorId: number; floorName: string | null; buildingId: number | null; buildingName: string | null;
+  code: string; name: string; objectType: string;
+  positionX: number | null; positionY: number | null; width: number | null; height: number | null; colorHex: string | null; iconName: string | null;
+  shelfCategoryRange: string | null; shelfSubjectName: string | null; shelfCapacity: number | null; shelfDescription: string | null;
+  storePublicId: string | null; status: number; createdAt: string; updatedAt: string | null;
+}
+export const SPACE_FIXTURE_TYPES: { value: string; label: string; icon: string }[] = [
+  { value: 'SHELF', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_SHELF', icon: 'menu_book' },
+  { value: 'PC', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_PC', icon: 'computer' },
+  { value: 'COUNTER', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_COUNTER', icon: 'storefront' },
+  { value: 'SERVER_ROOM', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_SERVER_ROOM', icon: 'dns' },
+  { value: 'OFFICE', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_OFFICE', icon: 'business_center' },
+  { value: 'DOOR', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_DOOR', icon: 'sensor_door' },
+  { value: 'ELEVATOR', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_ELEVATOR', icon: 'elevator' },
+  { value: 'RESTROOM', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_RESTROOM', icon: 'wc' },
+  { value: 'OTHER', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_OTHER', icon: 'category' },
+];
+
 export interface SpaceMember { readerPublicId: string; cardNo: string; name: string | null; }
 /** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Đang sử dụng, 4 Hoàn tất, 5 Đã huỷ, 6 Từ chối, 7 Không tới. */
 export interface SpaceBooking {
@@ -1179,6 +1199,9 @@ export class Api {
   }
   setSpaceFloorLayout(publicId: string, layoutImageUrl: string | null, canvasWidth: number, canvasHeight: number) {
     return this.post<SpaceFloor>(`/api/admin/space/floors/${publicId}/SetLayout`, { layoutImageUrl, canvasWidth, canvasHeight });
+  }
+  placeSpaceFixture(publicId: string, body: { positionX: number | null; positionY: number | null; width: number | null; height: number | null }) {
+    return this.post<SpaceFixture>(`/api/admin/space/fixtures/${publicId}/Place`, body);
   }
 
   searchSpaceBookings(body: SpaceBookingSearch) { return this.post<CrudPage<SpaceBooking>>('/api/admin/space/bookings/Search', body); }

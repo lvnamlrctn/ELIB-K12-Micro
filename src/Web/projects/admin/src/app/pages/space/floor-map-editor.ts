@@ -2,12 +2,14 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Api, SPACE_CATEGORIES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFloor, SpaceRoom, errorMessage } from '../../core/api';
+import {
+  Api, SPACE_CATEGORIES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture, SpaceFloor, SpaceRoom, errorMessage,
+} from '../../core/api';
 import { Loading, Modal } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
 
 type DragMode = 'move' | 'resize';
-/** Kích thước mặc định (%) khi đặt một không gian mới hoặc chưa có vị trí lên sơ đồ. */
+/** Kích thước mặc định (%) khi đặt một không gian/vật dụng mới hoặc chưa có vị trí lên sơ đồ. */
 const DEFAULT_SIZE = 12;
 
 const KIND_OPTIONS = [
@@ -15,14 +17,24 @@ const KIND_OPTIONS = [
   { value: SPACE_KIND_STUDY, label: 'SPACE_CAT.KIND_STUDY' },
 ];
 
-interface QuickForm { code: string; name: string; kind: number; category: number; capacity: number; autoApprove: boolean; colorHex: string | null; }
+/** 'ROOM' = không gian đặt được (SpaceRoom); còn lại là ObjectType của vật dụng (SpaceFixture). */
+type PlacingKind = 'ROOM' | string;
+
+interface RoomForm { code: string; name: string; kind: number; category: number; capacity: number; autoApprove: boolean; colorHex: string | null; }
+interface FixtureForm {
+  code: string; name: string; objectType: string; colorHex: string | null; iconName: string | null;
+  shelfCategoryRange: string | null; shelfSubjectName: string | null; shelfCapacity: number | null; shelfDescription: string | null;
+}
+
+type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: SpaceFixture };
 
 /**
- * Sơ đồ tầng trực quan (monolith: /admin/so-do-tang) — đúng luồng bản gốc: bấm "Thêm không gian" rồi bấm vào sơ đồ để đặt vị
- * trí (tạo mới ngay tại đó, mở form nhanh đặt tên/loại), hoặc kéo-thả không gian đã có để di chuyển/đổi kích thước. Quyền
- * SPACE_ROOMS. Vị trí/kích thước lưu theo % (0-100) trên khung ảnh — độc lập độ phân giải ảnh thật, khớp
- * SpaceRoom.PositionX/Y/Width/Height. Cấu hình đầy đủ (nội quy, loại bạn đọc cho phép, giờ...) vẫn ở trang Danh mục không gian
- * — form nhanh ở đây chỉ đủ để tạo/sửa nhanh ngay trên sơ đồ.
+ * Sơ đồ tầng trực quan (monolith: /admin/so-do-tang) — đúng luồng bản gốc: bấm 1 loại trong bảng "Thêm" rồi bấm vào sơ đồ để
+ * đặt vị trí (tạo mới ngay tại đó, mở form nhanh đặt tên), hoặc kéo-thả vật đã có để di chuyển/đổi kích thước. Gồm cả không
+ * gian đặt được (phòng — quyền SPACE_ROOMS) và vật dụng không đặt được (giá sách/máy tính/quầy/...— quyền SPACE_FIXTURES,
+ * monolith map.MapObject các ObjectType ngoài ROOM/STUDY_SPACE). Vị trí/kích thước lưu theo % (0-100) trên khung ảnh — độc
+ * lập độ phân giải ảnh thật. Cấu hình đầy đủ của phòng (nội quy, loại bạn đọc cho phép, giờ...) vẫn ở trang Danh mục không
+ * gian — form nhanh ở đây chỉ đủ để tạo/sửa nhanh ngay trên sơ đồ.
  */
 @Component({
   selector: 'app-space-floor-map-editor',
@@ -33,7 +45,7 @@ interface QuickForm { code: string; name: string; kind: number; category: number
     </div>
 
     <div class="panel mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div>
           <label class="field-label">{{ 'SPACE_CAT.BUILDING' | translate }}</label>
           <select class="input" [ngModel]="buildingId()" (ngModelChange)="selectBuilding($event)">
@@ -54,18 +66,28 @@ interface QuickForm { code: string; name: string; kind: number; category: number
             <input type="file" class="hidden" accept="image/png,image/jpeg,image/webp" [disabled]="!floor() || busy()" (change)="uploadLayout($event)" />
           </label>
         </div>
-        <div>
-          <button type="button" class="w-full !py-2" [class.btn-primary]="placing()" [class.btn-secondary]="!placing()"
-                  [disabled]="!floor() || busy()" (click)="togglePlacing()">
-            <span class="material-icons text-[18px]">add_location_alt</span> {{ 'SPACE_FLOOR_MAP_PAGE.ADD_SPACE' | translate }}
-          </button>
-        </div>
       </div>
-      @if (placing()) {
-        <p class="text-sm text-blue-700 mt-3 flex items-center gap-1.5">
-          <span class="material-icons text-[16px]">touch_app</span>{{ 'SPACE_FLOOR_MAP_PAGE.ADD_SPACE_HINT' | translate }}
-        </p>
-      }
+
+      <div class="mt-4">
+        <label class="field-label mb-1.5 block">{{ 'SPACE_FLOOR_MAP_PAGE.ADD_PALETTE' | translate }}</label>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" class="btn-secondary !py-1.5 !px-2.5 text-xs" [class.btn-primary]="placingKind() === 'ROOM'"
+                  [disabled]="!floor() || busy()" (click)="togglePlacing('ROOM')">
+            <span class="material-icons text-[16px] align-middle mr-1">meeting_room</span>{{ 'SPACE_FLOOR_MAP_PAGE.TYPE_ROOM' | translate }}
+          </button>
+          @for (t of fixtureTypes; track t.value) {
+            <button type="button" class="btn-secondary !py-1.5 !px-2.5 text-xs" [class.btn-primary]="placingKind() === t.value"
+                    [disabled]="!floor() || busy()" (click)="togglePlacing(t.value)">
+              <span class="material-icons text-[16px] align-middle mr-1">{{ t.icon }}</span>{{ t.label | translate }}
+            </button>
+          }
+        </div>
+        @if (placingKind()) {
+          <p class="text-sm text-blue-700 mt-2 flex items-center gap-1.5">
+            <span class="material-icons text-[16px]">touch_app</span>{{ 'SPACE_FLOOR_MAP_PAGE.ADD_SPACE_HINT' | translate }}
+          </p>
+        }
+      </div>
     </div>
 
     @if (floor(); as f) {
@@ -73,7 +95,7 @@ interface QuickForm { code: string; name: string; kind: number; category: number
         <div class="flex-1 panel p-3 relative">
           @if (busy()) { <app-loading /> }
           <div class="relative w-full bg-gray-100 rounded-lg border border-gray-200 overflow-hidden select-none"
-               [class.cursor-crosshair]="placing()"
+               [class.cursor-crosshair]="placingKind()"
                [style.aspect-ratio]="f.canvasWidth + ' / ' + f.canvasHeight"
                (pointerdown)="onBackgroundPointerDown($event)">
             @if (f.layoutImageUrl) {
@@ -85,33 +107,57 @@ interface QuickForm { code: string; name: string; kind: number; category: number
             }
             @for (s of placedRooms(); track s.id) {
               <div class="absolute rounded-md border-2 flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden"
-                   [class.border-blue-600]="selected()?.id === s.id" [class.bg-blue-100/80]="selected()?.id === s.id"
-                   [class.border-amber-500]="s.maintenance && selected()?.id !== s.id" [class.bg-amber-50/80]="s.maintenance && selected()?.id !== s.id"
-                   [class.border-gray-400]="!s.maintenance && selected()?.id !== s.id" [class.bg-white/80]="!s.maintenance && selected()?.id !== s.id"
+                   [class.border-blue-600]="isSelected('room', s.id)" [class.bg-blue-100/80]="isSelected('room', s.id)"
+                   [class.border-amber-500]="s.maintenance && !isSelected('room', s.id)" [class.bg-amber-50/80]="s.maintenance && !isSelected('room', s.id)"
+                   [class.border-gray-400]="!s.maintenance && !isSelected('room', s.id)" [class.bg-white/80]="!s.maintenance && !isSelected('room', s.id)"
                    [style.left.%]="s.positionX" [style.top.%]="s.positionY" [style.width.%]="s.width" [style.height.%]="s.height"
                    [style.background-color]="s.colorHex ? s.colorHex + '33' : null" [style.border-color]="s.colorHex"
-                   (pointerdown)="startDrag($event, s, 'move')">
+                   (pointerdown)="startDrag($event, 'room', s, 'move')">
                 @if (s.iconName) { <span class="material-icons text-[16px] mr-0.5">{{ s.iconName }}</span> }
                 <span class="truncate px-1">{{ s.name }}</span>
-                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, s, 'resize')"></div>
+                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, 'room', s, 'resize')"></div>
+              </div>
+            }
+            @for (x of placedFixtures(); track x.id) {
+              <div class="absolute rounded-md border-2 border-dashed flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden"
+                   [class.border-blue-600]="isSelected('fixture', x.id)" [class.bg-blue-100/80]="isSelected('fixture', x.id)"
+                   [class.border-gray-400]="!isSelected('fixture', x.id)" [class.bg-white/80]="!isSelected('fixture', x.id)"
+                   [style.left.%]="x.positionX" [style.top.%]="x.positionY" [style.width.%]="x.width" [style.height.%]="x.height"
+                   [style.background-color]="x.colorHex ? x.colorHex + '33' : null" [style.border-color]="x.colorHex"
+                   (pointerdown)="startDrag($event, 'fixture', x, 'move')">
+                <span class="material-icons text-[16px] mr-0.5">{{ x.iconName || fixtureIcon(x.objectType) }}</span>
+                <span class="truncate px-1">{{ x.name }}</span>
+                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, 'fixture', x, 'resize')"></div>
               </div>
             }
           </div>
         </div>
 
         <div class="w-full lg:w-72 space-y-3">
-          @if (selected(); as s) {
+          @if (selected(); as sel) {
             <div class="panel p-3">
-              <div class="font-medium text-gray-800 mb-1">{{ s.name }} <span class="text-gray-400">({{ s.code }})</span></div>
-              <div class="text-xs text-gray-500 mb-2">{{ 'SPACE_CAT.CAPACITY' | translate }}: {{ s.capacity }}</div>
-              @if (s.maintenance) {
-                <div class="text-xs text-amber-700 mb-2">{{ 'SPACE_CAT.MAINTENANCE_ON' | translate }}{{ s.maintenanceNote ? ' — ' + s.maintenanceNote : '' }}</div>
+              @if (sel.kind === 'room') {
+                <div class="font-medium text-gray-800 mb-1">{{ sel.item.name }} <span class="text-gray-400">({{ sel.item.code }})</span></div>
+                <div class="text-xs text-gray-500 mb-2">{{ 'SPACE_CAT.CAPACITY' | translate }}: {{ sel.item.capacity }}</div>
+                @if (sel.item.maintenance) {
+                  <div class="text-xs text-amber-700 mb-2">{{ 'SPACE_CAT.MAINTENANCE_ON' | translate }}{{ sel.item.maintenanceNote ? ' — ' + sel.item.maintenanceNote : '' }}</div>
+                }
+              } @else {
+                <div class="font-medium text-gray-800 mb-1">{{ sel.item.name }} <span class="text-gray-400">({{ sel.item.code }})</span></div>
+                <div class="text-xs text-gray-500 mb-2">{{ fixtureLabel(sel.item.objectType) | translate }}</div>
+                @if (sel.item.objectType === 'SHELF') {
+                  @if (sel.item.shelfCategoryRange) { <div class="text-xs text-gray-500">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_RANGE' | translate }}: {{ sel.item.shelfCategoryRange }}</div> }
+                  @if (sel.item.shelfSubjectName) { <div class="text-xs text-gray-500">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_SUBJECT' | translate }}: {{ sel.item.shelfSubjectName }}</div> }
+                  @if (sel.item.shelfCapacity) { <div class="text-xs text-gray-500 mb-2">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_CAPACITY' | translate }}: {{ sel.item.shelfCapacity }}</div> }
+                }
               }
-              <div class="flex gap-2">
-                <button type="button" class="btn-secondary !py-1 text-xs flex-1" (click)="openEdit(s)">{{ 'COMMON.EDIT' | translate }}</button>
+              <div class="flex gap-2 mt-2">
+                <button type="button" class="btn-secondary !py-1 text-xs flex-1" (click)="openEdit(sel)">{{ 'COMMON.EDIT' | translate }}</button>
                 <button type="button" class="btn-secondary !py-1 text-xs flex-1" (click)="deselect()">{{ 'COMMON.CLOSE' | translate }}</button>
               </div>
-              <a [routerLink]="['/space-rooms']" class="text-xs text-blue-600 hover:underline mt-2 inline-block">{{ 'SPACE_FLOOR_MAP_PAGE.FULL_CONFIG' | translate }} →</a>
+              @if (sel.kind === 'room') {
+                <a [routerLink]="['/space-rooms']" class="text-xs text-blue-600 hover:underline mt-2 inline-block">{{ 'SPACE_FLOOR_MAP_PAGE.FULL_CONFIG' | translate }} →</a>
+              }
             </div>
           }
           @if (unplacedRooms().length > 0) {
@@ -132,9 +178,9 @@ interface QuickForm { code: string; name: string; kind: number; category: number
       </div>
     }
 
-    @if (form(); as f) {
-      <app-modal [title]="(f.publicId ? 'SPACE_FLOOR_MAP_PAGE.EDIT_SPACE' : 'SPACE_FLOOR_MAP_PAGE.NEW_SPACE') | translate" widthClass="max-w-lg" (closed)="form.set(null)">
-        <form id="quick-space-form" (ngSubmit)="submitForm()" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    @if (roomForm(); as f) {
+      <app-modal [title]="(f.publicId ? 'SPACE_FLOOR_MAP_PAGE.EDIT_SPACE' : 'SPACE_FLOOR_MAP_PAGE.NEW_SPACE') | translate" widthClass="max-w-lg" (closed)="roomForm.set(null)">
+        <form id="quick-space-form" (ngSubmit)="submitRoomForm()" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label class="form-label">{{ 'COMMON.CODE' | translate }} <span class="text-red-500">*</span></label><input class="input" [(ngModel)]="f.code" name="code" required /></div>
           <div><label class="form-label">{{ 'COMMON.NAME' | translate }} <span class="text-red-500">*</span></label><input class="input" [(ngModel)]="f.name" name="name" required /></div>
           <div>
@@ -157,8 +203,39 @@ interface QuickForm { code: string; name: string; kind: number; category: number
           </div>
         </form>
         <ng-container footer>
-          <button type="button" (click)="form.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" (click)="roomForm.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="submit" form="quick-space-form" [disabled]="busy()" class="btn-primary"><span class="material-icons text-[16px]">save</span> {{ 'COMMON.SAVE' | translate }}</button>
+        </ng-container>
+      </app-modal>
+    }
+
+    @if (fixtureForm(); as f) {
+      <app-modal [title]="(f.publicId ? 'SPACE_FLOOR_MAP_PAGE.EDIT_FIXTURE' : 'SPACE_FLOOR_MAP_PAGE.NEW_FIXTURE') | translate" widthClass="max-w-lg" (closed)="fixtureForm.set(null)">
+        <form id="quick-fixture-form" (ngSubmit)="submitFixtureForm()" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="form-label">{{ 'COMMON.CODE' | translate }} <span class="text-red-500">*</span></label><input class="input" [(ngModel)]="f.code" name="code" required /></div>
+          <div><label class="form-label">{{ 'COMMON.NAME' | translate }} <span class="text-red-500">*</span></label><input class="input" [(ngModel)]="f.name" name="name" required /></div>
+          <div>
+            <label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.OBJECT_TYPE' | translate }}</label>
+            <select class="input" [(ngModel)]="f.objectType" name="objectType">
+              @for (t of fixtureTypes; track t.value) { <option [ngValue]="t.value">{{ t.label | translate }}</option> }
+            </select>
+          </div>
+          <div><label class="form-label">{{ 'SPACE_CAT.COLOR' | translate }}</label><input class="input" [(ngModel)]="f.colorHex" name="colorHex" placeholder="#2563eb" /></div>
+          @if (f.objectType === 'SHELF') {
+            <div class="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="sm:col-span-2 text-xs font-medium text-amber-800 flex items-center gap-1">
+                <span class="material-icons text-[16px]">menu_book</span>{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_DETAIL' | translate }}
+              </div>
+              <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_RANGE' | translate }}</label><input class="input" [(ngModel)]="f.shelfCategoryRange" name="shelfCategoryRange" placeholder="000 - 099" /></div>
+              <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_SUBJECT' | translate }}</label><input class="input" [(ngModel)]="f.shelfSubjectName" name="shelfSubjectName" /></div>
+              <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_CAPACITY' | translate }}</label><input type="number" class="input" [(ngModel)]="f.shelfCapacity" name="shelfCapacity" min="0" /></div>
+              <div class="sm:col-span-2"><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_DESCRIPTION' | translate }}</label><textarea class="input" [(ngModel)]="f.shelfDescription" name="shelfDescription" rows="2"></textarea></div>
+            </div>
+          }
+        </form>
+        <ng-container footer>
+          <button type="button" (click)="fixtureForm.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="submit" form="quick-fixture-form" [disabled]="busy()" class="btn-primary"><span class="material-icons text-[16px]">save</span> {{ 'COMMON.SAVE' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -170,27 +247,44 @@ export class SpaceFloorMapEditor implements OnInit {
 
   protected readonly kindOptions = KIND_OPTIONS;
   protected readonly categoryOptions = SPACE_CATEGORIES;
+  protected readonly fixtureTypes = SPACE_FIXTURE_TYPES;
 
   protected readonly buildings = signal<SpaceBuilding[]>([]);
   protected readonly floors = signal<SpaceFloor[]>([]);
   protected readonly rooms = signal<SpaceRoom[]>([]);
+  protected readonly fixtures = signal<SpaceFixture[]>([]);
   protected readonly buildingId = signal<number | null>(null);
   protected readonly floorId = signal<number | null>(null);
   protected readonly floor = signal<SpaceFloor | null>(null);
-  protected readonly selected = signal<SpaceRoom | null>(null);
+  protected readonly selected = signal<DragTarget | null>(null);
   protected readonly busy = signal(false);
-  protected readonly placing = signal(false);
-  protected readonly form = signal<(QuickForm & { publicId?: string; x?: number; y?: number }) | null>(null);
+  protected readonly placingKind = signal<PlacingKind | null>(null);
+  protected readonly roomForm = signal<(RoomForm & { publicId?: string; x?: number; y?: number }) | null>(null);
+  protected readonly fixtureForm = signal<(FixtureForm & { publicId?: string; x?: number; y?: number }) | null>(null);
 
   protected readonly floorsOfBuilding = () => this.floors().filter((f) => f.buildingId === this.buildingId());
   protected readonly placedRooms = () => this.rooms().filter((r) => r.positionX !== null && r.positionY !== null);
   protected readonly unplacedRooms = () => this.rooms().filter((r) => r.positionX === null || r.positionY === null);
+  protected readonly placedFixtures = () => this.fixtures().filter((x) => x.positionX !== null && x.positionY !== null);
 
-  private drag: { room: SpaceRoom; mode: DragMode; container: HTMLElement; startX: number; startY: number; orig: SpaceRoom } | null = null;
+  private drag: { target: DragTarget; mode: DragMode; container: HTMLElement; startX: number; startY: number } | null = null;
 
   async ngOnInit(): Promise<void> {
     this.buildings.set(await this.api.crud<SpaceBuilding>('buildings', 'space').searchAll());
     this.floors.set(await this.api.crud<SpaceFloor>('floors', 'space').searchAll());
+  }
+
+  protected fixtureIcon(objectType: string): string {
+    return this.fixtureTypes.find((t) => t.value === objectType)?.icon ?? 'category';
+  }
+
+  protected fixtureLabel(objectType: string): string {
+    return this.fixtureTypes.find((t) => t.value === objectType)?.label ?? 'SPACE_FLOOR_MAP_PAGE.TYPE_OTHER';
+  }
+
+  protected isSelected(kind: 'room' | 'fixture', id: number): boolean {
+    const sel = this.selected();
+    return !!sel && sel.kind === kind && sel.item.id === id;
   }
 
   protected selectBuilding(id: number | null): void {
@@ -198,49 +292,72 @@ export class SpaceFloorMapEditor implements OnInit {
     this.floorId.set(null);
     this.floor.set(null);
     this.rooms.set([]);
+    this.fixtures.set([]);
   }
 
   protected async selectFloor(id: number | null): Promise<void> {
     this.floorId.set(id);
     this.selected.set(null);
-    this.placing.set(false);
+    this.placingKind.set(null);
     const f = this.floors().find((x) => x.id === id) ?? null;
     this.floor.set(f);
-    if (!f) { this.rooms.set([]); return; }
-    this.rooms.set(await this.api.crud<SpaceRoom>('spaces', 'space').searchAll({ floorId: f.id }));
+    if (!f) { this.rooms.set([]); this.fixtures.set([]); return; }
+    const [rooms, fixtures] = await Promise.all([
+      this.api.crud<SpaceRoom>('spaces', 'space').searchAll({ floorId: f.id }),
+      this.api.crud<SpaceFixture>('fixtures', 'space').searchAll({ floorId: f.id }),
+    ]);
+    this.rooms.set(rooms);
+    this.fixtures.set(fixtures);
   }
 
   protected deselect(): void { this.selected.set(null); }
 
-  protected togglePlacing(): void {
-    this.placing.set(!this.placing());
+  protected togglePlacing(kind: PlacingKind): void {
+    this.placingKind.set(this.placingKind() === kind ? null : kind);
     this.selected.set(null);
   }
 
   protected onBackgroundPointerDown(event: PointerEvent): void {
-    if (this.placing()) { this.beginCreate(event); return; }
+    const kind = this.placingKind();
+    if (kind) { this.beginCreate(event, kind); return; }
     this.deselect();
   }
 
-  private beginCreate(event: PointerEvent): void {
+  private beginCreate(event: PointerEvent, kind: PlacingKind): void {
     const container = event.currentTarget as HTMLElement;
     const rect = container.getBoundingClientRect();
     const half = DEFAULT_SIZE / 2;
     const x = clamp(((event.clientX - rect.left) / rect.width) * 100 - half, 0, 100 - DEFAULT_SIZE);
     const y = clamp(((event.clientY - rect.top) / rect.height) * 100 - half, 0, 100 - DEFAULT_SIZE);
-    this.placing.set(false);
-    this.form.set({ code: '', name: '', kind: SPACE_KIND_ROOM, category: 1, capacity: 4, autoApprove: false, colorHex: null, x, y });
+    this.placingKind.set(null);
+    if (kind === 'ROOM') {
+      this.roomForm.set({ code: '', name: '', kind: SPACE_KIND_ROOM, category: 1, capacity: 4, autoApprove: false, colorHex: null, x, y });
+    } else {
+      this.fixtureForm.set({
+        code: '', name: '', objectType: kind, colorHex: null, iconName: this.fixtureIcon(kind),
+        shelfCategoryRange: null, shelfSubjectName: null, shelfCapacity: kind === 'SHELF' ? 100 : null, shelfDescription: null, x, y,
+      });
+    }
   }
 
-  protected openEdit(room: SpaceRoom): void {
-    this.form.set({
-      publicId: room.publicId, code: room.code, name: room.name, kind: room.kind, category: room.category,
-      capacity: room.capacity, autoApprove: room.autoApprove, colorHex: room.colorHex,
-    });
+  protected openEdit(sel: DragTarget): void {
+    if (sel.kind === 'room') {
+      const room = sel.item;
+      this.roomForm.set({
+        publicId: room.publicId, code: room.code, name: room.name, kind: room.kind, category: room.category,
+        capacity: room.capacity, autoApprove: room.autoApprove, colorHex: room.colorHex,
+      });
+    } else {
+      const x = sel.item;
+      this.fixtureForm.set({
+        publicId: x.publicId, code: x.code, name: x.name, objectType: x.objectType, colorHex: x.colorHex, iconName: x.iconName,
+        shelfCategoryRange: x.shelfCategoryRange, shelfSubjectName: x.shelfSubjectName, shelfCapacity: x.shelfCapacity, shelfDescription: x.shelfDescription,
+      });
+    }
   }
 
-  protected async submitForm(): Promise<void> {
-    const f = this.form();
+  protected async submitRoomForm(): Promise<void> {
+    const f = this.roomForm();
     const floor = this.floor();
     if (!f || !floor) return;
     this.busy.set(true);
@@ -249,7 +366,7 @@ export class SpaceFloorMapEditor implements OnInit {
         const existing = this.rooms().find((r) => r.publicId === f.publicId)!;
         const updated = await this.api.crud<SpaceRoom>('spaces', 'space').update(f.publicId, { ...existing, ...f });
         this.rooms.set(this.rooms().map((r) => (r.publicId === updated.publicId ? updated : r)));
-        this.selected.set(updated);
+        this.selected.set({ kind: 'room', item: updated });
       } else {
         const created = await this.api.crud<SpaceRoom>('spaces', 'space').add({
           floorId: floor.id, code: f.code, name: f.name, kind: f.kind, category: f.category, capacity: f.capacity,
@@ -258,9 +375,39 @@ export class SpaceFloorMapEditor implements OnInit {
         });
         const placed = await this.api.placeSpaceRoom(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
         this.rooms.set([...this.rooms(), placed]);
-        this.selected.set(placed);
+        this.selected.set({ kind: 'room', item: placed });
       }
-      this.form.set(null);
+      this.roomForm.set(null);
+      this.toastr.success('COMMON.SAVE_SUCCESS');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async submitFixtureForm(): Promise<void> {
+    const f = this.fixtureForm();
+    const floor = this.floor();
+    if (!f || !floor) return;
+    this.busy.set(true);
+    try {
+      if (f.publicId) {
+        const existing = this.fixtures().find((x) => x.publicId === f.publicId)!;
+        const updated = await this.api.crud<SpaceFixture>('fixtures', 'space').update(f.publicId, { ...existing, ...f, floorId: existing.floorId });
+        this.fixtures.set(this.fixtures().map((x) => (x.publicId === updated.publicId ? updated : x)));
+        this.selected.set({ kind: 'fixture', item: updated });
+      } else {
+        const created = await this.api.crud<SpaceFixture>('fixtures', 'space').add({
+          floorId: floor.id, code: f.code, name: f.name, objectType: f.objectType, colorHex: f.colorHex, iconName: f.iconName,
+          shelfCategoryRange: f.shelfCategoryRange, shelfSubjectName: f.shelfSubjectName, shelfCapacity: f.shelfCapacity,
+          shelfDescription: f.shelfDescription, storePublicId: null,
+        });
+        const placed = await this.api.placeSpaceFixture(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
+        this.fixtures.set([...this.fixtures(), placed]);
+        this.selected.set({ kind: 'fixture', item: placed });
+      }
+      this.fixtureForm.set(null);
       this.toastr.success('COMMON.SAVE_SUCCESS');
     } catch (e) {
       this.toastr.error(errorMessage(e));
@@ -293,34 +440,45 @@ export class SpaceFloorMapEditor implements OnInit {
 
   protected async placeAtCenter(room: SpaceRoom): Promise<void> {
     const half = DEFAULT_SIZE / 2;
-    await this.savePosition(room, 50 - half, 50 - half, DEFAULT_SIZE, DEFAULT_SIZE);
+    await this.savePosition({ kind: 'room', item: room }, 50 - half, 50 - half, DEFAULT_SIZE, DEFAULT_SIZE);
   }
 
-  protected startDrag(event: PointerEvent, room: SpaceRoom, mode: DragMode): void {
+  protected startDrag(event: PointerEvent, kind: 'room' | 'fixture', item: SpaceRoom | SpaceFixture, mode: DragMode): void {
     event.stopPropagation();
     event.preventDefault();
     const container = (event.currentTarget as HTMLElement).parentElement as HTMLElement;
-    this.selected.set(room);
-    this.drag = { room, mode, container, startX: event.clientX, startY: event.clientY, orig: room };
+    const target = (kind === 'room' ? { kind: 'room', item: item as SpaceRoom } : { kind: 'fixture', item: item as SpaceFixture }) as DragTarget;
+    this.selected.set(target);
+    this.drag = { target, mode, container, startX: event.clientX, startY: event.clientY };
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     if (!this.drag) return;
-    const { room, mode, container, startX, startY, orig } = this.drag;
+    const { target, mode, container, startX, startY } = this.drag;
     const rect = container.getBoundingClientRect();
     const dxPct = ((event.clientX - startX) / rect.width) * 100;
     const dyPct = ((event.clientY - startY) / rect.height) * 100;
+    const orig = target.item;
     const x = orig.positionX ?? 0;
     const y = orig.positionY ?? 0;
     const w = orig.width ?? DEFAULT_SIZE;
     const h = orig.height ?? DEFAULT_SIZE;
-    const next = mode === 'move'
-      ? { ...room, positionX: clamp(x + dxPct, 0, 100 - w), positionY: clamp(y + dyPct, 0, 100 - h) }
-      : { ...room, width: clamp(w + dxPct, 2, 100 - x), height: clamp(h + dyPct, 2, 100 - y) };
-    this.rooms.set(this.rooms().map((r) => (r.id === room.id ? next : r)));
-    if (this.selected()?.id === room.id) this.selected.set(next);
+    const nextPos = mode === 'move'
+      ? { positionX: clamp(x + dxPct, 0, 100 - w), positionY: clamp(y + dyPct, 0, 100 - h) }
+      : { width: clamp(w + dxPct, 2, 100 - x), height: clamp(h + dyPct, 2, 100 - y) };
+    if (target.kind === 'room') {
+      const next = { ...target.item, ...nextPos };
+      this.rooms.set(this.rooms().map((r) => (r.id === next.id ? next : r)));
+      this.drag = { ...this.drag, target: { kind: 'room', item: next } };
+      if (this.isSelected('room', next.id)) this.selected.set({ kind: 'room', item: next });
+    } else {
+      const next = { ...target.item, ...nextPos };
+      this.fixtures.set(this.fixtures().map((r) => (r.id === next.id ? next : r)));
+      this.drag = { ...this.drag, target: { kind: 'fixture', item: next } };
+      if (this.isSelected('fixture', next.id)) this.selected.set({ kind: 'fixture', item: next });
+    }
   };
 
   private readonly onPointerUp = (): void => {
@@ -329,15 +487,20 @@ export class SpaceFloorMapEditor implements OnInit {
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
     if (!drag) return;
-    const current = this.rooms().find((r) => r.id === drag.room.id);
-    if (current) void this.savePosition(current, current.positionX, current.positionY, current.width, current.height);
+    void this.savePosition(drag.target, drag.target.item.positionX, drag.target.item.positionY, drag.target.item.width, drag.target.item.height);
   };
 
-  private async savePosition(room: SpaceRoom, x: number | null, y: number | null, w: number | null, h: number | null): Promise<void> {
+  private async savePosition(target: DragTarget, x: number | null, y: number | null, w: number | null, h: number | null): Promise<void> {
     try {
-      const updated = await this.api.placeSpaceRoom(room.publicId, { positionX: x, positionY: y, width: w, height: h });
-      this.rooms.set(this.rooms().map((r) => (r.id === room.id ? updated : r)));
-      if (this.selected()?.id === room.id) this.selected.set(updated);
+      if (target.kind === 'room') {
+        const updated = await this.api.placeSpaceRoom(target.item.publicId, { positionX: x, positionY: y, width: w, height: h });
+        this.rooms.set(this.rooms().map((r) => (r.id === updated.id ? updated : r)));
+        if (this.isSelected('room', updated.id)) this.selected.set({ kind: 'room', item: updated });
+      } else {
+        const updated = await this.api.placeSpaceFixture(target.item.publicId, { positionX: x, positionY: y, width: w, height: h });
+        this.fixtures.set(this.fixtures().map((r) => (r.id === updated.id ? updated : r)));
+        if (this.isSelected('fixture', updated.id)) this.selected.set({ kind: 'fixture', item: updated });
+      }
     } catch (e) {
       this.toastr.error(errorMessage(e));
     }
