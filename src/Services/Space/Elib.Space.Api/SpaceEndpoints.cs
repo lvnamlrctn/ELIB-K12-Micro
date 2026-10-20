@@ -73,7 +73,10 @@ public static class SpaceEndpoints
         var reports = api.MapGroup("/reports").WithTags("Reports");
         reports.MapPost("/Search", [Permission("SPACE_REPORT", "view")] (ReportRequest request, ReportResource r, CancellationToken ct) => r.BuildAsync(request, ct));
         reports.MapPost("/Export", [Permission("SPACE_REPORT", "view")] async (ReportRequest request, ReportResource r, CancellationToken ct) =>
-            Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "bao-cao-dat-phong.xlsx"));
+        {
+            var file = await r.ExportAsync(request, ct);
+            return Results.File(file.Content, CrudExcel.ContentType, file.FileName);
+        });
 
         // Thiết bị kiểm soát cửa — không có Add/Update chung (Add cần sinh khoá API, trả về 1 lần duy nhất).
         var devices = api.MapGroup("/access/devices").WithTags("AccessDevices");

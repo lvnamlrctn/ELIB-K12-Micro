@@ -291,6 +291,38 @@ public sealed class AcquisitionReportTests : IClassFixture<AcquisitionApiFactory
 
     private static async Task<(HttpStatusCode Status, string? Code)> Failure(HttpResponseMessage response) => (response.StatusCode, await ErrorCode(response));
 
+    [Fact]
+    public async Task Excel_reports_carry_the_parent_body_and_end_with_the_date_line_and_signature_block()
+    {
+        var tenantId = NewTenant();
+        var userId = Interlocked.Increment(ref _nextUserId);
+        _factory.Permissions.Grants[userId] = ["*"];
+        var staff = _factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, userId) + ";name=Quan Tri Vien");
+        staff.DefaultRequestHeaders.Add("X-Report-Parent", Uri.EscapeDataString("Sở Giáo dục Thái Nguyên"));
+        staff.DefaultRequestHeaders.Add("X-Report-Place", Uri.EscapeDataString("Thái Nguyên"));
+
+        // Bảng rỗng: tiêu đề cột ở dòng 6 → dòng ngày 8, hai khối chữ ký dòng 10, "(Ký, ghi rõ họ tên)" dòng 11, tên người lập (từ token) dòng 15.
+        using (var book = await Workbook(await Post(staff, "LookupLinesExport", new AcquisitionReportRequest())))
+        {
+            var sheet = book.Worksheet(1);
+            Assert.Equal("SỞ GIÁO DỤC THÁI NGUYÊN", sheet.Cell(1, 1).GetString());
+            Assert.Equal("TRA CỨU ĐƠN NHẬN", sheet.Cell(3, 1).GetString());
+            Assert.Matches(@"^Thái Nguyên, ngày \d{2} tháng \d{2} năm \d{4}$", sheet.Cell(8, 1).GetString());
+            Assert.Equal(("NGƯỜI LẬP BÁO CÁO", "THỦ TRƯỞNG ĐƠN VỊ"), (sheet.Cell(10, 1).GetString(), sheet.Cell(10, 5).GetString()));
+            Assert.Equal("(Ký, ghi rõ họ tên)", sheet.Cell(11, 1).GetString());
+            Assert.Equal("Quan Tri Vien", sheet.Cell(15, 1).GetString());
+        }
+
+        // Không gửi header: không có cơ quan chủ quản, dòng ngày không có địa danh; người lập vẫn lấy từ token.
+        var plain = _factory.CreateClient().WithClaims(TestClaims.Staff(tenantId, userId) + ";name=Quan Tri Vien");
+        using (var book = await Workbook(await Post(plain, "LookupLinesExport", new AcquisitionReportRequest())))
+        {
+            var sheet = book.Worksheet(1);
+            Assert.Matches(@"^Ngày \d{2} tháng \d{2} năm \d{4}$", sheet.Cell(8, 1).GetString());
+            Assert.Equal("Quan Tri Vien", sheet.Cell(15, 1).GetString());
+        }
+    }
+
     private static async Task<XLWorkbook> Workbook(HttpResponseMessage response)
     {
         Assert.True(response.IsSuccessStatusCode, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");

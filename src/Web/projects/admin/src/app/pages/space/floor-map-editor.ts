@@ -1,16 +1,22 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
-  Api, SPACE_CATEGORIES, SPACE_CONDITION_STATUSES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture,
+  Api, STATUS_ACTIVE, STATUS_INACTIVE, SPACE_CATEGORIES, SPACE_CONDITION_STATUSES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture,
   SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceLockerCabinet, SpaceLockerCompartment, SpaceLockerLoan, SpaceRoom, SpaceStoreOption,
   errorMessage,
 } from '../../core/api';
+import { Language } from '../../core/i18n';
 import { Loading, Modal } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
 
 type DragMode = 'move' | 'resize';
+type Corner = 'nw' | 'ne' | 'sw' | 'se';
+interface Rect { x: number; y: number; w: number; h: number; }
+/** Cạnh nhỏ nhất (%) của một vật trên sơ đồ, và độ kéo (%) dưới ngưỡng này coi là bấm chứ không phải vẽ. */
+const MIN_SIZE = 3;
+const CLICK_TOLERANCE = 1.5;
 /** Kích thước mặc định (%) khi đặt một không gian/vật dụng mới hoặc chưa có vị trí lên sơ đồ. */
 const DEFAULT_SIZE = 12;
 
@@ -105,7 +111,7 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
       <div class="flex flex-col lg:flex-row gap-4">
         <div class="flex-1 panel p-3 relative">
           @if (busy()) { <app-loading /> }
-          <div class="relative w-full bg-gray-100 rounded-lg border border-gray-200 overflow-hidden select-none"
+          <div data-canvas class="relative w-full bg-gray-100 rounded-lg border border-gray-200 overflow-hidden select-none touch-none"
                [class.cursor-crosshair]="placingKind()"
                [style.aspect-ratio]="f.canvasWidth + ' / ' + f.canvasHeight"
                (pointerdown)="onBackgroundPointerDown($event)">
@@ -117,7 +123,7 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
                    style="background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px); background-size: 30px 30px;"></div>
             }
             @for (s of placedRooms(); track s.id) {
-              <div class="absolute rounded-md border-2 flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden"
+              <div class="absolute rounded-md border-2 flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden touch-none"
                    [class.border-blue-600]="isSelected('room', s.id)" [class.bg-blue-100/80]="isSelected('room', s.id)"
                    [class.border-amber-500]="s.maintenance && !isSelected('room', s.id)" [class.bg-amber-50/80]="s.maintenance && !isSelected('room', s.id)"
                    [class.border-gray-400]="!s.maintenance && !isSelected('room', s.id)" [class.bg-white/80]="!s.maintenance && !isSelected('room', s.id)"
@@ -126,11 +132,15 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
                    (pointerdown)="startDrag($event, 'room', s, 'move')">
                 @if (s.iconName) { <span class="material-icons text-[16px] mr-0.5">{{ s.iconName }}</span> }
                 <span class="truncate px-1">{{ s.name }}</span>
-                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, 'room', s, 'resize')"></div>
+                @if (isSelected('room', s.id)) {
+                  @for (k of corners; track k) {
+                    <div class="absolute w-4 h-4 rounded-sm bg-blue-600 border-2 border-white shadow" [class]="cornerClass(k)" (pointerdown)="startDrag($event, 'room', s, 'resize', k)"></div>
+                  }
+                }
               </div>
             }
             @for (x of placedFixtures(); track x.id) {
-              <div class="absolute rounded-md border-2 border-dashed flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden"
+              <div class="absolute rounded-md border-2 border-dashed flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden touch-none"
                    [class.border-blue-600]="isSelected('fixture', x.id)" [class.bg-blue-100/80]="isSelected('fixture', x.id)"
                    [class.border-gray-400]="!isSelected('fixture', x.id)" [class.bg-white/80]="!isSelected('fixture', x.id)"
                    [style.left.%]="x.positionX" [style.top.%]="x.positionY" [style.width.%]="x.width" [style.height.%]="x.height"
@@ -138,11 +148,15 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
                    (pointerdown)="startDrag($event, 'fixture', x, 'move')">
                 <span class="material-icons text-[16px] mr-0.5">{{ x.iconName || fixtureIcon(x.objectType) }}</span>
                 <span class="truncate px-1">{{ x.name }}</span>
-                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, 'fixture', x, 'resize')"></div>
+                @if (isSelected('fixture', x.id)) {
+                  @for (k of corners; track k) {
+                    <div class="absolute w-4 h-4 rounded-sm bg-blue-600 border-2 border-white shadow" [class]="cornerClass(k)" (pointerdown)="startDrag($event, 'fixture', x, 'resize', k)"></div>
+                  }
+                }
               </div>
             }
             @for (c of placedLockers(); track c.id) {
-              <div class="absolute rounded-md border-2 border-dotted flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden"
+              <div class="absolute rounded-md border-2 border-dotted flex items-center justify-center text-center text-xs font-medium cursor-move overflow-hidden touch-none"
                    [class.border-blue-600]="isSelected('locker', c.id)" [class.bg-blue-100/80]="isSelected('locker', c.id)"
                    [class.border-indigo-400]="!isSelected('locker', c.id)" [class.bg-white/80]="!isSelected('locker', c.id)"
                    [style.left.%]="c.positionX" [style.top.%]="c.positionY" [style.width.%]="c.width" [style.height.%]="c.height"
@@ -150,8 +164,16 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
                    (pointerdown)="startDrag($event, 'locker', c, 'move')">
                 <span class="material-icons text-[16px] mr-0.5">{{ c.iconName || 'lock' }}</span>
                 <span class="truncate px-1">{{ c.name }}</span>
-                <div class="absolute bottom-0 right-0 w-3 h-3 bg-gray-500/70 cursor-nwse-resize" (pointerdown)="startDrag($event, 'locker', c, 'resize')"></div>
+                @if (isSelected('locker', c.id)) {
+                  @for (k of corners; track k) {
+                    <div class="absolute w-4 h-4 rounded-sm bg-blue-600 border-2 border-white shadow" [class]="cornerClass(k)" (pointerdown)="startDrag($event, 'locker', c, 'resize', k)"></div>
+                  }
+                }
               </div>
+            }
+            @if (draft(); as d) {
+              <div class="absolute rounded-md border-2 border-dashed border-blue-600 bg-blue-200/40 pointer-events-none"
+                   [style.left.%]="d.x" [style.top.%]="d.y" [style.width.%]="d.w" [style.height.%]="d.h"></div>
             }
           </div>
         </div>
@@ -317,27 +339,71 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
 
         @if (f.publicId) {
           <div class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-            <div class="text-xs font-medium text-indigo-800 flex items-center gap-1 mb-2">
+            <div class="text-xs font-medium text-indigo-800 flex items-center gap-1 mb-1">
               <span class="material-icons text-[16px]">grid_view</span>{{ 'SPACE_FLOOR_MAP_PAGE.LOCKER_COMPARTMENTS' | translate }}
+              <span class="text-indigo-500 font-normal">· {{ lockerGrid().rows }} × {{ lockerGrid().cols }}</span>
             </div>
+            <p class="text-[11px] text-indigo-700/80 mb-2">{{ 'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_HINT' | translate }}</p>
             <input class="input !py-1 text-xs mb-2" [(ngModel)]="lockerScanCardNo" name="scanCardNo" [placeholder]="'SPACE_FLOOR_MAP_PAGE.LOCKER_SCAN_CARD' | translate" />
-            <div class="grid gap-1.5" [style.grid-template-columns]="'repeat(' + f.cols + ', minmax(0,1fr))'">
-              @for (c of lockerCompartments(); track c.id) {
-                @if (lockerOpenLoanOf(c.id); as loan) {
-                  <button type="button" class="rounded px-1.5 py-1 text-[11px] text-left bg-red-50 border border-red-300 text-red-700 hover:bg-red-100"
-                          (click)="returnFromCompartment(c)">
-                    <div class="font-medium truncate">{{ c.code }}</div>
-                    <div class="truncate">{{ 'SPACE_FLOOR_MAP_PAGE.LOCKER_OCCUPIED' | translate }} — {{ loan.cardNo }}</div>
-                  </button>
+            <div class="grid gap-1.5" [style.grid-template-columns]="'repeat(' + lockerGrid().cols + ', minmax(0,1fr))'">
+              @for (cell of lockerCells(); track cell.row + '-' + cell.col) {
+                @if (cell.item; as c) {
+                  <div class="relative group">
+                    @if (c.status === inactiveStatus) {
+                      <div class="rounded px-1.5 py-1 text-[11px] text-left bg-gray-100 border border-gray-300 text-gray-400 min-h-[2.75rem]">
+                        <div class="font-medium truncate pr-9">{{ c.code }}</div>
+                        <div class="truncate">{{ 'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_INACTIVE' | translate }}</div>
+                      </div>
+                    } @else {
+                      @if (lockerOpenLoanOf(c.id); as loan) {
+                      <button type="button" class="block w-full rounded px-1.5 py-1 text-[11px] text-left bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 min-h-[2.75rem]"
+                              (click)="returnFromCompartment(c)">
+                        <div class="font-medium truncate pr-9">{{ c.code }}</div>
+                        <div class="truncate">{{ 'SPACE_FLOOR_MAP_PAGE.LOCKER_OCCUPIED' | translate }} — {{ loan.cardNo }}</div>
+                      </button>
+                    } @else {
+                      <button type="button" class="block w-full rounded px-1.5 py-1 text-[11px] text-left bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 min-h-[2.75rem]"
+                              [disabled]="!lockerScanCardNo.trim()" (click)="borrowToCompartment(c)">
+                        <div class="font-medium truncate pr-9">{{ c.code }}</div>
+                        <div class="truncate text-gray-400">{{ c.name || ('SPACE_FLOOR_MAP_PAGE.LOCKER_FREE' | translate) }}</div>
+                      </button>
+                    }
+                    }
+                    <div class="absolute top-0.5 right-0.5 flex">
+                      <button type="button" class="material-icons text-[14px] text-gray-400 hover:text-blue-600" [title]="'COMMON.EDIT' | translate" (click)="editCompartment(c)">edit</button>
+                      <button type="button" class="material-icons text-[14px] text-gray-400 hover:text-red-600" [title]="'COMMON.DELETE' | translate" (click)="deleteCompartment(c)">delete</button>
+                    </div>
+                  </div>
                 } @else {
-                  <button type="button" class="rounded px-1.5 py-1 text-[11px] text-left bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
-                          [disabled]="!lockerScanCardNo.trim()" (click)="borrowToCompartment(c)">
-                    <div class="font-medium truncate">{{ c.code }}</div>
-                    <div class="truncate text-gray-400">{{ 'SPACE_FLOOR_MAP_PAGE.LOCKER_FREE' | translate }}</div>
+                  <button type="button" class="rounded px-1.5 py-1 text-[11px] border border-dashed border-indigo-300 text-indigo-500 hover:bg-white min-h-[2.75rem] flex flex-col items-center justify-center"
+                          [title]="'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_ADD' | translate" (click)="addCompartment(cell.row, cell.col)">
+                    <span class="material-icons text-[16px]">add</span>
+                    <span class="text-[10px]">{{ cell.row }}.{{ cell.col }}</span>
                   </button>
                 }
               }
             </div>
+
+            @if (compartmentForm(); as cf) {
+              <div class="mt-3 rounded-lg border border-indigo-300 bg-white p-3 grid grid-cols-2 gap-2">
+                <div class="col-span-2 text-xs font-medium text-indigo-800">
+                  {{ (cf.publicId ? 'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_EDIT' : 'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_NEW') | translate: { row: cf.row, col: cf.col } }}
+                </div>
+                <div><label class="form-label">{{ 'COMMON.CODE' | translate }} <span class="text-red-500">*</span></label>
+                  <input class="input !py-1 text-xs font-mono uppercase" maxlength="20" [(ngModel)]="cf.code" name="cpCode" /></div>
+                <div><label class="form-label">{{ 'COMMON.NAME' | translate }}</label>
+                  <input class="input !py-1 text-xs" maxlength="250" [(ngModel)]="cf.name" name="cpName" /></div>
+                <div class="col-span-2"><label class="form-label">{{ 'COMMON.NOTE' | translate }}</label>
+                  <input class="input !py-1 text-xs" maxlength="500" [(ngModel)]="cf.note" name="cpNote" /></div>
+                <label class="col-span-2 flex items-center gap-2 text-xs text-gray-700">
+                  <input type="checkbox" class="rounded border-gray-300" [(ngModel)]="cf.active" name="cpActive" /> {{ 'SPACE_FLOOR_MAP_PAGE.COMPARTMENT_ACTIVE' | translate }}
+                </label>
+                <div class="col-span-2 flex justify-end gap-2">
+                  <button type="button" class="btn-secondary !py-1 !px-3 text-xs" (click)="compartmentForm.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+                  <button type="button" class="btn-primary !py-1 !px-3 text-xs" [disabled]="busy()" (click)="saveCompartment()">{{ 'COMMON.SAVE' | translate }}</button>
+                </div>
+              </div>
+            }
           </div>
         }
 
@@ -385,9 +451,10 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
     }
   `,
 })
-export class SpaceFloorMapEditor implements OnInit {
+export class SpaceFloorMapEditor implements OnInit, OnDestroy {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly language = inject(Language);
 
   protected readonly kindOptions = KIND_OPTIONS;
   protected readonly categoryOptions = SPACE_CATEGORIES;
@@ -404,12 +471,28 @@ export class SpaceFloorMapEditor implements OnInit {
   protected readonly selected = signal<DragTarget | null>(null);
   protected readonly busy = signal(false);
   protected readonly placingKind = signal<PlacingKind | null>(null);
-  protected readonly roomForm = signal<(RoomForm & { publicId?: string; x?: number; y?: number }) | null>(null);
-  protected readonly fixtureForm = signal<(FixtureForm & { publicId?: string; x?: number; y?: number }) | null>(null);
-  protected readonly lockerForm = signal<(LockerForm & { publicId?: string; x?: number; y?: number }) | null>(null);
+  protected readonly roomForm = signal<(RoomForm & { publicId?: string; x?: number; y?: number; w?: number; h?: number }) | null>(null);
+  protected readonly fixtureForm = signal<(FixtureForm & { publicId?: string; x?: number; y?: number; w?: number; h?: number }) | null>(null);
+  protected readonly lockerForm = signal<(LockerForm & { publicId?: string; x?: number; y?: number; w?: number; h?: number }) | null>(null);
   protected readonly conditionOptions = SPACE_CONDITION_STATUSES;
+  protected readonly corners: Corner[] = ['nw', 'ne', 'sw', 'se'];
+  protected readonly inactiveStatus = STATUS_INACTIVE;
+  /** Khung đang vẽ (%) khi đặt vật mới — hiện nét đứt cho tới khi thả chuột. */
+  protected readonly draft = signal<Rect | null>(null);
 
   protected readonly lockerCompartments = signal<SpaceLockerCompartment[]>([]);
+  /** Lưới đã lưu của tủ đang mở (số dòng × cột) — ô nào trong lưới mà chưa có ngăn thì hiện nút "+". */
+  protected readonly lockerGrid = signal<{ rows: number; cols: number; code: string }>({ rows: 0, cols: 0, code: '' });
+  protected readonly compartmentForm = signal<{ publicId?: string; row: number; col: number; code: string; name: string; note: string; active: boolean; wasActive: boolean } | null>(null);
+  protected readonly lockerCells = (): { row: number; col: number; item: SpaceLockerCompartment | null }[] => {
+    const { rows, cols } = this.lockerGrid();
+    const items = this.lockerCompartments();
+    const cells: { row: number; col: number; item: SpaceLockerCompartment | null }[] = [];
+    for (let row = 1; row <= rows; row++) {
+      for (let col = 1; col <= cols; col++) cells.push({ row, col, item: items.find((c) => c.rowIndex === row && c.colIndex === col) ?? null });
+    }
+    return cells;
+  };
   protected readonly lockerOpenLoans = signal<SpaceLockerLoan[]>([]);
   protected lockerScanCardNo = '';
 
@@ -433,7 +516,8 @@ export class SpaceFloorMapEditor implements OnInit {
   protected readonly placedFixtures = () => this.fixtures().filter((x) => x.positionX !== null && x.positionY !== null);
   protected readonly placedLockers = () => this.lockers().filter((c) => c.positionX !== null && c.positionY !== null);
 
-  private drag: { target: DragTarget; mode: DragMode; container: HTMLElement; startX: number; startY: number } | null = null;
+  private drag: { target: DragTarget; mode: DragMode; corner: Corner; container: HTMLElement; startX: number; startY: number; orig: Rect; moved: boolean } | null = null;
+  private draw: { kind: PlacingKind; container: HTMLElement; sx: number; sy: number } | null = null;
 
   async ngOnInit(): Promise<void> {
     this.buildings.set(await this.api.crud<SpaceBuilding>('buildings', 'space').searchAll());
@@ -493,27 +577,83 @@ export class SpaceFloorMapEditor implements OnInit {
 
   protected onBackgroundPointerDown(event: PointerEvent): void {
     const kind = this.placingKind();
-    if (kind) { this.beginCreate(event, kind); return; }
-    this.deselect();
+    if (!kind) { this.deselect(); return; }
+    // Đặt vật mới: kéo để vẽ khung (như vẽ hình chữ nhật), thả chuột mới mở form — bấm một điểm thì dùng cỡ mặc định.
+    event.preventDefault();
+    const container = event.currentTarget as HTMLElement;
+    const p = this.pointOf(event, container);
+    this.draw = { kind, container, sx: p.x, sy: p.y };
+    this.draft.set({ x: p.x, y: p.y, w: 0, h: 0 });
+    window.addEventListener('pointermove', this.onDrawMove);
+    window.addEventListener('pointerup', this.onDrawEnd);
   }
 
-  private beginCreate(event: PointerEvent, kind: PlacingKind): void {
-    const container = event.currentTarget as HTMLElement;
-    const rect = container.getBoundingClientRect();
-    const half = DEFAULT_SIZE / 2;
-    const x = clamp(((event.clientX - rect.left) / rect.width) * 100 - half, 0, 100 - DEFAULT_SIZE);
-    const y = clamp(((event.clientY - rect.top) / rect.height) * 100 - half, 0, 100 - DEFAULT_SIZE);
+  @HostListener('window:keydown.escape')
+  protected cancelPlacing(): void {
+    this.stopDrawing();
     this.placingKind.set(null);
+  }
+
+  ngOnDestroy(): void {
+    this.stopDrawing();
+    window.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointerup', this.onPointerUp);
+  }
+
+  /** Toạ độ con trỏ theo % của khung sơ đồ (0–100). */
+  private pointOf(event: PointerEvent, container: HTMLElement): { x: number; y: number } {
+    const rect = container.getBoundingClientRect();
+    return { x: clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100), y: clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100) };
+  }
+
+  private readonly onDrawMove = (event: PointerEvent): void => {
+    const d = this.draw;
+    if (!d) return;
+    const p = this.pointOf(event, d.container);
+    this.draft.set({ x: Math.min(d.sx, p.x), y: Math.min(d.sy, p.y), w: Math.abs(p.x - d.sx), h: Math.abs(p.y - d.sy) });
+  };
+
+  private readonly onDrawEnd = (): void => {
+    const d = this.draw;
+    const rect = this.draft();
+    this.stopDrawing();
+    if (!d || !rect) return;
+    const drawn = rect.w >= CLICK_TOLERANCE || rect.h >= CLICK_TOLERANCE;
+    const box: Rect = drawn
+      ? { x: rect.x, y: rect.y, w: Math.max(rect.w, MIN_SIZE), h: Math.max(rect.h, MIN_SIZE) }
+      : { x: clamp(d.sx - DEFAULT_SIZE / 2, 0, 100 - DEFAULT_SIZE), y: clamp(d.sy - DEFAULT_SIZE / 2, 0, 100 - DEFAULT_SIZE), w: DEFAULT_SIZE, h: DEFAULT_SIZE };
+    box.w = Math.min(box.w, 100 - box.x);
+    box.h = Math.min(box.h, 100 - box.y);
+    this.placingKind.set(null);
+    this.beginCreate(d.kind, box);
+  };
+
+  private stopDrawing(): void {
+    this.draw = null;
+    this.draft.set(null);
+    window.removeEventListener('pointermove', this.onDrawMove);
+    window.removeEventListener('pointerup', this.onDrawEnd);
+  }
+
+  private beginCreate(kind: PlacingKind, box: Rect): void {
+    const place = { x: box.x, y: box.y, w: box.w, h: box.h };
     if (kind === 'ROOM') {
-      this.roomForm.set({ code: '', name: '', kind: SPACE_KIND_ROOM, category: 1, capacity: 4, autoApprove: false, colorHex: null, x, y });
+      this.roomForm.set({ code: '', name: '', kind: SPACE_KIND_ROOM, category: 1, capacity: 4, autoApprove: false, colorHex: null, ...place });
     } else if (kind === 'LOCKER') {
-      this.lockerForm.set({ code: '', name: '', rows: 2, cols: 3, colorHex: null, iconName: 'lock', note: null, x, y });
+      this.lockerForm.set({ code: '', name: '', rows: 2, cols: 3, colorHex: null, iconName: 'lock', note: null, ...place });
     } else {
       this.fixtureForm.set({
         code: '', name: '', objectType: kind, colorHex: null, iconName: this.fixtureIcon(kind),
-        shelfCategoryRange: null, shelfSubjectName: null, shelfCapacity: kind === 'SHELF' ? 100 : null, shelfDescription: null, storePublicId: null, x, y,
+        shelfCategoryRange: null, shelfSubjectName: null, shelfCapacity: kind === 'SHELF' ? 100 : null, shelfDescription: null, storePublicId: null, ...place,
       });
     }
+  }
+
+  protected cornerClass(c: Corner): string {
+    return {
+      nw: 'top-0 left-0 cursor-nwse-resize', ne: 'top-0 right-0 cursor-nesw-resize',
+      sw: 'bottom-0 left-0 cursor-nesw-resize', se: 'bottom-0 right-0 cursor-nwse-resize',
+    }[c];
   }
 
   protected openEdit(sel: DragTarget): void {
@@ -550,6 +690,9 @@ export class SpaceFloorMapEditor implements OnInit {
       this.api.searchLockerLoans({ loanStatus: 1, pageIndex: 1, pageSize: 500 }),
     ]);
     this.lockerCompartments.set(compartments);
+    this.compartmentForm.set(null);
+    const cabinet = this.lockers().find((x) => x.id === cabinetId);
+    if (cabinet) this.lockerGrid.set({ rows: cabinet.rows, cols: cabinet.cols, code: cabinet.code });
     const ids = new Set(compartments.map((c) => c.id));
     this.lockerOpenLoans.set(openLoans.items.filter((l) => ids.has(l.compartmentId)));
   }
@@ -570,6 +713,54 @@ export class SpaceFloorMapEditor implements OnInit {
       await this.api.returnLocker(c.code);
       const cabinet = this.lockers().find((x) => x.publicId === this.lockerForm()?.publicId);
       if (cabinet) await this.loadLockerCompartments(cabinet.id);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  /** Mã gợi ý cho ngăn thêm tay — cùng quy tắc với mã tự sinh của backend. */
+  private suggestCompartmentCode(row: number, col: number): string {
+    const code = this.lockerGrid().code;
+    return row <= 9 && col <= 9 ? `${code}-${row}${col}` : `${code}-${row}-${col}`;
+  }
+
+  protected addCompartment(row: number, col: number): void {
+    this.compartmentForm.set({ row, col, code: this.suggestCompartmentCode(row, col), name: '', note: '', active: true, wasActive: true });
+  }
+
+  protected editCompartment(c: SpaceLockerCompartment): void {
+    this.compartmentForm.set({
+      publicId: c.publicId, row: c.rowIndex, col: c.colIndex, code: c.code, name: c.name ?? '', note: c.note ?? '',
+      active: c.status !== STATUS_INACTIVE, wasActive: c.status !== STATUS_INACTIVE,
+    });
+  }
+
+  protected async saveCompartment(): Promise<void> {
+    const f = this.compartmentForm();
+    const cabinet = this.lockers().find((x) => x.publicId === this.lockerForm()?.publicId);
+    if (!f || !cabinet) return;
+    if (!f.code.trim()) { this.toastr.warning('SPACE_FLOOR_MAP_PAGE.COMPARTMENT_CODE_REQUIRED'); return; }
+    this.busy.set(true);
+    try {
+      const body = { cabinetId: cabinet.id, rowIndex: f.row, colIndex: f.col, code: f.code.trim(), name: f.name.trim() || null, note: f.note.trim() || null };
+      const client = this.api.crud<SpaceLockerCompartment>('locker-compartments', 'space');
+      const saved = f.publicId ? await client.update(f.publicId, body) : await client.add(body);
+      if (f.active !== f.wasActive || (!f.publicId && !f.active)) await client.changeStatus(saved.publicId, f.active ? STATUS_ACTIVE : STATUS_INACTIVE);
+      await this.loadLockerCompartments(cabinet.id);
+      this.toastr.success('COMMON.SAVE_SUCCESS');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async deleteCompartment(c: SpaceLockerCompartment): Promise<void> {
+    const cabinet = this.lockers().find((x) => x.publicId === this.lockerForm()?.publicId);
+    if (!cabinet || !confirm(this.language.t('SPACE_FLOOR_MAP_PAGE.COMPARTMENT_DELETE_CONFIRM', { code: c.code }))) return;
+    try {
+      await this.api.crud('locker-compartments', 'space').delete(c.publicId);
+      await this.loadLockerCompartments(cabinet.id);
     } catch (e) {
       this.toastr.error(errorMessage(e));
     }
@@ -663,7 +854,7 @@ export class SpaceFloorMapEditor implements OnInit {
           minAdvanceMinutes: 0, maxAdvanceDays: 7, maxAdvanceHours: null, maxBookingMinutesPerReader: 0, checkInGraceMinutes: 15,
           autoApprove: f.autoApprove, rules: null, allowedReaderTypeIds: [], minGroupSize: null, colorHex: f.colorHex, iconName: null,
         });
-        const placed = await this.api.placeSpaceRoom(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
+        const placed = await this.api.placeSpaceRoom(created.publicId, { positionX: f.x!, positionY: f.y!, width: f.w ?? DEFAULT_SIZE, height: f.h ?? DEFAULT_SIZE });
         this.rooms.set([...this.rooms(), placed]);
         this.selected.set({ kind: 'room', item: placed });
       }
@@ -693,7 +884,7 @@ export class SpaceFloorMapEditor implements OnInit {
           shelfCategoryRange: f.shelfCategoryRange, shelfSubjectName: f.shelfSubjectName, shelfCapacity: f.shelfCapacity,
           shelfDescription: f.shelfDescription, storePublicId: f.storePublicId,
         });
-        const placed = await this.api.placeSpaceFixture(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
+        const placed = await this.api.placeSpaceFixture(created.publicId, { positionX: f.x!, positionY: f.y!, width: f.w ?? DEFAULT_SIZE, height: f.h ?? DEFAULT_SIZE });
         this.fixtures.set([...this.fixtures(), placed]);
         this.selected.set({ kind: 'fixture', item: placed });
       }
@@ -722,9 +913,13 @@ export class SpaceFloorMapEditor implements OnInit {
         const created = await this.api.crud<SpaceLockerCabinet>('locker-cabinets', 'space').add({
           floorId: floor.id, code: f.code, name: f.name, rows: f.rows, cols: f.cols, colorHex: f.colorHex, iconName: f.iconName, note: f.note,
         });
-        const placed = await this.api.placeLockerCabinet(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
+        const placed = await this.api.placeLockerCabinet(created.publicId, { positionX: f.x!, positionY: f.y!, width: f.w ?? DEFAULT_SIZE, height: f.h ?? DEFAULT_SIZE });
         this.lockers.set([...this.lockers(), placed]);
         this.selected.set({ kind: 'locker', item: placed });
+        // Tủ mới: giữ hộp thoại và chuyển sang sửa tủ vừa tạo để thấy lưới ngăn đã sinh và quản lý từng ngăn.
+        this.openEdit({ kind: 'locker', item: placed });
+        this.toastr.success('SPACE_FLOOR_MAP_PAGE.LOCKER_CREATED');
+        return;
       }
       this.lockerForm.set(null);
       this.toastr.success('COMMON.SAVE_SUCCESS');
@@ -762,51 +957,60 @@ export class SpaceFloorMapEditor implements OnInit {
     await this.savePosition({ kind: 'room', item: room }, 50 - half, 50 - half, DEFAULT_SIZE, DEFAULT_SIZE);
   }
 
-  protected startDrag(event: PointerEvent, kind: 'room' | 'fixture' | 'locker', item: SpaceRoom | SpaceFixture | SpaceLockerCabinet, mode: DragMode): void {
+  protected startDrag(event: PointerEvent, kind: 'room' | 'fixture' | 'locker', item: SpaceRoom | SpaceFixture | SpaceLockerCabinet, mode: DragMode, corner: Corner = 'se'): void {
     event.stopPropagation();
     event.preventDefault();
-    const container = (event.currentTarget as HTMLElement).parentElement as HTMLElement;
+    // Khung sơ đồ (không phải phần tử cha trực tiếp — với tay nắm đổi kích thước đó là chính vật đang kéo).
+    const container = (event.currentTarget as HTMLElement).closest('[data-canvas]') as HTMLElement | null;
+    if (!container) return;
     const target = (
       kind === 'room' ? { kind: 'room', item: item as SpaceRoom }
       : kind === 'fixture' ? { kind: 'fixture', item: item as SpaceFixture }
       : { kind: 'locker', item: item as SpaceLockerCabinet }
     ) as DragTarget;
     this.selected.set(target);
-    this.drag = { target, mode, container, startX: event.clientX, startY: event.clientY };
+    const orig: Rect = { x: item.positionX ?? 0, y: item.positionY ?? 0, w: item.width ?? DEFAULT_SIZE, h: item.height ?? DEFAULT_SIZE };
+    this.drag = { target, mode, corner, container, startX: event.clientX, startY: event.clientY, orig, moved: false };
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
-    if (!this.drag) return;
-    const { target, mode, container, startX, startY } = this.drag;
-    const rect = container.getBoundingClientRect();
-    const dxPct = ((event.clientX - startX) / rect.width) * 100;
-    const dyPct = ((event.clientY - startY) / rect.height) * 100;
-    const orig = target.item;
-    const x = orig.positionX ?? 0;
-    const y = orig.positionY ?? 0;
-    const w = orig.width ?? DEFAULT_SIZE;
-    const h = orig.height ?? DEFAULT_SIZE;
-    const nextPos = mode === 'move'
-      ? { positionX: clamp(x + dxPct, 0, 100 - w), positionY: clamp(y + dyPct, 0, 100 - h) }
-      : { width: clamp(w + dxPct, 2, 100 - x), height: clamp(h + dyPct, 2, 100 - y) };
-    if (target.kind === 'room') {
-      const next = { ...target.item, ...nextPos };
-      this.rooms.set(this.rooms().map((r) => (r.id === next.id ? next : r)));
-      this.drag = { ...this.drag, target: { kind: 'room', item: next } };
-      if (this.isSelected('room', next.id)) this.selected.set({ kind: 'room', item: next });
-    } else if (target.kind === 'fixture') {
-      const next = { ...target.item, ...nextPos };
-      this.fixtures.set(this.fixtures().map((r) => (r.id === next.id ? next : r)));
-      this.drag = { ...this.drag, target: { kind: 'fixture', item: next } };
-      if (this.isSelected('fixture', next.id)) this.selected.set({ kind: 'fixture', item: next });
+    const drag = this.drag;
+    if (!drag) return;
+    const rect = drag.container.getBoundingClientRect();
+    // Luôn tính từ vị trí lúc bắt đầu kéo (không cộng dồn lên vị trí đã dời).
+    const dx = ((event.clientX - drag.startX) / rect.width) * 100;
+    const dy = ((event.clientY - drag.startY) / rect.height) * 100;
+    if (Math.abs(dx) + Math.abs(dy) > 0.2) drag.moved = true;
+    const o = drag.orig;
+    let next: Rect = o;
+    if (drag.mode === 'move') {
+      next = { ...o, x: clamp(o.x + dx, 0, 100 - o.w), y: clamp(o.y + dy, 0, 100 - o.h) };
     } else {
-      const next = { ...target.item, ...nextPos };
-      this.lockers.set(this.lockers().map((c) => (c.id === next.id ? next : c)));
-      this.drag = { ...this.drag, target: { kind: 'locker', item: next } };
-      if (this.isSelected('locker', next.id)) this.selected.set({ kind: 'locker', item: next });
+      let { x, y, w, h } = o;
+      if (drag.corner.includes('e')) w = clamp(o.w + dx, MIN_SIZE, 100 - o.x);
+      else { x = clamp(o.x + dx, 0, o.x + o.w - MIN_SIZE); w = o.x + o.w - x; }
+      if (drag.corner.includes('s')) h = clamp(o.h + dy, MIN_SIZE, 100 - o.y);
+      else { y = clamp(o.y + dy, 0, o.y + o.h - MIN_SIZE); h = o.y + o.h - y; }
+      next = { x, y, w, h };
     }
+    const pos = { positionX: next.x, positionY: next.y, width: next.w, height: next.h };
+    const target = drag.target;
+    if (target.kind === 'room') {
+      const item = { ...target.item, ...pos };
+      this.rooms.set(this.rooms().map((r) => (r.id === item.id ? item : r)));
+      drag.target = { kind: 'room', item };
+    } else if (target.kind === 'fixture') {
+      const item = { ...target.item, ...pos };
+      this.fixtures.set(this.fixtures().map((r) => (r.id === item.id ? item : r)));
+      drag.target = { kind: 'fixture', item };
+    } else {
+      const item = { ...target.item, ...pos };
+      this.lockers.set(this.lockers().map((c) => (c.id === item.id ? item : c)));
+      drag.target = { kind: 'locker', item };
+    }
+    this.selected.set(drag.target);
   };
 
   private readonly onPointerUp = (): void => {
@@ -814,8 +1018,9 @@ export class SpaceFloorMapEditor implements OnInit {
     this.drag = null;
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
-    if (!drag) return;
-    void this.savePosition(drag.target, drag.target.item.positionX, drag.target.item.positionY, drag.target.item.width, drag.target.item.height);
+    if (!drag || !drag.moved) return; // chỉ bấm chọn — không ghi lại vị trí
+    const it = drag.target.item;
+    void this.savePosition(drag.target, it.positionX, it.positionY, it.width, it.height);
   };
 
   private async savePosition(target: DragTarget, x: number | null, y: number | null, w: number | null, h: number | null): Promise<void> {

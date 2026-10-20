@@ -1,10 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, DocumentStats, DocumentStatsRequest, StoreBookReport, StoreBookReportRequest, StoreOption, errorMessage, saveFile } from '../../core/api';
-import { LDatePipe } from '../../core/i18n';
+import { LDatePipe, Language } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { ACQ_PRINT_MAX_ROWS, openReportPrint, periodLine } from '../acquisition/report-print';
 import { itemStatus } from './items';
 
 const CRITERIA: { value: string; label: string }[] = [
@@ -37,6 +39,7 @@ const CRITERIA: { value: string; label: string }[] = [
       <div><label for="st-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="st-f" type="date" class="input" [(ngModel)]="request.from" /></div>
       <div><label for="st-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="st-t" type="date" class="input" [(ngModel)]="request.to" /></div>
       <div class="flex gap-2 justify-end">
+        <button class="btn-secondary" [disabled]="busy() || !stats()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="run()"><span class="material-icons text-[18px]">query_stats</span></button>
       </div>
@@ -70,6 +73,8 @@ const CRITERIA: { value: string; label: string }[] = [
 export class StoreStats implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
+  private readonly language = inject(Language);
 
   protected readonly criteria = CRITERIA;
   protected request: DocumentStatsRequest = { criterion: 'bibtype', from: '', to: '', storeId: null };
@@ -95,6 +100,22 @@ export class StoreStats implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** In bảng thống kê theo tiêu chí đang chọn (đã có đủ dòng trên màn, không gọi lại API). */
+  protected print(): void {
+    const s = this.stats();
+    if (!s) return;
+    const t = (k: string) => this.language.t(k);
+    const crit = t(CRITERIA.find((c) => c.value === s.criterion)?.label ?? 'STORE_STATS.CRITERION');
+    const store = this.stores().find((x) => x.id === this.request.storeId);
+    const sub = [periodLine(this.request.from, this.request.to), store ? `${t('ITEMS_PAGE.STORE')}: ${store.name}` : ''].filter(Boolean).join(' — ');
+    const job = {
+      title: `${t('STORE_STATS.TITLE')} (${crit})`, subtitle: sub, headers: [crit, t('STORE_STATS.TITLES'), t('STORE_STATS.COPIES')],
+      rows: s.rows.map((r) => [s.criterion === 'status' ? t(this.status(r.key)) : r.label, String(r.titles), String(r.copies)]),
+      total: [t('STORE_STATS.TOTAL'), String(s.titles), String(s.copies)], right: [1, 2], truncated: false, backUrl: '/statistics-document', backLabel: 'STORE_STATS.TITLE',
+    };
+    if (!openReportPrint(this.router, job)) this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
   }
 
   protected async export(): Promise<void> {
@@ -130,6 +151,7 @@ export class StoreStats implements OnInit {
       <div><label for="sb-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="sb-f" type="date" class="input" [(ngModel)]="request.from" /></div>
       <div><label for="sb-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="sb-t" type="date" class="input" [(ngModel)]="request.to" /></div>
       <div class="flex gap-2 justify-end">
+        <button class="btn-secondary" [disabled]="busy() || !report()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="run()"><span class="material-icons text-[18px]">summarize</span></button>
       </div>
@@ -183,6 +205,8 @@ export class StoreStats implements OnInit {
 export class StoreBookReportPage implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
+  private readonly language = inject(Language);
 
   protected request: StoreBookReportRequest = { storeId: null, from: '', to: '', pageIndex: 1, pageSize: 50 };
   protected readonly stores = signal<StoreOption[]>([]);
@@ -207,6 +231,40 @@ export class StoreBookReportPage implements OnInit {
     this.request.pageIndex = e.pageIndex;
     this.request.pageSize = e.pageSize;
     void this.load();
+  }
+
+  /** In: lấy hết các trang theo bộ lọc (tối đa ACQ_PRINT_MAX_ROWS bản) rồi mở trang in chung. */
+  protected async print(): Promise<void> {
+    this.busy.set(true);
+    try {
+      const t = (k: string) => this.language.t(k);
+      const rows: StoreBookReport['rows'] = [];
+      let first: StoreBookReport | null = null;
+      for (let page = 1; page <= Math.ceil(ACQ_PRINT_MAX_ROWS / 500); page++) {
+        const r = await this.api.storeBookReport({ ...this.body(), pageIndex: page, pageSize: 500 });
+        first ??= r;
+        rows.push(...r.rows);
+        if (!r.rows.length || rows.length >= r.totalCount) break;
+      }
+      if (!first || !rows.length) {
+        this.toastr.warning('REPORT_PRINT.NOTHING');
+        return;
+      }
+      const date = (v: string | null) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '');
+      const store = this.stores().find((x) => x.id === this.request.storeId);
+      const job = {
+        title: t('STORE_BOOK_REPORT.TITLE'), subtitle: [periodLine(this.request.from, this.request.to), store ? `${t('ITEMS_PAGE.STORE')}: ${store.name}` : ''].filter(Boolean).join(' — '),
+        headers: [t('ITEMS_PAGE.BARCODE'), t('ITEMS_PAGE.TITLE_COL'), t('ITEMS_PAGE.AUTHOR'), 'DDC', t('STORE_BOOK_REPORT.RECEIVED_ON'), t('ITEMS_PAGE.STORE'), t('COMMON.STATUS')],
+        rows: rows.slice(0, ACQ_PRINT_MAX_ROWS).map((b) => [b.barcode, b.title ?? '', b.author ?? '', b.ddc ?? '', date(b.receivedOn ?? b.registeredOn), b.storeName ?? '', t(this.status(b.status, b.onLoan).name)]),
+        total: [t('STORE_STATS.TOTAL'), `${first.titleCount} / ${first.totalCount}`, '', '', '', '', ''], right: [] as number[],
+        truncated: first.totalCount > ACQ_PRINT_MAX_ROWS, backUrl: '/store-book-report', backLabel: 'STORE_BOOK_REPORT.TITLE',
+      };
+      if (!openReportPrint(this.router, job)) this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async export(): Promise<void> {

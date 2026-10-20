@@ -23,6 +23,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<SpaceReaderNotifier>();
         services.AddCrudResource<BanResource>();
         services.AddCrudResource<BookingResource>();
+        services.AddScoped<SpaceExcel>();
         services.AddScoped<ReportResource>();
         services.AddCrudResource<AccessDeviceResource>();
         services.AddCrudResource<AccessStaffCardResource>();

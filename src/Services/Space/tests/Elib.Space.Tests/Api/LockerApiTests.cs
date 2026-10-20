@@ -103,6 +103,63 @@ public sealed class LockerApiTests(SpaceApiFactory factory) : SpaceTestBase(fact
         Assert.Equal("Ngăn VIP", updated.Name);
     }
 
+    [Fact]
+    public async Task A_large_grid_generates_unique_compartment_codes()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+
+        // Dòng 1 cột 11 và dòng 11 cột 1 không được cùng ra "-111" (mã ngăn duy nhất trong đơn vị).
+        var cabinet = await Read<LockerCabinetDto>(await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),
+            new LockerCabinetRequest(floor.Id, "BIG", "Tủ lớn", 11, 11, null, null, null), Json));
+        var compartments = await Read<List<LockerCompartmentDto>>(await staff.PostAsJsonAsync(U("/api/locker-compartments/SearchAll"),
+            new LockerCompartmentSearch { CabinetId = cabinet.Id }, Json));
+        Assert.Equal(121, compartments.Count);
+        Assert.Equal(121, compartments.Select(c => c.Code).Distinct().Count());
+        Assert.Contains(compartments, c => c.Code == "BIG-11");
+        Assert.Contains(compartments, c => c.Code == "BIG-1-11");
+        Assert.Contains(compartments, c => c.Code == "BIG-11-1");
+
+        var tooLong = await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),
+            new LockerCabinetRequest(floor.Id, "TU-CO-MA-RAT-DAI-1", "Tủ", 12, 12, null, null, null), Json);
+        Assert.Equal("CABINET_CODE_TOO_LONG", (await Error(tooLong)).Item2);
+    }
+
+    [Fact]
+    public async Task A_deleted_compartment_stays_deleted_after_saving_the_cabinet_and_can_be_added_back_in_its_cell()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+
+        var cabinet = await Read<LockerCabinetDto>(await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),
+            new LockerCabinetRequest(floor.Id, "T09", "Tủ 9", 1, 3, null, null, null), Json));
+        async Task<List<LockerCompartmentDto>> ListAsync() => await Read<List<LockerCompartmentDto>>(await staff.PostAsJsonAsync(U("/api/locker-compartments/SearchAll"),
+            new LockerCompartmentSearch { CabinetId = cabinet.Id }, Json));
+        var middle = (await ListAsync()).Single(c => c.ColIndex == 2);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync(U($"/api/locker-compartments/Delete/{middle.PublicId}"))).StatusCode);
+
+        // Lưu lại tủ (cùng lưới) không sinh lại ngăn đã xoá.
+        await staff.PutAsJsonAsync(U($"/api/locker-cabinets/Update/{cabinet.PublicId}"), new LockerCabinetRequest(floor.Id, "T09", "Tủ 9 (đổi tên)", 1, 3, null, null, null), Json);
+        Assert.Equal([1, 3], (await ListAsync()).Select(c => c.ColIndex).Order());
+
+        // Lưới lớn lên chỉ sinh ngăn cho ô mới lộ ra.
+        await staff.PutAsJsonAsync(U($"/api/locker-cabinets/Update/{cabinet.PublicId}"), new LockerCabinetRequest(floor.Id, "T09", "Tủ 9", 1, 4, null, null, null), Json);
+        Assert.Equal([1, 3, 4], (await ListAsync()).Select(c => c.ColIndex).Order());
+
+        // Thêm lại ngăn vào ô đã xoá; ô đã có ngăn hoặc ngoài lưới bị từ chối.
+        var back = await Read<LockerCompartmentDto>(await staff.PostAsJsonAsync(U("/api/locker-compartments/Add"),
+            new LockerCompartmentRequest(cabinet.Id, 1, 2, "T09-2", "Ngăn giữa", null), Json));
+        Assert.Equal((1, 2, "T09-2"), (back.RowIndex, back.ColIndex, back.Code));
+        var taken = await staff.PostAsJsonAsync(U("/api/locker-compartments/Add"), new LockerCompartmentRequest(cabinet.Id, 1, 2, "T09-X", null, null), Json);
+        Assert.Equal("COMPARTMENT_CELL_TAKEN", (await Error(taken)).Item2);
+        var outside = await staff.PostAsJsonAsync(U("/api/locker-compartments/Add"), new LockerCompartmentRequest(cabinet.Id, 2, 1, "T09-Y", null, null), Json);
+        Assert.Equal("COMPARTMENT_OUT_OF_GRID", (await Error(outside)).Item2);
+    }
+
     private static async Task<(LockerCabinetDto Cabinet, LockerCompartmentDto Compartment)> AddCabinetWithOneCompartmentAsync(HttpClient staff, long floorId, string code)
     {
         var cabinet = await Read<LockerCabinetDto>(await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),

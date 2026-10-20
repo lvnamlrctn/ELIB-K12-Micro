@@ -1,5 +1,8 @@
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
+using Elib.BuildingBlocks.TenantReplica;
 using Elib.Space.Domain;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Space.Application;
@@ -20,7 +23,16 @@ public sealed record RoomBookingReport(
 /// Bản gọn hơn bản gốc: bỏ histogram giờ/ngày-trong-tuần, chỉ 1 sheet khi xuất Excel (đủ dùng cho vận hành, có thể bổ sung sau
 /// nếu cần).
 /// </summary>
-public sealed class ReportResource(ICrudDbContext db)
+public sealed class SpaceExcel(ICrudDbContext db, ITenantContext tenant, TimeProvider clock, IHttpContextAccessor http) : ReportExcel(clock, http)
+{
+    public override async Task<string?> LibraryNameAsync(CancellationToken ct)
+    {
+        var id = tenant.RequireTenantId();
+        return await db.Set<TenantReplicaRecord>().AsNoTracking().Where(t => t.TenantId == id).Select(t => t.Name).FirstOrDefaultAsync(ct);
+    }
+}
+
+public sealed class ReportResource(ICrudDbContext db, SpaceExcel excel)
 {
     public const int TopReadersLimit = 10;
 
@@ -73,18 +85,33 @@ public sealed class ReportResource(ICrudDbContext db)
             bySpace, topReaders);
     }
 
-    public async Task<byte[]> ExportAsync(ReportRequest request, CancellationToken ct)
+    /// <summary>File Excel: tổng hợp, theo không gian, bạn đọc đặt nhiều nhất — mỗi sheet có đầu/cuối báo cáo (cơ quan chủ quản, tên thư viện, ngày, chữ ký).</summary>
+    public async Task<ExcelFile> ExportAsync(ReportRequest request, CancellationToken ct)
     {
         var report = await BuildAsync(request, ct);
-        return CrudExcel.Export<SpaceReportRow>("Báo cáo đặt phòng",
+        var period = ReportExcel.Period(request.From, request.To);
+        const string title = "BÁO CÁO ĐẶT PHÒNG";
+        IReadOnlyList<object?> Pair(string name, object? value) => [name, value];
+        var summary = new ExcelSheet("Tổng hợp", title, period, ["Chỉ tiêu", "Giá trị"],
         [
-            new("spaceName", "Không gian", r => r.SpaceName),
-            new("bookings", "Lượt đặt", r => r.Bookings),
-            new("completed", "Hoàn tất", r => r.Completed),
-            new("noShow", "Không tới", r => r.NoShow),
-            new("cancelled", "Đã huỷ", r => r.Cancelled),
-            new("usedHours", "Giờ sử dụng", r => r.UsedHours),
-        ], report.BySpace);
+            Pair("Tổng lượt đặt", report.TotalBookings),
+            Pair("Chờ duyệt", report.Pending),
+            Pair("Đã duyệt", report.Approved),
+            Pair("Đã vào phòng", report.CheckedIn),
+            Pair("Hoàn tất", report.Completed),
+            Pair("Đã huỷ", report.Cancelled),
+            Pair("Từ chối", report.Rejected),
+            Pair("Không tới", report.NoShow),
+            Pair("Tỉ lệ không tới (%)", report.NoShowRatePercent),
+            Pair("Tỉ lệ huỷ (%)", report.CancelRatePercent),
+            Pair("Giờ sử dụng", report.TotalUsedHours),
+            Pair("Lượt người", report.TotalVisitors),
+        ]);
+        var bySpace = new ExcelSheet("Theo không gian", title, period, ["Không gian", "Lượt đặt", "Hoàn tất", "Không tới", "Đã huỷ", "Giờ sử dụng"],
+            report.BySpace.Select(r => (IReadOnlyList<object?>)[r.SpaceName, r.Bookings, r.Completed, r.NoShow, r.Cancelled, r.UsedHours]));
+        var readers = new ExcelSheet("Bạn đọc đặt nhiều", title, period, ["Số thẻ", "Bạn đọc", "Lượt đặt", "Không tới"],
+            report.TopReaders.Select(r => (IReadOnlyList<object?>)[r.CardNo, r.ReaderName, r.Bookings, r.NoShow]));
+        return await excel.BuildAsync("bao-cao-dat-phong", ct, summary, bySpace, readers);
     }
 
     private static DateTimeOffset ToUtc(DateOnly date) => new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();

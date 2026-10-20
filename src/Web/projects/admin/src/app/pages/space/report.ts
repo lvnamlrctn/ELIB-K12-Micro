@@ -1,9 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { Language } from '../../core/i18n';
 import { Api, SPACE_CATEGORIES, SpaceReport, errorMessage, saveFile } from '../../core/api';
 import { Loading } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
+import { openReportPrint, periodLine } from '../acquisition/report-print';
 
 /**
  * Báo cáo đặt phòng (monolith: RoomBookingReportService, quyền SPACE_REPORT) — bản gọn hơn bản gốc: không có histogram
@@ -26,6 +29,7 @@ import { ToastrService } from '../../shared/toastr';
           </select>
         </div>
         <button type="button" class="btn-primary" [disabled]="loading()" (click)="load()"><span class="material-icons text-[18px]">query_stats</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
+        <button type="button" class="btn-secondary" [disabled]="loading() || !report()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button type="button" class="btn-secondary" [disabled]="loading() || exporting()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
       </div>
     </div>
@@ -86,6 +90,8 @@ import { ToastrService } from '../../shared/toastr';
 export class SpaceReportPage {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
+  private readonly language = inject(Language);
 
   protected readonly categories = SPACE_CATEGORIES;
   protected from = isoDaysAgo(30);
@@ -108,6 +114,43 @@ export class SpaceReportPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** In: các chỉ tiêu tổng, theo không gian, bạn đọc đặt nhiều nhất — mỗi phần một bảng. */
+  protected print(): void {
+    const r = this.report();
+    if (!r) return;
+    const t = (k: string) => this.language.t(k);
+    const num = (v: number) => v.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+    const sections = [
+      {
+        heading: t('SPACE_REPORT_PAGE.SUMMARY'), headers: [t('SPACE_REPORT_PAGE.INDICATOR'), t('SPACE_REPORT_PAGE.VALUE')], right: [1], total: null,
+        rows: [
+          [t('SPACE_REPORT_PAGE.TOTAL'), num(r.totalBookings)],
+          [t('SPACE_REPORT_PAGE.NO_SHOW_RATE'), `${num(r.noShowRatePercent)}% (${num(r.noShow)} ${t('SPACE_REPORT_PAGE.TIMES')})`],
+          [t('SPACE_REPORT_PAGE.CANCEL_RATE'), `${num(r.cancelRatePercent)}% (${num(r.cancelled)} ${t('SPACE_REPORT_PAGE.TIMES')})`],
+          [t('SPACE_REPORT_PAGE.USED_HOURS'), num(r.totalUsedHours)],
+          [t('SPACE_REPORT_PAGE.VISITORS'), num(r.totalVisitors)],
+        ],
+      },
+      {
+        heading: t('SPACE_REPORT_PAGE.BY_SPACE'), right: [1, 2, 3, 4, 5],
+        headers: [t('SPACE_REPORT_PAGE.SPACE'), t('SPACE_REPORT_PAGE.BOOKINGS'), t('SPACE_REPORT_PAGE.COMPLETED'), t('SPACE_REPORT_PAGE.NO_SHOW_COUNT'), t('SPACE_REPORT_PAGE.CANCELLED'), t('SPACE_REPORT_PAGE.USED_HOURS')],
+        rows: r.bySpace.map((s) => [s.spaceName, num(s.bookings), num(s.completed), num(s.noShow), num(s.cancelled), num(s.usedHours)]),
+        total: r.bySpace.length ? [t('STORE_STATS.TOTAL'), num(r.bySpace.reduce((a, s) => a + s.bookings, 0)), num(r.bySpace.reduce((a, s) => a + s.completed, 0)),
+          num(r.bySpace.reduce((a, s) => a + s.noShow, 0)), num(r.bySpace.reduce((a, s) => a + s.cancelled, 0)), num(r.bySpace.reduce((a, s) => a + s.usedHours, 0))] : null,
+      },
+      {
+        heading: t('SPACE_REPORT_PAGE.TOP_READERS'), right: [2, 3], total: null,
+        headers: [t('SPACE_REPORT_PAGE.CARD_NO'), t('SPACE_BANS_PAGE.READER'), t('SPACE_REPORT_PAGE.BOOKINGS'), t('SPACE_REPORT_PAGE.NO_SHOW_COUNT')],
+        rows: r.topReaders.map((x) => [x.cardNo, x.readerName ?? '', num(x.bookings), num(x.noShow)]),
+      },
+    ].filter((s) => s.rows.length);
+    const job = {
+      title: t('SPACE_REPORT_PAGE.TITLE'), subtitle: periodLine(this.from, this.to), headers: [] as string[], rows: [] as string[][], total: null, right: [] as number[],
+      truncated: false, sections, backUrl: '/space-report', backLabel: 'MENU.SPACE_REPORT',
+    };
+    if (!openReportPrint(this.router, job)) this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
   }
 
   protected async export(): Promise<void> {

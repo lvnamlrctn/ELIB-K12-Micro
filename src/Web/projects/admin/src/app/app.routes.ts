@@ -46,6 +46,8 @@ export const routes: Routes = [
       { path: 'reader-cards', loadComponent: () => import('./pages/patron/reader-print').then((m) => m.ReaderPrint), canActivate: [tenantGuard, permissionGuard('READERS')], title: 'READER.PRINT_CARD' },
       { path: 'loan-slip', loadComponent: () => import('./pages/circulation/loan-slip').then((m) => m.LoanSlipPage), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'BORROW_PAGE.TITLE' },
       { path: 'acq-report', loadComponent: () => import('./pages/acquisition/report-print').then((m) => m.AcquisitionReportPrint), canActivate: [tenantGuard, permissionGuard('AB_RECEIPTS')], title: 'ACQ_REPORT.TITLE' },
+      // Bản in báo cáo dùng chung (lưu thông, đặt phòng, kho…): nội dung do màn báo cáo ghi sẵn vào sessionStorage, quyền kiểm ở màn đó.
+      { path: 'report', loadComponent: () => import('./pages/acquisition/report-print').then((m) => m.AcquisitionReportPrint), canActivate: [tenantGuard], title: 'REPORT_PRINT.TITLE' },
       { path: 'labels', loadComponent: () => import('./pages/holdings/labels').then((m) => m.LabelPrint), canActivate: [tenantGuard, anyPermissionGuard('PRINT_LABEL:view', 'CATALOG_BIBS:view')], title: 'LABELS_PAGE.TITLE' },
     ],
   },

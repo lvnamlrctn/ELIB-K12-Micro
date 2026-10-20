@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { LDatePipe } from '../core/i18n';
 import { AuthService } from '../core/auth.service';
+import { ReportMeta } from '../core/report-meta';
 import { Session } from '../core/session';
 import { Header } from './header';
 import { LayoutService } from './layout.service';
@@ -41,6 +42,8 @@ export class Shell {
   protected readonly layout = inject(LayoutService);
   protected readonly year = new Date().getFullYear();
   private readonly auth = inject(AuthService);
+  /** Dựng sớm để nạp cơ quan chủ quản / địa danh báo cáo của tài khoản trước khi người dùng bấm in hoặc xuất Excel. */
+  private readonly reportMeta = inject(ReportMeta);
 
   protected async exit(): Promise<void> {
     this.session.clear();

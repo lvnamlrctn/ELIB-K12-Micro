@@ -6,6 +6,7 @@ using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.TenantReplica;
 using Elib.Circulation.Domain;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Circulation.Application;
@@ -24,7 +25,7 @@ public sealed record CirculationReport(
 
 public sealed record CirculationReportFile(string FileName, byte[] Content);
 
-public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant, TimeProvider clock)
+public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant, TimeProvider clock, IHttpContextAccessor http)
 {
     public const int RowCap = 5000;
     public const int TopN = 50;
@@ -64,8 +65,8 @@ public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant,
         using var workbook = new XLWorkbook();
         var sheet = workbook.AddWorksheet("Báo cáo lưu thông");
         var width = Math.Max(headers.Count, 1);
-        sheet.Cell(1, 1).Value = (await LibraryNameAsync(ct) ?? "").ToUpperInvariant();
-        sheet.Cell(1, 1).Style.Font.Bold = true;
+        var signature = ReportSignature.From(http.HttpContext);
+        ReportSheet.WriteLetterhead(sheet, (await LibraryNameAsync(ct) ?? "").ToUpperInvariant(), signature);
         sheet.Cell(3, 1).Value = title;
         sheet.Range(3, 1, 3, width).Merge().Style.Font.SetBold().Font.SetFontSize(14).Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
         var range = Period(request);
@@ -90,6 +91,7 @@ public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant,
         table.SetOutsideBorder(XLBorderStyleValues.Thin);
         table.SetInsideBorder(XLBorderStyleValues.Thin);
         sheet.Columns(1, width).AdjustToContents(head, Math.Min(r, head + 500), 6, 60);
+        ReportSheet.WriteFooter(sheet, r, width, signature, clock.GetUtcNow());
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         var stamp = clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);

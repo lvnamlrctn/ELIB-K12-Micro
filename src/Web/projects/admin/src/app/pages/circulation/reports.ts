@@ -1,8 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CircPlace, CirculationReport, CirculationReportRequest, errorMessage, saveFile } from '../../core/api';
 import { ToastrService } from '../../shared/toastr';
+import { ACQ_PRINT_MAX_ROWS, numericColumns, openReportPrint, periodLine } from '../acquisition/report-print';
 import { Loading, Paginator } from '../../shared/ui';
 
 const REPORT_TYPES: { value: number; label: string; hint: string }[] = [
@@ -61,6 +63,7 @@ type Named = { id: number; name: string; publicId: string };
         </div>
       </div>
       <div class="flex justify-end gap-2 mt-4">
+        <button class="btn-secondary" [disabled]="busy()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
         <button class="btn-primary" [disabled]="busy()" (click)="run()"><span class="material-icons text-[18px]">summarize</span> {{ 'CIRC_REPORT_PAGE.RUN' | translate }}</button>
       </div>
@@ -97,6 +100,7 @@ type Named = { id: number; name: string; publicId: string };
 export class CirculationReports implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly router = inject(Router);
 
   protected readonly types = REPORT_TYPES;
   protected readonly places = signal<CircPlace[]>([]);
@@ -132,6 +136,41 @@ export class CirculationReports implements OnInit {
     this.busy.set(true);
     try {
       saveFile(await this.api.exportCirculationReport(this.body()), `bao-cao-luu-thong-${this.request.reportType}.xlsx`);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** In theo mẫu giấy: lấy hết các trang của báo cáo (tối đa ACQ_PRINT_MAX_ROWS dòng) rồi mở trang in chung. */
+  protected async print(): Promise<void> {
+    this.busy.set(true);
+    try {
+      const rows: string[][] = [];
+      let first: CirculationReport | null = null;
+      for (let page = 1; page <= Math.ceil(ACQ_PRINT_MAX_ROWS / 500); page++) {
+        const r = await this.api.circulationReport({ ...this.body(), pageIndex: page, pageSize: 500 });
+        first ??= r;
+        rows.push(...r.rows);
+        if (!r.rows.length || rows.length >= r.totalCount) break;
+      }
+      if (!first || !rows.length) {
+        this.toastr.warning('REPORT_PRINT.NOTHING');
+        return;
+      }
+      // Hầu hết loại báo cáo đã có cột STT riêng — bỏ đi vì trang in tự thêm cột STT (dòng tổng giữ nhãn "Tổng cộng" ở cột đầu còn lại).
+      const dropStt = first.headers[0] === 'STT';
+      const cut = <T>(cells: T[]): T[] => (dropStt ? cells.slice(1) : cells);
+      const body = rows.slice(0, ACQ_PRINT_MAX_ROWS).map(cut);
+      const total = first.totalRow ? cut(first.totalRow) : null;
+      if (dropStt && total && first.totalRow?.[0] && !total[0]) total[0] = first.totalRow[0];
+      const job = {
+        title: first.title, subtitle: periodLine(this.request.from, this.request.to), headers: cut(first.headers), rows: body,
+        total, right: numericColumns(body), truncated: first.truncated || first.totalCount > ACQ_PRINT_MAX_ROWS,
+        backUrl: '/circulation-report', backLabel: 'MENU.CIRC_REPORT',
+      };
+      if (!openReportPrint(this.router, job)) this.toastr.error('LABELS_PAGE.STORAGE_BLOCKED');
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

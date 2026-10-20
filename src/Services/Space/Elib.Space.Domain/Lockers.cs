@@ -96,6 +96,13 @@ public sealed class LockerCompartment : TenantEntity, IHasStatus
 
     public void ChangeStatus(int status) => Status = StatusRules.Validate(status);
 
+    /// <summary>
+    /// Mã ngăn tự sinh theo vị trí: "{mã tủ}-{dòng}{cột}" khi dòng và cột đều một chữ số (giữ nguyên mã đã có), ngược lại "{mã tủ}-{dòng}-{cột}" —
+    /// tránh trùng (dòng 1 cột 11 và dòng 11 cột 1 cùng ra "-111") ở tủ lớn; mã ngăn là duy nhất trong đơn vị.
+    /// </summary>
+    public static string GeneratedCode(string cabinetCode, int row, int col) =>
+        row <= 9 && col <= 9 ? $"{cabinetCode}-{row}{col}" : $"{cabinetCode}-{row}-{col}";
+
     public static LockerCompartment Create(long cabinetId, int rowIndex, int colIndex, string code, string? name, string? note)
     {
         var compartment = new LockerCompartment { CabinetId = cabinetId, RowIndex = rowIndex, ColIndex = colIndex };

@@ -73,13 +73,17 @@ public sealed class LockerCabinetResource(ICrudDbContext db)
             throw new BusinessRuleException("FLOOR_NOT_FOUND", "Tầng đã chọn không còn.");
         if (await Set.AnyAsync(x => x.Code == entity.Code && x.Id != entity.Id, ct))
             throw new ConflictException("CABINET_CODE_EXISTS", $"Mã tủ '{entity.Code}' đã có.");
+        // Mã ngăn tự sinh = mã tủ + hậu tố vị trí, tối đa LockerCompartment.MaxCodeLength — kiểm với ô lớn nhất của lưới.
+        var longest = LockerCompartment.GeneratedCode(entity.Code, entity.Rows, entity.Cols);
+        if (longest.Length > LockerCompartment.MaxCodeLength)
+            throw new BusinessRuleException("CABINET_CODE_TOO_LONG", $"Mã tủ quá dài cho lưới {entity.Rows}×{entity.Cols}: mã ngăn '{longest}' vượt {LockerCompartment.MaxCodeLength} ký tự.");
     }
 
     public override async Task<LockerCabinetDto> AddAsync(LockerCabinetRequest request, CancellationToken ct)
     {
         var dto = await base.AddAsync(request, ct);
         var cabinet = await LoadAsync(dto.PublicId, ct);
-        await SyncCompartmentsAsync(cabinet, ct);
+        await SyncCompartmentsAsync(cabinet, oldRows: 0, oldCols: 0, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(cabinet);
     }
@@ -89,8 +93,9 @@ public sealed class LockerCabinetResource(ICrudDbContext db)
         var cabinet = await LoadAsync(publicId, ct);
         // Kiểm TRƯỚC khi lưu — tránh lưu Rows/Cols mới rồi mới phát hiện chặn, để lại Cabinet lệch khỏi lưới ngăn thật.
         await EnsureGridShrinkAllowedAsync(cabinet.Id, request.Rows, request.Cols, ct);
+        var (oldRows, oldCols) = (cabinet.Rows, cabinet.Cols);
         await base.UpdateAsync(publicId, request, ct);
-        await SyncCompartmentsAsync(cabinet, ct);
+        await SyncCompartmentsAsync(cabinet, oldRows, oldCols, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(cabinet);
     }
@@ -123,17 +128,22 @@ public sealed class LockerCabinetResource(ICrudDbContext db)
             throw new BusinessRuleException("GRID_SHRINK_HAS_ACTIVE_LOAN", "Không thể giảm số dòng/cột vì có ngăn đang được mượn.");
     }
 
-    /// <summary>Sinh/đồng bộ lưới ngăn theo Rows×Cols — thêm ngăn mới nếu lưới lớn hơn, xoá mềm ngăn dư nếu nhỏ hơn.
-    /// Gọi sau khi <see cref="EnsureGridShrinkAllowedAsync"/> đã xác nhận an toàn (UpdateAsync) hoặc tủ còn mới (AddAsync).</summary>
-    private async Task SyncCompartmentsAsync(LockerCabinet cabinet, CancellationToken ct)
+    /// <summary>
+    /// Sinh/đồng bộ lưới ngăn theo Rows×Cols — chỉ thêm ngăn cho các ô <b>mới lộ ra</b> khi lưới lớn lên (ngoài lưới cũ <paramref name="oldRows"/>×
+    /// <paramref name="oldCols"/>), xoá mềm ngăn dư khi lưới nhỏ lại. Ô trong lưới cũ mà không có ngăn là ngăn đã bị xoá có chủ đích — không tự sinh lại
+    /// mỗi lần lưu tủ (muốn có lại thì thêm ngăn ở ô đó). Gọi sau khi <see cref="EnsureGridShrinkAllowedAsync"/> đã xác nhận an toàn (UpdateAsync)
+    /// hoặc tủ còn mới (AddAsync).
+    /// </summary>
+    private async Task SyncCompartmentsAsync(LockerCabinet cabinet, int oldRows, int oldCols, CancellationToken ct)
     {
         var existing = await Db.Set<LockerCompartment>().Where(c => c.CabinetId == cabinet.Id).ToListAsync(ct);
         for (var row = 1; row <= cabinet.Rows; row++)
         {
             for (var col = 1; col <= cabinet.Cols; col++)
             {
+                if (row <= oldRows && col <= oldCols) continue;
                 if (existing.Any(c => c.RowIndex == row && c.ColIndex == col)) continue;
-                Db.Set<LockerCompartment>().Add(LockerCompartment.Create(cabinet.Id, row, col, $"{cabinet.Code}-{row}{col}", null, null));
+                Db.Set<LockerCompartment>().Add(LockerCompartment.Create(cabinet.Id, row, col, LockerCompartment.GeneratedCode(cabinet.Code, row, col), null, null));
             }
         }
         var outOfGrid = existing.Where(c => c.RowIndex > cabinet.Rows || c.ColIndex > cabinet.Cols).ToList();
@@ -182,6 +192,11 @@ public sealed class LockerCompartmentResource(ICrudDbContext db)
             throw new BusinessRuleException("CABINET_NOT_FOUND", "Tủ đã chọn không còn.");
         if (await Set.AnyAsync(x => x.Code == entity.Code && x.Id != entity.Id, ct))
             throw new ConflictException("COMPARTMENT_CODE_EXISTS", $"Mã ngăn '{entity.Code}' đã có.");
+        var cabinet = await Db.Set<LockerCabinet>().AsNoTracking().Where(c => c.Id == entity.CabinetId).Select(c => new { c.Rows, c.Cols }).FirstAsync(ct);
+        if (entity.RowIndex < 1 || entity.RowIndex > cabinet.Rows || entity.ColIndex < 1 || entity.ColIndex > cabinet.Cols)
+            throw new BusinessRuleException("COMPARTMENT_OUT_OF_GRID", $"Ô ({entity.RowIndex}, {entity.ColIndex}) nằm ngoài lưới {cabinet.Rows}×{cabinet.Cols} của tủ.");
+        if (await Set.AnyAsync(x => x.CabinetId == entity.CabinetId && x.RowIndex == entity.RowIndex && x.ColIndex == entity.ColIndex && x.Id != entity.Id, ct))
+            throw new ConflictException("COMPARTMENT_CELL_TAKEN", $"Ô ({entity.RowIndex}, {entity.ColIndex}) đã có ngăn.");
     }
 
     protected override async Task EnsureDeletableAsync(LockerCompartment entity, CancellationToken ct) => await EnsureNoActiveLoanAsync(entity.Id, ct);

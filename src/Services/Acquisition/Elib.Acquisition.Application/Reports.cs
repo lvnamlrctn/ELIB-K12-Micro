@@ -4,6 +4,7 @@ using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.TenantReplica;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Acquisition.Application;
@@ -77,7 +78,7 @@ public sealed record NewBookRow(long Mfn, string Title, string? Author, string? 
 public sealed record LabelQuantityRow(long Mfn, string Title, string? Author, string? Ddc, string? Cutter, int Quantity);
 
 /// <summary>File Excel của các báo cáo bổ sung — tên thư viện lấy từ bản sao đơn vị trong DB của acquisition.</summary>
-public sealed class AcquisitionExcel(ICrudDbContext db, ITenantContext tenant, TimeProvider clock) : ReportExcel(clock)
+public sealed class AcquisitionExcel(ICrudDbContext db, ITenantContext tenant, TimeProvider clock, IHttpContextAccessor http) : ReportExcel(clock, http)
 {
     public override async Task<string?> LibraryNameAsync(CancellationToken ct)
     {

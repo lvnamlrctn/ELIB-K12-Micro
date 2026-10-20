@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using ClosedXML.Excel;
 using Elib.BuildingBlocks.Crud;
 using Elib.Circulation.Application;
 
@@ -51,6 +52,27 @@ public sealed class ReportsApiTests(CirculationApiFactory factory) : Circulation
         Assert.True(history.IsSuccessStatusCode);
         Assert.Equal((byte)'P', (await history.Content.ReadAsByteArrayAsync())[0]);
         Assert.Equal("REPORT_TYPE_INVALID", (await Error(await staff.PostAsJsonAsync(U("/api/reports/Search"), new CirculationReportRequest(12), Json))).Code);
+    }
+
+    [Fact]
+    public async Task Excel_export_starts_with_the_parent_body_and_ends_with_the_date_line_and_signature_block()
+    {
+        var tenantId = NewTenant();
+        var staff = NamedStaff(tenantId, "Quan Tri Vien", "quantri");
+        staff.DefaultRequestHeaders.Add("X-Report-Parent", Uri.EscapeDataString("Sở Giáo dục Thái Nguyên"));
+        staff.DefaultRequestHeaders.Add("X-Report-Place", Uri.EscapeDataString("Thái Nguyên"));
+
+        var response = await staff.PostAsJsonAsync(U("/api/reports/Export"), new CirculationReportRequest(6), Json);
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var book = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync()));
+        var sheet = book.Worksheet(1);
+        Assert.Equal("SỞ GIÁO DỤC THÁI NGUYÊN", sheet.Cell(1, 1).GetString());
+        var column = sheet.Column(1).CellsUsed().Select(c => c.GetString()).ToList();
+        Assert.Matches(@"^Thái Nguyên, ngày \d{2} tháng \d{2} năm \d{4}$", column.Single(c => c.StartsWith("Thái Nguyên,", StringComparison.Ordinal)));
+        Assert.Contains("NGƯỜI LẬP BÁO CÁO", column);
+        Assert.Equal("Quan Tri Vien", column[^1]);
+        var signRow = sheet.Column(1).CellsUsed().First(c => c.GetString() == "NGƯỜI LẬP BÁO CÁO").Address.RowNumber;
+        Assert.Contains("THỦ TRƯỞNG ĐƠN VỊ", sheet.Row(signRow).CellsUsed().Select(c => c.GetString()));
     }
 
     [Fact]

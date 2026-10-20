@@ -8,6 +8,7 @@ import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
+import { reportMetaInterceptor } from './core/report-meta';
 import { Language, languageInterceptor } from './core/i18n';
 import { TranslatedTitleStrategy } from './core/title';
 
@@ -18,7 +19,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([languageInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([languageInterceptor, authInterceptor, reportMetaInterceptor])),
     { provide: LOCALE_ID, useValue: 'vi' },
     // Từ điển public/i18n/{vi,en}.json — khoá theo ELIB-LRC (MENU.*, COMMON.*, READER.*…); thiếu khoá ở en thì dùng vi.
     provideTranslateService({ fallbackLang: 'vi', loader: provideTranslateHttpLoader({ prefix: 'i18n/', suffix: '.json' }) }),

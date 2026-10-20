@@ -5,6 +5,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Barcode } from '../../../../../shared/barcode';
 import { Api, ITEM_STATUSES, ItemLabel, ItemLabelRequest, Store, errorMessage } from '../../core/api';
 import { Preferences } from '../../core/preferences';
+import { ReportMeta } from '../../core/report-meta';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 
@@ -148,6 +149,7 @@ export class Labels implements OnInit {
   private readonly router = inject(Router);
   private readonly session = inject(Session);
   private readonly prefs = inject(Preferences);
+  private readonly reportMeta = inject(ReportMeta);
   private readonly toastr = inject(ToastrService);
 
   protected readonly kinds: { code: LabelKind; label: string; icon: string }[] = [
@@ -200,6 +202,7 @@ export class Labels implements OnInit {
   protected setHeader(change: Partial<LabelHeader>): void {
     this.header.update((h) => ({ ...h, ...change }));
     this.prefs.set(HEADER_PREF, this.header());
+    this.reportMeta.parent.set(this.header().parent);
   }
 
   protected async load(): Promise<void> {
