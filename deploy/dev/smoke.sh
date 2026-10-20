@@ -79,7 +79,7 @@ done
 echo "Notification"
 code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${MAILPIT_UI_PORT:-8025}/api/v1/info")
 [ "$code" = 200 ] && ok "Mailpit (SMTP nền tảng của DEV) chạy" || bad "Mailpit API → $code"
-for svc in notification audit media patron catalog holdings acquisition circulation search digital minio; do
+for svc in notification audit media patron catalog holdings acquisition circulation search digital space minio; do
   st=$(docker compose ps --format '{{.State}}' $svc 2>/dev/null)
   [ "$st" = running ] && ok "$svc đang chạy" || bad "$svc: '$st'"
 done
