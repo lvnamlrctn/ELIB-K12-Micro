@@ -113,3 +113,44 @@ public sealed class LockerCompartment : TenantEntity, IHasStatus
         Note = note2 is null || note2.Length <= MaxNoteLength ? note2 : throw new BusinessRuleException("NOTE_TOO_LONG", $"Ghi chú tối đa {MaxNoteLength} ký tự.");
     }
 }
+
+/// <summary>
+/// Lượt mượn/trả ngăn tủ (monolith: PrintBook.KeyOut + KeyIn gộp một bảng, quyền SPACE_LOCKER_LOANS) — đóng bằng
+/// <see cref="ReturnedAt"/> nullable (đúng khuôn <see cref="RoomBookingBan.LiftedAt"/>), không copy sang bảng khác và
+/// không xoá dòng như bản gốc, giữ nguyên lịch sử. Không hạn trả/không phí trễ hạn, một bạn đọc có thể giữ nhiều ngăn
+/// cùng lúc — đúng hành vi bản gốc.
+/// </summary>
+public sealed class LockerLoan : TenantEntity
+{
+    public const int MaxNoteLength = 500;
+
+    private LockerLoan() { }
+
+    public long CompartmentId { get; private set; }
+    public Guid ReaderPublicId { get; private set; }
+    public string CardNo { get; private set; } = "";
+    public DateTimeOffset BorrowedAt { get; private set; }
+    public long? BorrowedBy { get; private set; }
+    public DateTimeOffset? ReturnedAt { get; private set; }
+    public long? ReturnedBy { get; private set; }
+    public string? Note { get; private set; }
+
+    public bool IsOpen => ReturnedAt is null;
+
+    public static LockerLoan Open(long compartmentId, Guid readerPublicId, string cardNo, long? staffId, DateTimeOffset now, string? note = null)
+    {
+        var n = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        return new LockerLoan
+        {
+            CompartmentId = compartmentId, ReaderPublicId = readerPublicId, CardNo = (cardNo ?? "").Trim().ToUpperInvariant(),
+            BorrowedAt = now, BorrowedBy = staffId, Note = n is null || n.Length <= MaxNoteLength ? n : n[..MaxNoteLength],
+        };
+    }
+
+    public void Return(long? staffId, DateTimeOffset now)
+    {
+        if (ReturnedAt is not null) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", "Ngăn tủ đã được trả trước đó.");
+        ReturnedAt = now;
+        ReturnedBy = staffId;
+    }
+}

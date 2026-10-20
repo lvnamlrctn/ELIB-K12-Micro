@@ -209,6 +209,18 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
             e.HasOne<LockerCabinet>().WithMany().HasForeignKey(x => x.CabinetId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<LockerLoan>(e =>
+        {
+            e.ToTable("locker_loans");
+            e.Ignore(x => x.IsOpen);
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(LockerLoan.MaxNoteLength);
+            e.HasIndex(x => new { x.TenantId, x.CompartmentId, x.ReturnedAt });
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId });
+            e.HasIndex(x => new { x.TenantId, x.CardNo });
+            e.HasOne<LockerCompartment>().WithMany().HasForeignKey(x => x.CompartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

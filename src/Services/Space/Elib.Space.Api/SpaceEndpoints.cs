@@ -36,6 +36,13 @@ public static class SpaceEndpoints
         api.MapPost("/locker-cabinets/{publicId:guid}/Place", [Permission("SPACE_LOCKERS", "edit")]
             (Guid publicId, PlaceLockerRequest request, LockerCabinetResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("LockerCabinets");
         api.MapCrud<LockerCompartmentResource>("/locker-compartments", "SPACE_LOCKERS").WithTags("LockerCompartments");
+
+        // Mượn/trả tủ — không có Add/Update chung (chỉ Snapshot/Borrow/Return/Search, đúng khuôn Bookings/Bans).
+        var lockerLoans = api.MapGroup("/locker-loans").WithTags("LockerLoans");
+        lockerLoans.MapPost("/Snapshot", [Permission("SPACE_LOCKER_LOANS", "view")] (SnapshotLockerRequest request, LockerLoanResource r, CancellationToken ct) => r.SnapshotAsync(request, ct));
+        lockerLoans.MapPost("/Borrow", [Permission("SPACE_LOCKER_LOANS", "edit")] (BorrowLockerRequest request, LockerLoanResource r, CancellationToken ct) => r.BorrowAsync(request, ct));
+        lockerLoans.MapPost("/Return", [Permission("SPACE_LOCKER_LOANS", "edit")] (ReturnLockerRequest request, LockerLoanResource r, CancellationToken ct) => r.ReturnAsync(request, ct));
+        lockerLoans.MapPost("/Search", [Permission("SPACE_LOCKER_LOANS", "view")] (LockerLoanSearch search, LockerLoanResource r, CancellationToken ct) => r.SearchAsync(search, ct));
         api.MapCrud<SpecialDayResource>("/special-days", "SPACE_HOURS").WithTags("SpecialDays");
 
         var hours = api.MapGroup("/hours").WithTags("Hours");

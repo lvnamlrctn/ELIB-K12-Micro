@@ -862,6 +862,111 @@ namespace Elib.Space.Infrastructure.Migrations
                     b.ToTable("locker_compartments", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.LockerLoan", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("BorrowedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("borrowed_at");
+
+                    b.Property<long?>("BorrowedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("borrowed_by");
+
+                    b.Property<string>("CardNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("card_no");
+
+                    b.Property<long>("CompartmentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("compartment_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<Guid>("ReaderPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reader_public_id");
+
+                    b.Property<DateTimeOffset?>("ReturnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("returned_at");
+
+                    b.Property<long?>("ReturnedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("returned_by");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_locker_loans");
+
+                    b.HasIndex("CompartmentId")
+                        .HasDatabaseName("ix_locker_loans_compartment_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_locker_loans_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_locker_loans_tenant_id");
+
+                    b.HasIndex("TenantId", "CardNo")
+                        .HasDatabaseName("ix_locker_loans_tenant_id_card_no");
+
+                    b.HasIndex("TenantId", "ReaderPublicId")
+                        .HasDatabaseName("ix_locker_loans_tenant_id_reader_public_id");
+
+                    b.HasIndex("TenantId", "CompartmentId", "ReturnedAt")
+                        .HasDatabaseName("ix_locker_loans_tenant_id_compartment_id_returned_at");
+
+                    b.ToTable("locker_loans", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Space.Domain.MapBuilding", b =>
                 {
                     b.Property<long>("Id")
@@ -2334,6 +2439,16 @@ namespace Elib.Space.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_locker_compartments_locker_cabinets_cabinet_id");
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.LockerLoan", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.LockerCompartment", null)
+                        .WithMany()
+                        .HasForeignKey("CompartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_locker_loans_locker_compartments_compartment_id");
                 });
 
             modelBuilder.Entity("Elib.Space.Domain.MapFixture", b =>

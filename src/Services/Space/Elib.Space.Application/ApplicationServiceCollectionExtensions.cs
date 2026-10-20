@@ -16,6 +16,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<FloorUtilityResource>();
         services.AddCrudResource<LockerCabinetResource>();
         services.AddCrudResource<LockerCompartmentResource>();
+        services.AddCrudResource<LockerLoanResource>();
         services.AddScoped<HoursResource>();
         services.AddCrudResource<SpecialDayResource>();
         services.AddScoped<SettingsResource>();

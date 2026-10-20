@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Space.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -85,8 +86,10 @@ public sealed class LockerCabinetResource(ICrudDbContext db)
 
     public override async Task<LockerCabinetDto> UpdateAsync(Guid publicId, LockerCabinetRequest request, CancellationToken ct)
     {
-        await base.UpdateAsync(publicId, request, ct);
         var cabinet = await LoadAsync(publicId, ct);
+        // Kiểm TRƯỚC khi lưu — tránh lưu Rows/Cols mới rồi mới phát hiện chặn, để lại Cabinet lệch khỏi lưới ngăn thật.
+        await EnsureGridShrinkAllowedAsync(cabinet.Id, request.Rows, request.Cols, ct);
+        await base.UpdateAsync(publicId, request, ct);
         await SyncCompartmentsAsync(cabinet, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(cabinet);
@@ -102,7 +105,26 @@ public sealed class LockerCabinetResource(ICrudDbContext db)
         return ToDto(entity);
     }
 
-    /// <summary>Sinh/đồng bộ lưới ngăn theo Rows×Cols — thêm ngăn mới nếu lưới lớn hơn, xoá mềm ngăn dư nếu nhỏ hơn.</summary>
+    protected override async Task EnsureDeletableAsync(LockerCabinet entity, CancellationToken ct)
+    {
+        var compartmentIds = Db.Set<LockerCompartment>().Where(c => c.CabinetId == entity.Id).Select(c => c.Id);
+        if (await Db.Set<LockerLoan>().AnyAsync(l => compartmentIds.Contains(l.CompartmentId) && l.ReturnedAt == null, ct))
+            throw new BusinessRuleException("CABINET_HAS_ACTIVE_LOAN", "Tủ còn ngăn đang được mượn, không thể xoá.");
+    }
+
+    /// <summary>Kiểm trước khi đổi lưới — chặn nếu ngăn sẽ bị loại khỏi lưới đang có lượt mượn mở.</summary>
+    private async Task EnsureGridShrinkAllowedAsync(long cabinetId, int newRows, int newCols, CancellationToken ct)
+    {
+        var outOfGridIds = await Db.Set<LockerCompartment>()
+            .Where(c => c.CabinetId == cabinetId && (c.RowIndex > newRows || c.ColIndex > newCols))
+            .Select(c => c.Id).ToListAsync(ct);
+        if (outOfGridIds.Count == 0) return;
+        if (await Db.Set<LockerLoan>().AnyAsync(l => outOfGridIds.Contains(l.CompartmentId) && l.ReturnedAt == null, ct))
+            throw new BusinessRuleException("GRID_SHRINK_HAS_ACTIVE_LOAN", "Không thể giảm số dòng/cột vì có ngăn đang được mượn.");
+    }
+
+    /// <summary>Sinh/đồng bộ lưới ngăn theo Rows×Cols — thêm ngăn mới nếu lưới lớn hơn, xoá mềm ngăn dư nếu nhỏ hơn.
+    /// Gọi sau khi <see cref="EnsureGridShrinkAllowedAsync"/> đã xác nhận an toàn (UpdateAsync) hoặc tủ còn mới (AddAsync).</summary>
     private async Task SyncCompartmentsAsync(LockerCabinet cabinet, CancellationToken ct)
     {
         var existing = await Db.Set<LockerCompartment>().Where(c => c.CabinetId == cabinet.Id).ToListAsync(ct);
@@ -161,4 +183,155 @@ public sealed class LockerCompartmentResource(ICrudDbContext db)
         if (await Set.AnyAsync(x => x.Code == entity.Code && x.Id != entity.Id, ct))
             throw new ConflictException("COMPARTMENT_CODE_EXISTS", $"Mã ngăn '{entity.Code}' đã có.");
     }
+
+    protected override async Task EnsureDeletableAsync(LockerCompartment entity, CancellationToken ct) => await EnsureNoActiveLoanAsync(entity.Id, ct);
+
+    /// <summary>Chặn chuyển Không hoạt động khi ngăn đang có lượt mượn mở (cải tiến — bản gốc không chặn).</summary>
+    protected override async Task OnSavingAsync(LockerCompartment entity, CrudChange change, CancellationToken ct)
+    {
+        if (change == CrudChange.StatusChanged && entity.Status == IHasStatus.Inactive) await EnsureNoActiveLoanAsync(entity.Id, ct);
+    }
+
+    private async Task EnsureNoActiveLoanAsync(long compartmentId, CancellationToken ct)
+    {
+        if (await Db.Set<LockerLoan>().AnyAsync(l => l.CompartmentId == compartmentId && l.ReturnedAt == null, ct))
+            throw new BusinessRuleException("COMPARTMENT_HAS_ACTIVE_LOAN", "Ngăn tủ đang được mượn.");
+    }
+}
+
+public sealed class LockerLoanSearch : CrudSearch
+{
+    public string? CardNo { get; set; }
+    public long? CompartmentId { get; set; }
+
+    /// <summary>1 = Đang mượn, 2 = Đã trả — suy ra từ ReturnedAt, không lưu field riêng (đúng bản gốc).</summary>
+    public int? LoanStatus { get; set; }
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+}
+
+public sealed record LockerLoanDto(
+    long Id, Guid PublicId, long CompartmentId, string? CompartmentCode, long? CabinetId, string? CabinetCode,
+    Guid ReaderPublicId, string CardNo, string? ReaderName, DateTimeOffset BorrowedAt, DateTimeOffset? ReturnedAt, string? Note,
+    int LoanStatus, DateTimeOffset CreatedAt);
+
+public sealed record LockerLoanOpUnused;
+
+public sealed record SnapshotLockerRequest(string CardNo);
+
+public sealed record BorrowLockerRequest(string CompartmentCode, string CardNo, string? Note);
+
+public sealed record ReturnLockerRequest(string? CompartmentCode, Guid? LoanPublicId);
+
+/// <summary>
+/// Mượn/trả ngăn tủ (monolith: Receiption/BorrowKey, quyền SPACE_LOCKER_LOANS). Không có Add/Update chung — chỉ các
+/// thao tác nghiệp vụ (mượn/trả/xem nhanh), đúng khuôn BookingResource/BanResource.
+/// </summary>
+public sealed class LockerLoanResource(ICrudDbContext db, Replicas replicas, ICurrentActor actor, TimeProvider clock)
+    : CrudResource<LockerLoanResource, LockerLoan, LockerLoanSearch, LockerLoanOpUnused, LockerLoanDto>(db)
+{
+    protected override string EntityName => "Lượt mượn tủ";
+
+    protected override string? Describe(LockerLoan entity) => $"Thẻ {entity.CardNo}";
+
+    protected override Expression<Func<LockerLoan, LockerLoanDto>> Projection => x => new LockerLoanDto(
+        x.Id, x.PublicId, x.CompartmentId, Db.Set<LockerCompartment>().Where(c => c.Id == x.CompartmentId).Select(c => c.Code).FirstOrDefault(),
+        Db.Set<LockerCompartment>().Where(c => c.Id == x.CompartmentId).Select(c => c.CabinetId).FirstOrDefault(),
+        Db.Set<LockerCabinet>().Where(cab => cab.Id == Db.Set<LockerCompartment>().Where(c => c.Id == x.CompartmentId).Select(c => c.CabinetId).FirstOrDefault())
+            .Select(cab => cab.Code).FirstOrDefault(),
+        x.ReaderPublicId, x.CardNo, Db.Set<PatronReplica>().Where(r => r.ReaderPublicId == x.ReaderPublicId).Select(r => r.FullName).FirstOrDefault(),
+        x.BorrowedAt, x.ReturnedAt, x.Note, x.ReturnedAt == null ? 1 : 2, x.CreatedAt);
+
+    protected override LockerLoan Create(LockerLoanOpUnused request) => throw new NotSupportedException("Lượt mượn tủ tạo qua BorrowAsync.");
+
+    protected override void Update(LockerLoan entity, LockerLoanOpUnused request) => throw new NotSupportedException("Lượt mượn tủ sửa qua ReturnAsync.");
+
+    protected override IQueryable<LockerLoan> Filter(IQueryable<LockerLoan> query, LockerLoanSearch search)
+    {
+        if (!string.IsNullOrWhiteSpace(search.CardNo))
+        {
+            var card = PatronReplica.Key(search.CardNo);
+            query = query.Where(x => x.CardNo == card);
+        }
+        if (search.CompartmentId is { } compartmentId) query = query.Where(x => x.CompartmentId == compartmentId);
+        if (search.LoanStatus == 1) query = query.Where(x => x.ReturnedAt == null);
+        else if (search.LoanStatus == 2) query = query.Where(x => x.ReturnedAt != null);
+        if (search.From is { } from) query = query.Where(x => x.BorrowedAt >= Local(from));
+        if (search.To is { } to) query = query.Where(x => x.BorrowedAt < Local(to.AddDays(1)));
+        return query;
+    }
+
+    protected override IOrderedQueryable<LockerLoan> Order(IQueryable<LockerLoan> query) => query.OrderByDescending(x => x.BorrowedAt).ThenByDescending(x => x.Id);
+
+    /// <summary>Tủ đang giữ của một bạn đọc (theo thẻ) — xem nhanh trước khi mượn/trả.</summary>
+    public async Task<IReadOnlyList<LockerLoanDto>> SnapshotAsync(SnapshotLockerRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var reader = await replicas.ReaderAsync(request.CardNo, ct)
+            ?? throw new BusinessRuleException("READER_NOT_FOUND", $"Không tìm thấy bạn đọc có số thẻ '{request.CardNo?.Trim()}'.", 404);
+        var loans = await Set.AsNoTracking().Where(l => l.ReaderPublicId == reader.ReaderPublicId && l.ReturnedAt == null).ToListAsync(ct);
+        return await ToDtosAsync(loans, ct);
+    }
+
+    /// <summary>
+    /// Mượn ngăn tủ theo mã ngăn + số thẻ (quét/gõ) — đúng bản gốc: ngăn đang trống của chính bạn đọc này trả lại bản ghi
+    /// hiện có (vô hại nếu quét lại), ngăn đang có bạn đọc KHÁC giữ bị chặn.
+    /// </summary>
+    public async Task<LockerLoanDto> BorrowAsync(BorrowLockerRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var reader = await replicas.ReaderAsync(request.CardNo, ct)
+            ?? throw new BusinessRuleException("READER_NOT_FOUND", $"Không tìm thấy bạn đọc có số thẻ '{request.CardNo?.Trim()}'.", 404);
+        var compartment = await RequireCompartmentAsync(request.CompartmentCode, ct);
+        if (compartment.Status == IHasStatus.Inactive)
+            throw new BusinessRuleException("COMPARTMENT_INACTIVE", "Ngăn tủ đang không hoạt động, không thể mượn.");
+
+        var open = await Set.FirstOrDefaultAsync(l => l.CompartmentId == compartment.Id && l.ReturnedAt == null, ct);
+        if (open is not null)
+        {
+            if (open.ReaderPublicId == reader.ReaderPublicId) return (await ToDtosAsync([open], ct))[0];
+            throw new BusinessRuleException("COMPARTMENT_OCCUPIED", $"Ngăn tủ đang được thẻ {open.CardNo} giữ.", 409);
+        }
+
+        var loan = LockerLoan.Open(compartment.Id, reader.ReaderPublicId, reader.CardNo, actor.Id, clock.GetUtcNow(), request.Note);
+        Set.Add(loan);
+        await AuditAsync(loan, CrudChange.Added, ct);
+        await Db.SaveChangesAsync(ct);
+        return (await ToDtosAsync([loan], ct))[0];
+    }
+
+    /// <summary>Trả ngăn tủ — theo mã ngăn (đóng lượt mượn mở hiện có) hoặc trực tiếp theo PublicId lượt mượn.</summary>
+    public async Task<LockerLoanDto> ReturnAsync(ReturnLockerRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        LockerLoan loan;
+        if (request.LoanPublicId is { } publicId)
+        {
+            loan = await Set.FirstOrDefaultAsync(l => l.PublicId == publicId, ct) ?? throw new NotFoundException(EntityName, publicId);
+        }
+        else
+        {
+            var compartment = await RequireCompartmentAsync(request.CompartmentCode ?? "", ct);
+            loan = await Set.FirstOrDefaultAsync(l => l.CompartmentId == compartment.Id && l.ReturnedAt == null, ct)
+                ?? throw new BusinessRuleException("LOAN_NOT_OPEN", "Ngăn tủ hiện không có lượt mượn nào đang mở.");
+        }
+        loan.Return(actor.Id, clock.GetUtcNow());
+        await AuditAsync(loan, CrudChange.StatusChanged, ct);
+        await Db.SaveChangesAsync(ct);
+        return (await ToDtosAsync([loan], ct))[0];
+    }
+
+    private async Task<LockerCompartment> RequireCompartmentAsync(string code, CancellationToken ct)
+    {
+        var key = (code ?? "").Trim().ToUpperInvariant();
+        return await Db.Set<LockerCompartment>().FirstOrDefaultAsync(c => c.Code == key, ct) ?? throw new NotFoundException("Ngăn tủ", key);
+    }
+
+    private async Task<IReadOnlyList<LockerLoanDto>> ToDtosAsync(IReadOnlyList<LockerLoan> loans, CancellationToken ct)
+    {
+        var ids = loans.Select(l => l.Id).ToList();
+        return await Set.AsNoTracking().Where(l => ids.Contains(l.Id)).Select(Projection).ToListAsync(ct);
+    }
+
+    private static DateTimeOffset Local(DateOnly date) => new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
 }

@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Domain;
 using Elib.Space.Application;
 
 namespace Elib.Space.Tests.Api;
@@ -99,5 +101,154 @@ public sealed class LockerApiTests(SpaceApiFactory factory) : SpaceTestBase(fact
         var updated = await Read<LockerCompartmentDto>(await staff.PutAsJsonAsync(U($"/api/locker-compartments/Update/{first.PublicId}"),
             new LockerCompartmentRequest(cabinet.Id, first.RowIndex, first.ColIndex, first.Code, "Ngăn VIP", null), Json));
         Assert.Equal("Ngăn VIP", updated.Name);
+    }
+
+    private static async Task<(LockerCabinetDto Cabinet, LockerCompartmentDto Compartment)> AddCabinetWithOneCompartmentAsync(HttpClient staff, long floorId, string code)
+    {
+        var cabinet = await Read<LockerCabinetDto>(await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),
+            new LockerCabinetRequest(floorId, code, "Tủ " + code, 1, 1, null, null, null), Json));
+        var compartments = await Read<List<LockerCompartmentDto>>(await staff.PostAsJsonAsync(U("/api/locker-compartments/SearchAll"),
+            new LockerCompartmentSearch { CabinetId = cabinet.Id }, Json));
+        return (cabinet, compartments[0]);
+    }
+
+    [Fact]
+    public async Task Borrow_and_return_a_compartment_round_trip()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l01");
+        await Publish(reader);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L01");
+
+        var borrowed = await Read<LockerLoanDto>(await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"),
+            new BorrowLockerRequest(compartment.Code, "hs-l01", null), Json));
+        Assert.Equal((compartment.Id, "HS-L01", 1), (borrowed.CompartmentId, borrowed.CardNo, borrowed.LoanStatus));
+        Assert.Null(borrowed.ReturnedAt);
+
+        var returned = await Read<LockerLoanDto>(await staff.PostAsJsonAsync(U("/api/locker-loans/Return"),
+            new ReturnLockerRequest(compartment.Code, null), Json));
+        Assert.Equal(2, returned.LoanStatus);
+        Assert.NotNull(returned.ReturnedAt);
+    }
+
+    [Fact]
+    public async Task Borrowing_the_same_compartment_again_by_the_same_reader_is_idempotent()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l02");
+        await Publish(reader);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L02");
+
+        var first = await Read<LockerLoanDto>(await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"),
+            new BorrowLockerRequest(compartment.Code, "hs-l02", null), Json));
+        var again = await Read<LockerLoanDto>(await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"),
+            new BorrowLockerRequest(compartment.Code, "hs-l02", null), Json));
+        Assert.Equal(first.PublicId, again.PublicId);
+    }
+
+    [Fact]
+    public async Task Borrowing_a_compartment_held_by_another_reader_is_rejected()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var readerA = Reader(tenantId, "hs-l03a");
+        var readerB = Reader(tenantId, "hs-l03b");
+        await Publish(readerA, readerB);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L03");
+
+        await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(compartment.Code, "hs-l03a", null), Json);
+        var blocked = await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(compartment.Code, "hs-l03b", null), Json);
+        var (status, code, _) = await Error(blocked);
+        Assert.Equal((HttpStatusCode.Conflict, "COMPARTMENT_OCCUPIED"), ((HttpStatusCode)status, code));
+    }
+
+    [Fact]
+    public async Task Borrowing_an_inactive_compartment_is_rejected()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l04");
+        await Publish(reader);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L04");
+
+        await staff.PutAsJsonAsync(U("/api/locker-compartments/ChangeStatus"), new ChangeStatusRequest(compartment.PublicId, IHasStatus.Inactive), Json);
+        var blocked = await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(compartment.Code, "hs-l04", null), Json);
+        var (status, code, _) = await Error(blocked);
+        Assert.Equal((HttpStatusCode.BadRequest, "COMPARTMENT_INACTIVE"), ((HttpStatusCode)status, code));
+    }
+
+    [Fact]
+    public async Task Shrinking_the_grid_is_blocked_while_a_compartment_has_an_active_loan()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l05");
+        await Publish(reader);
+
+        var cabinet = await Read<LockerCabinetDto>(await staff.PostAsJsonAsync(U("/api/locker-cabinets/Add"),
+            new LockerCabinetRequest(floor.Id, "L05", "Tủ 5", 1, 2, null, null, null), Json));
+        var compartments = await Read<List<LockerCompartmentDto>>(await staff.PostAsJsonAsync(U("/api/locker-compartments/SearchAll"),
+            new LockerCompartmentSearch { CabinetId = cabinet.Id }, Json));
+        var toBeRemoved = compartments.First(c => c.ColIndex == 2);
+        await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(toBeRemoved.Code, "hs-l05", null), Json);
+
+        var response = await staff.PutAsJsonAsync(U($"/api/locker-cabinets/Update/{cabinet.PublicId}"),
+            new LockerCabinetRequest(floor.Id, "L05", "Tủ 5", 1, 1, null, null, null), Json);
+        var (status, code, _) = await Error(response);
+        Assert.Equal((HttpStatusCode.BadRequest, "GRID_SHRINK_HAS_ACTIVE_LOAN"), ((HttpStatusCode)status, code));
+    }
+
+    [Fact]
+    public async Task Deleting_a_compartment_with_an_active_loan_is_blocked()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l06");
+        await Publish(reader);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L06");
+        await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(compartment.Code, "hs-l06", null), Json);
+
+        var response = await staff.DeleteAsync(U($"/api/locker-compartments/Delete/{compartment.PublicId}"));
+        var (status, code, _) = await Error(response);
+        Assert.Equal((HttpStatusCode.BadRequest, "COMPARTMENT_HAS_ACTIVE_LOAN"), ((HttpStatusCode)status, code));
+    }
+
+    [Fact]
+    public async Task Snapshot_and_search_reflect_the_reader_s_open_loan()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var building = await AddBuildingAsync(staff);
+        var floor = await AddFloorAsync(staff, building.Id);
+        var reader = Reader(tenantId, "hs-l07");
+        await Publish(reader);
+        var (_, compartment) = await AddCabinetWithOneCompartmentAsync(staff, floor.Id, "L07");
+        await staff.PostAsJsonAsync(U("/api/locker-loans/Borrow"), new BorrowLockerRequest(compartment.Code, "hs-l07", null), Json);
+
+        var snapshot = await Read<List<LockerLoanDto>>(await staff.PostAsJsonAsync(U("/api/locker-loans/Snapshot"), new SnapshotLockerRequest("hs-l07"), Json));
+        Assert.Single(snapshot);
+        Assert.Equal(compartment.Id, snapshot[0].CompartmentId);
+
+        var openResults = await Read<CrudPage<LockerLoanDto>>(await staff.PostAsJsonAsync(U("/api/locker-loans/Search"),
+            new LockerLoanSearch { CardNo = "hs-l07", LoanStatus = 1 }, Json));
+        Assert.Single(openResults.Items);
+
+        await staff.PostAsJsonAsync(U("/api/locker-loans/Return"), new ReturnLockerRequest(compartment.Code, null), Json);
+        var afterReturn = await Read<List<LockerLoanDto>>(await staff.PostAsJsonAsync(U("/api/locker-loans/Snapshot"), new SnapshotLockerRequest("hs-l07"), Json));
+        Assert.Empty(afterReturn);
     }
 }
