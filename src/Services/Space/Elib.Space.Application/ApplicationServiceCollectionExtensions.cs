@@ -11,6 +11,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<BuildingResource>();
         services.AddCrudResource<FloorResource>();
         services.AddCrudResource<SpaceResource>();
+        services.AddCrudResource<FixtureResource>();
         services.AddScoped<HoursResource>();
         services.AddCrudResource<SpecialDayResource>();
         services.AddScoped<SettingsResource>();

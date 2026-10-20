@@ -25,6 +25,9 @@ public static class SpaceEndpoints
             (Guid publicId, PlaceSpaceRequest request, SpaceResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("Spaces");
         api.MapPost("/spaces/{publicId:guid}/SetMaintenance", [Permission("SPACE_ROOMS", "edit")]
             (Guid publicId, SetMaintenanceRequest request, SpaceResource r, CancellationToken ct) => r.SetMaintenanceAsync(publicId, request, ct)).WithTags("Spaces");
+        api.MapCrud<FixtureResource>("/fixtures", "SPACE_FIXTURES").WithTags("Fixtures");
+        api.MapPost("/fixtures/{publicId:guid}/Place", [Permission("SPACE_FIXTURES", "edit")]
+            (Guid publicId, PlaceFixtureRequest request, FixtureResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("Fixtures");
         api.MapCrud<SpecialDayResource>("/special-days", "SPACE_HOURS").WithTags("SpecialDays");
 
         var hours = api.MapGroup("/hours").WithTags("Hours");

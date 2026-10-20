@@ -142,6 +142,22 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
             e.HasOne<AccessDevice>().WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<MapFixture>(e =>
+        {
+            e.ToTable("map_fixtures");
+            e.Property(x => x.Code).HasMaxLength(MapFixture.MaxCodeLength);
+            e.Property(x => x.Name).HasMaxLength(MapFixture.MaxNameLength);
+            e.Property(x => x.ObjectType).HasMaxLength(20);
+            e.Property(x => x.ColorHex).HasMaxLength(20);
+            e.Property(x => x.IconName).HasMaxLength(50);
+            e.Property(x => x.ShelfCategoryRange).HasMaxLength(MapFixture.MaxShelfTextLength);
+            e.Property(x => x.ShelfSubjectName).HasMaxLength(MapFixture.MaxShelfTextLength);
+            e.Property(x => x.ShelfDescription).HasMaxLength(MapFixture.MaxShelfDescriptionLength);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.FloorId });
+            e.HasOne<MapFloor>().WithMany().HasForeignKey(x => x.FloorId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
