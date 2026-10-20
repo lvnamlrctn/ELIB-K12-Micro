@@ -11,7 +11,7 @@ export const routes: Routes = [
   { path: 'nop-tai-lieu', loadComponent: () => import('./pages/submit-document').then((m) => m.SubmitDocument), title: 'OPAC.SUBMIT_DOC.TITLE' },
   { path: 'tai-khoan', loadComponent: () => import('./pages/account').then((m) => m.Account), title: 'OPAC.MY_LIBRARY.ACCOUNT_TITLE' },
   { path: 'tai-khoan/callback', loadComponent: () => import('./pages/account-callback').then((m) => m.AccountCallback) },
-  { path: 'dat-phong', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_SPACE' } },
+  { path: 'dat-phong', loadComponent: () => import('./pages/space-booking').then((m) => m.SpaceBooking), title: 'OPAC.HOME.SERVICE_SPACE' },
   { path: 'tro-ly', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_AI' } },
   { path: 'tin-tuc', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_PORTAL' } },
   { path: '**', loadComponent: () => import('./pages/not-found').then((m) => m.NotFound) },

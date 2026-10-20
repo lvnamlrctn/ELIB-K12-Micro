@@ -18,7 +18,7 @@ const APPS = {
     strict: ['projects/admin/src/app'],
   },
 };
-const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_', 'TENANT_ADMIN.STATE_', 'TENANT_ADMIN.STEP_', 'TENANT_ADMIN.PACKAGE_', 'ROLE.ACTION_', 'SIP2.CMD_', 'CIRC_PLACE_PAGE.DAY_'];
+const DYNAMIC = ['ERRORS.', 'OPAC.LANG_CODE.', 'OPAC.BOOK_DETAIL.STATUS_', 'OPAC.SPACE.STATUS_', 'READER_IMPORT.STEP_', 'READER_IMPORT.STATUS_', 'READER_HISTORY.ACTION_', 'TENANT_ADMIN.STATE_', 'TENANT_ADMIN.STEP_', 'TENANT_ADMIN.PACKAGE_', 'ROLE.ACTION_', 'SIP2.CMD_', 'CIRC_PLACE_PAGE.DAY_'];
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const KEY = /['"`]((?:[A-Z][A-Z0-9_]*)(?:\.[A-Z0-9_]+)+)['"`]/g;
 

@@ -12,6 +12,7 @@ import { BOOK_OUT_UNITS, EXHIBITION_LOCATIONS, EXPORT_REASONS, STORES, STORE_TYP
 import { FINE_REASONS, LOAN_POLICIES, PHOTOCOPIES, SIP2_STATIONS } from './pages/circulation/catalogs';
 import { ACQ_SOURCES, BUDGETS, FUNDS, SUPPLIERS } from './pages/acquisition/catalogs';
 import { DIGITAL_COLLECTIONS, DIGITAL_DIG_TYPES, DIGITAL_POLICIES, DIGITAL_POLICIES_BY_COLLECTION, DIGITAL_REVIEWS, DIGITAL_SUBJECTS, DIGITAL_TOPICS } from './pages/digital/catalogs';
+import { SPACE_BUILDINGS, SPACE_FLOORS, SPACE_ROOMS } from './pages/space/catalogs';
 import type { CrudConfig } from './shared/crud-page';
 import type { TreeCatalogConfig } from './shared/tree-catalog-page';
 import { unsavedChangesGuard } from './shared/unsaved';
@@ -189,6 +190,17 @@ export const routes: Routes = [
       { path: 'digital-items', loadComponent: () => import('./pages/digital/items').then((m) => m.DigitalItems), canActivate: [tenantGuard, permissionGuard('DIGITAL_ITEMS')], title: 'DIGITAL_ITEMS_PAGE.TITLE' },
       { path: 'digital-loans', loadComponent: () => import('./pages/digital/loans').then((m) => m.DigitalLoans), canActivate: [tenantGuard, permissionGuard('DIGITAL_LOANS')], title: 'DIGITAL_LOANS_PAGE.TITLE' },
       { path: 'digital-submissions', loadComponent: () => import('./pages/digital/submissions').then((m) => m.DigitalSubmissions), canActivate: [tenantGuard, permissionGuard('DIGITAL_SUBMISSIONS')], title: 'DIGITAL_SUBMISSIONS_PAGE.TITLE' },
+      // Không gian & đặt phòng (space)
+      catalog('space-buildings', SPACE_BUILDINGS),
+      catalog('space-floors', SPACE_FLOORS),
+      catalog('space-rooms', SPACE_ROOMS),
+      { path: 'space-floor-map', loadComponent: () => import('./pages/space/floor-map-editor').then((m) => m.SpaceFloorMapEditor), canActivate: [tenantGuard, permissionGuard('SPACE_ROOMS')], title: 'SPACE_FLOOR_MAP_PAGE.TITLE' },
+      { path: 'space-bookings', loadComponent: () => import('./pages/space/bookings').then((m) => m.SpaceBookings), canActivate: [tenantGuard, permissionGuard('SPACE_BOOKINGS')], title: 'SPACE_BOOKINGS_PAGE.TITLE' },
+      { path: 'space-bans', loadComponent: () => import('./pages/space/bans').then((m) => m.SpaceBans), canActivate: [tenantGuard, permissionGuard('SPACE_BANS')], title: 'SPACE_BANS_PAGE.TITLE' },
+      { path: 'space-hours', loadComponent: () => import('./pages/space/hours').then((m) => m.SpaceHours), canActivate: [tenantGuard, permissionGuard('SPACE_HOURS')], title: 'SPACE_HOURS_PAGE.TITLE' },
+      { path: 'space-settings', loadComponent: () => import('./pages/space/settings').then((m) => m.SpaceSettingsPage), canActivate: [tenantGuard, permissionGuard('SPACE_SETTINGS')], title: 'SPACE_SETTINGS_PAGE.TITLE' },
+      { path: 'space-report', loadComponent: () => import('./pages/space/report').then((m) => m.SpaceReportPage), canActivate: [tenantGuard, permissionGuard('SPACE_REPORT')], title: 'SPACE_REPORT_PAGE.TITLE' },
+      { path: 'space-access', loadComponent: () => import('./pages/space/access').then((m) => m.SpaceAccess), canActivate: [tenantGuard, permissionGuard('SPACE_ACCESS')], title: 'SPACE_ACCESS_PAGE.TITLE' },
       { path: 'phan-he/:code', loadComponent: () => import('./pages/module-placeholder').then((m) => m.ModulePlaceholder), canActivate: [tenantGuard] },
     ],
   },

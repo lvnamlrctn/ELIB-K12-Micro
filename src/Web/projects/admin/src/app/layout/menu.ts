@@ -161,6 +161,23 @@ export class Menu {
         ],
       },
       {
+        title: 'MENU.SPACE_GROUP',
+        icon: MODULE_ICONS['SPACE'],
+        module: 'SPACE',
+        children: [
+          { title: 'MENU.SPACE_BOOKINGS', icon: 'event_available', link: '/space-bookings', perm: 'SPACE_BOOKINGS' },
+          { title: 'MENU.SPACE_FLOOR_MAP', icon: 'map', link: '/space-floor-map', perm: 'SPACE_ROOMS' },
+          { title: 'MENU.SPACE_ROOMS', icon: 'meeting_room', link: '/space-rooms', perm: 'SPACE_ROOMS' },
+          { title: 'MENU.SPACE_FLOORS', icon: 'layers', link: '/space-floors', perm: 'SPACE_FLOORS' },
+          { title: 'MENU.SPACE_BUILDINGS', icon: 'apartment', link: '/space-buildings', perm: 'SPACE_BUILDINGS' },
+          { title: 'MENU.SPACE_BANS', icon: 'block', link: '/space-bans', perm: 'SPACE_BANS' },
+          { title: 'MENU.SPACE_HOURS', icon: 'schedule', link: '/space-hours', perm: 'SPACE_HOURS' },
+          { title: 'MENU.SPACE_SETTINGS', icon: 'tune', link: '/space-settings', perm: 'SPACE_SETTINGS' },
+          { title: 'MENU.SPACE_REPORT', icon: 'bar_chart', link: '/space-report', perm: 'SPACE_REPORT' },
+          { title: 'MENU.SPACE_ACCESS', icon: 'sensor_door', link: '/space-access', perm: 'SPACE_ACCESS' },
+        ],
+      },
+      {
         title: 'MENU.STORE_MGMT',
         icon: 'store',
         module: 'HOLDINGS',

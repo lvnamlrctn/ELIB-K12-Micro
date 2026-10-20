@@ -8,6 +8,7 @@ import { DigitalApi, DigitalFavorite, DigitalLoan, DigitalReservation, DigitalRe
 import { LDatePipe, Language, LNumberPipe } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
+import { SpaceApi, SpaceBookingStatus, SpaceMyBooking } from '../core/space';
 import { ReaderCard } from './reader-card';
 
 /** Tài khoản bạn đọc: chưa đăng nhập → nút đăng nhập; đã đăng nhập → thông tin thẻ, đổi mật khẩu, đăng xuất. */
@@ -259,6 +260,55 @@ import { ReaderCard } from './reader-card';
             }
           </section>
         }
+
+        @if (library.has('SPACE')) {
+          <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
+            <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.SPACE.MY_BOOKINGS' | translate }}</h2>
+            @if (spaceError(); as err) { <p class="text-red-600 text-sm mb-3" role="alert">{{ err }}</p> }
+            @if (spaceBookings().length) {
+              <ul class="divide-y divide-slate-100">
+                @for (mb of spaceBookings(); track mb.booking.publicId) {
+                  <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                      <div class="font-medium text-slate-900">{{ mb.booking.spaceName }}</div>
+                      <div class="text-sm text-slate-500">{{ mb.booking.startAt | ldate: 'dd/MM/yyyy HH:mm' }} → {{ mb.booking.endAt | ldate: 'HH:mm' }}</div>
+                      @if (mb.booking.status === SpaceBookingStatus.Rejected && mb.booking.rejectReason) {
+                        <div class="text-sm text-red-600">{{ mb.booking.rejectReason }}</div>
+                      }
+                      @if (showQr() === mb.booking.publicId) {
+                        <div class="text-xs font-mono text-slate-500 break-all mt-1">{{ mb.booking.publicId }}</div>
+                      }
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">{{ ('OPAC.SPACE.STATUS_' + mb.booking.status) | translate }}</span>
+                      @if (mb.booking.status === SpaceBookingStatus.Approved || mb.booking.status === SpaceBookingStatus.CheckedIn) {
+                        <button type="button" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs hover:bg-slate-50"
+                                (click)="toggleQr(mb.booking.publicId)">{{ 'OPAC.SPACE.SHOW_QR' | translate }}</button>
+                      }
+                      @if (mb.booking.status === SpaceBookingStatus.Approved) {
+                        <button type="button" [disabled]="spaceBusyId() === mb.booking.publicId"
+                                class="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700 disabled:opacity-50"
+                                (click)="selfCheckIn(mb.booking)">{{ 'OPAC.SPACE.SELF_CHECK_IN' | translate }}</button>
+                      }
+                      @if (mb.booking.status === SpaceBookingStatus.CheckedIn) {
+                        <button type="button" [disabled]="spaceBusyId() === mb.booking.publicId"
+                                class="px-2.5 py-1.5 rounded-lg bg-slate-700 text-white text-xs hover:bg-slate-800 disabled:opacity-50"
+                                (click)="selfCheckOut(mb.booking)">{{ 'OPAC.SPACE.SELF_CHECK_OUT' | translate }}</button>
+                      }
+                      @if (mb.isOwner && (mb.booking.status === SpaceBookingStatus.Pending || mb.booking.status === SpaceBookingStatus.Approved)) {
+                        <button type="button" [disabled]="spaceBusyId() === mb.booking.publicId"
+                                class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs hover:bg-slate-50 disabled:opacity-50"
+                                (click)="cancelSpaceBooking(mb.booking)">{{ 'OPAC.SPACE.CANCEL' | translate }}</button>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-sm text-slate-500">{{ 'OPAC.SPACE.NO_BOOKINGS' | translate }}</p>
+            }
+          </section>
+        }
       }
     </div>
   `,
@@ -297,6 +347,13 @@ export class Account implements OnInit {
   protected readonly digitalFavoritesError = signal<string | null>(null);
   protected readonly digitalBusyId = signal<string | null>(null);
 
+  private readonly space = inject(SpaceApi);
+  protected readonly SpaceBookingStatus = SpaceBookingStatus;
+  protected readonly spaceBookings = signal<SpaceMyBooking[]>([]);
+  protected readonly spaceError = signal<string | null>(null);
+  protected readonly spaceBusyId = signal<string | null>(null);
+  protected readonly showQr = signal<string | null>(null);
+
   async ngOnInit(): Promise<void> {
     if (!(await this.auth.restore())) return;
     try {
@@ -318,6 +375,7 @@ export class Account implements OnInit {
       this.loadDigitalReservations();
       this.loadDigitalFavorites();
     }
+    if (this.library.has('SPACE')) this.loadSpaceBookings();
   }
 
   protected expired(m: ReaderMe): boolean {
@@ -442,6 +500,57 @@ export class Account implements OnInit {
       // Lịch sử không quan trọng bằng sách đang mượn — lỗi thì để trống, không chặn phần còn lại của trang.
     } finally {
       this.historyLoading.set(false);
+    }
+  }
+
+  private async loadSpaceBookings(): Promise<void> {
+    try {
+      this.spaceBookings.set(await this.space.myBookings());
+    } catch (e) {
+      this.spaceError.set(this.language.apiError(e));
+    }
+  }
+
+  protected toggleQr(publicId: string): void {
+    this.showQr.set(this.showQr() === publicId ? null : publicId);
+  }
+
+  protected async selfCheckIn(b: SpaceMyBooking['booking']): Promise<void> {
+    this.spaceBusyId.set(b.publicId);
+    this.spaceError.set(null);
+    try {
+      await this.space.checkIn(b.publicId);
+      await this.loadSpaceBookings();
+    } catch (e) {
+      this.spaceError.set(this.language.apiError(e));
+    } finally {
+      this.spaceBusyId.set(null);
+    }
+  }
+
+  protected async selfCheckOut(b: SpaceMyBooking['booking']): Promise<void> {
+    this.spaceBusyId.set(b.publicId);
+    this.spaceError.set(null);
+    try {
+      await this.space.checkOut(b.publicId);
+      await this.loadSpaceBookings();
+    } catch (e) {
+      this.spaceError.set(this.language.apiError(e));
+    } finally {
+      this.spaceBusyId.set(null);
+    }
+  }
+
+  protected async cancelSpaceBooking(b: SpaceMyBooking['booking']): Promise<void> {
+    this.spaceBusyId.set(b.publicId);
+    this.spaceError.set(null);
+    try {
+      await this.space.cancel(b.publicId);
+      await this.loadSpaceBookings();
+    } catch (e) {
+      this.spaceError.set(this.language.apiError(e));
+    } finally {
+      this.spaceBusyId.set(null);
     }
   }
 

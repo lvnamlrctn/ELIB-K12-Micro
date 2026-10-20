@@ -497,6 +497,88 @@ export const DOCUMENT_SUBMISSION_STATUSES: { code: number; name: string; badge: 
   { code: 3, name: 'DIGITAL_SUBMISSIONS_PAGE.STATUS_3', badge: 'badge-off' },
 ];
 
+// ── Không gian & đặt phòng (service space) ──
+export interface SpaceBuilding { id: number; publicId: string; code: string; name: string; description: string | null; createdAt: string; updatedAt: string | null; }
+export interface SpaceFloor {
+  id: number; publicId: string; buildingId: number; buildingName: string | null; name: string; floorNumber: number | null;
+  layoutImageUrl: string | null; canvasWidth: number; canvasHeight: number; createdAt: string; updatedAt: string | null;
+}
+export const SPACE_KIND_ROOM = 1;
+export const SPACE_KIND_STUDY = 2;
+export const SPACE_CATEGORIES: { value: number; label: string }[] = [
+  { value: 1, label: 'SPACE_CAT.CATEGORY_1' },
+  { value: 2, label: 'SPACE_CAT.CATEGORY_2' },
+  { value: 3, label: 'SPACE_CAT.CATEGORY_3' },
+  { value: 4, label: 'SPACE_CAT.CATEGORY_4' },
+];
+export interface SpaceRoom {
+  id: number; publicId: string; floorId: number; floorName: string | null; buildingId: number | null; buildingName: string | null;
+  code: string; name: string; kind: number; category: number; capacity: number; minAdvanceMinutes: number; maxAdvanceDays: number;
+  maxAdvanceHours: number | null; maxBookingMinutesPerReader: number; checkInGraceMinutes: number; autoApprove: boolean; rules: string | null;
+  allowedReaderTypeIds: number[]; minGroupSize: number | null; colorHex: string | null; iconName: string | null;
+  positionX: number | null; positionY: number | null; width: number | null; height: number | null; maintenance: boolean;
+  maintenanceNote: string | null; status: number; createdAt: string; updatedAt: string | null;
+}
+
+export interface SpaceMember { readerPublicId: string; cardNo: string; name: string | null; }
+/** status: 1 Chờ duyệt, 2 Đã duyệt, 3 Đang sử dụng, 4 Hoàn tất, 5 Đã huỷ, 6 Từ chối, 7 Không tới. */
+export interface SpaceBooking {
+  id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; spaceId: number; spaceName: string | null;
+  floorName: string | null; buildingName: string | null; startAt: string; endAt: string; partySize: number; status: number;
+  approvedBy: number | null; approvedAt: string | null; rejectReason: string | null; cancelledAt: string | null; checkedInAt: string | null;
+  checkedOutAt: string | null; note: string | null; createdAt: string; members: SpaceMember[];
+}
+export interface SpaceBookingSearch extends CrudSearch { cardNo?: string | null; spaceId?: number | null; bookingStatus?: number | null; from?: string | null; to?: string | null; }
+export const SPACE_BOOKING_STATUSES: { code: number; name: string; badge: string }[] = [
+  { code: 1, name: 'SPACE_BOOKINGS_PAGE.STATUS_1', badge: 'badge-warn' },
+  { code: 2, name: 'SPACE_BOOKINGS_PAGE.STATUS_2', badge: 'badge-info' },
+  { code: 3, name: 'SPACE_BOOKINGS_PAGE.STATUS_3', badge: 'badge-on' },
+  { code: 4, name: 'SPACE_BOOKINGS_PAGE.STATUS_4', badge: 'badge-off' },
+  { code: 5, name: 'SPACE_BOOKINGS_PAGE.STATUS_5', badge: 'badge-off' },
+  { code: 6, name: 'SPACE_BOOKINGS_PAGE.STATUS_6', badge: 'badge-off' },
+  { code: 7, name: 'SPACE_BOOKINGS_PAGE.STATUS_7', badge: 'badge-off' },
+];
+export interface SpaceBusySlot { startAt: string; endAt: string; }
+export interface SpaceAvailability {
+  closed: boolean; openTime: string | null; closeTime: string | null; closedReason: string | null; maintenance: boolean;
+  maintenanceNote: string | null; busy: SpaceBusySlot[];
+}
+
+export interface SpaceBan {
+  id: number; publicId: string; readerPublicId: string; cardNo: string; readerName: string | null; reason: string; source: number;
+  bannedUntil: string; liftedAt: string | null; liftedBy: number | null; isActive: boolean; createdAt: string;
+}
+export interface SpaceBanSearch extends CrudSearch { activeOnly?: boolean | null; }
+
+export interface SpaceWeeklyHourRow { weekday: number; openTime: string; closeTime: string; isClosed: boolean; }
+export interface SpaceSpecialDay {
+  id: number; publicId: string; date: string; category: number | null; isClosed: boolean; openTime: string | null; closeTime: string | null;
+  reason: string | null; createdAt: string; updatedAt: string | null;
+}
+export interface SpaceSettings {
+  defaultOpenTime: string; defaultCloseTime: string; maxPerDay: number; maxActive: number; maxSessionMinutes: number;
+  noShowLimit: number; noShowWindowDays: number; banDays: number;
+}
+
+export interface SpaceReportRow { spaceId: number; spaceName: string; bookings: number; completed: number; noShow: number; cancelled: number; usedHours: number; }
+export interface SpaceTopReaderRow { cardNo: string; readerName: string | null; bookings: number; noShow: number; }
+export interface SpaceReport {
+  totalBookings: number; pending: number; approved: number; checkedIn: number; completed: number; cancelled: number; rejected: number; noShow: number;
+  noShowRatePercent: number; cancelRatePercent: number; totalUsedHours: number; totalVisitors: number;
+  bySpace: SpaceReportRow[]; topReaders: SpaceTopReaderRow[];
+}
+
+export interface SpaceAccessDevice {
+  id: number; publicId: string; code: string; name: string; spaceId: number | null; spaceName: string | null; lastSeenAt: string | null;
+  status: number; createdAt: string; updatedAt: string | null;
+}
+export interface SpaceAccessStaffCard { id: number; publicId: string; cardUid: string; label: string | null; status: number; createdAt: string; updatedAt: string | null; }
+export interface SpaceAccessScanLog {
+  id: number; publicId: string; deviceId: number; deviceCode: string | null; cardUid: string; readerPublicId: string | null;
+  readerName: string | null; bookingPublicId: string | null; allowed: boolean; reason: string; scannedAt: string;
+}
+export interface SpaceAccessScanLogSearch extends CrudSearch { deviceId?: number | null; allowed?: boolean | null; }
+
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
@@ -1086,4 +1168,63 @@ export class Api {
   rejectDocumentSubmission(submissionPublicId: string, reason: string) {
     return this.post<DocumentSubmission>('/api/admin/digital/document-submissions/Reject', { submissionPublicId, reason });
   }
+
+  // Không gian & đặt phòng (space): danh mục qua crud('buildings'|'floors'|'spaces'|'special-days', 'space'); phần còn lại
+  // (vị trí/bảo trì trên sơ đồ, đặt/duyệt/check-in, cấm, giờ mở cửa, tham số, báo cáo, thiết bị RFID) là thao tác nghiệp vụ riêng.
+  placeSpaceRoom(publicId: string, body: { positionX: number | null; positionY: number | null; width: number | null; height: number | null }) {
+    return this.post<SpaceRoom>(`/api/admin/space/spaces/${publicId}/Place`, body);
+  }
+  setSpaceRoomMaintenance(publicId: string, on: boolean, note: string | null) {
+    return this.post<SpaceRoom>(`/api/admin/space/spaces/${publicId}/SetMaintenance`, { on, note });
+  }
+  setSpaceFloorLayout(publicId: string, layoutImageUrl: string | null, canvasWidth: number, canvasHeight: number) {
+    return this.post<SpaceFloor>(`/api/admin/space/floors/${publicId}/SetLayout`, { layoutImageUrl, canvasWidth, canvasHeight });
+  }
+
+  searchSpaceBookings(body: SpaceBookingSearch) { return this.post<CrudPage<SpaceBooking>>('/api/admin/space/bookings/Search', body); }
+  spaceBooking(publicId: string) { return this.get<SpaceBooking>(`/api/admin/space/bookings/GetById/${publicId}`); }
+  approveSpaceBooking(publicId: string) { return this.post<SpaceBooking>(`/api/admin/space/bookings/${publicId}/Approve`); }
+  rejectSpaceBooking(publicId: string, reason: string) { return this.post<SpaceBooking>('/api/admin/space/bookings/Reject', { publicId, reason }); }
+  checkInSpaceBooking(publicId: string, kioskSpaceId?: number | null) {
+    return this.post<SpaceBooking>('/api/admin/space/bookings/CheckIn', { publicId, kioskSpaceId: kioskSpaceId ?? null });
+  }
+  checkInSpaceBookingByCard(cardNo: string, kioskSpaceId?: number | null) {
+    return this.post<SpaceBooking>('/api/admin/space/bookings/CheckInByCard', { cardNo, kioskSpaceId: kioskSpaceId ?? null });
+  }
+  checkOutSpaceBooking(publicId: string) { return this.post<SpaceBooking>(`/api/admin/space/bookings/${publicId}/CheckOut`); }
+
+  spaceWeeklyHours(category?: number | null) { return this.get<SpaceWeeklyHourRow[]>('/api/admin/space/hours/weekly', { category: category ?? undefined }); }
+  saveSpaceWeeklyHours(category: number | null, rows: SpaceWeeklyHourRow[]) {
+    return this.put<SpaceWeeklyHourRow[]>('/api/admin/space/hours/weekly', { category, rows });
+  }
+  spaceSettings() { return this.get<SpaceSettings>('/api/admin/space/settings'); }
+  updateSpaceSettings(body: SpaceSettings) { return this.put<SpaceSettings>('/api/admin/space/settings', body); }
+
+  searchSpaceBans(body: SpaceBanSearch) { return this.post<CrudPage<SpaceBan>>('/api/admin/space/bans/Search', body); }
+  addSpaceBan(cardNo: string, days: number, reason: string) { return this.post<SpaceBan>('/api/admin/space/bans/Add', { cardNo, days, reason }); }
+  liftSpaceBan(publicId: string) { return this.post<SpaceBan>(`/api/admin/space/bans/${publicId}/Lift`); }
+
+  spaceReport(body: { from: string; to: string; spaceId?: number | null; category?: number | null }) {
+    return this.post<SpaceReport>('/api/admin/space/reports/Search', body);
+  }
+  exportSpaceReport(body: { from: string; to: string; spaceId?: number | null; category?: number | null }) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/space/reports/Export', body, { responseType: 'blob' })));
+  }
+
+  searchSpaceAccessDevices(body: CrudSearch) { return this.post<CrudPage<SpaceAccessDevice>>('/api/admin/space/access/devices/Search', body); }
+  addSpaceAccessDevice(code: string, name: string, spaceId: number | null) {
+    return this.post<{ device: SpaceAccessDevice; key: { rawKey: string } }>('/api/admin/space/access/devices/Add', { code, name, spaceId });
+  }
+  updateSpaceAccessDevice(publicId: string, code: string, name: string, spaceId: number | null) {
+    return this.put<SpaceAccessDevice>(`/api/admin/space/access/devices/Update/${publicId}`, { code, name, spaceId });
+  }
+  regenerateSpaceAccessDeviceKey(publicId: string) { return this.post<{ rawKey: string }>(`/api/admin/space/access/devices/${publicId}/RegenerateKey`); }
+  changeSpaceAccessDeviceStatus(publicId: string, status: number) {
+    return this.put<void>('/api/admin/space/access/devices/ChangeStatus', { publicId, status });
+  }
+  deleteSpaceAccessDevice(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/space/access/devices/Delete/${publicId}`)); }
+  unlockSpaceAccessDevice(body: { deviceId?: number | null; bookingPublicId?: string | null; note?: string | null }) {
+    return this.post<void>('/api/admin/space/access/unlock', body);
+  }
+  searchSpaceAccessScanLogs(body: SpaceAccessScanLogSearch) { return this.post<CrudPage<SpaceAccessScanLog>>('/api/admin/space/access/scan-logs/Search', body); }
 }
