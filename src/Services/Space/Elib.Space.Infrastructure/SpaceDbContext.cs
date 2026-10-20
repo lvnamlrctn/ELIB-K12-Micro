@@ -185,6 +185,30 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
             e.HasIndex(x => new { x.TenantId, x.StorePublicId }).IsUnique();
         });
 
+        modelBuilder.Entity<LockerCabinet>(e =>
+        {
+            e.ToTable("locker_cabinets");
+            e.Property(x => x.Code).HasMaxLength(LockerCabinet.MaxCodeLength);
+            e.Property(x => x.Name).HasMaxLength(LockerCabinet.MaxNameLength);
+            e.Property(x => x.ColorHex).HasMaxLength(20);
+            e.Property(x => x.IconName).HasMaxLength(50);
+            e.Property(x => x.Note).HasMaxLength(LockerCabinet.MaxNoteLength);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.FloorId });
+            e.HasOne<MapFloor>().WithMany().HasForeignKey(x => x.FloorId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LockerCompartment>(e =>
+        {
+            e.ToTable("locker_compartments");
+            e.Property(x => x.Code).HasMaxLength(LockerCompartment.MaxCodeLength);
+            e.Property(x => x.Name).HasMaxLength(LockerCompartment.MaxNameLength);
+            e.Property(x => x.Note).HasMaxLength(LockerCompartment.MaxNoteLength);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.TenantId, x.CabinetId });
+            e.HasOne<LockerCabinet>().WithMany().HasForeignKey(x => x.CabinetId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

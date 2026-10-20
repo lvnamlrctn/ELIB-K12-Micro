@@ -121,6 +121,8 @@ public static class PermissionCatalog
         new("SPACE_FLOORS", "Tầng", SpaceGroup, Crud, SpaceLicense),
         new("SPACE_ROOMS", "Không gian / phòng", SpaceGroup, Crud, SpaceLicense),
         new("SPACE_FIXTURES", "Kệ sách & vật dụng khác", SpaceGroup, Crud, SpaceLicense),
+        new("SPACE_LOCKERS", "Tủ đựng đồ", SpaceGroup, Crud, SpaceLicense),
+        new("SPACE_LOCKER_LOANS", "Mượn/trả tủ", SpaceGroup, [View, Edit], SpaceLicense),
         new("SPACE_HOURS", "Giờ mở cửa", SpaceGroup, [View, Edit], SpaceLicense),
         new("SPACE_SETTINGS", "Tham số đặt phòng", SpaceGroup, [View, Edit], SpaceLicense),
         new("SPACE_BOOKINGS", "Duyệt/check-in đặt phòng", SpaceGroup, [View, Edit], SpaceLicense),

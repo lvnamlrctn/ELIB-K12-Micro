@@ -32,6 +32,10 @@ public static class SpaceEndpoints
             (Replicas replicas, CancellationToken ct) => replicas.StoresAsync(ct)).WithTags("Fixtures");
         api.MapCrud<FixtureEquipmentResource>("/fixture-equipment", "SPACE_FIXTURES").WithTags("FixtureEquipment");
         api.MapCrud<FloorUtilityResource>("/floor-utilities", "SPACE_FLOORS").WithTags("FloorUtilities");
+        api.MapCrud<LockerCabinetResource>("/locker-cabinets", "SPACE_LOCKERS").WithTags("LockerCabinets");
+        api.MapPost("/locker-cabinets/{publicId:guid}/Place", [Permission("SPACE_LOCKERS", "edit")]
+            (Guid publicId, PlaceLockerRequest request, LockerCabinetResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("LockerCabinets");
+        api.MapCrud<LockerCompartmentResource>("/locker-compartments", "SPACE_LOCKERS").WithTags("LockerCompartments");
         api.MapCrud<SpecialDayResource>("/special-days", "SPACE_HOURS").WithTags("SpecialDays");
 
         var hours = api.MapGroup("/hours").WithTags("Hours");

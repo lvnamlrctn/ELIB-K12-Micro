@@ -633,6 +633,235 @@ namespace Elib.Space.Infrastructure.Migrations
                     b.ToTable("bookable_spaces", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.LockerCabinet", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("ColorHex")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("color_hex");
+
+                    b.Property<int>("Cols")
+                        .HasColumnType("integer")
+                        .HasColumnName("cols");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<long>("FloorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("floor_id");
+
+                    b.Property<double?>("Height")
+                        .HasColumnType("double precision")
+                        .HasColumnName("height");
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("icon_name");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<double?>("PositionX")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_x");
+
+                    b.Property<double?>("PositionY")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_y");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int>("Rows")
+                        .HasColumnType("integer")
+                        .HasColumnName("rows");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.Property<double?>("Width")
+                        .HasColumnType("double precision")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_locker_cabinets");
+
+                    b.HasIndex("FloorId")
+                        .HasDatabaseName("ix_locker_cabinets_floor_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_locker_cabinets_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_locker_cabinets_tenant_id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_locker_cabinets_tenant_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("TenantId", "FloorId")
+                        .HasDatabaseName("ix_locker_cabinets_tenant_id_floor_id");
+
+                    b.ToTable("locker_cabinets", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.LockerCompartment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CabinetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cabinet_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<int>("ColIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("col_index");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int>("RowIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_index");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_locker_compartments");
+
+                    b.HasIndex("CabinetId")
+                        .HasDatabaseName("ix_locker_compartments_cabinet_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_locker_compartments_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_locker_compartments_tenant_id");
+
+                    b.HasIndex("TenantId", "CabinetId")
+                        .HasDatabaseName("ix_locker_compartments_tenant_id_cabinet_id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_locker_compartments_tenant_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("locker_compartments", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Space.Domain.MapBuilding", b =>
                 {
                     b.Property<long>("Id")
@@ -2085,6 +2314,26 @@ namespace Elib.Space.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_bookable_spaces_map_floors_floor_id");
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.LockerCabinet", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.MapFloor", null)
+                        .WithMany()
+                        .HasForeignKey("FloorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_locker_cabinets_map_floors_floor_id");
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.LockerCompartment", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.LockerCabinet", null)
+                        .WithMany()
+                        .HasForeignKey("CabinetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_locker_compartments_locker_cabinets_cabinet_id");
                 });
 
             modelBuilder.Entity("Elib.Space.Domain.MapFixture", b =>
