@@ -528,6 +528,21 @@ export interface SpaceFixture {
   shelfCategoryRange: string | null; shelfSubjectName: string | null; shelfCapacity: number | null; shelfDescription: string | null;
   storePublicId: string | null; status: number; createdAt: string; updatedAt: string | null;
 }
+/** Thiết bị gắn theo một vật dụng (monolith: map.MapEquipment). */
+export interface SpaceFixtureEquipment {
+  id: number; publicId: string; fixtureId: number; name: string; description: string | null; quantity: number | null; conditionStatus: number;
+  createdAt: string; updatedAt: string | null;
+}
+/** Tiện ích theo tầng (monolith: map.MapFloorUtility) — bình chữa cháy, camera... */
+export interface SpaceFloorUtility {
+  id: number; publicId: string; floorId: number; name: string; description: string | null; quantity: number | null; conditionStatus: number;
+  iconName: string | null; createdAt: string; updatedAt: string | null;
+}
+export const SPACE_CONDITION_STATUSES: { value: number; label: string }[] = [
+  { value: 1, label: 'SPACE_FLOOR_MAP_PAGE.CONDITION_1' },
+  { value: 2, label: 'SPACE_FLOOR_MAP_PAGE.CONDITION_2' },
+  { value: 3, label: 'SPACE_FLOOR_MAP_PAGE.CONDITION_3' },
+];
 export const SPACE_FIXTURE_TYPES: { value: string; label: string; icon: string }[] = [
   { value: 'SHELF', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_SHELF', icon: 'menu_book' },
   { value: 'PC', label: 'SPACE_FLOOR_MAP_PAGE.TYPE_PC', icon: 'computer' },

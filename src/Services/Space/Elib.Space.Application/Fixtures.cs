@@ -90,3 +90,81 @@ public sealed class FixtureResource(ICrudDbContext db) : CrudResource<FixtureRes
         return ToDto(entity);
     }
 }
+
+public sealed class FixtureEquipmentSearch : CrudSearch
+{
+    public long? FixtureId { get; set; }
+}
+
+public sealed record FixtureEquipmentRequest(long FixtureId, string Name, string? Description, int? Quantity, int ConditionStatus);
+
+public sealed record FixtureEquipmentDto(long Id, Guid PublicId, long FixtureId, string Name, string? Description, int? Quantity, int ConditionStatus,
+    DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+/// <summary>Thiết bị gắn theo một vật dụng trên sơ đồ (monolith: map.MapEquipment, quyền SPACE_FIXTURES).</summary>
+public sealed class FixtureEquipmentResource(ICrudDbContext db)
+    : CrudResource<FixtureEquipmentResource, MapFixtureEquipment, FixtureEquipmentSearch, FixtureEquipmentRequest, FixtureEquipmentDto>(db)
+{
+    protected override string EntityName => "Thiết bị";
+
+    protected override string? Describe(MapFixtureEquipment entity) => entity.Name;
+
+    protected override Expression<Func<MapFixtureEquipment, FixtureEquipmentDto>> Projection => x =>
+        new FixtureEquipmentDto(x.Id, x.PublicId, x.FixtureId, x.Name, x.Description, x.Quantity, x.ConditionStatus, x.CreatedAt, x.UpdatedAt);
+
+    protected override MapFixtureEquipment Create(FixtureEquipmentRequest request) =>
+        MapFixtureEquipment.Create(request.FixtureId, request.Name, request.Description, request.Quantity, request.ConditionStatus);
+
+    protected override void Update(MapFixtureEquipment entity, FixtureEquipmentRequest request) =>
+        entity.Update(request.Name, request.Description, request.Quantity, request.ConditionStatus);
+
+    protected override IQueryable<MapFixtureEquipment> Filter(IQueryable<MapFixtureEquipment> query, FixtureEquipmentSearch search) =>
+        search.FixtureId is { } fixtureId ? query.Where(x => x.FixtureId == fixtureId) : query;
+
+    protected override IOrderedQueryable<MapFixtureEquipment> Order(IQueryable<MapFixtureEquipment> query) => query.OrderBy(x => x.Name).ThenBy(x => x.Id);
+
+    protected override async Task ValidateAsync(MapFixtureEquipment entity, CancellationToken ct)
+    {
+        if (!await Db.Set<MapFixture>().AnyAsync(x => x.Id == entity.FixtureId, ct))
+            throw new BusinessRuleException("FIXTURE_NOT_FOUND", "Vật dụng đã chọn không còn.");
+    }
+}
+
+public sealed class FloorUtilitySearch : CrudSearch
+{
+    public long? FloorId { get; set; }
+}
+
+public sealed record FloorUtilityRequest(long FloorId, string Name, string? Description, int? Quantity, int ConditionStatus, string? IconName);
+
+public sealed record FloorUtilityDto(long Id, Guid PublicId, long FloorId, string Name, string? Description, int? Quantity, int ConditionStatus,
+    string? IconName, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+/// <summary>Tiện ích theo tầng (monolith: map.MapFloorUtility, quyền SPACE_FLOORS).</summary>
+public sealed class FloorUtilityResource(ICrudDbContext db)
+    : CrudResource<FloorUtilityResource, MapFloorUtility, FloorUtilitySearch, FloorUtilityRequest, FloorUtilityDto>(db)
+{
+    protected override string EntityName => "Tiện ích tầng";
+
+    protected override string? Describe(MapFloorUtility entity) => entity.Name;
+
+    protected override Expression<Func<MapFloorUtility, FloorUtilityDto>> Projection => x =>
+        new FloorUtilityDto(x.Id, x.PublicId, x.FloorId, x.Name, x.Description, x.Quantity, x.ConditionStatus, x.IconName, x.CreatedAt, x.UpdatedAt);
+
+    protected override MapFloorUtility Create(FloorUtilityRequest request) =>
+        MapFloorUtility.Create(request.FloorId, request.Name, request.Description, request.Quantity, request.ConditionStatus, request.IconName);
+
+    protected override void Update(MapFloorUtility entity, FloorUtilityRequest request) =>
+        entity.Update(request.Name, request.Description, request.Quantity, request.ConditionStatus, request.IconName);
+
+    protected override IQueryable<MapFloorUtility> Filter(IQueryable<MapFloorUtility> query, FloorUtilitySearch search) =>
+        search.FloorId is { } floorId ? query.Where(x => x.FloorId == floorId) : query;
+
+    protected override IOrderedQueryable<MapFloorUtility> Order(IQueryable<MapFloorUtility> query) => query.OrderBy(x => x.Name).ThenBy(x => x.Id);
+
+    protected override async Task ValidateAsync(MapFloorUtility entity, CancellationToken ct)
+    {
+        if (!await Db.Set<MapFloor>().AnyAsync(f => f.Id == entity.FloorId, ct))
+            throw new BusinessRuleException("FLOOR_NOT_FOUND", "Tầng đã chọn không còn.");
+    }
+}

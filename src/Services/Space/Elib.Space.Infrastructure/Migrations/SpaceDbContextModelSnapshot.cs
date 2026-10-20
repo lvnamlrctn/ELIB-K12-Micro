@@ -857,6 +857,93 @@ namespace Elib.Space.Infrastructure.Migrations
                     b.ToTable("map_fixtures", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.MapFixtureEquipment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ConditionStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("condition_status");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("FixtureId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int?>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_map_fixture_equipment");
+
+                    b.HasIndex("FixtureId")
+                        .HasDatabaseName("ix_map_fixture_equipment_fixture_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_fixture_equipment_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_map_fixture_equipment_tenant_id");
+
+                    b.HasIndex("TenantId", "FixtureId")
+                        .HasDatabaseName("ix_map_fixture_equipment_tenant_id_fixture_id");
+
+                    b.ToTable("map_fixture_equipment", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Space.Domain.MapFloor", b =>
                 {
                     b.Property<long>("Id")
@@ -946,6 +1033,98 @@ namespace Elib.Space.Infrastructure.Migrations
                         .HasDatabaseName("ix_map_floors_tenant_id_building_id");
 
                     b.ToTable("map_floors", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.MapFloorUtility", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ConditionStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("condition_status");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("FloorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("floor_id");
+
+                    b.Property<string>("IconName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("icon_name");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int?>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_map_floor_utilities");
+
+                    b.HasIndex("FloorId")
+                        .HasDatabaseName("ix_map_floor_utilities_floor_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_floor_utilities_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_map_floor_utilities_tenant_id");
+
+                    b.HasIndex("TenantId", "FloorId")
+                        .HasDatabaseName("ix_map_floor_utilities_tenant_id_floor_id");
+
+                    b.ToTable("map_floor_utilities", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Space.Domain.PatronReplica", b =>
@@ -1872,6 +2051,16 @@ namespace Elib.Space.Infrastructure.Migrations
                         .HasConstraintName("fk_map_fixtures_map_floors_floor_id");
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.MapFixtureEquipment", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.MapFixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_map_fixture_equipment_map_fixtures_fixture_id");
+                });
+
             modelBuilder.Entity("Elib.Space.Domain.MapFloor", b =>
                 {
                     b.HasOne("Elib.Space.Domain.MapBuilding", null)
@@ -1880,6 +2069,16 @@ namespace Elib.Space.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_map_floors_map_buildings_building_id");
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.MapFloorUtility", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.MapFloor", null)
+                        .WithMany()
+                        .HasForeignKey("FloorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_map_floor_utilities_map_floors_floor_id");
                 });
 
             modelBuilder.Entity("Elib.Space.Domain.RoomBooking", b =>

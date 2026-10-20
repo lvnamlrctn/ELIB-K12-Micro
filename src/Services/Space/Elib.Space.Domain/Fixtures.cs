@@ -104,3 +104,82 @@ public sealed class MapFixture : TenantEntity, IHasStatus
 
     private static double? Clamp(double? value) => value is { } v ? Math.Clamp(v, 0, 100) : null;
 }
+
+/// <summary>Tình trạng thiết bị/tiện ích (monolith: 2 từ vựng khác nhau cho MapEquipment/MapFloorUtility — gộp về 1 ở đây).</summary>
+public static class ConditionStatusRules
+{
+    public const int Ready = 1;
+    public const int Working = 2;
+    public const int Maintenance = 3;
+
+    public static readonly int[] All = [Ready, Working, Maintenance];
+
+    public static int Validate(int value) => Array.IndexOf(All, value) >= 0 ? value : throw new BusinessRuleException("CONDITION_STATUS_INVALID", "Tình trạng không hợp lệ.");
+}
+
+/// <summary>Thiết bị gắn theo một vật dụng trên sơ đồ (monolith: map.MapEquipment) — máy chiếu, bàn ghế... Áp dụng cho mọi loại <see cref="MapFixture"/>.</summary>
+public sealed class MapFixtureEquipment : TenantEntity
+{
+    public const int MaxNameLength = 250;
+    public const int MaxDescriptionLength = 1000;
+
+    private MapFixtureEquipment() { }
+
+    public long FixtureId { get; private set; }
+    public string Name { get; private set; } = "";
+    public string? Description { get; private set; }
+    public int? Quantity { get; private set; }
+    public int ConditionStatus { get; private set; } = ConditionStatusRules.Ready;
+
+    public static MapFixtureEquipment Create(long fixtureId, string name, string? description, int? quantity, int conditionStatus)
+    {
+        var equipment = new MapFixtureEquipment { FixtureId = fixtureId };
+        equipment.Update(name, description, quantity, conditionStatus);
+        return equipment;
+    }
+
+    public void Update(string name, string? description, int? quantity, int conditionStatus)
+    {
+        var n = (name ?? "").Trim();
+        Name = n.Length is > 0 and <= MaxNameLength ? n : throw new BusinessRuleException("NAME_INVALID", $"Tên thiết bị bắt buộc, tối đa {MaxNameLength} ký tự.");
+        var d = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Description = d is null || d.Length <= MaxDescriptionLength ? d : throw new BusinessRuleException("DESCRIPTION_TOO_LONG", $"Mô tả tối đa {MaxDescriptionLength} ký tự.");
+        Quantity = quantity is null or >= 0 ? quantity : throw new BusinessRuleException("QUANTITY_INVALID", "Số lượng không được âm.");
+        ConditionStatus = ConditionStatusRules.Validate(conditionStatus);
+    }
+}
+
+/// <summary>Tiện ích theo tầng (monolith: map.MapFloorUtility) — bình chữa cháy, camera... gắn theo cả tầng, không theo vật cụ thể.</summary>
+public sealed class MapFloorUtility : TenantEntity
+{
+    public const int MaxNameLength = 250;
+    public const int MaxDescriptionLength = 1000;
+
+    private MapFloorUtility() { }
+
+    public long FloorId { get; private set; }
+    public string Name { get; private set; } = "";
+    public string? Description { get; private set; }
+    public int? Quantity { get; private set; }
+    public int ConditionStatus { get; private set; } = ConditionStatusRules.Ready;
+    public string? IconName { get; private set; }
+
+    public static MapFloorUtility Create(long floorId, string name, string? description, int? quantity, int conditionStatus, string? iconName)
+    {
+        var utility = new MapFloorUtility { FloorId = floorId };
+        utility.Update(name, description, quantity, conditionStatus, iconName);
+        return utility;
+    }
+
+    public void Update(string name, string? description, int? quantity, int conditionStatus, string? iconName)
+    {
+        var n = (name ?? "").Trim();
+        Name = n.Length is > 0 and <= MaxNameLength ? n : throw new BusinessRuleException("NAME_INVALID", $"Tên tiện ích bắt buộc, tối đa {MaxNameLength} ký tự.");
+        var d = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Description = d is null || d.Length <= MaxDescriptionLength ? d : throw new BusinessRuleException("DESCRIPTION_TOO_LONG", $"Mô tả tối đa {MaxDescriptionLength} ký tự.");
+        Quantity = quantity is null or >= 0 ? quantity : throw new BusinessRuleException("QUANTITY_INVALID", "Số lượng không được âm.");
+        ConditionStatus = ConditionStatusRules.Validate(conditionStatus);
+        var icon = string.IsNullOrWhiteSpace(iconName) ? null : iconName.Trim();
+        IconName = icon is null || icon.Length <= 50 ? icon : throw new BusinessRuleException("ICON_INVALID", "Tên biểu tượng tối đa 50 ký tự.");
+    }
+}

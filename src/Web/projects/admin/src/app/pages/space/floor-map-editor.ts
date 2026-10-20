@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
-  Api, SPACE_CATEGORIES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture, SpaceFloor, SpaceRoom, errorMessage,
+  Api, SPACE_CATEGORIES, SPACE_CONDITION_STATUSES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture,
+  SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceRoom, errorMessage,
 } from '../../core/api';
 import { Loading, Modal } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
@@ -42,6 +43,9 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
   template: `
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
       <h4 class="page-title">{{ 'SPACE_FLOOR_MAP_PAGE.TITLE' | translate }}</h4>
+      <button type="button" class="btn-secondary" [disabled]="!floor()" (click)="openUtilities()">
+        <span class="material-icons text-[18px]">inventory_2</span> {{ 'SPACE_FLOOR_MAP_PAGE.FLOOR_UTILITIES' | translate }}
+      </button>
     </div>
 
     <div class="panel mb-4">
@@ -233,9 +237,74 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
             </div>
           }
         </form>
+
+        @if (f.publicId) {
+          <div class="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3">
+            <div class="text-xs font-medium text-violet-800 flex items-center gap-1 mb-2">
+              <span class="material-icons text-[16px]">inventory_2</span>{{ 'SPACE_FLOOR_MAP_PAGE.EQUIPMENT_TITLE' | translate: { count: equipment().length } }}
+            </div>
+            @if (equipment().length) {
+              <ul class="space-y-1 mb-2">
+                @for (eq of equipment(); track eq.id) {
+                  <li class="flex items-center justify-between gap-2 bg-white rounded px-2 py-1 text-xs">
+                    <span>{{ eq.name }} @if (eq.quantity) { <span class="text-gray-400">×{{ eq.quantity }}</span> } — {{ conditionLabel(eq.conditionStatus) | translate }}</span>
+                    <button type="button" class="material-icons text-[16px] text-gray-400 hover:text-red-600" (click)="deleteEquipment(eq)">delete</button>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="grid grid-cols-4 gap-1.5">
+              <input class="input !py-1 text-xs col-span-2" [(ngModel)]="equipmentName" name="eqName" [placeholder]="'COMMON.NAME' | translate" />
+              <input type="number" class="input !py-1 text-xs" [(ngModel)]="equipmentQty" name="eqQty" min="0" [placeholder]="'SPACE_FLOOR_MAP_PAGE.QUANTITY' | translate" />
+              <select class="input !py-1 text-xs" [(ngModel)]="equipmentStatus" name="eqStatus">
+                @for (c of conditionOptions; track c.value) { <option [ngValue]="c.value">{{ c.label | translate }}</option> }
+              </select>
+            </div>
+            <button type="button" class="btn-secondary !py-1 text-xs w-full mt-1.5" (click)="addEquipment(f.publicId)">
+              <span class="material-icons text-[14px] align-middle mr-1">add</span>{{ 'COMMON.ADD' | translate }}
+            </button>
+          </div>
+        }
+
         <ng-container footer>
           <button type="button" (click)="fixtureForm.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
           <button type="submit" form="quick-fixture-form" [disabled]="busy()" class="btn-primary"><span class="material-icons text-[16px]">save</span> {{ 'COMMON.SAVE' | translate }}</button>
+        </ng-container>
+      </app-modal>
+    }
+
+    @if (utilityModalOpen()) {
+      <app-modal [title]="'SPACE_FLOOR_MAP_PAGE.FLOOR_UTILITIES' | translate" widthClass="max-w-lg" (closed)="utilityModalOpen.set(false)">
+        @if (utilities().length) {
+          <ul class="space-y-1 mb-3">
+            @for (u of utilities(); track u.id) {
+              <li class="flex items-center justify-between gap-2 bg-gray-50 rounded px-2 py-1.5 text-sm">
+                <span class="flex items-center gap-1.5">
+                  <span class="material-icons text-[16px] text-gray-500">{{ u.iconName || 'inventory_2' }}</span>
+                  {{ u.name }} @if (u.quantity) { <span class="text-gray-400 text-xs">×{{ u.quantity }}</span> }
+                  <span class="text-xs text-gray-400">— {{ conditionLabel(u.conditionStatus) | translate }}</span>
+                </span>
+                <button type="button" class="material-icons text-[16px] text-gray-400 hover:text-red-600" (click)="deleteUtility(u)">delete</button>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-sm text-gray-500 mb-3">{{ 'COMMON.NO_DATA' | translate }}</p>
+        }
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" [(ngModel)]="utilityName" name="utName" [placeholder]="'COMMON.NAME' | translate" />
+          <input class="input" [(ngModel)]="utilityIcon" name="utIcon" [placeholder]="'SPACE_CAT.ICON' | translate" />
+          <input type="number" class="input" [(ngModel)]="utilityQty" name="utQty" min="0" [placeholder]="'SPACE_FLOOR_MAP_PAGE.QUANTITY' | translate" />
+          <select class="input" [(ngModel)]="utilityStatus" name="utStatus">
+            @for (c of conditionOptions; track c.value) { <option [ngValue]="c.value">{{ c.label | translate }}</option> }
+          </select>
+          <textarea class="input col-span-2" [(ngModel)]="utilityDesc" name="utDesc" rows="2" [placeholder]="'SPACE_FLOOR_MAP_PAGE.SHELF_DESCRIPTION' | translate"></textarea>
+        </div>
+        <button type="button" class="btn-secondary w-full mt-2" (click)="addUtility()">
+          <span class="material-icons text-[16px] align-middle mr-1">add</span>{{ 'COMMON.ADD' | translate }}
+        </button>
+        <ng-container footer>
+          <button type="button" (click)="utilityModalOpen.set(false)" class="btn-secondary">{{ 'COMMON.CLOSE' | translate }}</button>
         </ng-container>
       </app-modal>
     }
@@ -261,6 +330,20 @@ export class SpaceFloorMapEditor implements OnInit {
   protected readonly placingKind = signal<PlacingKind | null>(null);
   protected readonly roomForm = signal<(RoomForm & { publicId?: string; x?: number; y?: number }) | null>(null);
   protected readonly fixtureForm = signal<(FixtureForm & { publicId?: string; x?: number; y?: number }) | null>(null);
+  protected readonly conditionOptions = SPACE_CONDITION_STATUSES;
+
+  protected readonly equipment = signal<SpaceFixtureEquipment[]>([]);
+  protected equipmentName = '';
+  protected equipmentQty: number | null = null;
+  protected equipmentStatus = 1;
+
+  protected readonly utilities = signal<SpaceFloorUtility[]>([]);
+  protected readonly utilityModalOpen = signal(false);
+  protected utilityName = '';
+  protected utilityIcon = '';
+  protected utilityQty: number | null = null;
+  protected utilityStatus = 1;
+  protected utilityDesc = '';
 
   protected readonly floorsOfBuilding = () => this.floors().filter((f) => f.buildingId === this.buildingId());
   protected readonly placedRooms = () => this.rooms().filter((r) => r.positionX !== null && r.positionY !== null);
@@ -353,6 +436,81 @@ export class SpaceFloorMapEditor implements OnInit {
         publicId: x.publicId, code: x.code, name: x.name, objectType: x.objectType, colorHex: x.colorHex, iconName: x.iconName,
         shelfCategoryRange: x.shelfCategoryRange, shelfSubjectName: x.shelfSubjectName, shelfCapacity: x.shelfCapacity, shelfDescription: x.shelfDescription,
       });
+      this.equipmentName = '';
+      this.equipmentQty = null;
+      this.equipmentStatus = 1;
+      void this.loadEquipment(x.id);
+    }
+  }
+
+  protected conditionLabel(status: number): string {
+    return this.conditionOptions.find((c) => c.value === status)?.label ?? 'SPACE_FLOOR_MAP_PAGE.CONDITION_1';
+  }
+
+  private async loadEquipment(fixtureId: number): Promise<void> {
+    this.equipment.set(await this.api.crud<SpaceFixtureEquipment>('fixture-equipment', 'space').searchAll({ fixtureId }));
+  }
+
+  protected async addEquipment(fixturePublicId: string): Promise<void> {
+    const fixture = this.fixtures().find((x) => x.publicId === fixturePublicId);
+    if (!fixture || !this.equipmentName.trim()) return;
+    try {
+      await this.api.crud<SpaceFixtureEquipment>('fixture-equipment', 'space').add({
+        fixtureId: fixture.id, name: this.equipmentName.trim(), description: null, quantity: this.equipmentQty, conditionStatus: this.equipmentStatus,
+      });
+      this.equipmentName = '';
+      this.equipmentQty = null;
+      await this.loadEquipment(fixture.id);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  protected async deleteEquipment(eq: SpaceFixtureEquipment): Promise<void> {
+    try {
+      await this.api.crud('fixture-equipment', 'space').delete(eq.publicId);
+      this.equipment.set(this.equipment().filter((x) => x.id !== eq.id));
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  protected async openUtilities(): Promise<void> {
+    const floor = this.floor();
+    if (!floor) return;
+    this.utilityName = '';
+    this.utilityIcon = '';
+    this.utilityQty = null;
+    this.utilityStatus = 1;
+    this.utilityDesc = '';
+    this.utilities.set(await this.api.crud<SpaceFloorUtility>('floor-utilities', 'space').searchAll({ floorId: floor.id }));
+    this.utilityModalOpen.set(true);
+  }
+
+  protected async addUtility(): Promise<void> {
+    const floor = this.floor();
+    if (!floor || !this.utilityName.trim()) return;
+    try {
+      await this.api.crud<SpaceFloorUtility>('floor-utilities', 'space').add({
+        floorId: floor.id, name: this.utilityName.trim(), description: this.utilityDesc.trim() || null, quantity: this.utilityQty,
+        conditionStatus: this.utilityStatus, iconName: this.utilityIcon.trim() || null,
+      });
+      this.utilityName = '';
+      this.utilityIcon = '';
+      this.utilityQty = null;
+      this.utilityDesc = '';
+      this.utilities.set(await this.api.crud<SpaceFloorUtility>('floor-utilities', 'space').searchAll({ floorId: floor.id }));
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  protected async deleteUtility(u: SpaceFloorUtility): Promise<void> {
+    try {
+      await this.api.crud('floor-utilities', 'space').delete(u.publicId);
+      this.utilities.set(this.utilities().filter((x) => x.id !== u.id));
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
     }
   }
 

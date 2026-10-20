@@ -3545,7 +3545,13 @@
     "SHELF_RANGE": "DDC range",
     "SHELF_SUBJECT": "Subject",
     "SHELF_CAPACITY": "Capacity (copies)",
-    "SHELF_DESCRIPTION": "Description"
+    "SHELF_DESCRIPTION": "Description",
+    "EQUIPMENT_TITLE": "Equipment ({{count}})",
+    "QUANTITY": "Quantity",
+    "CONDITION_1": "Ready",
+    "CONDITION_2": "Working",
+    "CONDITION_3": "Maintenance",
+    "FLOOR_UTILITIES": "Floor utilities"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Booking Requests",

@@ -3545,7 +3545,13 @@
     "SHELF_RANGE": "Nhóm DDC",
     "SHELF_SUBJECT": "Chủ đề",
     "SHELF_CAPACITY": "Sức chứa (bản)",
-    "SHELF_DESCRIPTION": "Mô tả"
+    "SHELF_DESCRIPTION": "Mô tả",
+    "EQUIPMENT_TITLE": "Thiết bị ({{count}})",
+    "QUANTITY": "Số lượng",
+    "CONDITION_1": "Sẵn sàng",
+    "CONDITION_2": "Hoạt động",
+    "CONDITION_3": "Bảo trì",
+    "FLOOR_UTILITIES": "Tiện ích tầng"
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Yêu cầu đặt phòng",
