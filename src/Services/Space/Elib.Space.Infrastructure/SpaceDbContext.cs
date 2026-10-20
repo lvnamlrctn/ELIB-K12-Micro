@@ -39,6 +39,7 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
         {
             e.ToTable("map_floors");
             e.Property(x => x.Name).HasMaxLength(MapFloor.MaxNameLength);
+            e.Property(x => x.LayoutImageUrl).HasMaxLength(FloorLayout.MaxUrlLength);
             e.HasIndex(x => new { x.TenantId, x.BuildingId });
             e.HasOne<MapBuilding>().WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.Restrict);
         });
