@@ -1,4 +1,5 @@
 ﻿using System;
+using Elib.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -39,6 +40,8 @@ namespace Elib.Space.Infrastructure.Migrations
                 table: "store_replicas",
                 columns: new[] { "tenant_id", "store_public_id" },
                 unique: true);
+
+            migrationBuilder.EnableTenantRls("store_replicas");
         }
 
         /// <inheritdoc />

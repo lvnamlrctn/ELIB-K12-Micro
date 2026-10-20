@@ -1,4 +1,5 @@
 ﻿using System;
+using Elib.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -118,6 +119,9 @@ namespace Elib.Space.Infrastructure.Migrations
                 name: "ix_map_floor_utilities_tenant_id_floor_id",
                 table: "map_floor_utilities",
                 columns: new[] { "tenant_id", "floor_id" });
+
+            migrationBuilder.EnableTenantRls("map_fixture_equipment");
+            migrationBuilder.EnableTenantRls("map_floor_utilities");
         }
 
         /// <inheritdoc />
