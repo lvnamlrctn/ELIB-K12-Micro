@@ -3545,6 +3545,7 @@
     "SHELF_RANGE": "DDC range",
     "SHELF_SUBJECT": "Subject",
     "SHELF_CAPACITY": "Capacity (copies)",
+    "SHELF_STORE": "Store (hint only, not real shelving location)",
     "SHELF_DESCRIPTION": "Description",
     "EQUIPMENT_TITLE": "Equipment ({{count}})",
     "QUANTITY": "Quantity",

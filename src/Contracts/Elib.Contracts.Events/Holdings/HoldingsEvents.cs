@@ -29,3 +29,16 @@ public sealed record ItemChanged : IntegrationEvent
     public bool Deleted { get; init; }
     public long Version { get; init; }
 }
+
+/// <summary>
+/// Kho vật lý (monolith: Store) — space giữ StoreReplica từ event này để gợi ý kho khi đặt giá sách trên sơ đồ tầng
+/// (chỉ là thông tin mô tả, không phải cơ chế dẫn đường định sách thật). Thay đổi hiếm (CRUD thủ thư), nên không cần
+/// Version như ItemChanged/ReaderChanged — bản sao chỉ cần ghi đè theo lần phát gần nhất (last-write-wins).
+/// </summary>
+public sealed record StoreChanged : IntegrationEvent
+{
+    public required Guid StorePublicId { get; init; }
+    public required string Code { get; init; }
+    public required string Name { get; init; }
+    public bool Deleted { get; init; }
+}

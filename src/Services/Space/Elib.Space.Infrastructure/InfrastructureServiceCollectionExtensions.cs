@@ -36,6 +36,7 @@ public static class InfrastructureServiceCollectionExtensions
         {
             x.AddTenantReplicaConsumers<SpaceDbContext>();
             x.AddConsumer<ReaderChangedConsumer>();
+            x.AddConsumer<StoreChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
         services.AddSingleton<SpaceBookingExpiryJob>();

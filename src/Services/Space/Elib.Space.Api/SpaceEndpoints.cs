@@ -28,6 +28,8 @@ public static class SpaceEndpoints
         api.MapCrud<FixtureResource>("/fixtures", "SPACE_FIXTURES").WithTags("Fixtures");
         api.MapPost("/fixtures/{publicId:guid}/Place", [Permission("SPACE_FIXTURES", "edit")]
             (Guid publicId, PlaceFixtureRequest request, FixtureResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("Fixtures");
+        api.MapGet("/stores", [Permission("SPACE_FIXTURES", "view")]
+            (Replicas replicas, CancellationToken ct) => replicas.StoresAsync(ct)).WithTags("Fixtures");
         api.MapCrud<FixtureEquipmentResource>("/fixture-equipment", "SPACE_FIXTURES").WithTags("FixtureEquipment");
         api.MapCrud<FloorUtilityResource>("/floor-utilities", "SPACE_FLOORS").WithTags("FloorUtilities");
         api.MapCrud<SpecialDayResource>("/special-days", "SPACE_HOURS").WithTags("SpecialDays");

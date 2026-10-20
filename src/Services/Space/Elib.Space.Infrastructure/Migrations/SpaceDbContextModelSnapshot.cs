@@ -1774,6 +1774,52 @@ namespace Elib.Space.Infrastructure.Migrations
                     b.ToTable("space_booking_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.StoreReplica", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("StorePublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_store_replicas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_store_replicas_tenant_id");
+
+                    b.HasIndex("TenantId", "StorePublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_store_replicas_tenant_id_store_public_id");
+
+                    b.ToTable("store_replicas", (string)null);
+                });
+
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.InboxState", b =>
                 {
                     b.Property<long>("Id")

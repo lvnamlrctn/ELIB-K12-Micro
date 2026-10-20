@@ -3545,6 +3545,7 @@
     "SHELF_RANGE": "Nhóm DDC",
     "SHELF_SUBJECT": "Chủ đề",
     "SHELF_CAPACITY": "Sức chứa (bản)",
+    "SHELF_STORE": "Kho (gợi ý, không phải dẫn đường định sách)",
     "SHELF_DESCRIPTION": "Mô tả",
     "EQUIPMENT_TITLE": "Thiết bị ({{count}})",
     "QUANTITY": "Số lượng",

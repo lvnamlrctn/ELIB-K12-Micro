@@ -177,6 +177,14 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
             e.HasOne<MapFloor>().WithMany().HasForeignKey(x => x.FloorId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<StoreReplica>(e =>
+        {
+            e.ToTable("store_replicas");
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.HasIndex(x => new { x.TenantId, x.StorePublicId }).IsUnique();
+        });
+
         modelBuilder.AddTenantReplica();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);

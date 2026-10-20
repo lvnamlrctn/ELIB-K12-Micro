@@ -526,8 +526,10 @@ export interface SpaceFixture {
   code: string; name: string; objectType: string;
   positionX: number | null; positionY: number | null; width: number | null; height: number | null; colorHex: string | null; iconName: string | null;
   shelfCategoryRange: string | null; shelfSubjectName: string | null; shelfCapacity: number | null; shelfDescription: string | null;
-  storePublicId: string | null; status: number; createdAt: string; updatedAt: string | null;
+  storePublicId: string | null; storeName: string | null; status: number; createdAt: string; updatedAt: string | null;
 }
+/** Kho vật lý (bản sao từ Holdings, StoreChanged) — gợi ý khi đặt giá sách, chỉ là thông tin mô tả. */
+export interface SpaceStoreOption { storePublicId: string; code: string; name: string; }
 /** Thiết bị gắn theo một vật dụng (monolith: map.MapEquipment). */
 export interface SpaceFixtureEquipment {
   id: number; publicId: string; fixtureId: number; name: string; description: string | null; quantity: number | null; conditionStatus: number;
@@ -1218,6 +1220,7 @@ export class Api {
   placeSpaceFixture(publicId: string, body: { positionX: number | null; positionY: number | null; width: number | null; height: number | null }) {
     return this.post<SpaceFixture>(`/api/admin/space/fixtures/${publicId}/Place`, body);
   }
+  spaceStores() { return this.get<SpaceStoreOption[]>('/api/admin/space/stores'); }
 
   searchSpaceBookings(body: SpaceBookingSearch) { return this.post<CrudPage<SpaceBooking>>('/api/admin/space/bookings/Search', body); }
   spaceBooking(publicId: string) { return this.get<SpaceBooking>(`/api/admin/space/bookings/GetById/${publicId}`); }

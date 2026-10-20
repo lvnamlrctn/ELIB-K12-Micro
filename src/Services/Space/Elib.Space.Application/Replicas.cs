@@ -1,6 +1,7 @@
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Space.Domain;
+using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Patron;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,4 +75,22 @@ public sealed class Replicas(ICrudDbContext db, IReplicaSources sources, ITenant
     }
 
     private static string? Cut(string? value, int max) => value is null ? null : value.Length <= max ? value : value[..max];
+
+    /// <summary>Upsert kho. Chưa lưu — nơi gọi SaveChanges. Không Version như bạn đọc — ghi đè theo lần phát gần nhất (xem StoreReplica).</summary>
+    public async Task<StoreReplica> ApplyAsync(StoreChanged e, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        var r = await db.Set<StoreReplica>().FirstOrDefaultAsync(x => x.StorePublicId == e.StorePublicId, ct);
+        if (r is null) db.Set<StoreReplica>().Add(r = new StoreReplica { StorePublicId = e.StorePublicId });
+        r.Code = Cut(e.Code, 20) ?? "";
+        r.Name = Cut(e.Name, 250) ?? "";
+        r.Deleted = e.Deleted;
+        return r;
+    }
+
+    /// <summary>Danh sách kho (chưa xoá) cho dropdown khi đặt giá sách trên sơ đồ tầng.</summary>
+    public Task<List<StoreOptionDto>> StoresAsync(CancellationToken ct) => db.Set<StoreReplica>().AsNoTracking().Where(x => !x.Deleted)
+        .OrderBy(x => x.Code).Select(x => new StoreOptionDto(x.StorePublicId, x.Code, x.Name)).ToListAsync(ct);
 }
+
+public sealed record StoreOptionDto(Guid StorePublicId, string Code, string Name);

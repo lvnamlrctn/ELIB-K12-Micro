@@ -71,6 +71,11 @@ type Elib.Contracts.Events.Holdings.ItemChanged class : Elib.Contracts.Events.In
   StoreId : Nullable<System.Int64>
   StoreName : System.String?
   Version : System.Int64
+type Elib.Contracts.Events.Holdings.StoreChanged class : Elib.Contracts.Events.IntegrationEvent
+  Code : System.String required
+  Deleted : System.Boolean
+  Name : System.String required
+  StorePublicId : System.Guid required
 type Elib.Contracts.Events.IntegrationEvent abstract
   Actor : Elib.Contracts.Events.EventActor
   EventId : System.Guid

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   Api, SPACE_CATEGORIES, SPACE_CONDITION_STATUSES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture,
-  SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceRoom, errorMessage,
+  SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceRoom, SpaceStoreOption, errorMessage,
 } from '../../core/api';
 import { Loading, Modal } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
@@ -25,6 +25,7 @@ interface RoomForm { code: string; name: string; kind: number; category: number;
 interface FixtureForm {
   code: string; name: string; objectType: string; colorHex: string | null; iconName: string | null;
   shelfCategoryRange: string | null; shelfSubjectName: string | null; shelfCapacity: number | null; shelfDescription: string | null;
+  storePublicId: string | null;
 }
 
 type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: SpaceFixture };
@@ -152,7 +153,8 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
                 @if (sel.item.objectType === 'SHELF') {
                   @if (sel.item.shelfCategoryRange) { <div class="text-xs text-gray-500">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_RANGE' | translate }}: {{ sel.item.shelfCategoryRange }}</div> }
                   @if (sel.item.shelfSubjectName) { <div class="text-xs text-gray-500">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_SUBJECT' | translate }}: {{ sel.item.shelfSubjectName }}</div> }
-                  @if (sel.item.shelfCapacity) { <div class="text-xs text-gray-500 mb-2">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_CAPACITY' | translate }}: {{ sel.item.shelfCapacity }}</div> }
+                  @if (sel.item.shelfCapacity) { <div class="text-xs text-gray-500">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_CAPACITY' | translate }}: {{ sel.item.shelfCapacity }}</div> }
+                  @if (sel.item.storeName) { <div class="text-xs text-gray-500 mb-2">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_STORE' | translate }}: {{ sel.item.storeName }}</div> }
                 }
               }
               <div class="flex gap-2 mt-2">
@@ -233,6 +235,13 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
               <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_RANGE' | translate }}</label><input class="input" [(ngModel)]="f.shelfCategoryRange" name="shelfCategoryRange" placeholder="000 - 099" /></div>
               <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_SUBJECT' | translate }}</label><input class="input" [(ngModel)]="f.shelfSubjectName" name="shelfSubjectName" /></div>
               <div><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_CAPACITY' | translate }}</label><input type="number" class="input" [(ngModel)]="f.shelfCapacity" name="shelfCapacity" min="0" /></div>
+              <div>
+                <label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_STORE' | translate }}</label>
+                <select class="input" [(ngModel)]="f.storePublicId" name="storePublicId">
+                  <option [ngValue]="null">{{ 'COMMON.SELECT' | translate }}</option>
+                  @for (s of storeOptions(); track s.storePublicId) { <option [ngValue]="s.storePublicId">{{ s.code }} — {{ s.name }}</option> }
+                </select>
+              </div>
               <div class="sm:col-span-2"><label class="form-label">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_DESCRIPTION' | translate }}</label><textarea class="input" [(ngModel)]="f.shelfDescription" name="shelfDescription" rows="2"></textarea></div>
             </div>
           }
@@ -344,6 +353,7 @@ export class SpaceFloorMapEditor implements OnInit {
   protected utilityQty: number | null = null;
   protected utilityStatus = 1;
   protected utilityDesc = '';
+  protected readonly storeOptions = signal<SpaceStoreOption[]>([]);
 
   protected readonly floorsOfBuilding = () => this.floors().filter((f) => f.buildingId === this.buildingId());
   protected readonly placedRooms = () => this.rooms().filter((r) => r.positionX !== null && r.positionY !== null);
@@ -355,6 +365,7 @@ export class SpaceFloorMapEditor implements OnInit {
   async ngOnInit(): Promise<void> {
     this.buildings.set(await this.api.crud<SpaceBuilding>('buildings', 'space').searchAll());
     this.floors.set(await this.api.crud<SpaceFloor>('floors', 'space').searchAll());
+    this.storeOptions.set(await this.api.spaceStores());
   }
 
   protected fixtureIcon(objectType: string): string {
@@ -418,7 +429,7 @@ export class SpaceFloorMapEditor implements OnInit {
     } else {
       this.fixtureForm.set({
         code: '', name: '', objectType: kind, colorHex: null, iconName: this.fixtureIcon(kind),
-        shelfCategoryRange: null, shelfSubjectName: null, shelfCapacity: kind === 'SHELF' ? 100 : null, shelfDescription: null, x, y,
+        shelfCategoryRange: null, shelfSubjectName: null, shelfCapacity: kind === 'SHELF' ? 100 : null, shelfDescription: null, storePublicId: null, x, y,
       });
     }
   }
@@ -435,6 +446,7 @@ export class SpaceFloorMapEditor implements OnInit {
       this.fixtureForm.set({
         publicId: x.publicId, code: x.code, name: x.name, objectType: x.objectType, colorHex: x.colorHex, iconName: x.iconName,
         shelfCategoryRange: x.shelfCategoryRange, shelfSubjectName: x.shelfSubjectName, shelfCapacity: x.shelfCapacity, shelfDescription: x.shelfDescription,
+        storePublicId: x.storePublicId,
       });
       this.equipmentName = '';
       this.equipmentQty = null;
@@ -559,7 +571,7 @@ export class SpaceFloorMapEditor implements OnInit {
         const created = await this.api.crud<SpaceFixture>('fixtures', 'space').add({
           floorId: floor.id, code: f.code, name: f.name, objectType: f.objectType, colorHex: f.colorHex, iconName: f.iconName,
           shelfCategoryRange: f.shelfCategoryRange, shelfSubjectName: f.shelfSubjectName, shelfCapacity: f.shelfCapacity,
-          shelfDescription: f.shelfDescription, storePublicId: null,
+          shelfDescription: f.shelfDescription, storePublicId: f.storePublicId,
         });
         const placed = await this.api.placeSpaceFixture(created.publicId, { positionX: f.x!, positionY: f.y!, width: DEFAULT_SIZE, height: DEFAULT_SIZE });
         this.fixtures.set([...this.fixtures(), placed]);

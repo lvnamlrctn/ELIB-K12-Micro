@@ -20,7 +20,7 @@ public sealed record FixtureRequest(
 public sealed record FixtureDto(
     long Id, Guid PublicId, long FloorId, string? FloorName, long? BuildingId, string? BuildingName, string Code, string Name, string ObjectType,
     double? PositionX, double? PositionY, double? Width, double? Height, string? ColorHex, string? IconName,
-    string? ShelfCategoryRange, string? ShelfSubjectName, int? ShelfCapacity, string? ShelfDescription, Guid? StorePublicId,
+    string? ShelfCategoryRange, string? ShelfSubjectName, int? ShelfCapacity, string? ShelfDescription, Guid? StorePublicId, string? StoreName,
     int Status, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 public sealed record PlaceFixtureRequest(double? PositionX, double? PositionY, double? Width, double? Height);
@@ -42,6 +42,7 @@ public sealed class FixtureResource(ICrudDbContext db) : CrudResource<FixtureRes
             .Select(b => b.Name).FirstOrDefault(),
         x.Code, x.Name, x.ObjectType, x.PositionX, x.PositionY, x.Width, x.Height, x.ColorHex, x.IconName,
         x.ShelfCategoryRange, x.ShelfSubjectName, x.ShelfCapacity, x.ShelfDescription, x.StorePublicId,
+        x.StorePublicId == null ? null : Db.Set<StoreReplica>().Where(s => s.StorePublicId == x.StorePublicId).Select(s => s.Name).FirstOrDefault(),
         x.Status, x.CreatedAt, x.UpdatedAt);
 
     protected override MapFixture Create(FixtureRequest request) => MapFixture.Create(
@@ -78,6 +79,8 @@ public sealed class FixtureResource(ICrudDbContext db) : CrudResource<FixtureRes
             throw new BusinessRuleException("FLOOR_NOT_FOUND", "Tầng đã chọn không còn.");
         if (await Set.AnyAsync(x => x.Code == entity.Code && x.Id != entity.Id, ct))
             throw new ConflictException("FIXTURE_CODE_EXISTS", $"Mã vật dụng '{entity.Code}' đã có.");
+        if (entity.StorePublicId is { } storeId && !await Db.Set<StoreReplica>().AnyAsync(s => s.StorePublicId == storeId && !s.Deleted, ct))
+            throw new BusinessRuleException("STORE_NOT_FOUND", "Kho đã chọn không còn.");
     }
 
     /// <summary>Đặt vị trí trên sơ đồ tầng (trang sơ đồ trực quan) — không đi qua UpdateAsync/form cấu hình thường.</summary>

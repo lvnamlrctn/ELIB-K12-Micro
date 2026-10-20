@@ -5,6 +5,7 @@ using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Messaging;
 using Elib.Space.Application;
+using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Patron;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,19 @@ public sealed class ReaderChangedConsumer(Replicas replicas, ICrudDbContext db, 
     protected override string? RequiredModule => "SPACE";
 
     protected override async Task HandleAsync(ReaderChanged message, ConsumeContext<ReaderChanged> context)
+    {
+        await replicas.ApplyAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Bản sao kho vật lý theo event của holdings (chỉ đơn vị có license SPACE) — gợi ý kho khi đặt giá sách.</summary>
+public sealed class StoreChangedConsumer(Replicas replicas, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<StoreChangedConsumer> logger)
+    : ElibConsumer<StoreChanged>(licenses, logger)
+{
+    protected override string? RequiredModule => "SPACE";
+
+    protected override async Task HandleAsync(StoreChanged message, ConsumeContext<StoreChanged> context)
     {
         await replicas.ApplyAsync(message, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);

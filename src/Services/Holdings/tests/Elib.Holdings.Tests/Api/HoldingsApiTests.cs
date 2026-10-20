@@ -73,6 +73,26 @@ public sealed class HoldingsApiTests : IClassFixture<HoldingsApiFactory>, IAsync
     private static async Task<StoreDto> AddStore(HttpClient staff, string code) =>
         await Read<StoreDto>(await staff.PostAsJsonAsync(U("/api/stores/Add"), new StoreRequest(code, "Kho " + code), Json));
 
+    /// <summary>Space giữ bản sao Store để gợi ý kho khi đặt giá sách trên sơ đồ tầng (StoreChanged, xem docs 02).</summary>
+    [Fact]
+    public async Task Store_changes_publish_StoreChanged_for_space_to_replicate()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+
+        var store = await AddStore(staff, "KS01");
+        var created = _factory.PublishedOf<StoreChanged>().Single(e => e.TenantId == tenantId && e.StorePublicId == store.PublicId);
+        Assert.Equal(("KS01", "Kho KS01", false), (created.Code, created.Name, created.Deleted));
+
+        await staff.PutAsJsonAsync(U($"/api/stores/Update/{store.PublicId}"), new StoreRequest("KS01", "Kho sách mới"), Json);
+        var updated = _factory.PublishedOf<StoreChanged>().Where(e => e.StorePublicId == store.PublicId).OrderByDescending(e => e.OccurredAt).First();
+        Assert.Equal("Kho sách mới", updated.Name);
+
+        await staff.DeleteAsync(U($"/api/stores/Delete/{store.PublicId}"));
+        var deleted = _factory.PublishedOf<StoreChanged>().Where(e => e.StorePublicId == store.PublicId).OrderByDescending(e => e.OccurredAt).First();
+        Assert.True(deleted.Deleted);
+    }
+
     [Fact]
     public async Task New_tenant_gets_default_store_types_and_a_common_store()
     {

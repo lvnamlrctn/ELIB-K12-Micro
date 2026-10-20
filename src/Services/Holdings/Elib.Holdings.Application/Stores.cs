@@ -42,7 +42,7 @@ public sealed record StoreDto(
     DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Kho (monolith: StoreController, quyền STORES). Mã kho duy nhất trong đơn vị; kho còn bản sách thì không xoá được.</summary>
-public sealed class StoreResource(ICrudDbContext db) : CrudResource<StoreResource, Store, CrudSearch, StoreRequest, StoreDto>(db)
+public sealed class StoreResource(ICrudDbContext db, StoreEvents events) : CrudResource<StoreResource, Store, CrudSearch, StoreRequest, StoreDto>(db)
 {
     public const string DefaultCode = "KC";
 
@@ -82,6 +82,9 @@ public sealed class StoreResource(ICrudDbContext db) : CrudResource<StoreResourc
         var count = await Db.Set<Item>().CountAsync(i => i.StoreId == entity.Id, ct);
         if (count > 0) throw new ConflictException("STORE_NOT_EMPTY", $"Kho {entity.Code} còn {count} bản sách — chuyển kho hết rồi mới xoá được.");
     }
+
+    protected override async Task OnSavingAsync(Store entity, CrudChange change, CancellationToken ct) =>
+        await events.PublishAsync(entity, change == CrudChange.Deleted, ct);
 
     /// <summary>Đơn vị mới: một kho chung để đăng ký cá biệt được ngay.</summary>
     public async Task<bool> AddDefaultAsync(CancellationToken ct)
