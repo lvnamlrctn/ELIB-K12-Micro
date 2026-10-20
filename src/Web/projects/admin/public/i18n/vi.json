@@ -212,6 +212,7 @@
     "SPACE_GROUP": "Không gian & đặt phòng",
     "SPACE_BOOKINGS": "Yêu cầu đặt phòng",
     "SPACE_FLOOR_MAP": "Sơ đồ tầng",
+    "SPACE_LOCKER_DESK": "Mượn/trả tủ",
     "SPACE_ROOMS": "Không gian/phòng",
     "SPACE_FLOORS": "Tầng",
     "SPACE_BUILDINGS": "Toà nhà",
@@ -3562,6 +3563,22 @@
     "LOCKER_SCAN_CARD": "Số thẻ bạn đọc (để mượn)",
     "LOCKER_OCCUPIED": "Đang mượn",
     "LOCKER_FREE": "Trống"
+  },
+  "SPACE_LOCKER_DESK_PAGE": {
+    "TITLE": "Mượn/trả tủ",
+    "CARD": "Số thẻ bạn đọc",
+    "CARD_PH": "Gõ hoặc quét số thẻ",
+    "COMPARTMENT": "Mã ngăn tủ",
+    "COMPARTMENT_PH": "Gõ hoặc quét mã ngăn",
+    "READY_TO_SCAN": "Đã nhận thẻ — quét ngăn tủ",
+    "CURRENTLY_HOLDING": "Đang giữ:",
+    "HOLDING_NONE": "Chưa giữ ngăn tủ nào.",
+    "SCAN_CARD_FIRST": "Quét số thẻ bạn đọc để bắt đầu.",
+    "RECENT": "Hoạt động gần đây",
+    "BORROWED": "Đang mượn",
+    "RETURNED": "Đã trả",
+    "BORROW_DONE": "Đã mượn ngăn {{code}}.",
+    "RETURN_DONE": "Đã trả ngăn {{code}}."
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Yêu cầu đặt phòng",

@@ -212,6 +212,7 @@
     "SPACE_GROUP": "Space & Room Booking",
     "SPACE_BOOKINGS": "Booking Requests",
     "SPACE_FLOOR_MAP": "Floor Map",
+    "SPACE_LOCKER_DESK": "Locker Borrow/Return",
     "SPACE_ROOMS": "Rooms/Spaces",
     "SPACE_FLOORS": "Floors",
     "SPACE_BUILDINGS": "Buildings",
@@ -3562,6 +3563,22 @@
     "LOCKER_SCAN_CARD": "Reader card number (to borrow)",
     "LOCKER_OCCUPIED": "Borrowed",
     "LOCKER_FREE": "Free"
+  },
+  "SPACE_LOCKER_DESK_PAGE": {
+    "TITLE": "Locker Borrow/Return",
+    "CARD": "Reader card number",
+    "CARD_PH": "Type or scan the card number",
+    "COMPARTMENT": "Compartment code",
+    "COMPARTMENT_PH": "Type or scan the compartment code",
+    "READY_TO_SCAN": "Reader loaded — scan a compartment",
+    "CURRENTLY_HOLDING": "Currently holding:",
+    "HOLDING_NONE": "Not holding any compartment.",
+    "SCAN_CARD_FIRST": "Scan the reader's card number to start.",
+    "RECENT": "Recent activity",
+    "BORROWED": "Borrowed",
+    "RETURNED": "Returned",
+    "BORROW_DONE": "Borrowed compartment {{code}}.",
+    "RETURN_DONE": "Returned compartment {{code}}."
   },
   "SPACE_BOOKINGS_PAGE": {
     "TITLE": "Booking Requests",

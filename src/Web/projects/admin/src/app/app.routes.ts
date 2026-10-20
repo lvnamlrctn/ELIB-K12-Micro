@@ -195,6 +195,7 @@ export const routes: Routes = [
       catalog('space-floors', SPACE_FLOORS),
       catalog('space-rooms', SPACE_ROOMS),
       { path: 'space-floor-map', loadComponent: () => import('./pages/space/floor-map-editor').then((m) => m.SpaceFloorMapEditor), canActivate: [tenantGuard, permissionGuard('SPACE_ROOMS')], title: 'SPACE_FLOOR_MAP_PAGE.TITLE' },
+      { path: 'space-locker-desk', loadComponent: () => import('./pages/space/locker-desk').then((m) => m.SpaceLockerDesk), canActivate: [tenantGuard, permissionGuard('SPACE_LOCKER_LOANS')], title: 'SPACE_LOCKER_DESK_PAGE.TITLE' },
       { path: 'space-bookings', loadComponent: () => import('./pages/space/bookings').then((m) => m.SpaceBookings), canActivate: [tenantGuard, permissionGuard('SPACE_BOOKINGS')], title: 'SPACE_BOOKINGS_PAGE.TITLE' },
       { path: 'space-bans', loadComponent: () => import('./pages/space/bans').then((m) => m.SpaceBans), canActivate: [tenantGuard, permissionGuard('SPACE_BANS')], title: 'SPACE_BANS_PAGE.TITLE' },
       { path: 'space-hours', loadComponent: () => import('./pages/space/hours').then((m) => m.SpaceHours), canActivate: [tenantGuard, permissionGuard('SPACE_HOURS')], title: 'SPACE_HOURS_PAGE.TITLE' },

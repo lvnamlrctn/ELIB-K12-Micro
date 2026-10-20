@@ -167,6 +167,7 @@ export class Menu {
         children: [
           { title: 'MENU.SPACE_BOOKINGS', icon: 'event_available', link: '/space-bookings', perm: 'SPACE_BOOKINGS' },
           { title: 'MENU.SPACE_FLOOR_MAP', icon: 'map', link: '/space-floor-map', perm: 'SPACE_ROOMS' },
+          { title: 'MENU.SPACE_LOCKER_DESK', icon: 'lock_open', link: '/space-locker-desk', perm: 'SPACE_LOCKER_LOANS' },
           { title: 'MENU.SPACE_ROOMS', icon: 'meeting_room', link: '/space-rooms', perm: 'SPACE_ROOMS' },
           { title: 'MENU.SPACE_FLOORS', icon: 'layers', link: '/space-floors', perm: 'SPACE_FLOORS' },
           { title: 'MENU.SPACE_BUILDINGS', icon: 'apartment', link: '/space-buildings', perm: 'SPACE_BUILDINGS' },
