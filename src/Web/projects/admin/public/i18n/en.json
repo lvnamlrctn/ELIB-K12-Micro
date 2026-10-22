@@ -330,7 +330,10 @@
     "EXHIBITION_LOCATIONS": "Exhibition locations",
     "PRINT_LABELS": "Print labels",
     "ACQUISITION_GROUP": "Acquisitions",
-    "ACQ_REPORTS": "Acquisition reports"
+    "ACQ_REPORTS": "Acquisition reports",
+    "DIGITAL_METADATA_SCHEMAS": "Metadata schemas",
+    "DIGITAL_METADATA_FIELDS": "Metadata fields",
+    "DIGITAL_READING": "Reading tracking"
   },
   "HEADER": {
     "LANG_ALT": "language",
@@ -3559,7 +3562,10 @@
     "ADD_FILE": "Add file",
     "UPLOADING": "Uploading…",
     "NO_FILES": "No attached files yet.",
-    "TITLE_REQUIRED": "Please enter a title."
+    "TITLE_REQUIRED": "Please enter a title.",
+    "METADATA": "Metadata",
+    "ADD_METADATA": "Add row",
+    "METADATA_VALUE": "Value"
   },
   "DIGITAL_LOANS_PAGE": {
     "TITLE": "Digital Loans / Reservations",
@@ -3597,7 +3603,13 @@
     "RATING": "Rating",
     "DISPLAY_NAME": "Reviewer name",
     "EMAIL": "Email",
-    "CONTENT": "Content"
+    "CONTENT": "Content",
+    "APPROVE": "Approve review",
+    "REJECT": "Reject review",
+    "REASON": "Rejection reason",
+    "REJECT_REASON": "Rejection reason",
+    "APPROVED": "Review approved.",
+    "REJECTED": "Review rejected."
   },
   "DIGITAL_SUBMISSIONS_PAGE": {
     "TITLE": "Reader document submissions",
@@ -4007,5 +4019,41 @@
     "ISSUED": "Fee created.",
     "CASHED": "Cash payment recorded.",
     "CANCELLED": "Fee cancelled."
+  },
+  "DIGITAL_METADATA": {
+    "SCHEMAS_TITLE": "Digital item metadata schemas",
+    "FIELDS_TITLE": "Digital item metadata fields",
+    "SHORT_ID": "Short id",
+    "NAMESPACE": "Namespace",
+    "SCHEMA": "Schema",
+    "FIELD": "Field",
+    "SUBFIELD": "Subfield",
+    "INPUT": "Input type",
+    "INPUT_TEXT": "Short text",
+    "INPUT_TEXTAREA": "Long text",
+    "INPUT_DATE": "Date (yyyy, yyyy-MM, yyyy-MM-dd)",
+    "INPUT_NUMBER": "Number"
+  },
+  "READING_PAGE": {
+    "TITLE": "Digital reading tracking",
+    "FROM": "From",
+    "TO": "To",
+    "VIEW": "View",
+    "SESSIONS": "Reading sessions",
+    "READERS": "Readers",
+    "EBOOKS": "Items",
+    "HOURS": "Reading hours",
+    "VIEWS": "Views",
+    "DOWNLOADS": "Downloads",
+    "PER_DAY": "Sessions per day",
+    "TOP_EBOOKS": "Most read items",
+    "TOP_READERS": "Top readers",
+    "EBOOK": "Item",
+    "READER": "Reader",
+    "MINUTES": "Minutes",
+    "LIST": "Reading sessions",
+    "STARTED": "Started",
+    "PAGES": "Pages read",
+    "DEVICE": "Device"
   }
 }

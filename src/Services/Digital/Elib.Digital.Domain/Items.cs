@@ -58,6 +58,16 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     public int TotalView { get; private set; }
     public int TotalDownload { get; private set; }
 
+    /// <summary>Tăng mỗi lần nội dung/trạng thái/metadata đổi — dùng làm phiên bản cho sự kiện Ebook* (nơi nhận bỏ bản cũ hơn).</summary>
+    public long Version { get; private set; } = 1;
+
+    /// <summary>Đánh dấu nội dung liên quan (metadata, file) vừa đổi mà không qua <see cref="Update"/>.</summary>
+    public void Touch(DateTimeOffset now)
+    {
+        Version++;
+        LastUpdate = now;
+    }
+
     public void RecordView() => TotalView++;
     public void RecordDownload() => TotalDownload++;
 
@@ -108,9 +118,14 @@ public sealed class EbookItem : TenantEntity, IHasStatus
         LinkedBibPublicId = f.LinkedBibPublicId;
         if (Status != f.Status) ChangeStatus(f.Status);
         LastUpdate = now;
+        Version++;
     }
 
-    public void ChangeStatus(int status) => Status = StatusRules.Validate(status);
+    public void ChangeStatus(int status)
+    {
+        Status = StatusRules.Validate(status);
+        Version++;
+    }
 }
 
 /// <summary>Trường ghi được của tài liệu số qua màn quản trị (LRC: EbookItemRequest + EbookItemXml, không gồm MetaDataEntries — hoãn).</summary>

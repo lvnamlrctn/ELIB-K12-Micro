@@ -205,7 +205,11 @@
       "TRY_OTHER_LIBRARIES": "Tìm \"{{q}}\" ở thư viện khác",
       "ALL_BORROWED": "Đã mượn hết",
       "ELAPSED": "({{ms}} ms)",
-      "PHRASE_HINT": "Đặt cụm từ trong dấu \"...\" để tìm đúng cụm, ví dụ \"lập trình hướng đối tượng\"."
+      "PHRASE_HINT": "Đặt cụm từ trong dấu \"...\" để tìm đúng cụm, ví dụ \"lập trình hướng đối tượng\".",
+      "EBOOKS": "Tài liệu số",
+      "EBOOKS_N": "Tài liệu số ({count})",
+      "EBOOKS_ALL": "Xem tất cả tài liệu số",
+      "EBOOK_FREE": "đọc miễn phí"
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Không tìm thấy tài liệu (có thể đã bị ẩn hoặc xoá).",
@@ -413,6 +417,24 @@
       "KOR": "Tiếng Hàn",
       "GER": "Tiếng Đức",
       "DEU": "Tiếng Đức"
+    },
+    "READER": {
+      "TITLE": "Đọc tài liệu",
+      "BACK": "Quay lại",
+      "PREV": "Trang trước",
+      "NEXT": "Trang sau",
+      "PAGE": "Số trang",
+      "PAGE_N": "Trang {{n}}",
+      "ZOOM_OUT": "Thu nhỏ",
+      "ZOOM_IN": "Phóng to",
+      "BOOKMARK": "Đánh dấu trang",
+      "BOOKMARKS": "Dấu trang",
+      "NO_BOOKMARKS": "Chưa có dấu trang.",
+      "REMOVE": "Xoá dấu trang",
+      "LOADING": "Đang tải tài liệu… {{percent}}%",
+      "LOAD_FAILED": "Không tải được tài liệu.",
+      "TOO_LARGE": "Tài liệu quá lớn để đọc trong trang.",
+      "OPEN_TAB": "Mở ở tab mới"
     }
   },
   "ERRORS": {

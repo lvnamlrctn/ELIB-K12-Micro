@@ -135,6 +135,7 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.Property(x => x.DisplayName).HasMaxLength(EbookReview.MaxDisplayNameLength);
             e.Property(x => x.Content).HasMaxLength(EbookReview.MaxContentLength);
             e.Property(x => x.Email).HasMaxLength(EbookReview.MaxEmailLength);
+            e.Property(x => x.RejectReason).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.Status });
         });
 
@@ -156,6 +157,64 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.Property(x => x.RejectReason).HasMaxLength(DocumentSubmission.MaxReasonLength);
             e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.Status });
+        });
+
+        modelBuilder.Entity<EbookReadSession>(e =>
+        {
+            e.ToTable("ebook_read_sessions");
+            e.Property(x => x.Device).HasMaxLength(40);
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.SessionKey }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.StartedAt });
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.StartedAt });
+        });
+
+        modelBuilder.Entity<EbookReadProgress>(e =>
+        {
+            e.ToTable("ebook_read_progress");
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.EbookItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<EbookBookmark>(e =>
+        {
+            e.ToTable("ebook_bookmarks");
+            e.Property(x => x.Note).HasMaxLength(EbookBookmark.MaxNoteLength);
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.EbookItemId, x.Page }).IsUnique();
+        });
+
+        modelBuilder.Entity<EbookAccessLog>(e =>
+        {
+            e.ToTable("ebook_access_logs");
+            e.Property(x => x.Kind).HasMaxLength(10);
+            e.HasIndex(x => new { x.TenantId, x.At });
+        });
+
+        modelBuilder.Entity<MetadataSchema>(e =>
+        {
+            e.ToTable("metadata_schemas");
+            e.Property(x => x.NameSpace).HasMaxLength(MetadataSchema.MaxLength);
+            e.Property(x => x.ShortId).HasMaxLength(50);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.HasIndex(x => new { x.TenantId, x.ShortId }).IsUnique();
+        });
+
+        modelBuilder.Entity<MetadataField>(e =>
+        {
+            e.ToTable("metadata_fields");
+            e.Property(x => x.Field).HasMaxLength(100);
+            e.Property(x => x.Subfield).HasMaxLength(100);
+            e.Property(x => x.DescriptionVn).HasMaxLength(300);
+            e.Property(x => x.DescriptionEn).HasMaxLength(300);
+            e.Property(x => x.Input).HasMaxLength(20);
+            e.HasIndex(x => new { x.TenantId, x.SchemaId, x.Field, x.Subfield }).IsUnique();
+        });
+
+        modelBuilder.Entity<EbookMetadataValue>(e =>
+        {
+            e.ToTable("ebook_metadata_values");
+            e.Property(x => x.Value).HasMaxLength(EbookMetadataValue.MaxValueLength);
+            e.Property(x => x.Language).HasMaxLength(10);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.FieldId, x.SortOrder });
+            e.HasIndex(x => new { x.TenantId, x.FieldId });
         });
 
         modelBuilder.AddTenantReplica();

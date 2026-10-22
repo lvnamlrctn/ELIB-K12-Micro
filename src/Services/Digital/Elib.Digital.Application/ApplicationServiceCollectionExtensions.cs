@@ -16,9 +16,16 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<PolicyDigitalByCollectionResource>();
         services.AddCrudResource<EbookItemResource>();
         services.AddCrudResource<EbookFileResource>();
+        services.AddCrudResource<MetadataSchemaResource>();
+        services.AddCrudResource<MetadataFieldResource>();
         services.AddScoped<OpacItems>();
         services.AddScoped<OpacCatalogs>();
         services.AddScoped<EbookReaderNotifier>();
+        services.AddScoped<EbookMetadata>();
+        services.AddScoped<EbookStatePublisher>();
+        services.AddScoped<ReaderReading>();
+        services.AddScoped<ReaderBookmarks>();
+        services.AddScoped<ReadingTracking>();
         services.AddScoped<EbookReservationAllocator>();
         services.AddCrudResource<EbookLoanResource>();
         services.AddCrudResource<EbookReservationResource>();

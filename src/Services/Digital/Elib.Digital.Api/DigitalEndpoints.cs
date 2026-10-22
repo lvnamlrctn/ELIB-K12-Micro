@@ -1,6 +1,8 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Tenancy;
+using Elib.Contracts.Events.Digital;
+using Elib.Contracts.Events.Platform;
 using Elib.Digital.Application;
 
 namespace Elib.Digital.Api;
@@ -25,7 +27,24 @@ public static class DigitalEndpoints
         api.MapCrud<PolicyDigitalByCollectionResource>("/policies-by-collection", "DIGITAL_POLICIES_BY_COLLECTION").WithTags("PoliciesByCollection");
         var items = api.MapCrud<EbookItemResource>("/items", "DIGITAL_ITEMS").WithTags("Items");
         api.MapCrud<EbookFileResource>("/files", "DIGITAL_ITEMS").WithTags("Files");
-        api.MapCrud<EbookReviewResource>("/reviews", "DIGITAL_REVIEWS").WithTags("Reviews");
+        var reviews = api.MapCrud<EbookReviewResource>("/reviews", "DIGITAL_REVIEWS").WithTags("Reviews");
+        reviews.MapPost("/{publicId:guid}/Approve", [Permission("DIGITAL_REVIEWS", "approve")] (Guid publicId, EbookReviewResource r, ICurrentActor actor, CancellationToken ct)
+            => r.ApproveAsync(publicId, actor.Id, ct));
+        reviews.MapPost("/{publicId:guid}/Reject", [Permission("DIGITAL_REVIEWS", "approve")] (Guid publicId, RejectReviewRequest request, EbookReviewResource r, ICurrentActor actor, CancellationToken ct)
+            => r.RejectAsync(publicId, request, actor.Id, ct));
+
+        // Theo dõi đọc (LRC: ReadingTrackingController) — thủ thư xem lượt đọc và thống kê.
+        var reading = api.MapGroup("/reading-tracking").WithTags("ReadingTracking");
+        reading.MapPost("/Search", [Permission("DIGITAL_READING", "view")] (ReadingSearch search, ReadingTracking t, CancellationToken ct) => t.SearchAsync(search, ct));
+        reading.MapPost("/Statistics", [Permission("DIGITAL_READING", "view")] (ReadingStatsRequest request, ReadingTracking t, CancellationToken ct) => t.StatisticsAsync(request, ct));
+
+        api.MapCrud<MetadataSchemaResource>("/metadata-schemas", "DIGITAL_METADATA").WithTags("Metadata");
+        api.MapCrud<MetadataFieldResource>("/metadata-fields", "DIGITAL_METADATA").WithTags("Metadata");
+        // Metadata của một tài liệu số: đọc/đặt lại cả danh sách — cùng quyền với sửa tài liệu số.
+        items.MapGet("/{publicId:guid}/metadata", [Permission("DIGITAL_ITEMS", "view")] (Guid publicId, EbookMetadata metadata, CancellationToken ct)
+            => metadata.GetAsync(publicId, ct));
+        items.MapPut("/{publicId:guid}/metadata", [Permission("DIGITAL_ITEMS", "edit")] (Guid publicId, EbookMetadataSave save, EbookMetadata metadata, CancellationToken ct)
+            => metadata.ReplaceAsync(publicId, save, ct));
 
         // Ô chọn liên kết sách in của màn thêm/sửa tài liệu số (quyết định #2) — proxy sang catalog, không giữ bản sao.
         items.MapGet("/bib-options", [Permission("DIGITAL_ITEMS", "view")] (string? q, ICatalogBibLookup bibs, CancellationToken ct) =>
@@ -58,6 +77,17 @@ public static class DigitalEndpoints
             => r.ApproveAsync(publicId, actor.Id, ct));
         submissions.MapPost("/Reject", [Permission("DIGITAL_SUBMISSIONS", "edit")] (RejectSubmissionRequest request, DocumentSubmissionResource r, ICurrentActor actor, CancellationToken ct)
             => r.RejectAsync(request, actor.Id, ct));
+
+        // Nội bộ: search dựng chỉ mục lần đầu / dựng lại — trạng thái mọi tài liệu theo Id tăng dần (không qua gateway, chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/ebooks", async (long tenantId, long? after, int? take, ITenantContext tenant, EbookStatePublisher states, CancellationToken ct) =>
+        {
+            var size = Math.Clamp(take ?? 300, 1, EbookStatePublisher.MaxStatePage);
+            using (tenant.Use(tenantId))
+            {
+                var items = await states.StatesAsync(after ?? 0, size, ct);
+                return new StatePage<EbookChanged>(items, items.Count == size ? items[^1].EbookId : null);
+            }
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
         return app;
     }

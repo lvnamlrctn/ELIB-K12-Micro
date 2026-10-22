@@ -49,6 +49,29 @@ public sealed class SearchDbContext(DbContextOptions<SearchDbContext> options, I
             // Chỉ mục trigram (pg_trgm) cho search_text/title_fold/author_fold tạo bằng SQL trong migration — chỉ PostgreSQL.
         });
 
+        modelBuilder.Entity<SearchEbook>(e =>
+        {
+            e.ToTable("search_ebooks");
+            e.Property(x => x.Title).HasMaxLength(1000);
+            e.Property(x => x.Author).HasMaxLength(500);
+            e.Property(x => x.OtherTitle).HasMaxLength(1000);
+            e.Property(x => x.Publisher).HasMaxLength(500);
+            e.Property(x => x.PublishYear).HasMaxLength(4);
+            e.Property(x => x.Keywords).HasMaxLength(2000);
+            e.Property(x => x.Language).HasMaxLength(20);
+            e.Property(x => x.CollectionName).HasMaxLength(250);
+            e.Property(x => x.SubjectName).HasMaxLength(250);
+            e.Property(x => x.TopicName).HasMaxLength(250);
+            e.Property(x => x.TypeName).HasMaxLength(250);
+            e.Property(x => x.CoverUrl).HasMaxLength(1000);
+            e.Property(x => x.TitleFold).HasMaxLength(2000);
+            e.Property(x => x.AuthorFold).HasMaxLength(500);
+            e.Property(x => x.SearchText).HasMaxLength(8000);
+            e.HasIndex(x => new { x.TenantId, x.EbookPublicId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Status, x.Deleted, x.Year });
+            // Chỉ mục trigram cho search_text/title_fold/author_fold tạo bằng SQL trong migration — chỉ PostgreSQL.
+        });
+
         modelBuilder.Entity<SearchItem>(e =>
         {
             e.ToTable("search_items");

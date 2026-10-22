@@ -41,7 +41,7 @@ public sealed record EbookItemDto(
     string? CoverUrl, Guid? LinkedBibPublicId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Tài liệu số (LRC: EbookItemController, quyền DIGITAL_ITEMS) — trang quản trị bespoke (có file đính kèm + liên kết sách in).</summary>
-public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock)
+public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock, EbookStatePublisher states)
     : CrudResource<EbookItemResource, EbookItem, EbookItemSearch, EbookItemFields, EbookItemDto>(db)
 {
     private readonly DigitalOptions _options = options.Value;
@@ -86,8 +86,34 @@ public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, 
             throw new BusinessRuleException("DIG_TYPE_NOT_FOUND", "Loại tài liệu số đã chọn không còn.");
     }
 
+    // Mọi thay đổi phát EbookChanged (outbox, cùng transaction) cho search.
+    protected override Task OnSavingAsync(EbookItem entity, CrudChange change, CancellationToken ct) =>
+        change == CrudChange.Added ? Task.CompletedTask : states.PublishAsync(entity, change == CrudChange.Deleted, ct);
+
+    /// <summary>Thêm tài liệu: lưu trước để có Id, rồi phát <see cref="Elib.Contracts.Events.Digital.EbookChanged"/> + nhật ký trong CÙNG transaction
+    /// (khuôn BibResource.AddAsync) — search nhận được Id ngay từ event đầu tiên.</summary>
+    public override async Task<EbookItemDto> AddAsync(EbookItemFields request, CancellationToken ct)
+    {
+        var entity = await CreateAsync(request, ct);
+        await ValidateAsync(entity, ct);
+        var strategy = Db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async token =>
+        {
+            await using var transaction = await Db.Database.BeginTransactionAsync(token);
+            if (Set.Entry(entity).State == EntityState.Detached) Set.Add(entity);
+            await Db.SaveChangesAsync(token);
+            await states.PublishAsync(entity, deleted: false, token);
+            await AuditAsync(entity, CrudChange.Added, token);
+            await Db.SaveChangesAsync(token);
+            await transaction.CommitAsync(token);
+        }, ct);
+        return ToDto(entity);
+    }
+
     protected override async Task EnsureDeletableAsync(EbookItem entity, CancellationToken ct)
     {
+        // Metadata là con của tài liệu: xoá cùng lần lưu (không chặn xoá).
+        Db.Set<EbookMetadataValue>().RemoveRange(await Db.Set<EbookMetadataValue>().Where(v => v.EbookItemId == entity.Id).ToListAsync(ct));
         if (await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == entity.Id, ct))
             throw new ConflictException("EBOOK_ITEM_HAS_FILES", $"Tài liệu số '{entity.Title}' còn file đính kèm — xoá file trước.");
     }
@@ -110,8 +136,20 @@ public sealed class EbookFileSearch : CrudSearch
 /// File đính kèm của tài liệu số (LRC: EbookFileController, cùng quyền DIGITAL_ITEMS — file là con của tài liệu số, không có quyền riêng).
 /// Nội dung đã upload trực tiếp lên media từ trình quản trị (purpose <c>ebook-file</c>) trước khi gọi Add — chỉ lưu tham chiếu ở đây.
 /// </summary>
-public sealed class EbookFileResource(ICrudDbContext db) : CrudResource<EbookFileResource, EbookFile, EbookFileSearch, EbookFileRequest, EbookFileDto>(db)
+public sealed class EbookFileResource(ICrudDbContext db, EbookStatePublisher states, TimeProvider clock)
+    : CrudResource<EbookFileResource, EbookFile, EbookFileSearch, EbookFileRequest, EbookFileDto>(db)
 {
+    // Thêm/xoá file đổi "có file để đọc" của tài liệu → tăng phiên bản và phát lại trạng thái cho search.
+    protected override async Task OnSavingAsync(EbookFile entity, CrudChange change, CancellationToken ct)
+    {
+        if (change is not (CrudChange.Added or CrudChange.Deleted)) return;
+        var item = await Db.Set<EbookItem>().FirstOrDefaultAsync(i => i.Id == entity.EbookItemId, ct);
+        if (item is null) return;
+        var hasFile = change == CrudChange.Added || await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == item.Id && f.Id != entity.Id, ct);
+        item.Touch(clock.GetUtcNow());
+        await states.PublishAsync(item, false, ct, hasFile: hasFile);
+    }
+
     protected override string EntityName => "File tài liệu số";
 
     protected override string? Describe(EbookFile entity) => entity.FileExt is { } ext ? $"file #{entity.Id}.{ext}" : $"file #{entity.Id}";

@@ -415,6 +415,7 @@ services:
       Catalog__Url: http://catalog:8080
       Holdings__Url: http://holdings:8080
       Circulation__Url: http://circulation:8080
+      Digital__Url: http://digital:8080
 
   # GĐ2 (làm sớm): tài liệu số — danh mục/chính sách/biểu ghi + mượn/trả/đặt trước; bản sao bạn đọc (thiếu thì hỏi patron).
   digital:

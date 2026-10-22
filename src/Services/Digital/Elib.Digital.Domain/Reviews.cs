@@ -22,6 +22,12 @@ public sealed class EbookReview : TenantEntity, IHasStatus
     public string? Email { get; private set; }
     public int Status { get; private set; } = IHasStatus.Inactive;
 
+    /// <summary>Từ chối: vẫn Status=Inactive (không hiện công khai) nhưng có RejectedAt — phân biệt với "Chờ duyệt" (RejectedAt null).</summary>
+    public DateTimeOffset? ReviewedAt { get; private set; }
+    public long? ReviewedBy { get; private set; }
+    public DateTimeOffset? RejectedAt { get; private set; }
+    public string? RejectReason { get; private set; }
+
     public static EbookReview Submit(long ebookItemId, int? rating, string? displayName, string? content, string? email)
     {
         var review = new EbookReview { EbookItemId = ebookItemId };
@@ -37,7 +43,38 @@ public sealed class EbookReview : TenantEntity, IHasStatus
         Email = TextRules.Optional(email, MaxEmailLength, "EMAIL_INVALID", "Email");
     }
 
-    public void ChangeStatus(int status) => Status = StatusRules.Validate(status);
+    public void ChangeStatus(int status)
+    {
+        Status = StatusRules.Validate(status);
+        if (Status == IHasStatus.Active) ClearRejection();
+    }
+
+    /// <summary>Duyệt — hiện công khai. Gọi lại khi đã duyệt không đổi gì.</summary>
+    public void Approve(long? actorId, DateTimeOffset now)
+    {
+        if (Status == IHasStatus.Active) return;
+        Status = IHasStatus.Active;
+        ReviewedAt = now;
+        ReviewedBy = actorId;
+        ClearRejection();
+    }
+
+    /// <summary>Từ chối — lý do bắt buộc; đánh giá đã duyệt cũng gỡ được (ẩn lại).</summary>
+    public void Reject(long? actorId, DateTimeOffset now, string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) throw new BusinessRuleException("REVIEW_REJECT_REASON_REQUIRED", "Phải nêu lý do từ chối đánh giá.");
+        Status = IHasStatus.Inactive;
+        ReviewedAt = now;
+        ReviewedBy = actorId;
+        RejectedAt = now;
+        RejectReason = TextRules.Optional(reason, 500, "REJECT_REASON_INVALID", "Lý do từ chối");
+    }
+
+    private void ClearRejection()
+    {
+        RejectedAt = null;
+        RejectReason = null;
+    }
 }
 
 /// <summary>

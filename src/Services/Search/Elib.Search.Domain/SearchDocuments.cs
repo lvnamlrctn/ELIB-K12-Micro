@@ -108,6 +108,43 @@ public sealed class SearchBib : Entity, ITenantOwned
 }
 
 /// <summary>
+/// Tài liệu số trong chỉ mục (read model, ghi từ EbookChanged của digital, chỉ khi Version lớn hơn bản đang có). Đã xoá giữ dòng với
+/// <see cref="Deleted"/> để event cũ tới muộn không làm sống lại. Chỉ tìm theo metadata — chưa có toàn văn (digital-indexer hoãn).
+/// </summary>
+public sealed class SearchEbook : Entity, ITenantOwned
+{
+    public const int OpacVisible = 2;
+
+    public long TenantId { get; set; }
+    public Guid EbookPublicId { get; set; }
+    public string Title { get; set; } = "";
+    public string? Author { get; set; }
+    public string? OtherTitle { get; set; }
+    public string? Publisher { get; set; }
+    public string? PublishYear { get; set; }
+    public int? Year { get; set; }
+    public string? Keywords { get; set; }
+    public string? Language { get; set; }
+    public string? CollectionName { get; set; }
+    public string? SubjectName { get; set; }
+    public string? TopicName { get; set; }
+    public string? TypeName { get; set; }
+    public string? CoverUrl { get; set; }
+    public bool Free { get; set; }
+    public bool HasFile { get; set; }
+    public Guid? LinkedBibPublicId { get; set; }
+    public int Status { get; set; }
+    public bool Deleted { get; set; }
+    public long Version { get; set; }
+
+    public string TitleFold { get; set; } = "";
+    public string AuthorFold { get; set; } = "";
+    public string SearchText { get; set; } = "";
+    public DateTimeOffset IndexedAt { get; set; }
+    public Guid? SyncRun { get; set; }
+}
+
+/// <summary>
 /// Bản sách trong chỉ mục (ItemChanged từ holdings) + lượt mượn hiện tại (LoanChanged từ circulation) — OPAC hiện số bản, còn bao
 /// nhiêu bản sẵn sàng, kho, hạn trả.
 /// </summary>
@@ -166,5 +203,6 @@ public sealed class SearchSyncState : ITenantOwned
     public int Bibs { get; set; }
     public int Items { get; set; }
     public int Loans { get; set; }
+    public int Ebooks { get; set; }
     public string? Error { get; set; }
 }

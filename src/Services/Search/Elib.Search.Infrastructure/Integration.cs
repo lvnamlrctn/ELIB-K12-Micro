@@ -4,6 +4,7 @@ using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Messaging;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Circulation;
+using Elib.Contracts.Events.Digital;
 using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Platform;
 using Elib.Search.Application;
@@ -47,12 +48,24 @@ public sealed class LoanChangedConsumer(SearchIndex index, ISearchDb db, IModule
     }
 }
 
-/// <summary>Đọc trạng thái theo trang từ /internal của catalog, holdings, circulation (service token của search).</summary>
+/// <summary>Tài liệu số từ digital.</summary>
+public sealed class EbookChangedConsumer(SearchIndex index, ISearchDb db, IModuleLicenseSource licenses, ILogger<EbookChangedConsumer> logger)
+    : ElibConsumer<EbookChanged>(licenses, logger)
+{
+    protected override async Task HandleAsync(EbookChanged message, ConsumeContext<EbookChanged> context)
+    {
+        await index.ApplyAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Đọc trạng thái theo trang từ /internal của catalog, holdings, circulation, digital (service token của search).</summary>
 public sealed class HttpSearchSources(IHttpClientFactory clients) : ISearchSources
 {
     public const string Catalog = "elib-catalog";
     public const string Holdings = "elib-holdings";
     public const string Circulation = "elib-circulation";
+    public const string Digital = "elib-digital";
 
     public Task<StatePage<BibChanged>> BibsAsync(long tenantId, long after, CancellationToken ct) =>
         GetAsync<BibChanged>(Catalog, string.Create(CultureInfo.InvariantCulture, $"internal/tenants/{tenantId}/bibs?after={after}&take=500"), ct);
@@ -62,6 +75,9 @@ public sealed class HttpSearchSources(IHttpClientFactory clients) : ISearchSourc
 
     public Task<StatePage<LoanChanged>> OpenLoansAsync(long tenantId, long after, CancellationToken ct) =>
         GetAsync<LoanChanged>(Circulation, string.Create(CultureInfo.InvariantCulture, $"internal/tenants/{tenantId}/loans/open?after={after}&take=1000"), ct);
+
+    public Task<StatePage<EbookChanged>> EbooksAsync(long tenantId, long after, CancellationToken ct) =>
+        GetAsync<EbookChanged>(Digital, string.Create(CultureInfo.InvariantCulture, $"internal/tenants/{tenantId}/ebooks?after={after}&take=300"), ct);
 
     private async Task<StatePage<T>> GetAsync<T>(string client, string path, CancellationToken ct)
     {

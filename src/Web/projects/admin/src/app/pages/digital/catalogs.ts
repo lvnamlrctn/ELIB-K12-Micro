@@ -113,6 +113,72 @@ export const DIGITAL_POLICIES: CrudConfig = {
   modalWidth: 'max-w-lg',
 };
 
+const METADATA_INPUTS = [
+  { value: 'text', label: 'DIGITAL_METADATA.INPUT_TEXT' },
+  { value: 'textarea', label: 'DIGITAL_METADATA.INPUT_TEXTAREA' },
+  { value: 'date', label: 'DIGITAL_METADATA.INPUT_DATE' },
+  { value: 'number', label: 'DIGITAL_METADATA.INPUT_NUMBER' },
+];
+
+/** Lược đồ metadata (LRC: MetadataSchemaRegistry, quyền DIGITAL_METADATA) — ví dụ Dublin Core. */
+export const DIGITAL_METADATA_SCHEMAS: CrudConfig = {
+  title: 'DIGITAL_METADATA.SCHEMAS_TITLE',
+  resource: 'metadata-schemas',
+  service: 'digital',
+  perm: 'DIGITAL_METADATA',
+  searchLabel: 'COMMON.SEARCH',
+  searchPlaceholder: '',
+  hasStatus: true,
+  columns: [
+    { key: 'shortId', label: 'DIGITAL_METADATA.SHORT_ID', type: 'mono', width: '140px' },
+    { key: 'nameSpace', label: 'DIGITAL_METADATA.NAMESPACE' },
+    { key: 'language', label: 'DIGITAL_CAT.LANGUAGE', width: '100px' },
+    { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' },
+  ],
+  fields: [
+    { key: 'shortId', label: 'DIGITAL_METADATA.SHORT_ID', type: 'text', required: true, half: true },
+    { key: 'language', label: 'DIGITAL_CAT.LANGUAGE', type: 'select', options: LANGUAGE_OPTIONS, emptyLabel: 'COMMON.ALL', half: true },
+    { key: 'nameSpace', label: 'DIGITAL_METADATA.NAMESPACE', type: 'text', required: true },
+  ],
+  defaults: { shortId: '', nameSpace: '', language: null },
+  modalWidth: 'max-w-lg',
+};
+
+/** Trường metadata (LRC: MetaDataFieldRegistery, quyền DIGITAL_METADATA) — Field/Subfield, mô tả vi/en, kiểu nhập. */
+export const DIGITAL_METADATA_FIELDS: CrudConfig = {
+  title: 'DIGITAL_METADATA.FIELDS_TITLE',
+  resource: 'metadata-fields',
+  service: 'digital',
+  perm: 'DIGITAL_METADATA',
+  searchLabel: 'COMMON.SEARCH',
+  searchPlaceholder: '',
+  hasStatus: true,
+  columns: [
+    { key: 'schemaShortId', label: 'DIGITAL_METADATA.SCHEMA', type: 'mono', width: '110px' },
+    { key: 'field', label: 'DIGITAL_METADATA.FIELD', type: 'mono', width: '150px' },
+    { key: 'subfield', label: 'DIGITAL_METADATA.SUBFIELD', type: 'mono', width: '130px' },
+    { key: 'descriptionVn', label: 'DIGITAL_CAT.DESCRIPTION_VN' },
+    { key: 'input', label: 'DIGITAL_METADATA.INPUT', width: '100px' },
+    { key: 'sortOrder', label: 'DIGITAL_CAT.SORT_ORDER', type: 'number', width: '90px' },
+    { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' },
+  ],
+  fields: [
+    {
+      key: 'schemaPublicId', label: 'DIGITAL_METADATA.SCHEMA', type: 'select', required: true,
+      optionsFrom: async (api) =>
+        (await api.crud<{ publicId: string; shortId: string }>('metadata-schemas', 'digital').searchAll()).map((s) => ({ value: s.publicId, label: s.shortId })),
+    },
+    { key: 'sortOrder', label: 'DIGITAL_CAT.SORT_ORDER', type: 'number', half: true },
+    { key: 'field', label: 'DIGITAL_METADATA.FIELD', type: 'text', required: true, half: true },
+    { key: 'subfield', label: 'DIGITAL_METADATA.SUBFIELD', type: 'text', half: true },
+    { key: 'input', label: 'DIGITAL_METADATA.INPUT', type: 'select', options: METADATA_INPUTS, half: true },
+    { key: 'descriptionVn', label: 'DIGITAL_CAT.DESCRIPTION_VN', type: 'text', required: true },
+    { key: 'descriptionEn', label: 'DIGITAL_CAT.DESCRIPTION_EN', type: 'text' },
+  ],
+  defaults: { schemaPublicId: null, field: '', subfield: null, descriptionVn: '', descriptionEn: null, sortOrder: 0, input: 'text', exportField: null },
+  modalWidth: 'max-w-lg',
+};
+
 /** Đánh giá tài liệu số (LRC: EbookReview, quyền DIGITAL_REVIEWS) — bạn đọc gửi ẩn danh qua OPAC, thủ thư duyệt bằng cột trạng thái. */
 export const DIGITAL_REVIEWS: CrudConfig = {
   title: 'DIGITAL_REVIEWS_PAGE.TITLE',
@@ -125,7 +191,19 @@ export const DIGITAL_REVIEWS: CrudConfig = {
     { key: 'itemTitle', label: 'DIGITAL_REVIEWS_PAGE.ITEM' },
     { key: 'rating', label: 'DIGITAL_REVIEWS_PAGE.RATING', width: '90px' },
     { key: 'displayName', label: 'DIGITAL_REVIEWS_PAGE.DISPLAY_NAME' },
+    { key: 'rejectReason', label: 'DIGITAL_REVIEWS_PAGE.REJECT_REASON' },
     { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' },
+  ],
+  rowActions: [
+    {
+      icon: 'check_circle', title: 'DIGITAL_REVIEWS_PAGE.APPROVE', action: 'approve', show: (r) => r['status'] !== 2,
+      run: async (api, row) => { await api.approveEbookReview(row.publicId); return { key: 'DIGITAL_REVIEWS_PAGE.APPROVED' }; },
+    },
+    {
+      icon: 'block', title: 'DIGITAL_REVIEWS_PAGE.REJECT', action: 'approve', show: (r) => !r['rejectedAt'],
+      inputs: [{ key: 'reason', label: 'DIGITAL_REVIEWS_PAGE.REASON' }],
+      run: async (api, row, v) => { await api.rejectEbookReview(row.publicId, v['reason'] ?? ''); return { key: 'DIGITAL_REVIEWS_PAGE.REJECTED' }; },
+    },
   ],
   fields: [
     {

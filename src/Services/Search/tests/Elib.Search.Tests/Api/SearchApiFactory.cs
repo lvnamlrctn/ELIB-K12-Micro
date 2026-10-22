@@ -154,6 +154,7 @@ public sealed class FakeSearchSources : ISearchSources
     public ConcurrentDictionary<long, List<BibChanged>> Bibs { get; } = new();
     public ConcurrentDictionary<long, List<ItemChanged>> Items { get; } = new();
     public ConcurrentDictionary<long, List<LoanChanged>> Loans { get; } = new();
+    public ConcurrentDictionary<long, List<Elib.Contracts.Events.Digital.EbookChanged>> Ebooks { get; } = new();
 
     /// <summary>Kích thước trang nhỏ để test đi qua nhiều trang.</summary>
     public int PageSize { get; set; } = 2;
@@ -163,6 +164,8 @@ public sealed class FakeSearchSources : ISearchSources
     public Task<StatePage<ItemChanged>> ItemsAsync(long tenantId, long after, CancellationToken ct) => Task.FromResult(Page(Items, tenantId, after));
 
     public Task<StatePage<LoanChanged>> OpenLoansAsync(long tenantId, long after, CancellationToken ct) => Task.FromResult(Page(Loans, tenantId, after));
+
+    public Task<StatePage<Elib.Contracts.Events.Digital.EbookChanged>> EbooksAsync(long tenantId, long after, CancellationToken ct) => Task.FromResult(Page(Ebooks, tenantId, after));
 
     private StatePage<T> Page<T>(ConcurrentDictionary<long, List<T>> source, long tenantId, long after)
     {

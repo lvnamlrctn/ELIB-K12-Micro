@@ -79,6 +79,7 @@ public sealed partial class EbookLoanExpiryJob(IServiceScopeFactory scopes, Time
         var notifier = services.GetRequiredService<EbookReaderNotifier>();
         var allocator = services.GetRequiredService<EbookReservationAllocator>();
         var now = clock.GetUtcNow();
+        await PurgeReadingAsync(db, now, ct);
 
         var expiredLoans = await db.Set<EbookItemLoan>().Where(l => l.Status == EbookLoanStatus.Active && l.ExpiresAt != null && l.ExpiresAt < now)
             .Take(Batch).ToListAsync(ct);
@@ -105,6 +106,16 @@ public sealed partial class EbookLoanExpiryJob(IServiceScopeFactory scopes, Time
         foreach (var itemId in itemIds) promoted += await allocator.PromoteAsync(itemId, ct);
         return (expiredLoans.Count, promoted);
     }
+
+    /// <summary>Nhật ký đọc/truy cập quá <see cref="ReadingRetentionDays"/> ngày (ngoài tiến độ "đọc tiếp", giữ mãi) bị xoá — dữ liệu hành vi bạn đọc không giữ vô hạn.</summary>
+    private static async Task PurgeReadingAsync(DigitalDbContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var cutoff = now.AddDays(-ReadingRetentionDays);
+        await db.Set<EbookReadSession>().Where(s => s.StartedAt < cutoff).ExecuteDeleteAsync(ct);
+        await db.Set<EbookAccessLog>().Where(a => a.At < cutoff).ExecuteDeleteAsync(ct);
+    }
+
+    public const int ReadingRetentionDays = 730;
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Đơn vị {TenantId}: tự hết hạn {Expired} lượt mượn tài liệu số, đẩy {Promoted} đặt trước lên sẵn sàng")]
     private static partial void LogRan(ILogger logger, long tenantId, int expired, int promoted);

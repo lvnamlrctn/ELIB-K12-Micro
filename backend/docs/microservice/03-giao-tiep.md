@@ -79,7 +79,7 @@ ingress-nginx (TLS *.thuvientn.vn)
 | `ChargeSettled` | circulation, patron | payment, reporting | Đã thu tiền mặt tại quầy; payment đóng giao dịch QR đang chờ (nếu có) |
 | `BibHoldingsEmpty` | holdings | catalog | Biểu ghi không còn bản sách nào; catalog gợi ý ẩn biểu ghi |
 | `PaymentSucceeded` / `PaymentExpired` / `PaymentRefunded` | payment | circulation, patron, notification, reporting | Đánh dấu đã nộp; gửi biên lai |
-| `EbookPublished` / `EbookUpdated` / `EbookUnpublished` | digital | search, reporting | Index metadata ebook |
+| `EbookChanged` (thay cho `EbookPublished` / `EbookUpdated` / `EbookUnpublished`: một event trạng thái có `Status` + `Deleted` + `Version`, cùng khuôn `BibChanged`) | digital | search (reporting sau) | Index metadata ebook (chưa có toàn văn) |
 | `EbookFileUploaded` | digital | digital-indexer | Kích hoạt trích xuất text/OCR |
 | `EbookTextExtracted` | digital-indexer | search | Chunk, embedding (Ollama), index nội dung |
 | `EbookLoanCreated` / `EbookLoanExpired` / `EbookRead` | digital | reporting, school, notification | Thống kê, huy hiệu, nhắc hạn |

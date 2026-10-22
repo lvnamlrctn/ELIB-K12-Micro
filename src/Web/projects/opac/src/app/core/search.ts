@@ -11,6 +11,13 @@ export interface SearchRequest {
   /** Chỉ đổi bộ lọc/sắp xếp của câu tìm đang xem — không tính lượt tìm mới trong thống kê. */
   refine?: boolean;
 }
+/** Tài liệu số trong kết quả tra cứu (metadata; đọc/mượn ở trang tài liệu số). */
+export interface EbookHit {
+  publicId: string; title: string; author: string | null; publisher: string | null; publishYear: string | null; language: string | null;
+  collectionName: string | null; typeName: string | null; coverUrl: string | null; free: boolean; hasFile: boolean; linkedBibPublicId: string | null;
+}
+export interface EbookHits { total: number; page: number; pageSize: number; items: EbookHit[]; }
+
 export interface Bib {
   publicId: string; mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null;
   materialType: string | null; language: string | null; ddc: string | null; isbns: string | null; summary: string | null; copies: number; available: number;
@@ -73,6 +80,7 @@ export class SearchApi {
   private readonly http = inject(HttpClient);
 
   search(body: SearchRequest) { return firstValueFrom(this.http.post<SearchResult>('/api/opac/search/bibs/Search', body)); }
+  ebooks(q: string, pageSize = 6) { return firstValueFrom(this.http.post<EbookHits>('/api/opac/search/ebooks/Search', { q, page: 1, pageSize })); }
   detail(publicId: string) { return firstValueFrom(this.http.get<BibDetail>(`/api/opac/search/bibs/${publicId}`)); }
   similar(publicId: string) { return firstValueFrom(this.http.get<Bib[]>(`/api/opac/search/bibs/${publicId}/similar`)); }
   suggest(q: string) { return firstValueFrom(this.http.get<string[]>('/api/opac/search/suggest', { params: { q } })); }

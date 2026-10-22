@@ -75,6 +75,8 @@ public static class DefaultTemplates
     public const string EbookLoanExpired = "EBOOK_LOAN_EXPIRED";
     public const string EbookSubmissionApproved = "EBOOK_SUBMISSION_APPROVED";
     public const string EbookSubmissionRejected = "EBOOK_SUBMISSION_REJECTED";
+    public const string EbookReviewApproved = "EBOOK_REVIEW_APPROVED";
+    public const string EbookReviewRejected = "EBOOK_REVIEW_REJECTED";
 
     // Không gian & đặt phòng (space gửi theo mã).
     public const string SpaceBookingCreated = "SPACE_BOOKING_CREATED";
@@ -155,6 +157,16 @@ public static class DefaultTemplates
             """
             <p>Xin chào {{ full_name }},</p>
             <p>Tài liệu <strong>{{ title }}</strong> bạn nộp chưa được duyệt. Lý do: {{ reason }}.</p>
+            """),
+        new(EbookReviewApproved, "Đánh giá tài liệu đã được duyệt", "Đánh giá của bạn đã được duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Đánh giá của bạn về tài liệu <strong>{{ title }}</strong> đã được thủ thư duyệt và hiển thị công khai. Cảm ơn bạn đã đóng góp!</p>
+            """),
+        new(EbookReviewRejected, "Đánh giá tài liệu không được duyệt", "Đánh giá của bạn chưa được duyệt — {{ tenant_name }}",
+            """
+            <p>Xin chào {{ full_name }},</p>
+            <p>Đánh giá của bạn về tài liệu <strong>{{ title }}</strong> chưa được duyệt. Lý do: {{ reason }}.</p>
             """),
         new(SpaceBookingCreated, "Đã gửi yêu cầu đặt phòng", "Đã gửi yêu cầu đặt phòng — {{ tenant_name }}",
             """

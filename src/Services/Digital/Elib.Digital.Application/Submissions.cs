@@ -51,7 +51,7 @@ public sealed record RejectSubmissionRequest(Guid SubmissionPublicId, string Rea
 /// <see cref="EbookLoanResource"/>.
 /// </summary>
 public sealed class DocumentSubmissionResource(
-    ICrudDbContext db, TimeProvider clock, IMediaUploadTicket media, EbookReaderNotifier notifier, ITenantContext tenant, IOptions<DigitalOptions> options)
+    ICrudDbContext db, TimeProvider clock, IMediaUploadTicket media, EbookReaderNotifier notifier, ITenantContext tenant, IOptions<DigitalOptions> options, EbookStatePublisher states)
     : CrudResource<DocumentSubmissionResource, DocumentSubmission, DocumentSubmissionSearch, DocumentSubmissionOpUnused, DocumentSubmissionDto>(db)
 {
     public const string Purpose = "document-submission";
@@ -127,6 +127,7 @@ public sealed class DocumentSubmissionResource(
 
             Db.Set<EbookFile>().Add(EbookFile.Create(item.Id, submission.MediaFileId, new EbookFileFields(FileExt: submission.FileExt, FileSize: submission.FileSize)));
             submission.Approve(actorId, now, item.PublicId);
+            await states.PublishAsync(item, false, token, hasFile: true);
             var reader = await Db.Set<PatronReplica>().AsNoTracking().FirstOrDefaultAsync(r => r.ReaderPublicId == submission.ReaderPublicId, token);
             // Publish TRƯỚC SaveChanges — NotificationRequested đi qua outbox, chỉ gửi được nếu cùng transaction lưu kèm thay đổi này.
             await notifier.NotifyAsync(reader, EbookTemplates.SubmissionApproved, new Dictionary<string, string> { ["title"] = submission.Title },

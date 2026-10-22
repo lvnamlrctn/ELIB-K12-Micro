@@ -15,6 +15,11 @@ export interface DigitalItemDetail {
   subjectName: string | null; topicId: number | null; topicName: string | null; topicRequiresLogin: boolean; typeId: number | null;
   typeName: string | null; linkedBibPublicId: string | null; files: DigitalFileSummary[];
 }
+export interface DigitalBookmark { publicId: string; ebookPublicId: string; page: number; note: string | null; createdAt: string; }
+export interface DigitalReadProgress { ebookPublicId: string; lastPage: number; maxPage: number; pageCount: number; percent: number; lastReadAt: string; }
+export interface DigitalReadBeat {
+  ebookPublicId: string; filePublicId: string | null; sessionKey: string; page: number; pageCount: number; activeSeconds: number; device: string | null;
+}
 export interface DigitalCatalogNode { id: number; name: string; parentId: number | null; level: number; sortOrder: number; childCount: number; hasChildren: boolean; }
 export interface DigitalSearchRequest {
   keyword?: string | null; collectionId?: number | null; subjectId?: number | null; topicId?: number | null; typeId?: number | null;
@@ -37,7 +42,7 @@ export const DigitalLoanStatus = { Active: 1, Recalled: 2, Returned: 3, AutoExpi
 export const DigitalReservationStatus = { Pending: 1, Ready: 2, Fulfilled: 3, Cancelled: 4, Expired: 5 } as const;
 
 export interface DigitalReview { publicId: string; rating: number | null; displayName: string | null; content: string | null; createdAt: string; }
-export interface DigitalReviewSubmission { rating?: number | null; displayName?: string | null; content?: string | null; email?: string | null; }
+export interface DigitalReviewSubmission { rating?: number | null; displayName?: string | null; content?: string | null; email?: string | null; website?: string | null; }
 export interface DigitalFavorite { ebookItemPublicId: string; title: string; author: string | null; coverUrl: string | null; free: boolean; createdAt: string; }
 export interface DigitalByBibSummary { publicId: string; title: string; free: boolean; }
 
@@ -97,6 +102,15 @@ export class DigitalApi {
   findByLinkedBib(bibPublicId: string) {
     return firstValueFrom(this.http.get<DigitalByBibSummary | null>(`/api/opac/digital/browse/items/by-bib/${bibPublicId}`));
   }
+
+  /** Trình đọc: nhịp đọc (lượt đọc + tiến độ), tiến độ đọc tiếp, dấu trang — cần đăng nhập bạn đọc (gateway → digital's /api/reader/**). */
+  readingBeat(beat: DigitalReadBeat) { return firstValueFrom(this.http.put<DigitalReadProgress>('/api/opac/digital/reading/progress', beat)); }
+  readingProgress(itemPublicId: string) { return firstValueFrom(this.http.get<DigitalReadProgress | null>(`/api/opac/digital/reading/progress/${itemPublicId}`)); }
+  bookmarks(itemPublicId: string) { return firstValueFrom(this.http.get<DigitalBookmark[]>(`/api/opac/digital/bookmarks/${itemPublicId}`)); }
+  saveBookmark(ebookPublicId: string, page: number, note: string | null) {
+    return firstValueFrom(this.http.post<DigitalBookmark>('/api/opac/digital/bookmarks', { ebookPublicId, page, note }));
+  }
+  deleteBookmark(bookmarkPublicId: string) { return firstValueFrom(this.http.delete(`/api/opac/digital/bookmarks/${bookmarkPublicId}`)); }
 
   myFavorites() { return firstValueFrom(this.http.get<DigitalFavorite[]>('/api/opac/digital/favorites')); }
   addFavorite(itemPublicId: string) { return firstValueFrom(this.http.post(`/api/opac/digital/favorites/${itemPublicId}`, {})); }

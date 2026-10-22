@@ -2,11 +2,13 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
-  Api, BibLinkOption, CrudPage as Page, EbookFile, EbookFileSearch, EbookItem, EbookItemSearch, STATUS_ACTIVE, errorMessage,
+  Api, BibLinkOption, CrudPage as Page, EbookFile, EbookFileSearch, EbookItem, EbookItemSearch, MetadataField, STATUS_ACTIVE, errorMessage,
 } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
+
+interface MetaRow { fieldPublicId: string; value: string; language: string }
 
 type TreeRow = { id: number; publicId: string; name: string; parentId: number | null; sortOrder: number };
 type NamedRow = { id: number; publicId: string; name: string };
@@ -204,6 +206,28 @@ interface ItemForm {
             }
           </div>
 
+          @if (f.publicId && metaFields().length) {
+            <div class="col-span-2 border border-gray-200 rounded-lg p-3">
+              <div class="flex items-center justify-between mb-2">
+                <label class="form-label !mb-0">{{ 'DIGITAL_ITEMS_PAGE.METADATA' | translate }}</label>
+                <button type="button" class="btn-secondary !py-1 !px-2.5" (click)="addMeta()">
+                  <span class="material-icons text-[16px]">add</span> {{ 'DIGITAL_ITEMS_PAGE.ADD_METADATA' | translate }}</button>
+              </div>
+              @for (m of metaRows; track $index) {
+                <div class="grid grid-cols-12 gap-2 mb-1.5 items-start">
+                  <select class="input col-span-4" [(ngModel)]="m.fieldPublicId" [name]="'mf' + $index" [attr.aria-label]="'DIGITAL_ITEMS_PAGE.METADATA' | translate">
+                    @for (mf of metaFields(); track mf.publicId) { <option [ngValue]="mf.publicId">{{ mf.schemaShortId }}:{{ mf.field }}{{ mf.subfield ? '.' + mf.subfield : '' }} — {{ mf.descriptionVn }}</option> }
+                  </select>
+                  <input class="input col-span-6" [(ngModel)]="m.value" [name]="'mv' + $index" maxlength="2000" [attr.aria-label]="'DIGITAL_ITEMS_PAGE.METADATA_VALUE' | translate" />
+                  <select class="input col-span-1" [(ngModel)]="m.language" [name]="'ml' + $index" aria-label="Language">
+                    <option value="">—</option><option value="vi">vi</option><option value="en">en</option>
+                  </select>
+                  <button type="button" class="icon-btn text-red-600 col-span-1" (click)="metaRows.splice($index, 1)" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[18px]">close</span></button>
+                </div>
+              }
+            </div>
+          }
+
           @if (f.publicId) {
             <div class="col-span-2 border border-gray-200 rounded-lg p-3">
               <div class="flex items-center justify-between mb-2">
@@ -257,6 +281,8 @@ export class DigitalItems implements OnInit {
   protected readonly form = signal<ItemForm | null>(null);
   protected readonly deleting = signal<EbookItem | null>(null);
   protected readonly files = signal<EbookFile[]>([]);
+  protected readonly metaFields = signal<MetadataField[]>([]);
+  protected metaRows: MetaRow[] = [];
 
   protected readonly collectionOptions = signal<{ id: number; label: string }[]>([]);
   protected readonly subjectOptions = signal<{ id: number; label: string }[]>([]);
@@ -329,6 +355,7 @@ export class DigitalItems implements OnInit {
       status: STATUS_ACTIVE, coverUrl: null, linkedBibPublicId: null, linkedBibLabel: null,
     });
     this.files.set([]);
+    this.metaRows = [];
     this.bibQuery = '';
     this.bibResults.set([]);
   }
@@ -343,11 +370,20 @@ export class DigitalItems implements OnInit {
     });
     this.bibQuery = '';
     this.bibResults.set([]);
+    this.metaRows = [];
     try {
       this.files.set((await this.fileClient.search({ ebookItemPublicId: item.publicId, pageSize: 200 } as EbookFileSearch)).items);
+      this.metaFields.set((await this.api.crud<MetadataField>('metadata-fields', 'digital').searchAll()).filter((x) => x.status === STATUS_ACTIVE));
+      if (this.metaFields().length) {
+        this.metaRows = (await this.api.ebookMetadata(item.publicId)).map((r) => ({ fieldPublicId: r.fieldPublicId, value: r.value, language: r.language ?? '' }));
+      }
     } catch (e) {
       this.toastr.error(errorMessage(e));
     }
+  }
+
+  protected addMeta(): void {
+    this.metaRows.push({ fieldPublicId: this.metaFields()[0]?.publicId ?? '', value: '', language: '' });
   }
 
   protected async onCoverSelect(event: Event, f: ItemForm): Promise<void> {
@@ -438,8 +474,13 @@ export class DigitalItems implements OnInit {
         subjectId: f.subjectId, topicId: f.topicId, typeId: f.typeId, free: f.free, allowDownload: f.allowDownload, printCopies: f.printCopies,
         offlineDays: f.offlineDays, coverUrl: f.coverUrl, linkedBibPublicId: f.linkedBibPublicId, status: f.status,
       };
-      if (f.publicId) await this.client.update(f.publicId, body);
-      else await this.client.add(body);
+      if (f.publicId) {
+        await this.client.update(f.publicId, body);
+        if (this.metaFields().length) {
+          await this.api.saveEbookMetadata(f.publicId, this.metaRows.filter((m) => m.fieldPublicId && m.value.trim())
+            .map((m) => ({ fieldPublicId: m.fieldPublicId, value: m.value.trim(), language: m.language || null })));
+        }
+      } else await this.client.add(body);
       this.toastr.success(f.publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');
       this.form.set(null);
       await this.load();

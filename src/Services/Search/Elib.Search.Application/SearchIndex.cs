@@ -1,6 +1,7 @@
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Circulation;
+using Elib.Contracts.Events.Digital;
 using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Platform;
 using Elib.Search.Domain;
@@ -14,6 +15,7 @@ public interface ISearchSources
     Task<StatePage<BibChanged>> BibsAsync(long tenantId, long after, CancellationToken ct);
     Task<StatePage<ItemChanged>> ItemsAsync(long tenantId, long after, CancellationToken ct);
     Task<StatePage<LoanChanged>> OpenLoansAsync(long tenantId, long after, CancellationToken ct);
+    Task<StatePage<EbookChanged>> EbooksAsync(long tenantId, long after, CancellationToken ct);
 }
 
 /// <summary>
@@ -82,6 +84,42 @@ public sealed class SearchIndex(ISearchDb db, TimeProvider clock)
         item.Version = e.Version;
     }
 
+    public async Task ApplyAsync(EbookChanged e, CancellationToken ct, Guid? syncRun = null)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        var ebook = await db.Set<SearchEbook>().FirstOrDefaultAsync(x => x.EbookPublicId == e.EbookPublicId, ct);
+        if (ebook is null) db.Set<SearchEbook>().Add(ebook = new SearchEbook { EbookPublicId = e.EbookPublicId, Version = -1 });
+        if (syncRun is not null) ebook.SyncRun = syncRun;
+        if (e.Version <= ebook.Version) return;
+
+        ebook.Title = TextFold.Cut(e.Title, 1000) ?? "";
+        ebook.Author = TextFold.Cut(e.Author, 500);
+        ebook.OtherTitle = TextFold.Cut(e.OtherTitle, 1000);
+        ebook.Publisher = TextFold.Cut(e.Publisher, 500);
+        ebook.PublishYear = TextFold.Cut(e.PublishYear, 4);
+        ebook.Year = SearchBib.ParseYear(e.PublishYear);
+        ebook.Keywords = TextFold.Cut(e.Keywords, 2000);
+        ebook.Language = TextFold.Cut(e.Language, 20);
+        ebook.CollectionName = TextFold.Cut(e.CollectionName, 250);
+        ebook.SubjectName = TextFold.Cut(e.SubjectName, 250);
+        ebook.TopicName = TextFold.Cut(e.TopicName, 250);
+        ebook.TypeName = TextFold.Cut(e.TypeName, 250);
+        ebook.CoverUrl = e.CoverUrl is { Length: <= 1000 } cover ? cover : null;
+        ebook.Free = e.Free;
+        ebook.HasFile = e.HasFile;
+        ebook.LinkedBibPublicId = e.LinkedBibPublicId;
+        ebook.Status = e.Status;
+        ebook.Deleted = e.Deleted;
+        ebook.Version = e.Version;
+
+        ebook.TitleFold = TextFold.Cut(TextFold.Fold($"{ebook.Title} {ebook.OtherTitle}"), 2000)!;
+        ebook.AuthorFold = TextFold.Cut(TextFold.Fold(ebook.Author), 500)!;
+        ebook.SearchText = TextFold.Cut(TextFold.Fold(string.Join(' ',
+            ebook.Title, ebook.OtherTitle, ebook.Author, ebook.Publisher, ebook.Keywords, ebook.CollectionName, ebook.SubjectName, ebook.TopicName, ebook.TypeName,
+            string.Join(' ', e.Metadata))), 8000)!;
+        ebook.IndexedAt = clock.GetUtcNow();
+    }
+
     /// <summary>Lượt mượn — bản sách chưa có trong chỉ mục (ItemChanged tới sau) thì bỏ qua: lần dựng lại sẽ lấy lượt đang mở.</summary>
     public async Task ApplyAsync(LoanChanged e, CancellationToken ct)
     {
@@ -92,7 +130,7 @@ public sealed class SearchIndex(ISearchDb db, TimeProvider clock)
 }
 
 public sealed record SearchIndexStatus(string Status, DateTimeOffset? StartedAt, DateTimeOffset? FinishedAt, int Bibs, int Items, int Loans, string? Error,
-    int IndexedBibs, int VisibleBibs, int IndexedItems);
+    int IndexedBibs, int VisibleBibs, int IndexedItems, int Ebooks = 0, int IndexedEbooks = 0);
 
 /// <summary>
 /// Dựng lại chỉ mục của đơn vị hiện tại từ catalog, holdings, circulation (/internal theo trang): ghi trạng thái hiện tại của mọi biểu
@@ -114,7 +152,7 @@ public sealed class IndexRebuilder(ISearchDb db, SearchIndex index, ISearchSourc
         var run = Guid.CreateVersion7();
         try
         {
-            var (bibs, items, loans) = (0, 0, 0);
+            var (bibs, items, loans, ebooks) = (0, 0, 0, 0);
             for (long? after = 0; after is not null;)
             {
                 var page = await sources.BibsAsync(tenantId, after.Value, ct);
@@ -136,6 +174,28 @@ public sealed class IndexRebuilder(ISearchDb db, SearchIndex index, ISearchSourc
                 .ExecuteUpdateAsync(s => s.SetProperty(b => b.Deleted, true), ct);
             await db.Set<SearchItem>().Where(i => i.SyncRun != run && !i.Deleted)
                 .ExecuteUpdateAsync(s => s.SetProperty(i => i.Deleted, true), ct);
+
+            // Tài liệu số: digital có thể chưa triển khai/chưa bán cho đơn vị → bỏ phần này, và KHÔNG đánh dấu xoá gì (không biết nguồn có gì).
+            var ebooksRead = true;
+            for (long? after = 0; after is not null;)
+            {
+                StatePage<EbookChanged> page;
+                try
+                {
+                    page = await sources.EbooksAsync(tenantId, after.Value, ct);
+                }
+                catch (HttpRequestException) when (after == 0)
+                {
+                    ebooksRead = false;
+                    break;
+                }
+                foreach (var e in page.Items) await index.ApplyAsync(e, ct, run);
+                await FlushAsync(ct);
+                ebooks += page.Items.Count;
+                after = page.Next;
+            }
+            if (ebooksRead)
+                await db.Set<SearchEbook>().Where(b => b.SyncRun != run && !b.Deleted).ExecuteUpdateAsync(s => s.SetProperty(b => b.Deleted, true), ct);
 
             var open = new HashSet<Guid>();
             for (long? after = 0; after is not null;)
@@ -164,7 +224,7 @@ public sealed class IndexRebuilder(ISearchDb db, SearchIndex index, ISearchSourc
                 await db.Set<SearchItem>().Where(i => returned.Contains(i.ItemPublicId)).ExecuteUpdateAsync(s => s.SetProperty(i => i.OnLoan, false), ct);
 
             state = await db.Set<SearchSyncState>().FirstAsync(ct);
-            (state.Status, state.FinishedAt, state.Bibs, state.Items, state.Loans) = (SearchSyncState.Done, clock.GetUtcNow(), bibs, items, loans);
+            (state.Status, state.FinishedAt, state.Bibs, state.Items, state.Loans, state.Ebooks) = (SearchSyncState.Done, clock.GetUtcNow(), bibs, items, loans, ebooks);
             await db.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -184,7 +244,7 @@ public sealed class IndexRebuilder(ISearchDb db, SearchIndex index, ISearchSourc
         return new SearchIndexStatus(state.Status, state.StartedAt, state.FinishedAt, state.Bibs, state.Items, state.Loans, state.Error,
             await db.Set<SearchBib>().CountAsync(b => !b.Deleted, ct),
             await db.Set<SearchBib>().CountAsync(b => !b.Deleted && b.Status == SearchBib.OpacVisible, ct),
-            await db.Set<SearchItem>().CountAsync(i => !i.Deleted, ct));
+            await db.Set<SearchItem>().CountAsync(i => !i.Deleted, ct), state.Ebooks, await db.Set<SearchEbook>().CountAsync(e => !e.Deleted, ct));
     }
 
     private async Task FlushAsync(CancellationToken ct)

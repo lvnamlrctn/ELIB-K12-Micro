@@ -76,7 +76,7 @@ import { ReaderAuth } from '../core/reader-auth';
                     <span class="flex items-center gap-2 text-sm text-slate-800"><span class="material-icons text-slate-400 text-[20px]">picture_as_pdf</span>{{ f.description || f.fileExt || 'PDF' }}</span>
                     <div class="flex items-center gap-2 shrink-0">
                       <button type="button" class="px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 text-sm hover:bg-blue-50 disabled:opacity-50"
-                              [disabled]="fileBusy() === f.publicId" (click)="openFile(it, f.publicId, false)">{{ 'OPAC.DIGITAL.READ_ONLINE' | translate }}</button>
+                              [disabled]="fileBusy() === f.publicId" (click)="read(it, f)">{{ 'OPAC.DIGITAL.READ_ONLINE' | translate }}</button>
                       @if (it.allowDownload) {
                         <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50"
                                 [disabled]="fileBusy() === f.publicId" (click)="openFile(it, f.publicId, true)">{{ 'OPAC.DIGITAL.DOWNLOAD' | translate }}</button>
@@ -111,6 +111,8 @@ import { ReaderAuth } from '../core/reader-auth';
 
             <form class="mt-4 border border-slate-200 rounded-lg p-4 space-y-2" (ngSubmit)="submitReview(it)">
               <div class="font-medium text-slate-900 text-sm">{{ 'OPAC.DIGITAL.WRITE_REVIEW' | translate }}</div>
+              <!-- Ô bẫy chống bot: người thật không thấy, không điền. -->
+              <input type="text" [(ngModel)]="reviewWebsite" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute -left-[9999px] w-px h-px opacity-0" />
               <div class="flex gap-2 flex-wrap">
                 <input type="text" [(ngModel)]="reviewDisplayName" name="displayName" [placeholder]="'OPAC.DIGITAL.YOUR_NAME' | translate"
                        class="flex-1 min-w-[160px] px-3 py-1.5 border border-slate-300 rounded-lg text-sm" />
@@ -203,6 +205,7 @@ export class EbookDetail {
   protected reviewDisplayName = '';
   protected reviewRating: number | null = null;
   protected reviewContent = '';
+  protected reviewWebsite = '';
   protected readonly reviewBusy = signal(false);
   protected readonly reviewError = signal<string | null>(null);
   protected readonly reviewSubmitted = signal(false);
@@ -291,6 +294,12 @@ export class EbookDetail {
     }
   }
 
+  /** PDF đọc trong trình đọc của OPAC (nhớ trang, dấu trang, thống kê); định dạng khác mở ở tab mới như trước. */
+  protected async read(it: DigitalItemDetail, f: { publicId: string; fileExt: string | null }): Promise<void> {
+    if ((f.fileExt ?? 'pdf').toLowerCase() === 'pdf') await this.router.navigate(['/thu-vien-so', it.publicId, 'doc', f.publicId]);
+    else await this.openFile(it, f.publicId, false);
+  }
+
   protected async openFile(it: DigitalItemDetail, filePublicId: string, download: boolean): Promise<void> {
     this.fileBusy.set(filePublicId);
     this.fileError.set(null);
@@ -309,7 +318,7 @@ export class EbookDetail {
     this.reviewError.set(null);
     try {
       await this.api.submitReview(it.publicId, {
-        rating: this.reviewRating, displayName: this.reviewDisplayName || null, content: this.reviewContent || null,
+        rating: this.reviewRating, displayName: this.reviewDisplayName || null, content: this.reviewContent || null, website: this.reviewWebsite || null,
       });
       this.reviewSubmitted.set(true);
       this.reviewDisplayName = '';

@@ -18,7 +18,7 @@ public interface IMediaFileAccess
 /// cũng xin được; còn lại phải có lượt mượn còn hiệu lực (xem EbookLoanResource.ValidateAccessAsync). Tải (<paramref name="download"/>)
 /// còn cần AllowDownload.
 /// </summary>
-public sealed class EbookFileAccess(ICrudDbContext db, EbookLoanResource loans, IMediaFileAccess media)
+public sealed class EbookFileAccess(ICrudDbContext db, EbookLoanResource loans, IMediaFileAccess media, TimeProvider clock)
 {
     public async Task<EbookFileUrl> SignedUrlAsync(Guid itemPublicId, Guid filePublicId, Guid? readerPublicId, bool download, CancellationToken ct)
     {
@@ -39,6 +39,7 @@ public sealed class EbookFileAccess(ICrudDbContext db, EbookLoanResource loans, 
 
         var url = await media.SignedUrlAsync(file.MediaFileId, ct);
         if (download) item.RecordDownload(); else item.RecordView();
+        db.Set<EbookAccessLog>().Add(EbookAccessLog.Create(item.Id, readerPublicId, download, clock.GetUtcNow()));
         await db.SaveChangesAsync(ct);
         return url;
     }

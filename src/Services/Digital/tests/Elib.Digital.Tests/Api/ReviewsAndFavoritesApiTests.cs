@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
+using Elib.Contracts.Events.Platform;
 using Elib.Digital.Api;
 using Elib.Digital.Application;
 using Elib.Digital.Domain;
@@ -34,9 +35,70 @@ public sealed class ReviewsAndFavoritesApiTests(DigitalApiFactory factory) : Dig
         Assert.Equal(item.PublicId, review.EbookItemPublicId);
         Assert.Equal(item.Title, review.ItemTitle);
 
-        await staff.PutAsJsonAsync(U("/api/reviews/ChangeStatus"), new ChangeStatusRequest(review.PublicId, IHasStatus.Active), Json);
+        // ChangeStatus chung của CRUD không còn duyệt được (chỉ cần quyền edit) — phải qua Approve.
+        Assert.Equal("REVIEW_USE_APPROVE", (await Error(await staff.PutAsJsonAsync(U("/api/reviews/ChangeStatus"), new ChangeStatusRequest(review.PublicId, IHasStatus.Active), Json))).Code);
+        Assert.Empty(await Read<List<OpacReviewSummary>>(await opac.GetAsync(U($"/api/opac/items/{item.PublicId}/reviews"))));
+        var editor = Staff(tenantId, "DIGITAL_REVIEWS:view", "DIGITAL_REVIEWS:edit");
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await editor.PostAsync(U($"/api/reviews/{review.PublicId}/Approve"), null)).StatusCode);
+        await staff.PostAsync(U($"/api/reviews/{review.PublicId}/Approve"), null);
         published = await Read<List<OpacReviewSummary>>(await opac.GetAsync(U($"/api/opac/items/{item.PublicId}/reviews")));
         Assert.Equal("Bạn đọc A", Assert.Single(published).DisplayName);
+    }
+
+    [Fact]
+    public async Task Approve_publishes_the_review_and_tells_the_author_once()
+    {
+        var (tenantId, staff, item) = await SetupAsync();
+        var opac = Opac(tenantId);
+        await opac.PostAsJsonAsync(U($"/api/opac/items/{item.PublicId}/reviews"), new { rating = 4, displayName = "Bạn đọc B", content = "Ổn", email = "b@example.com" }, Json);
+        var review = Assert.Single((await Read<CrudPage<EbookReviewDto>>(await staff.PostAsJsonAsync(U("/api/reviews/Search"), new EbookReviewSearch(), Json))).Items);
+
+        var approved = await Read<EbookReviewDto>(await staff.PostAsync(U($"/api/reviews/{review.PublicId}/Approve"), null));
+        Assert.Equal(IHasStatus.Active, approved.Status);
+        Assert.NotNull(approved.ReviewedAt);
+        Assert.Single(await Read<List<OpacReviewSummary>>(await opac.GetAsync(U($"/api/opac/items/{item.PublicId}/reviews"))));
+
+        await staff.PostAsync(U($"/api/reviews/{review.PublicId}/Approve"), null); // gọi lại: không báo lần hai
+        var notes = Factory.PublishedOf<NotificationRequested>().Where(n => n.TemplateCode == EbookTemplates.ReviewApproved && n.Recipient.Email == "b@example.com").ToList();
+        Assert.Single(notes);
+    }
+
+    [Fact]
+    public async Task Reject_needs_a_reason_hides_the_review_and_records_why()
+    {
+        var (tenantId, staff, item) = await SetupAsync();
+        var opac = Opac(tenantId);
+        await opac.PostAsJsonAsync(U($"/api/opac/items/{item.PublicId}/reviews"), new { rating = 1, displayName = "Spam", content = "mua hàng tại ...", email = "spam@example.com" }, Json);
+        var review = Assert.Single((await Read<CrudPage<EbookReviewDto>>(await staff.PostAsJsonAsync(U("/api/reviews/Search"), new EbookReviewSearch(), Json))).Items);
+
+        var noReason = await staff.PostAsJsonAsync(U($"/api/reviews/{review.PublicId}/Reject"), new RejectReviewRequest("  "), Json);
+        Assert.Equal("REVIEW_REJECT_REASON_REQUIRED", (await Error(noReason)).Code);
+
+        var rejected = await Read<EbookReviewDto>(await staff.PostAsJsonAsync(U($"/api/reviews/{review.PublicId}/Reject"), new RejectReviewRequest("Quảng cáo"), Json));
+        Assert.Equal("Quảng cáo", rejected.RejectReason);
+        Assert.NotNull(rejected.RejectedAt);
+        Assert.Empty(await Read<List<OpacReviewSummary>>(await opac.GetAsync(U($"/api/opac/items/{item.PublicId}/reviews"))));
+        Assert.Contains(Factory.PublishedOf<NotificationRequested>(), n => n.TemplateCode == EbookTemplates.ReviewRejected && n.Data["reason"] == "Quảng cáo");
+
+        // Duyệt lại sau khi từ chối: xoá dấu từ chối.
+        var again = await Read<EbookReviewDto>(await staff.PostAsync(U($"/api/reviews/{review.PublicId}/Approve"), null));
+        Assert.Null(again.RejectedAt);
+        Assert.Null(again.RejectReason);
+    }
+
+    [Fact]
+    public async Task Honeypot_and_pending_caps_stop_spam()
+    {
+        var (tenantId, staff, item) = await SetupAsync();
+        var opac = Opac(tenantId);
+        var url = U($"/api/opac/items/{item.PublicId}/reviews");
+
+        await opac.PostAsJsonAsync(url, new { rating = 5, displayName = "Bot", content = "x", website = "http://spam" }, Json);
+        Assert.Empty((await Read<CrudPage<EbookReviewDto>>(await staff.PostAsJsonAsync(U("/api/reviews/Search"), new EbookReviewSearch(), Json))).Items);
+
+        for (var i = 0; i < 3; i++) Assert.True((await opac.PostAsJsonAsync(url, new { rating = 5, displayName = "Một người", email = "same@example.com" }, Json)).IsSuccessStatusCode);
+        var fourth = await opac.PostAsJsonAsync(url, new { rating = 5, displayName = "Một người", email = "same@example.com" }, Json);
+        Assert.Equal("REVIEW_TOO_MANY_PENDING", (await Error(fourth)).Code);
     }
 
     [Fact]

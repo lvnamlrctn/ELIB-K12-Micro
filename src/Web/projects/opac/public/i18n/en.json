@@ -205,7 +205,11 @@
       "TRY_OTHER_LIBRARIES": "Search other libraries for \"{{q}}\"",
       "ALL_BORROWED": "All copies on loan",
       "ELAPSED": "({{ms}} ms)",
-      "PHRASE_HINT": "Put words in \"...\" to search for the exact phrase, e.g. \"object oriented programming\"."
+      "PHRASE_HINT": "Put words in \"...\" to search for the exact phrase, e.g. \"object oriented programming\".",
+      "EBOOKS": "Digital items",
+      "EBOOKS_N": "Digital items ({count})",
+      "EBOOKS_ALL": "See all digital items",
+      "EBOOK_FREE": "free to read"
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Document not found (it may have been hidden or removed).",
@@ -413,6 +417,24 @@
       "KOR": "Korean",
       "GER": "German",
       "DEU": "German"
+    },
+    "READER": {
+      "TITLE": "Read document",
+      "BACK": "Back",
+      "PREV": "Previous page",
+      "NEXT": "Next page",
+      "PAGE": "Page number",
+      "PAGE_N": "Page {{n}}",
+      "ZOOM_OUT": "Zoom out",
+      "ZOOM_IN": "Zoom in",
+      "BOOKMARK": "Bookmark",
+      "BOOKMARKS": "Bookmarks",
+      "NO_BOOKMARKS": "No bookmarks yet.",
+      "REMOVE": "Remove bookmark",
+      "LOADING": "Loading document… {{percent}}%",
+      "LOAD_FAILED": "Could not load the document.",
+      "TOO_LARGE": "This document is too large to read in the page.",
+      "OPEN_TAB": "Open in a new tab"
     }
   },
   "ERRORS": {

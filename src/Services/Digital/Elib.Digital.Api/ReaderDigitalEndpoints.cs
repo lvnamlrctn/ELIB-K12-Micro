@@ -43,6 +43,22 @@ public static class ReaderDigitalEndpoints
             async (Guid reservationId, ClaimsPrincipal principal, EbookReservationResource r, CancellationToken ct) =>
                 (await r.CancelAsync(reservationId, ct, ReaderId(principal))).ForReader());
 
+        // Trình đọc: nhịp đọc (lượt đọc + tiến độ) và tiến độ "đọc tiếp".
+        reader.MapPut("/reading/progress", async (ReadBeatRequest request, ClaimsPrincipal principal, ReaderReading reading, CancellationToken ct) =>
+            await reading.BeatAsync(ReaderId(principal), request, ct));
+        reader.MapGet("/reading/progress/{ebookPublicId:guid}", async (Guid ebookPublicId, ClaimsPrincipal principal, ReaderReading reading, CancellationToken ct) =>
+            await reading.ProgressAsync(ReaderId(principal), ebookPublicId, ct) is { } progress ? Results.Ok(progress) : Results.NoContent());
+
+        reader.MapGet("/bookmarks/{ebookPublicId:guid}", async (Guid ebookPublicId, ClaimsPrincipal principal, ReaderBookmarks bookmarks, CancellationToken ct) =>
+            await bookmarks.ListAsync(ReaderId(principal), ebookPublicId, ct));
+        reader.MapPost("/bookmarks", async (BookmarkRequest request, ClaimsPrincipal principal, ReaderBookmarks bookmarks, CancellationToken ct) =>
+            await bookmarks.SaveAsync(ReaderId(principal), request, ct));
+        reader.MapDelete("/bookmarks/{bookmarkPublicId:guid}", async (Guid bookmarkPublicId, ClaimsPrincipal principal, ReaderBookmarks bookmarks, CancellationToken ct) =>
+        {
+            await bookmarks.DeleteAsync(ReaderId(principal), bookmarkPublicId, ct);
+            return Results.NoContent();
+        });
+
         reader.MapGet("/favorites", async (ClaimsPrincipal principal, ReaderFavorites favorites, CancellationToken ct) =>
             await favorites.MyListAsync(ReaderId(principal), ct));
 

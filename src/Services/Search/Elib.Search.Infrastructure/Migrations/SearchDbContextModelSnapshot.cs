@@ -297,6 +297,154 @@ namespace Elib.Search.Infrastructure.Migrations
                     b.ToTable("search_bibs", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Search.Domain.SearchEbook", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Author")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("author");
+
+                    b.Property<string>("AuthorFold")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("author_fold");
+
+                    b.Property<string>("CollectionName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("collection_name");
+
+                    b.Property<string>("CoverUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cover_url");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<Guid>("EbookPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ebook_public_id");
+
+                    b.Property<bool>("Free")
+                        .HasColumnType("boolean")
+                        .HasColumnName("free");
+
+                    b.Property<bool>("HasFile")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_file");
+
+                    b.Property<DateTimeOffset>("IndexedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("indexed_at");
+
+                    b.Property<string>("Keywords")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("keywords");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("language");
+
+                    b.Property<Guid?>("LinkedBibPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_bib_public_id");
+
+                    b.Property<string>("OtherTitle")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("other_title");
+
+                    b.Property<string>("PublishYear")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("publish_year");
+
+                    b.Property<string>("Publisher")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("publisher");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("search_text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SubjectName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("subject_name");
+
+                    b.Property<Guid?>("SyncRun")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sync_run");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("TitleFold")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("title_fold");
+
+                    b.Property<string>("TopicName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("topic_name");
+
+                    b.Property<string>("TypeName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("type_name");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint")
+                        .HasColumnName("version");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_search_ebooks");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_search_ebooks_tenant_id");
+
+                    b.HasIndex("TenantId", "EbookPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_search_ebooks_tenant_id_ebook_public_id");
+
+                    b.HasIndex("TenantId", "Status", "Deleted", "Year")
+                        .HasDatabaseName("ix_search_ebooks_tenant_id_status_deleted_year");
+
+                    b.ToTable("search_ebooks", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Search.Domain.SearchItem", b =>
                 {
                     b.Property<long>("Id")
@@ -474,6 +622,10 @@ namespace Elib.Search.Infrastructure.Migrations
                     b.Property<int>("Bibs")
                         .HasColumnType("integer")
                         .HasColumnName("bibs");
+
+                    b.Property<int>("Ebooks")
+                        .HasColumnType("integer")
+                        .HasColumnName("ebooks");
 
                     b.Property<string>("Error")
                         .HasMaxLength(1000)

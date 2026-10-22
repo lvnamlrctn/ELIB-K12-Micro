@@ -518,6 +518,24 @@ export interface SaveFineTicket {
 }
 
 // ── Tài liệu số (service digital) ──
+export interface ReadingSessionRow {
+  publicId: string; ebookPublicId: string; ebookTitle: string; readerPublicId: string; cardNo: string | null; fullName: string | null; startedAt: string; lastSeenAt: string;
+  lastPage: number; maxPage: number; pageCount: number; activeSeconds: number; device: string | null;
+}
+export interface ReadingSessionPage { totalCount: number; items: ReadingSessionRow[]; }
+export interface ReadingStats {
+  totals: { sessions: number; readers: number; ebooks: number; activeSeconds: number; views: number; downloads: number };
+  topEbooks: { ebookPublicId: string; title: string; sessions: number; readers: number; activeSeconds: number }[];
+  topReaders: { readerPublicId: string; cardNo: string | null; fullName: string | null; sessions: number; activeSeconds: number }[];
+  daily: { date: string; sessions: number; activeSeconds: number }[];
+}
+
+export interface MetadataField {
+  id: number; publicId: string; schemaPublicId: string; schemaShortId: string; field: string; subfield: string | null; descriptionVn: string; descriptionEn: string | null;
+  sortOrder: number; input: string; exportField: number | null; status: number;
+}
+export interface EbookMetadataRow { fieldPublicId: string; field: string; subfield: string | null; descriptionVn: string; descriptionEn: string | null; input: string; value: string; language: string | null; }
+
 export interface EbookItem {
   id: number; publicId: string; status: number; collectionId: number | null; collectionName: string | null; subjectId: number | null;
   topicId: number | null; typeId: number | null; title: string; author: string | null; publisher: string | null; publishDate: string | null;
@@ -1375,6 +1393,17 @@ export class Api {
   rejectDocumentSubmission(submissionPublicId: string, reason: string) {
     return this.post<DocumentSubmission>('/api/admin/digital/document-submissions/Reject', { submissionPublicId, reason });
   }
+
+  ebookMetadata(itemPublicId: string) { return this.get<EbookMetadataRow[]>(`/api/admin/digital/items/${itemPublicId}/metadata`); }
+  saveEbookMetadata(itemPublicId: string, values: { fieldPublicId: string; value: string; language: string | null }[]) {
+    return this.put<EbookMetadataRow[]>(`/api/admin/digital/items/${itemPublicId}/metadata`, { values });
+  }
+  readingStatistics(range: { from: string | null; to: string | null }) { return this.post<ReadingStats>('/api/admin/digital/reading-tracking/Statistics', range); }
+  readingSessions(search: { ebookPublicId: string | null; keyword: string | null; from: string | null; to: string | null; pageIndex: number; pageSize: number }) {
+    return this.post<ReadingSessionPage>('/api/admin/digital/reading-tracking/Search', search);
+  }
+  approveEbookReview(publicId: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Approve`); }
+  rejectEbookReview(publicId: string, reason: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Reject`, { reason }); }
 
   // Không gian & đặt phòng (space): danh mục qua crud('buildings'|'floors'|'spaces'|'special-days', 'space'); phần còn lại
   // (vị trí/bảo trì trên sơ đồ, đặt/duyệt/check-in, cấm, giờ mở cửa, tham số, báo cáo, thiết bị RFID) là thao tác nghiệp vụ riêng.

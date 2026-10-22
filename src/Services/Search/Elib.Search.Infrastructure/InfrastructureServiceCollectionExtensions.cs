@@ -34,6 +34,7 @@ public static class InfrastructureServiceCollectionExtensions
         AddSource(services, configuration, HttpSearchSources.Catalog, "Catalog:Url");
         AddSource(services, configuration, HttpSearchSources.Holdings, "Holdings:Url");
         AddSource(services, configuration, HttpSearchSources.Circulation, "Circulation:Url");
+        AddSource(services, configuration, HttpSearchSources.Digital, "Digital:Url");
         services.AddScoped<ISearchSources, HttpSearchSources>();
 
         // OAI-PMH: cổng harvest metadata công khai cho hệ thống ngoài.
@@ -61,6 +62,7 @@ public static class InfrastructureServiceCollectionExtensions
             x.AddConsumer<BibChangedConsumer>();
             x.AddConsumer<ItemChangedConsumer>();
             x.AddConsumer<LoanChangedConsumer>();
+            x.AddConsumer<EbookChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });
         services.AddHealthChecks().AddDbContextCheck<SearchDbContext>("db", tags: [ElibHealthTags.Ready]);

@@ -17,6 +17,8 @@ public static class EbookTemplates
     public const string LoanExpired = "EBOOK_LOAN_EXPIRED";
     public const string SubmissionApproved = "EBOOK_SUBMISSION_APPROVED";
     public const string SubmissionRejected = "EBOOK_SUBMISSION_REJECTED";
+    public const string ReviewApproved = "EBOOK_REVIEW_APPROVED";
+    public const string ReviewRejected = "EBOOK_REVIEW_REJECTED";
 }
 
 internal static class EbookDates
@@ -27,6 +29,20 @@ internal static class EbookDates
 /// <summary>Gửi tin cho bạn đọc qua notification (NotificationRequested, outbox) — đúng khuôn Circulation's ReaderNotifier.</summary>
 public sealed class EbookReaderNotifier(IPublishEndpoint publisher, ITenantContext tenant)
 {
+    /// <summary>Gửi cho người nhập email (đánh giá ẩn danh — không có hồ sơ bạn đọc).</summary>
+    public Task NotifyEmailAsync(string? email, string? name, string templateCode, IReadOnlyDictionary<string, string> data, string deduplicationKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return Task.CompletedTask;
+        return publisher.Publish(new NotificationRequested
+        {
+            TenantId = tenant.RequireTenantId(),
+            TemplateCode = templateCode,
+            Recipient = new NotificationRecipient(null, null, email, null, name),
+            Data = new Dictionary<string, string>(data, StringComparer.Ordinal),
+            DeduplicationKey = deduplicationKey,
+        }, ct);
+    }
+
     public Task NotifyAsync(PatronReplica? reader, string templateCode, IReadOnlyDictionary<string, string> data, string deduplicationKey, CancellationToken ct)
     {
         if (reader is null || (string.IsNullOrWhiteSpace(reader.Email) && string.IsNullOrWhiteSpace(reader.Phone))) return Task.CompletedTask;

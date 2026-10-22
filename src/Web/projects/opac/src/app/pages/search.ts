@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink, convertToParamMap } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Language } from '../core/i18n';
+import { Library } from '../core/library';
 import { SavedSearch, SavedSearches, SearchParams } from '../core/saved-searches';
-import { Bib, Facet, Msg, SearchApi, SearchRequest, SearchResult, languageName, searchErrorMessage } from '../core/search';
+import { Bib, EbookHits, Facet, Msg, SearchApi, SearchRequest, SearchResult, languageName, searchErrorMessage } from '../core/search';
 
 const PAGE_SIZE = 10;
 type FacetKey = 'materialTypes' | 'authors' | 'years' | 'languages' | 'stores';
@@ -172,6 +173,26 @@ const ADVANCED: { key: keyof SearchRequest; label: string; param: string }[] = [
           <div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm">{{ e.key | translate: e.params }}</div>
         }
 
+        @if (ebooks(); as eb) {
+          @if (eb.items.length) {
+            <section class="mb-4 bg-white border border-slate-200 rounded-xl p-4" [attr.aria-label]="'OPAC.SEARCH.EBOOKS' | translate">
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <h2 class="font-semibold text-slate-900 flex items-center gap-1.5"><span class="material-icons text-blue-600 text-[20px]">auto_stories</span>
+                  {{ 'OPAC.SEARCH.EBOOKS_N' | translate: { count: eb.total } }}</h2>
+                <a routerLink="/thu-vien-so" [queryParams]="{ q }" class="text-sm text-blue-600 hover:underline">{{ 'OPAC.SEARCH.EBOOKS_ALL' | translate }}</a>
+              </div>
+              <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                @for (e of eb.items; track e.publicId) {
+                  <li><a [routerLink]="['/thu-vien-so', e.publicId]" class="block rounded-lg border border-slate-100 hover:border-blue-300 px-3 py-2">
+                    <div class="font-medium text-slate-900 text-sm line-clamp-1">{{ e.title }}</div>
+                    <div class="text-xs text-slate-500 line-clamp-1">{{ e.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }}@if (e.publishYear) { · {{ e.publishYear }} }@if (e.free) { · {{ 'OPAC.SEARCH.EBOOK_FREE' | translate }} }</div>
+                  </a></li>
+                }
+              </ul>
+            </section>
+          }
+        }
+
         <ul class="space-y-3">
           @for (b of result()?.items ?? []; track b.publicId; let i = $index) {
             <li class="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 hover:border-blue-300 transition">
@@ -235,6 +256,8 @@ export class Search implements OnInit {
   protected readonly facets = FACETS;
   protected readonly advanced = ADVANCED;
   protected readonly result = signal<SearchResult | null>(null);
+  protected readonly ebooks = signal<EbookHits | null>(null);
+  private readonly library = inject(Library);
   protected readonly loading = signal(false);
   protected readonly error = signal<Msg | null>(null);
   protected readonly suggestions = signal<string[]>([]);
@@ -383,6 +406,20 @@ export class Search implements OnInit {
     void this.router.navigate([], { relativeTo: this.route, queryParams: params, queryParamsHandling: 'merge' });
   }
 
+  /** Tài liệu số khớp cùng từ khoá (chỉ trang đầu, đơn vị có phân hệ Tài liệu số) — lỗi không làm hỏng kết quả sách in. */
+  private async loadEbooks(request: SearchRequest): Promise<void> {
+    const q = request.q?.trim();
+    if (!q || (request.page ?? 1) > 1 || !this.library.has('DIGITAL')) {
+      this.ebooks.set(null);
+      return;
+    }
+    try {
+      this.ebooks.set(await this.api.ebooks(q));
+    } catch {
+      this.ebooks.set(null);
+    }
+  }
+
   private async load(): Promise<void> {
     const request = buildRequest(this.params!);
     // Cùng câu tìm với lượt trước trong tab này (đổi bộ lọc, sắp xếp, lật trang, quay lại từ trang chi tiết) → không tính lượt tìm mới.
@@ -394,6 +431,7 @@ export class Search implements OnInit {
     try {
       const result = await this.api.search({ ...request, refine });
       this.result.set(result);
+      void this.loadEbooks(request);
       this.queryId = refine ? last!.queryId : result.queryId;
       if (!refine) writeLast({ criteria, queryId: result.queryId });
       const saved = this.current();

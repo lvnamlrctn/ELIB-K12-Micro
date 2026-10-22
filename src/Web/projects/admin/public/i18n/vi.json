@@ -330,7 +330,10 @@
     "EXHIBITION_LOCATIONS": "Địa điểm triển lãm",
     "PRINT_LABELS": "In nhãn",
     "ACQUISITION_GROUP": "Bổ sung",
-    "ACQ_REPORTS": "Báo cáo bổ sung"
+    "ACQ_REPORTS": "Báo cáo bổ sung",
+    "DIGITAL_METADATA_SCHEMAS": "Lược đồ metadata",
+    "DIGITAL_METADATA_FIELDS": "Trường metadata",
+    "DIGITAL_READING": "Theo dõi đọc"
   },
   "HEADER": {
     "LANG_ALT": "ngôn ngữ",
@@ -3559,7 +3562,10 @@
     "ADD_FILE": "Thêm file",
     "UPLOADING": "Đang tải lên…",
     "NO_FILES": "Chưa có file đính kèm.",
-    "TITLE_REQUIRED": "Vui lòng nhập nhan đề."
+    "TITLE_REQUIRED": "Vui lòng nhập nhan đề.",
+    "METADATA": "Metadata",
+    "ADD_METADATA": "Thêm dòng",
+    "METADATA_VALUE": "Giá trị"
   },
   "DIGITAL_LOANS_PAGE": {
     "TITLE": "Mượn/trả/đặt trước tài liệu số",
@@ -3597,7 +3603,13 @@
     "RATING": "Số sao",
     "DISPLAY_NAME": "Tên người đánh giá",
     "EMAIL": "Email",
-    "CONTENT": "Nội dung"
+    "CONTENT": "Nội dung",
+    "APPROVE": "Duyệt đánh giá",
+    "REJECT": "Từ chối đánh giá",
+    "REASON": "Lý do từ chối",
+    "REJECT_REASON": "Lý do từ chối",
+    "APPROVED": "Đã duyệt đánh giá.",
+    "REJECTED": "Đã từ chối đánh giá."
   },
   "DIGITAL_SUBMISSIONS_PAGE": {
     "TITLE": "Nộp tài liệu bạn đọc",
@@ -4007,5 +4019,41 @@
     "ISSUED": "Đã lập khoản phí.",
     "CASHED": "Đã ghi nhận thu tiền mặt.",
     "CANCELLED": "Đã huỷ khoản phí."
+  },
+  "DIGITAL_METADATA": {
+    "SCHEMAS_TITLE": "Lược đồ metadata tài liệu số",
+    "FIELDS_TITLE": "Trường metadata tài liệu số",
+    "SHORT_ID": "Mã ngắn",
+    "NAMESPACE": "Namespace",
+    "SCHEMA": "Lược đồ",
+    "FIELD": "Trường",
+    "SUBFIELD": "Trường con",
+    "INPUT": "Kiểu nhập",
+    "INPUT_TEXT": "Văn bản ngắn",
+    "INPUT_TEXTAREA": "Văn bản dài",
+    "INPUT_DATE": "Ngày (yyyy, yyyy-MM, yyyy-MM-dd)",
+    "INPUT_NUMBER": "Số"
+  },
+  "READING_PAGE": {
+    "TITLE": "Theo dõi đọc tài liệu số",
+    "FROM": "Từ ngày",
+    "TO": "Đến ngày",
+    "VIEW": "Xem",
+    "SESSIONS": "Lượt đọc",
+    "READERS": "Bạn đọc",
+    "EBOOKS": "Tài liệu",
+    "HOURS": "Giờ đọc",
+    "VIEWS": "Lượt xem",
+    "DOWNLOADS": "Lượt tải",
+    "PER_DAY": "Lượt đọc theo ngày",
+    "TOP_EBOOKS": "Tài liệu đọc nhiều",
+    "TOP_READERS": "Bạn đọc đọc nhiều",
+    "EBOOK": "Tài liệu",
+    "READER": "Bạn đọc",
+    "MINUTES": "Phút",
+    "LIST": "Danh sách lượt đọc",
+    "STARTED": "Bắt đầu",
+    "PAGES": "Trang đã đọc",
+    "DEVICE": "Thiết bị"
   }
 }
