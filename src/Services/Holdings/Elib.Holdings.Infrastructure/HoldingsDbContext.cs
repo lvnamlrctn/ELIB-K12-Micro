@@ -44,7 +44,49 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.HasIndex(x => new { x.TenantId, x.StoreId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.ReceiptPublicId });
             e.HasIndex(x => new { x.TenantId, x.ReceiptLinePublicId });
+            e.HasIndex(x => new { x.TenantId, x.ShelfPublicId });
             e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShelfReplica>(e =>
+        {
+            e.ToTable("shelf_replicas");
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.ColorHex).HasMaxLength(20);
+            e.HasIndex(x => new { x.TenantId, x.ShelfPublicId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.StorePublicId });
+        });
+
+        modelBuilder.Entity<ShelfRowReplica>(e =>
+        {
+            e.ToTable("shelf_row_replicas");
+            e.Property(x => x.DdcStart).HasMaxLength(30);
+            e.Property(x => x.DdcEnd).HasMaxLength(30);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.ShelfPublicId });
+        });
+
+        modelBuilder.Entity<FloorReplica>(e =>
+        {
+            e.ToTable("floor_replicas");
+            e.Property(x => x.Name).HasMaxLength(250);
+            e.Property(x => x.BuildingName).HasMaxLength(250);
+            e.Property(x => x.LayoutImageUrl).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.FloorPublicId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ItemMovement>(e =>
+        {
+            e.ToTable("item_movements");
+            e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
+            e.Property(x => x.Kind).HasMaxLength(12);
+            e.Property(x => x.FromStatus).HasMaxLength(1);
+            e.Property(x => x.ToStatus).HasMaxLength(1);
+            e.Property(x => x.Reason).HasMaxLength(ItemMovement.MaxReasonLength);
+            e.Property(x => x.ActorName).HasMaxLength(250);
+            e.HasIndex(x => new { x.TenantId, x.ItemId, x.At });
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<BibSnapshot>(e =>
@@ -75,12 +117,17 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
         modelBuilder.NamedCatalog<BookOutUnit>("book_out_units", 250);
         modelBuilder.NamedCatalog<ExhibitionLocation>("exhibition_locations", 250);
 
+        ApprovalModel.Configure(modelBuilder);
+
         modelBuilder.Entity<LostRecord>(e =>
         {
             e.ToTable("lost_records");
             e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
             e.Property(x => x.Reason).HasMaxLength(500);
             e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.PreviousStatus).HasMaxLength(1);
+            e.Property(x => x.ReversedByName).HasMaxLength(300);
+            e.Property(x => x.ReversalReason).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.ItemId });
             e.HasIndex(x => new { x.TenantId, x.LostOn });
             e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
@@ -91,6 +138,10 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.ToTable("liquidations");
             e.Property(x => x.Barcode).HasMaxLength(Item.MaxBarcodeLength);
             e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.DecisionNo).HasMaxLength(100);
+            e.Property(x => x.PreviousStatus).HasMaxLength(1);
+            e.Property(x => x.ReversedByName).HasMaxLength(300);
+            e.Property(x => x.ReversalReason).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.ItemId });
             e.HasIndex(x => new { x.TenantId, x.LiquidatedOn });
             e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);

@@ -21,8 +21,14 @@ public sealed record BuildingRequest(string Code, string Name, string? Descripti
 public sealed record BuildingDto(long Id, Guid PublicId, string Code, string Name, string? Description, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Toà nhà (monolith: map.MapBuilding, quyền SPACE_BUILDINGS).</summary>
-public sealed class BuildingResource(ICrudDbContext db) : CrudResource<BuildingResource, MapBuilding, CrudSearch, BuildingRequest, BuildingDto>(db)
+public sealed class BuildingResource(ICrudDbContext db, ShelfEvents events) : CrudResource<BuildingResource, MapBuilding, CrudSearch, BuildingRequest, BuildingDto>(db)
 {
+    /// <summary>Đổi tên toà → holdings cần tên toà mới ở sơ đồ giá.</summary>
+    protected override async Task OnSavingAsync(MapBuilding entity, CrudChange change, CancellationToken ct)
+    {
+        if (change == CrudChange.Updated) await events.PublishFloorsOfBuildingAsync(entity.Id, entity.Name, ct);
+    }
+
     protected override string EntityName => "Toà nhà";
 
     protected override string? Describe(MapBuilding entity) => $"{entity.Code} — {entity.Name}";
@@ -70,7 +76,7 @@ public sealed record FloorDto(long Id, Guid PublicId, long BuildingId, string? B
 public sealed record SetFloorLayoutRequest(string? LayoutImageUrl, double CanvasWidth, double CanvasHeight);
 
 /// <summary>Tầng (monolith: map.MapFloor, quyền SPACE_FLOORS) — thuộc một Toà nhà.</summary>
-public sealed class FloorResource(ICrudDbContext db, ITenantContext tenant, IOptions<SpaceOptions> options)
+public sealed class FloorResource(ICrudDbContext db, ITenantContext tenant, IOptions<SpaceOptions> options, ShelfEvents events)
     : CrudResource<FloorResource, MapFloor, FloorSearch, FloorRequest, FloorDto>(db)
 {
     private readonly SpaceOptions _options = options.Value;
@@ -107,6 +113,9 @@ public sealed class FloorResource(ICrudDbContext db, ITenantContext tenant, IOpt
             throw new BusinessRuleException("BUILDING_NOT_FOUND", "Toà nhà đã chọn không còn.");
     }
 
+    protected override Task OnSavingAsync(MapFloor entity, CrudChange change, CancellationToken ct) =>
+        change is CrudChange.Updated or CrudChange.Deleted or CrudChange.Added ? events.PublishFloorAsync(entity, change == CrudChange.Deleted, ct) : Task.CompletedTask;
+
     protected override async Task EnsureDeletableAsync(MapFloor entity, CancellationToken ct)
     {
         if (await Db.Set<BookableSpace>().AnyAsync(s => s.FloorId == entity.Id, ct))
@@ -120,6 +129,7 @@ public sealed class FloorResource(ICrudDbContext db, ITenantContext tenant, IOpt
         var entity = await LoadAsync(publicId, ct);
         var url = FloorLayout.Validate(request.LayoutImageUrl, _options.MediaPublicPrefix, tenant.RequireTenantId());
         entity.SetLayout(url, request.CanvasWidth, request.CanvasHeight);
+        await events.PublishFloorAsync(entity, deleted: false, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(entity);
     }

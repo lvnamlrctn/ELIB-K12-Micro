@@ -29,8 +29,11 @@ public sealed record PlaceFixtureRequest(double? PositionX, double? PositionY, d
 /// Vật dụng đặt trên sơ đồ tầng, không đặt được (monolith: map.MapObject, các ObjectType ngoài ROOM/STUDY_SPACE — quyền
 /// SPACE_FIXTURES). Vị trí trên sơ đồ sửa qua <see cref="PlaceAsync"/> riêng, không qua form cấu hình thường.
 /// </summary>
-public sealed class FixtureResource(ICrudDbContext db) : CrudResource<FixtureResource, MapFixture, FixtureSearch, FixtureRequest, FixtureDto>(db)
+public sealed class FixtureResource(ICrudDbContext db, ShelfEvents events) : CrudResource<FixtureResource, MapFixture, FixtureSearch, FixtureRequest, FixtureDto>(db)
 {
+    /// <summary>Vật dụng đang sửa vốn là giá sách? (để phát "giá đã xoá" khi đổi loại khỏi SHELF.)</summary>
+    private bool _wasShelf;
+
     protected override string EntityName => "Vật dụng";
 
     protected override string? Describe(MapFixture entity) => $"{entity.Code} — {entity.Name}";
@@ -83,12 +86,28 @@ public sealed class FixtureResource(ICrudDbContext db) : CrudResource<FixtureRes
             throw new BusinessRuleException("STORE_NOT_FOUND", "Kho đã chọn không còn.");
     }
 
+    public override async Task<FixtureDto> UpdateAsync(Guid publicId, FixtureRequest request, CancellationToken ct)
+    {
+        _wasShelf = (await LoadAsync(publicId, ct)).ObjectType == FixtureType.Shelf;
+        return await base.UpdateAsync(publicId, request, ct);
+    }
+
+    /// <summary>Giá sách đổi/xoá → holdings cập nhật bản sao (đổi loại khỏi SHELF = như xoá giá).</summary>
+    protected override async Task OnSavingAsync(MapFixture entity, CrudChange change, CancellationToken ct)
+    {
+        var isShelf = entity.ObjectType == FixtureType.Shelf;
+        if (change == CrudChange.Deleted) { if (isShelf) await events.PublishShelfAsync(entity, deleted: true, null, false, ct); }
+        else if (isShelf) await events.PublishShelfAsync(entity, deleted: false, null, false, ct);
+        else if (change == CrudChange.Updated && _wasShelf) await events.PublishShelfAsync(entity, deleted: true, null, false, ct);
+    }
+
     /// <summary>Đặt vị trí trên sơ đồ tầng (trang sơ đồ trực quan) — không đi qua UpdateAsync/form cấu hình thường.</summary>
     public async Task<FixtureDto> PlaceAsync(Guid publicId, PlaceFixtureRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
         var entity = await LoadAsync(publicId, ct);
         entity.SetPosition(request.PositionX, request.PositionY, request.Width, request.Height);
+        if (entity.ObjectType == FixtureType.Shelf) await events.PublishShelfAsync(entity, deleted: false, null, false, ct);
         await Db.SaveChangesAsync(ct);
         return ToDto(entity);
     }

@@ -92,6 +92,20 @@
     "CLICK_CHON_NHIEU_FILE_XML": "Click để chọn nhiều file .xml"
   },
   "OPAC": {
+    "PAYMENT": {
+      "TITLE": "Phí / Nợ của tôi",
+      "CURRENCY": "đ",
+      "PAY_WITH": "Thanh toán {{provider}}",
+      "PAY_AT_COUNTER": "Thanh toán tại quầy thư viện",
+      "NONE": "Bạn không có khoản nợ nào.",
+      "EXPIRES_IN": "Mã hết hạn sau {{time}}",
+      "HINT_VIETQR": "Mở app ngân hàng và quét mã — số tiền và nội dung đã điền sẵn, giữ nguyên nội dung chuyển khoản.",
+      "HINT_VNPAY": "Quét mã bằng app ngân hàng hoặc mở cổng VNPAY để thanh toán.",
+      "OPEN_GATEWAY": "Mở cổng VNPAY",
+      "EXPIRED": "Mã đã hết hạn. Đóng cửa sổ này và tạo mã mới.",
+      "CLOSE": "Đóng",
+      "PAID": "Đã nhận thanh toán của bạn. Cảm ơn!"
+    },
     "NAVBAR": {
       "HOME": "Trang chủ",
       "SEARCH_LINK": "Tra cứu",

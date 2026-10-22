@@ -5,12 +5,13 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Api, CrudPage, ItemBatchResult, LiquidationRow, LostRow, StoreOption, StoreRecordSearch, errorMessage, saveFile } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
+import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 import { itemStatus } from './items';
 
 type Kind = 'lost' | 'liquidation';
-type Row = (LostRow | LiquidationRow) & { date: string; cardNo?: string | null };
+type Row = (LostRow | LiquidationRow) & { date: string; cardNo?: string | null; decisionNo?: string | null };
 
 /** Chữ và quyền khác nhau giữa hai màn — khoá viết thẳng để công cụ kiểm tra đa ngữ thấy. */
 const KINDS = {
@@ -31,7 +32,7 @@ const KINDS = {
  */
 @Component({
   selector: 'app-store-records',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [FormsModule, LDatePipe, Loading, Paginator, ReasonDialog, TranslatePipe],
   template: `
     @let k = text();
     <div class="mb-5"><h4 class="page-title">{{ k.title | translate }}</h4></div>
@@ -43,9 +44,15 @@ const KINDS = {
           <textarea id="sr-codes" rows="8" class="input font-mono text-[13px]" [(ngModel)]="codes" placeholder="VV000001&#10;VV000002"></textarea>
           <label for="sr-date" class="form-label mt-3">{{ k.date | translate }}</label>
           <input id="sr-date" type="date" class="input" [(ngModel)]="actDate" />
-          <label for="sr-reason" class="form-label mt-3">{{ 'STORE_RECORD.REASON' | translate }}</label>
+          <label for="sr-reason" class="form-label mt-3">{{ 'STORE_RECORD.REASON' | translate }} <span class="text-red-600">*</span></label>
           <input id="sr-reason" class="input" maxlength="500" [(ngModel)]="reason" />
-          <button type="button" class="btn-primary w-full justify-center mt-4" [disabled]="busy() || !codeList().length" (click)="act()">
+          @if (kind() !== 'lost') {
+            <div class="grid grid-cols-2 gap-2 mt-3">
+              <div><label for="sr-dno" class="form-label">{{ 'STORE_RECORD.DECISION_NO' | translate }}</label><input id="sr-dno" class="input" maxlength="100" [(ngModel)]="decisionNo" /></div>
+              <div><label for="sr-ddate" class="form-label">{{ 'STORE_RECORD.DECISION_DATE' | translate }}</label><input id="sr-ddate" type="date" class="input" [(ngModel)]="decisionDate" /></div>
+            </div>
+          }
+          <button type="button" class="btn-primary w-full justify-center mt-4" [disabled]="busy() || !codeList().length || !reason.trim()" (click)="act()">
             <span class="material-icons text-[18px]">{{ kind() === 'lost' ? 'report' : 'delete_sweep' }}</span>
             {{ k.actN | translate: { count: codeList().length } }}
           </button>
@@ -104,14 +111,14 @@ const KINDS = {
                       @if (r.cardNo) { <div class="text-[11px] text-gray-500">{{ 'STORE_RECORD.CARD' | translate: { card: r.cardNo } }}</div> }</td>
                     <td class="td">{{ r.storeName ?? '—' }}</td>
                     <td class="td">{{ r.date | ldate: 'dd/MM/yyyy' }}</td>
-                    <td class="td text-[13px] text-gray-600">{{ r.reason ?? '' }}</td>
+                    <td class="td text-[13px] text-gray-600">{{ r.reason ?? '' }}@if (r.decisionNo) { <div class="text-[11px] text-gray-500">{{ 'STORE_RECORD.DECISION_SHORT' | translate: { no: r.decisionNo } }}</div> }</td>
                     <td class="td text-center">
                       @if (r.itemStatus) { <span [class]="status(r.itemStatus).badge">{{ status(r.itemStatus).name | translate }}</span> }
                       @else { <span class="text-xs text-gray-400">{{ 'STORE_RECORD.ITEM_DELETED' | translate }}</span> }
                     </td>
                     <td class="td text-center">
                       @if (session.can(k.perm + ':edit') && r.itemStatus === k.undoStatus) {
-                        <button class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [disabled]="busy()" [title]="k.undo | translate" (click)="undo(r)">
+                        <button class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [disabled]="busy()" [title]="k.undo | translate" (click)="undoing.set(r)">
                           <span class="material-icons text-[18px]">undo</span></button>
                       }
                     </td>
@@ -128,6 +135,11 @@ const KINDS = {
         </div>
       </div>
     </div>
+
+    @if (undoing(); as u) {
+      <app-reason-dialog [title]="kind() === 'lost' ? 'STORE_RECORD.RESTORE_TITLE' : 'STORE_RECORD.CANCEL_TITLE'" [message]="kind() === 'lost' ? 'STORE_RECORD.RESTORE_MSG' : 'STORE_RECORD.CANCEL_MSG'"
+                         [params]="{ barcode: u.barcode }" (confirmed)="undo(u, $event)" (cancelled)="undoing.set(null)" />
+    }
   `,
 })
 export class StoreRecords implements OnInit {
@@ -140,6 +152,9 @@ export class StoreRecords implements OnInit {
   protected codes = '';
   protected actDate = '';
   protected reason = '';
+  protected decisionNo = '';
+  protected decisionDate = '';
+  protected readonly undoing = signal<Row | null>(null);
   protected search: StoreRecordSearch = { keyword: '', storeId: null, from: '', to: '', pageIndex: 1, pageSize: 10 };
   protected readonly stores = signal<StoreOption[]>([]);
   protected readonly page = signal<CrudPage<LostRow | LiquidationRow> | null>(null);
@@ -176,12 +191,13 @@ export class StoreRecords implements OnInit {
   protected async act(): Promise<void> {
     this.busy.set(true);
     try {
-      const body = { barcodes: this.codeList(), reason: this.reason.trim() || null };
-      const r = this.kind() === 'lost'
+      const body = { barcodes: this.codeList(), reason: this.reason.trim() };
+      const o = this.kind() === 'lost'
         ? await this.api.markLost({ ...body, lostOn: this.actDate || null })
-        : await this.api.liquidate({ ...body, liquidatedOn: this.actDate || null });
-      this.result.set(r);
-      if (r.done > 0) this.toastr.success(this.text().done, { count: r.done });
+        : await this.api.liquidate({ ...body, liquidatedOn: this.actDate || null, decisionNo: this.decisionNo.trim() || null, decisionDate: this.decisionDate || null });
+      this.result.set(o.result);
+      if (o.pending) this.toastr.info('FINE_TICKET_PAGE.PENDING_SENT');
+      else if (o.result && o.result.done > 0) this.toastr.success(this.text().done, { count: o.result.done });
       this.codes = '';
       await this.load();
     } catch (e) {
@@ -191,12 +207,13 @@ export class StoreRecords implements OnInit {
     }
   }
 
-  protected async undo(r: Row): Promise<void> {
+  protected async undo(r: Row, input: ReasonResult): Promise<void> {
+    this.undoing.set(null);
     this.busy.set(true);
     try {
-      if (this.kind() === 'lost') await this.api.restoreLost(r.barcode);
-      else await this.api.cancelLiquidation(r.barcode);
-      this.toastr.success(this.text().undone, { barcode: r.barcode });
+      const pending = this.kind() === 'lost' ? await this.api.restoreLost(r.barcode, input.reason) : await this.api.cancelLiquidation(r.barcode, input.reason);
+      if (pending) this.toastr.info('FINE_TICKET_PAGE.PENDING_SENT');
+      else this.toastr.success(this.text().undone, { barcode: r.barcode });
       await this.load();
     } catch (e) {
       this.toastr.error(errorMessage(e));

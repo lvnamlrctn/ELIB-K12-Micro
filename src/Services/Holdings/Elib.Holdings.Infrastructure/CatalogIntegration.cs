@@ -7,6 +7,7 @@ using Elib.BuildingBlocks.Messaging;
 using Elib.Contracts.Events.Acquisition;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Circulation;
+using Elib.Contracts.Events.Space;
 using Elib.Holdings.Application;
 using MassTransit;
 using Microsoft.Extensions.Logging;
@@ -46,6 +47,32 @@ public sealed class ReceiptChangedConsumer(ReceiptSnapshots snapshots, ICrudDbCo
     protected override string? RequiredModule => "HOLDINGS";
 
     protected override async Task HandleAsync(ReceiptChanged message, ConsumeContext<ReceiptChanged> context)
+    {
+        await snapshots.ApplyAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Giá sách/ngăn từ space (xếp giá trực quan) — chỉ đơn vị có license HOLDINGS.</summary>
+public sealed class ShelfChangedConsumer(ShelfSnapshots snapshots, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<ShelfChangedConsumer> logger)
+    : ElibConsumer<ShelfChanged>(licenses, logger)
+{
+    protected override string? RequiredModule => "HOLDINGS";
+
+    protected override async Task HandleAsync(ShelfChanged message, ConsumeContext<ShelfChanged> context)
+    {
+        await snapshots.ApplyAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Tầng từ space (tỉ lệ khung, ảnh nền, tên toà/tầng) — chỉ đơn vị có license HOLDINGS.</summary>
+public sealed class FloorChangedConsumer(ShelfSnapshots snapshots, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<FloorChangedConsumer> logger)
+    : ElibConsumer<FloorChanged>(licenses, logger)
+{
+    protected override string? RequiredModule => "HOLDINGS";
+
+    protected override async Task HandleAsync(FloorChanged message, ConsumeContext<FloorChanged> context)
     {
         await snapshots.ApplyAsync(message, context.CancellationToken);
         await db.SaveChangesAsync(context.CancellationToken);

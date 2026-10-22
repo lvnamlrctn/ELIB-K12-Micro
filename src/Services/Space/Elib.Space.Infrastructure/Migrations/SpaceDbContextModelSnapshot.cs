@@ -2017,6 +2017,97 @@ namespace Elib.Space.Infrastructure.Migrations
                     b.ToTable("room_special_days", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Space.Domain.ShelfRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DdcEnd")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ddc_end");
+
+                    b.Property<string>("DdcStart")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ddc_start");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("FixtureId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<int>("RowIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_index");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shelf_rows");
+
+                    b.HasIndex("FixtureId")
+                        .HasDatabaseName("ix_shelf_rows_fixture_id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shelf_rows_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_shelf_rows_tenant_id");
+
+                    b.HasIndex("TenantId", "FixtureId", "RowIndex")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shelf_rows_tenant_id_fixture_id_row_index")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("shelf_rows", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Space.Domain.SpaceBookingSettings", b =>
                 {
                     b.Property<long>("Id")
@@ -2509,6 +2600,16 @@ namespace Elib.Space.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_room_booking_members_room_bookings_booking_id");
+                });
+
+            modelBuilder.Entity("Elib.Space.Domain.ShelfRow", b =>
+                {
+                    b.HasOne("Elib.Space.Domain.MapFixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_shelf_rows_map_fixtures_fixture_id");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

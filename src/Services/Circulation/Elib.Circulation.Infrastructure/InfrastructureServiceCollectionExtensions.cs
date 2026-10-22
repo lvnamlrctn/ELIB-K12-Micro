@@ -38,6 +38,8 @@ public static class InfrastructureServiceCollectionExtensions
             x.AddTenantReplicaConsumers<CirculationDbContext>();
             x.AddConsumer<ReaderChangedConsumer>();
             x.AddConsumer<ItemChangedConsumer>();
+            x.AddConsumer<ItemLossReversedConsumer>();
+            x.AddConsumer<PaymentSucceededConsumer>();
             x.AddConsumer<BibChangedConsumer>();
             x.AddPermissionCacheInvalidation();
         });

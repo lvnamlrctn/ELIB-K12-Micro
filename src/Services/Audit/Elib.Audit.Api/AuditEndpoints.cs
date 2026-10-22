@@ -10,7 +10,7 @@ namespace Elib.Audit.Api;
 public static class AuditEndpoints
 {
     /// <summary>Loại bản ghi có màn "Lịch sử thay đổi" → mã quyền xem bản ghi đó.</summary>
-    private static readonly (string EntityType, string Module)[] EntityViewModules = [("Reader", "READERS"), ("Bib", "CATALOG_BIBS")];
+    private static readonly (string EntityType, string Module)[] EntityViewModules = [("Reader", "READERS"), ("Bib", "CATALOG_BIBS"), ("FineTicket", "FINES"), ("Loan", "LOAN_HISTORY"), ("Item", "LOST_BOOKS")];
 
     public static IEndpointRouteBuilder MapAuditEndpoints(this IEndpointRouteBuilder app)
     {

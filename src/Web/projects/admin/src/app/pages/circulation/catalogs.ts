@@ -161,4 +161,6 @@ export const PHOTOCOPIES: CrudConfig = {
   ],
   defaults: { fromPage: 1, toPage: 1, copies: 1, unitPrice: 500, paid: false },
   modalWidth: 'max-w-lg',
+  // Thu bằng mã QR (VietQR / VNPAY) — chỉ phiếu chưa thu; cần license PAYMENT và quyền PAYMENT_TRANSACTIONS:add.
+  rowActions: [{ icon: 'qr_code_2', title: 'PAYMENT_DIALOG.COLLECT', action: 'edit', payment: true, show: (row) => row['paid'] !== true, run: () => Promise.resolve('') }],
 };

@@ -13,6 +13,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<LoanResource>();
         services.AddCrudResource<FineReasonResource>();
         services.AddCrudResource<FineTicketResource>();
+        services.AddApprovals([.. FineApprovals.Kinds, .. LoanApprovals.Kinds]);
+        services.AddScoped<IChangeRequestHandler, FineChangeHandler>();
+        services.AddScoped<IChangeRequestHandler, LoanChangeHandler>();
         services.AddCrudResource<HoldResource>();
         services.AddCrudResource<PhotocopyResource>();
         services.AddCrudResource<VisitResource>();

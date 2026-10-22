@@ -182,3 +182,66 @@ public sealed partial class SpaceBookingExpiryJob(IServiceScopeFactory scopes, T
     [LoggerMessage(Level = LogLevel.Error, Message = "Việc định kỳ đặt phòng lỗi")]
     private static partial void LogFailed(ILogger logger, Exception exception);
 }
+
+/// <summary>
+/// Khi space khởi động, phát lại giá sách/tầng của mọi đơn vị có phân hệ SPACE để holdings dựng bản sao (giá/ngăn/tầng cho xếp giá trực quan)
+/// cho dữ liệu có trước khi có sự kiện này, hoặc sau khi holdings mất bản sao. Idempotent — holdings ghi đè theo lần phát gần nhất.
+/// </summary>
+public sealed partial class ShelfRepublishJob(IServiceScopeFactory scopes, TimeProvider clock, ILogger<ShelfRepublishJob> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(45), clock, stoppingToken); // để service khởi động xong (migrate, bản sao đơn vị)
+            await RunAllAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            LogFailed(logger, ex);
+        }
+    }
+
+    public async Task<int> RunAllAsync(CancellationToken ct)
+    {
+        List<long> tenants;
+        using (var scope = scopes.CreateScope())
+        {
+            using var system = scope.ServiceProvider.GetRequiredService<ITenantContext>().UseSystem();
+            tenants = await scope.ServiceProvider.GetRequiredService<SpaceDbContext>().Set<TenantReplicaRecord>().AsNoTracking()
+                .Where(t => t.Status == "Active").OrderBy(t => t.TenantId).Select(t => t.TenantId).ToListAsync(ct);
+        }
+
+        var total = 0;
+        foreach (var tenantId in tenants)
+        {
+            using var scope = scopes.CreateScope();
+            if (!await scope.ServiceProvider.GetRequiredService<IModuleLicenseSource>().IsLicensedAsync(tenantId, SpaceBookingExpiryJob.Module, ct)) continue;
+            using var use = scope.ServiceProvider.GetRequiredService<ITenantContext>().Use(tenantId);
+            try
+            {
+                var count = await scope.ServiceProvider.GetRequiredService<ShelfEvents>().RepublishAllAsync(ct);
+                await scope.ServiceProvider.GetRequiredService<SpaceDbContext>().SaveChangesAsync(ct); // đẩy outbox
+                total += count;
+                if (count > 0) LogRan(logger, tenantId, count);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogTenantFailed(logger, tenantId, ex);
+            }
+        }
+        return total;
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Đơn vị {TenantId}: đã phát lại {Count} giá sách cho holdings.")]
+    private static partial void LogRan(ILogger logger, long tenantId, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Đơn vị {TenantId}: phát lại giá sách lỗi.")]
+    private static partial void LogTenantFailed(ILogger logger, long tenantId, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Phát lại giá sách lỗi.")]
+    private static partial void LogFailed(ILogger logger, Exception ex);
+}

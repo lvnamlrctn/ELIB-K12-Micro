@@ -18,12 +18,17 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<StoreMoveResource>();
         services.AddCrudResource<DeliveryResource>();
         services.AddScoped<BibSnapshots>();
+        services.AddScoped<ShelfSnapshots>();
+        services.AddScoped<ItemMovements>();
+        services.AddScoped<MapShelvingResource>();
         services.AddScoped<ReceiptSnapshots>();
         services.AddScoped<ReceiptItems>();
         services.AddScoped<ReceiptItemReports>();
         services.AddScoped<ItemEvents>();
         services.AddScoped<HoldingsExcel>();
         services.AddScoped<LostBooks>();
+        services.AddApprovals(StoreApprovals.Kinds);
+        services.AddScoped<IChangeRequestHandler, StoreRecordChangeHandler>();
         services.AddScoped<Liquidations>();
         services.AddScoped<StoreOuts>();
         services.AddScoped<BarcodeReRegistration>();

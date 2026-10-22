@@ -41,6 +41,8 @@ public static class InfrastructureServiceCollectionExtensions
         });
         services.AddSingleton<SpaceBookingExpiryJob>();
         services.AddHostedService(sp => sp.GetRequiredService<SpaceBookingExpiryJob>());
+        services.AddSingleton<ShelfRepublishJob>();
+        services.AddHostedService(sp => sp.GetRequiredService<ShelfRepublishJob>());
         services.AddHealthChecks().AddDbContextCheck<SpaceDbContext>("db", tags: [ElibHealthTags.Ready]);
         return services;
     }

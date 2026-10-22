@@ -33,7 +33,8 @@ public sealed class FinesApiTests(CirculationApiFactory factory) : CirculationTe
         var keptLine = built.Lines.Single(l => l.Barcode == "PH001");
         var saved = await Read<FineTicketDetail>(await staff.PutAsJsonAsync(U($"/api/fine-tickets/Save/{built.Ticket.PublicId}"),
             new SaveFineTicketRequest(FineTicketStatus.Done, 2000, 60000, "Đền sách",
-                Lines: [new FineLineChange(keptLine.Id, "QUAHAN", 12000), new FineLineChange(lostLine.Id, "MATTL", 50000)]), Json));
+                Lines: [new FineLineChange(keptLine.Id, "QUAHAN", 12000), new FineLineChange(lostLine.Id, "MATTL", 50000)],
+                Reason: "Bạn đọc làm mất sách, đền tiền và được miễn 2.000đ"), Json));
         Assert.Equal((62000m, 2000m, 60000m, 0m, 2), (saved.Ticket.Total, saved.Ticket.Discount, saved.Ticket.Paid, saved.Ticket.Remaining, saved.Ticket.Status));
         Assert.False(saved.Lines.Single(l => l.Barcode == "PH002").LoanOpen);
         var lost = Factory.PublishedOf<LoanChanged>().Single(e => e.Barcode == "PH002" && e.ReturnedAt is not null);
@@ -44,9 +45,9 @@ public sealed class FinesApiTests(CirculationApiFactory factory) : CirculationTe
 
         // Phiếu đã hoàn thành: không thêm dòng, không xoá được.
         var locked = await staff.PutAsJsonAsync(U($"/api/fine-tickets/Save/{built.Ticket.PublicId}"),
-            new SaveFineTicketRequest(FineTicketStatus.Done, 0, 0, Lines: [new FineLineChange(null, "HUHONG", 10000)]), Json);
+            new SaveFineTicketRequest(FineTicketStatus.Done, 2000, 60000, Lines: [new FineLineChange(null, "HUHONG", 10000)]), Json);
         Assert.Equal("FINE_TICKET_DONE", (await Error(locked)).Code);
-        Assert.Equal("FINE_TICKET_LOCKED", (await Error(await staff.DeleteAsync(U($"/api/fine-tickets/Delete/{built.Ticket.PublicId}")))).Code);
+        Assert.Equal("FINE_TICKET_LOCKED", (await Error(await DeleteWithReason(staff, $"/api/fine-tickets/Delete/{built.Ticket.PublicId}", "Xoá thử")) ).Code);
 
         var totals = await Read<FineTicketTotals>(await staff.PostAsJsonAsync(U("/api/fine-tickets/Totals"), new FineTicketSearch { CardNo = "ph-01" }, Json));
         Assert.Equal((60000m, 60000m, 0m), (totals.Receivable, totals.Received, totals.Remaining));
@@ -66,13 +67,14 @@ public sealed class FinesApiTests(CirculationApiFactory factory) : CirculationTe
         var panel = await Read<ReaderPanel>(await staff.PostAsJsonAsync(U("/api/loans/Reader"), new ReaderPanelRequest("TC-01"), Json));
         Assert.Equal(30000m, panel.UnpaidFines);
 
-        Assert.True((await staff.DeleteAsync(U($"/api/fine-tickets/Delete/{first.PublicId}"))).IsSuccessStatusCode);
+        Assert.Equal("REASON_REQUIRED", (await Error(await staff.DeleteAsync(U($"/api/fine-tickets/Delete/{first.PublicId}")))).Code);
+        Assert.True((await DeleteWithReason(staff, $"/api/fine-tickets/Delete/{first.PublicId}", "Lập nhầm")).IsSuccessStatusCode);
         var second = await Read<FineTicketDto>(await staff.PostAsJsonAsync(U("/api/fine-tickets/Add"), new FineTicketCreateRequest("TC-01", 5000), Json));
         Assert.Equal(("PT002", 2), (second.Code, second.Round));
 
         // Thêm dòng theo ĐKCB lạ → lỗi; khoản tự do → tổng tính theo dòng thay số tiền nhập tay.
         var bad = await staff.PutAsJsonAsync(U($"/api/fine-tickets/Save/{second.PublicId}"),
-            new SaveFineTicketRequest(FineTicketStatus.Open, 0, 0, Lines: [new FineLineChange(null, "QUAHAN", 1000, "KHONGCO")]), Json);
+            new SaveFineTicketRequest(FineTicketStatus.Open, 0, 0, Lines: [new FineLineChange(null, "QUAHAN", 5000, "KHONGCO")]), Json);
         Assert.Equal("FINE_REASON_INVALID", (await Error(bad)).Code); // đơn vị chưa có lý do phạt nào
 
         Assert.Equal(5, (await Read<Dictionary<string, int>>(await staff.PostAsync(U("/api/fine-reasons/AddDefaults"), null)))["added"]);
@@ -83,11 +85,18 @@ public sealed class FinesApiTests(CirculationApiFactory factory) : CirculationTe
         Assert.Equal("FINE_REASON_BUILT_IN", (await Error(await staff.DeleteAsync(U($"/api/fine-reasons/Delete/{overdue.PublicId}")))).Code);
 
         var unknownItem = await staff.PutAsJsonAsync(U($"/api/fine-tickets/Save/{second.PublicId}"),
-            new SaveFineTicketRequest(FineTicketStatus.Open, 0, 0, Lines: [new FineLineChange(null, "HUHONG", 1000, "KHONGCO")]), Json);
+            new SaveFineTicketRequest(FineTicketStatus.Open, 0, 0, Lines: [new FineLineChange(null, "HUHONG", 5000, "KHONGCO")]), Json);
         Assert.Equal("ITEM_NOT_FOUND", (await Error(unknownItem)).Code);
         var withLine = await Read<FineTicketDetail>(await staff.PutAsJsonAsync(U($"/api/fine-tickets/Save/{second.PublicId}"),
             new SaveFineTicketRequest(FineTicketStatus.Open, 0, 2000, Lines: [new FineLineChange(null, "HUHONG", 15000)]), Json));
         Assert.Equal((15000m, 13000m), (withLine.Ticket.Total, withLine.Ticket.Remaining));
+    }
+
+    private static Task<HttpResponseMessage> DeleteWithReason(HttpClient client, string url, string reason)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(url, UriKind.Relative));
+        request.Headers.Add(CrudDiff.ReasonHeader, Uri.EscapeDataString(reason));
+        return client.SendAsync(request);
     }
 
     [Fact]

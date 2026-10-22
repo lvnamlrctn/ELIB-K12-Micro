@@ -1,5 +1,5 @@
 import { translateError } from './i18n';
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -140,6 +140,8 @@ export interface Item {
   publishYear: string | null; ddc: string | null; storeId: number | null; storeCode: string | null; storeName: string | null;
   status: string; note: string | null; version: number; createdAt: string; updatedAt: string | null;
   onLoan: boolean; loanCardNo: string | null; loanDueAt: string | null;
+  /** Giá/ngăn đang nằm (từ sơ đồ tầng); null = chưa xếp vào giá nào. */
+  shelfPublicId?: string | null; shelfName?: string | null; shelfRowIndex?: number | null; shelfRowRange?: string | null;
 }
 export interface ItemSearch extends CrudSearch {
   mfn?: number | null; storeId?: number | null; itemStatus?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null;
@@ -147,6 +149,32 @@ export interface ItemSearch extends CrudSearch {
 export interface RegisterItems { mfn: number; quantity: number; prefix: string; digits: number; startNumber?: number | null; storeId?: number | null; }
 export interface NextBarcode { prefix: string; number: number; barcode: string; }
 export interface ShelveResult { shelved: number; notFound: string[]; skipped: string[]; }
+
+// ── Xếp giá trực quan / xếp giá lại ──
+export interface MapShelvingSearch {
+  status?: string | null; storeId?: number | null; receipt?: string | null; barcodeFrom?: string | null; barcodeTo?: string | null; keyword?: string | null;
+  pageIndex: number; pageSize: number;
+}
+export interface MapShelvingRow {
+  publicId: string; barcode: string; mfn: number; title: string | null; ddc: string | null; status: string; onLoan: boolean; storeId: number | null;
+  storeName: string | null; receiptCode: number | null; shelfPublicId: string | null; shelfName: string | null; shelfDeleted: boolean; rowIndex: number | null;
+  rowRange: string | null; suggestedShelfPublicId: string | null; suggestedShelfName: string | null; suggestedRowPublicId: string | null; suggestedRowIndex: number | null;
+}
+export interface MapShelfRowNode { rowPublicId: string; rowIndex: number; ddcStart: string; ddcEnd: string; description: string | null; items: number; }
+export interface MapShelfNode {
+  shelfPublicId: string; code: string; name: string; positionX: number | null; positionY: number | null; width: number | null; height: number | null;
+  colorHex: string | null; items: number; rows: MapShelfRowNode[];
+}
+export interface MapFloorNode {
+  floorPublicId: string; name: string; floorNumber: number | null; buildingName: string | null; canvasWidth: number; canvasHeight: number;
+  layoutImageUrl: string | null; shelves: MapShelfNode[];
+}
+export interface PlaceResult { placed: number; skipped: { barcode: string; reason: string }[]; }
+/** Lịch sử di chuyển của một bản sách (xếp giá, xếp giá lại, chuyển kho, đăng ký lại mã vạch). */
+export interface ItemMovement {
+  id: number; kind: string; kindName: string; at: string; actorId: number | null; actorName: string | null; fromStatus: string | null; toStatus: string | null;
+  fromStore: string | null; toStore: string | null; fromShelf: string | null; toShelf: string | null; fromRow: string | null; toRow: string | null; reason: string | null;
+}
 /** Kho rút gọn cho ô chọn (mọi màn kho xem được, không cần quyền STORES). */
 export interface StoreOption { id: number; code: string; name: string; }
 export interface SkippedItem { barcode: string; reason: string; }
@@ -162,7 +190,10 @@ export interface LostRow {
 export interface LiquidationRow {
   id: number; publicId: string; barcode: string; itemPublicId: string | null; mfn: number | null; title: string | null; author: string | null;
   publisher: string | null; storeId: number | null; storeName: string | null; liquidatedOn: string; reason: string | null; itemStatus: string | null; createdAt: string;
+  decisionNo?: string | null; decisionDate?: string | null;
 }
+/** Báo mất / thanh lý theo lô: đã xử lý (result) hoặc chờ duyệt (pending, chưa đổi gì). */
+export interface BatchOutcome { result: ItemBatchResult | null; pending: PendingApproval | null; }
 export interface StoreOutSearch extends CrudSearch {
   barcode?: string | null; open?: boolean | null; reasonId?: number | null; unitId?: number | null; exhibitionLocationId?: number | null;
   outFrom?: string | null; outTo?: string | null; inFrom?: string | null; inTo?: string | null;
@@ -344,7 +375,11 @@ export interface Loan {
   returnedAt: string | null; renewCount: number; note: string | null; version: number;
   /** Kho của bản sách lúc mượn; người cho mượn / nhận trả ("Họ tên (tên đăng nhập)"); trả sau ngày hết hạn. */
   storeId?: number | null; returnCircPlaceId?: number | null; loanedByName?: string | null; returnedByName?: string | null; returnedLate?: boolean;
+  /** Returned | Lost | Forced (đóng cưỡng bức); lý do đóng; số lần được mở lại. */
+  closeKind?: string | null; closeReason?: string | null; reopenCount?: number;
 }
+/** Kết quả đóng cưỡng bức / mở lại: đã áp dụng (200) hoặc chờ duyệt (202, chưa đổi gì). */
+export type LoanActionResult = { loan: Loan; pending: null } | { loan: null; pending: PendingApproval };
 export interface ReaderPanel {
   readerPublicId: string; cardNo: string; fullName: string; readerTypeName: string | null; className: string | null; courseName: string | null;
   photoId: string | null; expireDate: string | null; isLocked: boolean; isExpired: boolean; hasOverdue: boolean; canBorrow: boolean;
@@ -425,7 +460,53 @@ export interface FineLine {
   id: number; reasonId: number; reasonCode: string; reasonName: string | null; amount: number; loanPublicId: string | null;
   barcode: string | null; mfn: number | null; title: string | null; overdueDays: number; dueAt: string | null; loanOpen: boolean;
 }
-export interface FineTicketDetail { ticket: FineTicket; lines: FineLine[]; finePerDay: number; }
+// ── Thanh toán QR (service payment) ──
+export interface PaymentAccount {
+  configured: boolean; vietQrEnabled: boolean; bankBin: string | null; accountNo: string | null; accountName: string | null; hasSepayApiKey: boolean;
+  vnPayEnabled: boolean; vnPayTmnCode: string | null; hasVnPayHashSecret: boolean; vnPayPaymentUrl: string; expireMinutes: number;
+}
+/** Bí mật: để trống = giữ nguyên; clear… = xoá. */
+export interface PaymentAccountInput {
+  vietQrEnabled: boolean; bankBin: string | null; accountNo: string | null; accountName: string | null; sepayApiKey: string | null; clearSepayApiKey: boolean;
+  vnPayEnabled: boolean; vnPayTmnCode: string | null; vnPayHashSecret: string | null; clearVnPayHashSecret: boolean; vnPayPaymentUrl: string | null; expireMinutes: number;
+}
+/** Pending | Paid | Expired | Cancelled | PaidLate */
+export interface PaymentTx {
+  publicId: string; transactionCode: string; provider: string; amount: number; status: string; expiresAt: string; qrContent: string; label: string; kind: string;
+  paidAt: string | null; needsReview: boolean; reviewNote: string | null;
+}
+export interface PaymentRow {
+  publicId: string; transactionCode: string; provider: string; amount: number; status: string; createdAt: string; expiresAt: string; paidAt: string | null;
+  providerRef: string | null; needsReview: boolean; reviewNote: string | null; label: string; kind: string; cardNo: string; chargeStatus: string;
+}
+export interface PaymentSearch extends CrudSearch { transactionStatus?: string | null; provider?: string | null; needsReview?: boolean | null; from?: string | null; to?: string | null; }
+export interface PaymentSearchResult { page: CrudPage<PaymentRow>; totals: { paid: number; pending: number; needsReview: number; needsReviewCount: number }; }
+export interface WebhookLogRow { id: number; provider: string; transactionCode: string | null; result: string; payload: string; remoteIp: string | null; receivedAt: string; }
+export interface CardFee {
+  publicId: string; cardNo: string; readerName: string; amount: number; reason: string; status: string; paidAt: string | null; paidVia: string | null;
+  createdByName: string | null; createdAt: string;
+}
+export interface FinePayment { id: number; amount: number; method: string; note: string | null; reason: string | null; byName: string | null; paidAt: string; }
+export interface FineTicketDetail {
+  ticket: FineTicket; lines: FineLine[]; finePerDay: number; payments?: FinePayment[] | null; pendingRequests?: ChangeRequest[] | null;
+}
+
+// ── Phê duyệt theo thẩm quyền (mọi service dùng chung khung; service = circulation | holdings) ──
+export type ApprovalService = 'circulation' | 'holdings';
+/** Pending | Approved | Rejected | Cancelled | Failed */
+export interface ChangeRequest {
+  publicId: string; kind: string; kindName: string; module: string; targetPublicId: string; targetLabel: string | null; summary: string; reason: string;
+  amount: number | null; count: number | null; status: string; requestedByName: string | null; requestedAt: string; decidedByName: string | null;
+  decidedAt: string | null; decisionNote: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null; canDecide: boolean;
+  service?: ApprovalService;
+}
+export interface PendingApproval { requestId: string; kind: string; kindName: string; message: string; }
+export interface ApprovalRule {
+  kind: string; module: string; name: string; description: string; enabled: boolean; amount: number | null; percent: number | null; count: number | null;
+  isCustom: boolean; service?: ApprovalService;
+}
+/** Kết quả lưu có thể là đã áp dụng (200) hoặc chờ duyệt (202, chưa đổi gì). */
+export type FineSaveResult = { detail: FineTicketDetail; pending: null } | { detail: null; pending: PendingApproval };
 export interface FineTicketTotals { receivable: number; received: number; remaining: number; }
 export interface FineTicketSearch extends CrudSearch {
   cardNo?: string | null; ticketStatus?: number | null; unpaid?: boolean | null; from?: string | null; to?: string | null;
@@ -433,7 +514,7 @@ export interface FineTicketSearch extends CrudSearch {
 export interface FineLineChange { id: number | null; reasonCode: string; amount: number; barcode?: string | null; }
 export interface SaveFineTicket {
   status: number; discount: number; paid: number; note: string | null; manualAmount?: number | null; fineDate?: string | null;
-  lines: FineLineChange[]; deletedLineIds: number[];
+  lines: FineLineChange[]; deletedLineIds: number[]; reason?: string | null;
 }
 
 // ── Tài liệu số (service digital) ──
@@ -564,6 +645,8 @@ export interface SpaceLockerCabinet {
   positionX: number | null; positionY: number | null; width: number | null; height: number | null;
   colorHex: string | null; iconName: string | null; note: string | null; status: number; createdAt: string; updatedAt: string | null;
 }
+/** Ngăn của giá sách theo khoảng DDC (monolith: map.MapShelfRow). Bản sách có DDC trong khoảng (hoặc bắt đầu bằng DDC đến) thuộc ngăn này. */
+export interface SpaceShelfRow { id: number; publicId: string; fixtureId: number; rowIndex: number; ddcStart: string; ddcEnd: string; description: string | null; createdAt: string; updatedAt: string | null; }
 /** Ngăn trong tủ (monolith: PrintBook.CabinetCompartment) — sinh tự động theo Rows×Cols khi tạo/sửa tủ. */
 export interface SpaceLockerCompartment {
   id: number; publicId: string; cabinetId: number; rowIndex: number; colIndex: number; code: string; name: string | null; note: string | null;
@@ -988,24 +1071,56 @@ export class Api {
   nextBarcode(prefix: string, digits: number) { return this.get<NextBarcode>('/api/admin/holdings/items/NextBarcode', { prefix, digits }); }
   shelveItems(body: { ids?: string[]; barcodes?: string[]; storeId?: number | null }) { return this.post<ShelveResult>('/api/admin/holdings/items/Shelve', body); }
   storeOptions() { return this.get<StoreOption[]>('/api/admin/holdings/stores/Options'); }
+  // Thanh toán QR
+  paymentAccount() { return this.get<PaymentAccount>('/api/admin/payment/payment-account'); }
+  savePaymentAccount(body: PaymentAccountInput) { return this.put<PaymentAccount>('/api/admin/payment/payment-account', body); }
+  paymentProviders() { return this.get<string[]>('/api/admin/payment/payments/Providers'); }
+  createPayment(sourceService: string, sourceId: string, provider: string) {
+    return this.post<PaymentTx>('/api/admin/payment/payments/Create', { sourceService, sourceId, provider });
+  }
+  paymentStatus(publicId: string) { return this.get<PaymentTx>(`/api/admin/payment/payments/${publicId}`); }
+  searchPayments(search: PaymentSearch) { return this.post<PaymentSearchResult>('/api/admin/payment/payments/Search', search); }
+  resolvePaymentReview(publicId: string, note: string) { return this.post<void>(`/api/admin/payment/payments/${publicId}/ResolveReview`, { note }); }
+  searchWebhookLogs(search: CrudSearch & { provider?: string | null }) { return this.post<CrudPage<WebhookLogRow>>('/api/admin/payment/webhook-logs/Search', search); }
+  resyncCharges() { return this.post<{ synced: number }>('/api/admin/payment/charges/Resync', {}); }
+  // Phí cấp lại thẻ (patron)
+  searchCardFees(search: CrudSearch & { cardNo?: string | null; feeStatus?: string | null }) { return this.post<CrudPage<CardFee>>('/api/admin/patron/card-fees/Search', search); }
+  addCardFee(body: { cardNo: string; amount: number; reason: string }) { return this.post<CardFee>('/api/admin/patron/card-fees/Add', body); }
+  settleCardFeeCash(publicId: string) { return this.post<CardFee>(`/api/admin/patron/card-fees/${publicId}/SettleCash`, {}); }
+  cancelCardFee(publicId: string, reason: string) { return this.post<CardFee>(`/api/admin/patron/card-fees/${publicId}/Cancel`, { reason }); }
+  searchMapShelving(body: MapShelvingSearch) { return this.post<CrudPage<MapShelvingRow>>('/api/admin/holdings/map-shelving/Search', body); }
+  mapShelves(storeId: number) { return this.get<MapFloorNode[]>('/api/admin/holdings/map-shelving/Shelves', { storeId }); }
+  placeItems(body: { ids: string[]; shelfPublicId: string; rowPublicId?: string | null; reason?: string | null }) {
+    return this.post<PlaceResult>('/api/admin/holdings/map-shelving/Place', body);
+  }
+  itemMovements(publicId: string) { return this.get<ItemMovement[]>(`/api/admin/holdings/items/Movements/${publicId}`); }
   // Sách mất (LOST_BOOKS) / thanh lý (LIQUIDATES)
   searchLost(search: StoreRecordSearch) { return this.post<CrudPage<LostRow>>('/api/admin/holdings/lost-books/Search', search); }
   exportLost(search: StoreRecordSearch) { return this.holdingsFile('lost-books/Export', search); }
-  markLost(body: { barcodes: string[]; lostOn: string | null; reason: string | null }) { return this.post<ItemBatchResult>('/api/admin/holdings/lost-books/MarkLost', body); }
-  restoreLost(barcode: string) { return this.post<void>('/api/admin/holdings/lost-books/Restore', { barcode }); }
+  markLost(body: { barcodes: string[]; lostOn: string | null; reason: string }) { return this.batch('/api/admin/holdings/lost-books/MarkLost', body); }
+  /** Hoàn tác báo mất: lý do bắt buộc; trả pending khi cần duyệt (HTTP 202). */
+  restoreLost(barcode: string, reason: string) { return this.undo('/api/admin/holdings/lost-books/Restore', { barcode, reason }); }
   searchLiquidations(search: StoreRecordSearch) { return this.post<CrudPage<LiquidationRow>>('/api/admin/holdings/liquidations/Search', search); }
   exportLiquidations(search: StoreRecordSearch) { return this.holdingsFile('liquidations/Export', search); }
-  liquidate(body: { barcodes: string[]; liquidatedOn: string | null; reason: string | null }) {
-    return this.post<ItemBatchResult>('/api/admin/holdings/liquidations/Liquidate', body);
+  liquidate(body: { barcodes: string[]; liquidatedOn: string | null; reason: string; decisionNo?: string | null; decisionDate?: string | null }) {
+    return this.batch('/api/admin/holdings/liquidations/Liquidate', body);
   }
-  cancelLiquidation(barcode: string) { return this.post<void>('/api/admin/holdings/liquidations/Cancel', { barcode }); }
+  cancelLiquidation(barcode: string, reason: string) { return this.undo('/api/admin/holdings/liquidations/Cancel', { barcode, reason }); }
+  private async batch(url: string, body: unknown): Promise<BatchOutcome> {
+    const r = await firstValueFrom(this.http.post<ItemBatchResult | PendingApproval>(url, body, { observe: 'response' }));
+    return r.status === 202 ? { result: null, pending: r.body as PendingApproval } : { result: r.body as ItemBatchResult, pending: null };
+  }
+  private async undo(url: string, body: unknown): Promise<PendingApproval | null> {
+    const r = await firstValueFrom(this.http.post<PendingApproval | null>(url, body, { observe: 'response' }));
+    return r.status === 202 ? (r.body as PendingApproval) : null;
+  }
   // Sách ra vào kho (BOOK_OUT_STORE)
   storeOutOptions() { return this.get<StoreOutOptions>('/api/admin/holdings/store-outs/Options'); }
   searchStoreOuts(search: StoreOutSearch) { return this.post<CrudPage<StoreOutRow>>('/api/admin/holdings/store-outs/Search', search); }
   exportStoreOuts(search: StoreOutSearch) { return this.holdingsFile('store-outs/Export', search); }
   scanOut(body: ScanOut) { return this.post<StoreOutRow>('/api/admin/holdings/store-outs/ScanOut', body); }
   scanIn(barcode: string) { return this.post<StoreOutRow>('/api/admin/holdings/store-outs/ScanIn', { barcode }); }
-  deleteStoreOut(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/holdings/store-outs/Delete/${publicId}`)); }
+  deleteStoreOut(publicId: string, reason: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/holdings/store-outs/Delete/${publicId}`, { headers: reasonHeader(reason) })); }
   // Kiểm kê (INVENTORY): crud('inventories', 'holdings') + quét, nhập Excel, đối chiếu
   closeInventory(publicId: string) { return this.post<Inventory>(`/api/admin/holdings/inventories/Close/${publicId}`); }
   reopenInventory(publicId: string) { return this.post<Inventory>(`/api/admin/holdings/inventories/Reopen/${publicId}`); }
@@ -1153,8 +1268,43 @@ export class Api {
   buildFineTicket(cardNo: string, loanIds: string[] = [], circPlaceId: number | null = null) {
     return this.post<FineTicketDetail>('/api/admin/circulation/fine-tickets/BuildForReader', { cardNo, loanIds, circPlaceId });
   }
-  saveFineTicket(publicId: string, body: SaveFineTicket) { return this.put<FineTicketDetail>(`/api/admin/circulation/fine-tickets/Save/${publicId}`, body); }
-  deleteFineTicket(publicId: string) { return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/fine-tickets/Delete/${publicId}`)); }
+  async saveFineTicket(publicId: string, body: SaveFineTicket): Promise<FineSaveResult> {
+    return this.fineResult(await firstValueFrom(this.http.put<FineTicketDetail | PendingApproval>(`/api/admin/circulation/fine-tickets/Save/${publicId}`, body, { observe: 'response' })));
+  }
+  /** Hoàn tiền / điều chỉnh giảm số đã thu (amount âm) — luôn có lý do. */
+  async forceCloseLoan(loanId: string, reason: string): Promise<LoanActionResult> {
+    return this.loanResult(await firstValueFrom(this.http.post<Loan | PendingApproval>('/api/admin/circulation/loans/ForceClose', { loanId, reason }, { observe: 'response' })));
+  }
+  async reopenLoan(loanId: string, reason: string): Promise<LoanActionResult> {
+    return this.loanResult(await firstValueFrom(this.http.post<Loan | PendingApproval>('/api/admin/circulation/loans/Reopen', { loanId, reason }, { observe: 'response' })));
+  }
+  private loanResult(response: HttpResponse<Loan | PendingApproval>): LoanActionResult {
+    return response.status === 202 ? { loan: null, pending: response.body as PendingApproval } : { loan: response.body as Loan, pending: null };
+  }
+  async adjustFineTicket(publicId: string, body: { amount: number; reason: string; note?: string | null }): Promise<FineSaveResult> {
+    return this.fineResult(await firstValueFrom(this.http.post<FineTicketDetail | PendingApproval>(`/api/admin/circulation/fine-tickets/Adjust/${publicId}`, body, { observe: 'response' })));
+  }
+  deleteFineTicket(publicId: string, reason: string) {
+    return firstValueFrom(this.http.delete<void>(`/api/admin/circulation/fine-tickets/Delete/${publicId}`, { headers: reasonHeader(reason) }));
+  }
+  private fineResult(response: HttpResponse<FineTicketDetail | PendingApproval>): FineSaveResult {
+    return response.status === 202
+      ? { detail: null, pending: response.body as PendingApproval }
+      : { detail: response.body as FineTicketDetail, pending: null };
+  }
+
+  // Phê duyệt theo thẩm quyền — mỗi service có hộp riêng; màn "Chờ phê duyệt" gộp các service có quyền.
+  searchApprovals(service: ApprovalService, scope: 'inbox' | 'mine', status: number | null, pageIndex = 1, pageSize = 50) {
+    return this.post<CrudPage<ChangeRequest>>(`/api/admin/${service}/approvals/Search`, { scope, status, pageIndex, pageSize });
+  }
+  approvalCount(service: ApprovalService) { return this.get<{ pending: number }>(`/api/admin/${service}/approvals/Count`); }
+  approve(service: ApprovalService, publicId: string, note: string | null) { return this.post<ChangeRequest>(`/api/admin/${service}/approvals/${publicId}/Approve`, { note }); }
+  rejectApproval(service: ApprovalService, publicId: string, note: string) { return this.post<ChangeRequest>(`/api/admin/${service}/approvals/${publicId}/Reject`, { note }); }
+  cancelApproval(service: ApprovalService, publicId: string) { return this.post<ChangeRequest>(`/api/admin/${service}/approvals/${publicId}/Cancel`, {}); }
+  approvalRules(service: ApprovalService) { return this.get<ApprovalRule[]>(`/api/admin/${service}/approval-rules`); }
+  saveApprovalRule(service: ApprovalService, kind: string, body: { enabled: boolean; amount: number | null; percent: number | null; count: number | null }, reason?: string | null) {
+    return firstValueFrom(this.http.put<ApprovalRule>(`/api/admin/${service}/approval-rules/${kind}`, body, { headers: reasonHeader(reason) }));
+  }
   addDefaultFineReasons() { return this.post<{ added: number }>('/api/admin/circulation/fine-reasons/AddDefaults'); }
   restoreCatalogDefaults() { return this.post<{ added: number; worksheets: number }>('/api/admin/catalog/bib-types/RestoreDefaults'); }
   faceStatus() { return this.get<{ enabled: boolean }>('/api/admin/patron/readers/FaceStatus'); }

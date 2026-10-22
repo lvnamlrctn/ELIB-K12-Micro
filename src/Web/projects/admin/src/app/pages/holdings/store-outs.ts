@@ -5,7 +5,8 @@ import { Api, CrudPage, ScanOut, StoreOutOptions, StoreOutRow, StoreOutSearch, e
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
-import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
+import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
+import { Loading, Paginator } from '../../shared/ui';
 
 /**
  * Sách ra vào kho (monolith: /admin/book-out-store, quyền BOOK_OUT_STORE): quét ĐKCB xuất kho tạm (photo, triển lãm, cho đơn vị
@@ -13,7 +14,7 @@ import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-store-outs',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, ConfirmDelete, TranslatePipe],
+  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ReasonDialog],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'STORE_OUT.TITLE' | translate }}</h4></div>
 
@@ -151,7 +152,8 @@ import { ConfirmDelete, Loading, Paginator } from '../../shared/ui';
       }
     </div>
     @if (deleting(); as r) {
-      <app-confirm-delete [busy]="busy()" message="STORE_OUT.DELETE_CONFIRM" [messageParams]="{ barcode: r.barcode }" (confirmed)="remove(r)" (cancelled)="deleting.set(null)" />
+      <app-reason-dialog title="STORE_OUT.DELETE_TITLE" message="STORE_OUT.DELETE_CONFIRM" [params]="{ barcode: r.barcode }" confirmText="COMMON.DELETE"
+                         (confirmed)="remove(r, $event)" (cancelled)="deleting.set(null)" />
     }
   `,
 })
@@ -207,10 +209,10 @@ export class StoreOuts implements OnInit {
     }
   }
 
-  protected async remove(r: StoreOutRow): Promise<void> {
+  protected async remove(r: StoreOutRow, result: ReasonResult): Promise<void> {
     this.busy.set(true);
     try {
-      await this.api.deleteStoreOut(r.publicId);
+      await this.api.deleteStoreOut(r.publicId, result.reason);
       this.toastr.success('COMMON.DELETE_SUCCESS');
       this.deleting.set(null);
       await this.load();

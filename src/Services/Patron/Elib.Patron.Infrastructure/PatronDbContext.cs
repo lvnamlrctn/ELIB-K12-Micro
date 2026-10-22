@@ -20,6 +20,21 @@ public sealed class PatronDbContext(DbContextOptions<PatronDbContext> options, I
         modelBuilder.NamedCatalog<SchoolClass>("classes", 250);
         modelBuilder.NamedCatalog<Course>("courses", 250);
 
+        modelBuilder.Entity<CardFee>(e =>
+        {
+            e.ToTable("card_fees");
+            e.Property(x => x.CardNo).HasMaxLength(50);
+            e.Property(x => x.ReaderName).HasMaxLength(300);
+            e.Property(x => x.Amount).HasPrecision(18, 0);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.Status).HasMaxLength(10);
+            e.Property(x => x.PaidVia).HasMaxLength(4);
+            e.Property(x => x.PaymentCode).HasMaxLength(30);
+            e.Property(x => x.CreatedByName).HasMaxLength(300);
+            e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.CreatedAt });
+        });
+
         modelBuilder.Entity<ReaderGroup>(e =>
         {
             e.ToTable("reader_groups");

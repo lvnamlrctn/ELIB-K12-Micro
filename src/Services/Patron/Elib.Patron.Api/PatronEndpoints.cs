@@ -22,6 +22,15 @@ public static class PatronEndpoints
         app.MapCrud<CourseResource>("/api/courses", "COURSES").WithTags("Courses");
         app.MapCrud<ReaderGroupResource>("/api/reader-groups", "GROUPREADER").WithTags("ReaderGroups");
 
+        // Phí cấp lại thẻ: lập khoản thu, thu tiền mặt, huỷ — thu qua QR do dịch vụ thanh toán (PaymentSucceeded).
+        var cardFees = app.MapGroup("/api/card-fees").WithTags("CardFees");
+        cardFees.MapPost("/Search", [Permission("READER_CARD_FEES", "view")] (CardFeeSearch search, CardFeeService s, CancellationToken ct) => s.SearchAsync(search, ct));
+        cardFees.MapPost("/Add", [Permission("READER_CARD_FEES", "add")] async (CardFeeRequest request, CardFeeService s, CancellationToken ct)
+            => Results.Created((string?)null, await s.IssueAsync(request, ct)));
+        cardFees.MapPost("/{publicId:guid}/SettleCash", [Permission("READER_CARD_FEES", "edit")] (Guid publicId, CardFeeService s, CancellationToken ct) => s.SettleCashAsync(publicId, ct));
+        cardFees.MapPost("/{publicId:guid}/Cancel", [Permission("READER_CARD_FEES", "edit")] (Guid publicId, CardFeeCancelRequest request, CardFeeService s, CancellationToken ct)
+            => s.CancelAsync(publicId, request.Reason, ct));
+
         var readers = app.MapCrud<ReaderResource>("/api/readers", "READERS").WithTags("Readers");
         readers.MapGet("/CheckExist", [Permission("READERS", "view")] (string cardNo, Guid? excludePublicId, ReaderResource r, CancellationToken ct)
             => r.CheckExistAsync(cardNo, excludePublicId, ct));

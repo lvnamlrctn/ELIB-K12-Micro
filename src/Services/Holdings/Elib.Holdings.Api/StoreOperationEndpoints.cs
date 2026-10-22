@@ -63,12 +63,9 @@ public static class StoreOperationEndpoints
         g.MapPost("/Search", [Permission("LOST_BOOKS", "view")] (StoreRecordSearch search, LostBooks r, CancellationToken ct) => r.SearchAsync(search, ct));
         g.MapPost("/Export", [Permission("LOST_BOOKS", "view")] async (StoreRecordSearch search, LostBooks r, CancellationToken ct)
             => File(await r.ExportAsync(search, ct)));
-        g.MapPost("/MarkLost", [Permission("LOST_BOOKS", "add")] (MarkLostRequest request, LostBooks r, CancellationToken ct) => r.MarkLostAsync(request, ct));
-        g.MapPost("/Restore", [Permission("LOST_BOOKS", "edit")] async (BarcodeRequest request, LostBooks r, CancellationToken ct) =>
-        {
-            await r.RestoreAsync(request, ct);
-            return Results.NoContent();
-        });
+        g.MapPost("/MarkLost", [Permission("LOST_BOOKS", "add")] async (MarkLostRequest request, LostBooks r, CancellationToken ct) => Batch(await r.MarkLostAsync(request, ct)));
+        g.MapPost("/Restore", [Permission("LOST_BOOKS", "edit")] async (ItemReasonRequest request, LostBooks r, CancellationToken ct) =>
+            await r.RestoreAsync(request, ct) is { } pending ? Results.Json(pending, statusCode: StatusCodes.Status202Accepted) : Results.NoContent());
     }
 
     private static void MapLiquidations(RouteGroupBuilder g)
@@ -76,14 +73,15 @@ public static class StoreOperationEndpoints
         g.MapPost("/Search", [Permission("LIQUIDATES", "view")] (StoreRecordSearch search, Liquidations r, CancellationToken ct) => r.SearchAsync(search, ct));
         g.MapPost("/Export", [Permission("LIQUIDATES", "view")] async (StoreRecordSearch search, Liquidations r, CancellationToken ct)
             => File(await r.ExportAsync(search, ct)));
-        g.MapPost("/Liquidate", [Permission("LIQUIDATES", "add")] (LiquidateRequest request, Liquidations r, CancellationToken ct)
-            => r.LiquidateAsync(request, ct));
-        g.MapPost("/Cancel", [Permission("LIQUIDATES", "edit")] async (BarcodeRequest request, Liquidations r, CancellationToken ct) =>
-        {
-            await r.CancelAsync(request, ct);
-            return Results.NoContent();
-        });
+        g.MapPost("/Liquidate", [Permission("LIQUIDATES", "add")] async (LiquidateRequest request, Liquidations r, CancellationToken ct)
+            => Batch(await r.LiquidateAsync(request, ct)));
+        g.MapPost("/Cancel", [Permission("LIQUIDATES", "edit")] async (ItemReasonRequest request, Liquidations r, CancellationToken ct) =>
+            await r.CancelAsync(request, ct) is { } pending ? Results.Json(pending, statusCode: StatusCodes.Status202Accepted) : Results.NoContent());
     }
+
+    /// <summary>200 khi đã xử lý; 202 khi vượt thẩm quyền và chỉ mới tạo yêu cầu chờ duyệt (chưa đổi gì).</summary>
+    private static IResult Batch(ItemBatchOutcome outcome) =>
+        outcome.Pending is { } pending ? Results.Json(pending, statusCode: StatusCodes.Status202Accepted) : Results.Ok(outcome.Result);
 
     private static void MapStoreOuts(RouteGroupBuilder api)
     {

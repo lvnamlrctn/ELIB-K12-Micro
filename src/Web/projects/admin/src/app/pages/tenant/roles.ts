@@ -12,6 +12,7 @@ const ACTIONS = [
   { key: 'add', label: 'ROLE.ACTION_add' },
   { key: 'edit', label: 'ROLE.ACTION_edit' },
   { key: 'delete', label: 'ROLE.ACTION_delete' },
+  { key: 'approve', label: 'ROLE.ACTION_approve' },
 ] as const;
 
 /** Một dòng của bảng phân quyền: tiêu đề nhóm (theo menu) hoặc một module quyền. */
@@ -129,7 +130,7 @@ interface MatrixRow {
             <thead class="sticky top-0 z-10">
               <tr class="bg-teal-600 text-white">
                 <th class="py-3 px-4 text-left font-medium">{{ 'ROLE.FUNCTION' | translate }}</th>
-                @for (a of actions; track a.key) { <th class="py-3 px-2 text-center font-medium w-24">{{ a.label }}</th> }
+                @for (a of actions; track a.key) { <th class="py-3 px-2 text-center font-medium w-24">{{ a.label | translate }}</th> }
               </tr>
             </thead>
             <tbody>
@@ -150,7 +151,7 @@ interface MatrixRow {
                       @if (supports(row, a.key)) {
                         <button type="button" (click)="toggle(row, a.key)" [disabled]="!canEditMatrix()"
                                 class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 disabled:cursor-default disabled:opacity-70"
-                                [class]="isOn(row, a.key) ? (a.key === 'delete' ? 'bg-red-400' : 'bg-teal-500') : 'bg-gray-200'"
+                                [class]="isOn(row, a.key) ? (a.key === 'delete' ? 'bg-red-400' : a.key === 'approve' ? 'bg-amber-500' : 'bg-teal-500') : 'bg-gray-200'"
                                 [title]="row.module ? (a.label | translate) : ('ROLE.WHOLE_GROUP' | translate: { action: (a.label | translate) })">
                           <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
                                 [class]="isOn(row, a.key) ? 'translate-x-4' : 'translate-x-0.5'"></span>
@@ -162,7 +163,7 @@ interface MatrixRow {
                   }
                 </tr>
               } @empty {
-                <tr><td colspan="5" class="py-12 text-center text-gray-400">{{ catalogLoading() ? '' : ('ROLE.NO_MODULES' | translate) }}</td></tr>
+                <tr><td colspan="6" class="py-12 text-center text-gray-400">{{ catalogLoading() ? '' : ('ROLE.NO_MODULES' | translate) }}</td></tr>
               }
             </tbody>
           </table>

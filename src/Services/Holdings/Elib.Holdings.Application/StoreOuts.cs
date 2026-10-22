@@ -89,7 +89,7 @@ public sealed record ScanOutRequest(
 /// lại để nhập kho. Bản "X" của dữ liệu cũ không có lượt xuất vẫn nhập được (ghi một lượt chỉ có ngày nhập). Xoá lượt còn mở thì bản
 /// sách về kho.
 /// </summary>
-public sealed class StoreOuts(ICrudDbContext db, ItemEvents events, HoldingsExcel excel, TimeProvider clock, ICrudAuditSink? audit = null)
+public sealed class StoreOuts(ICrudDbContext db, ItemEvents events, HoldingsExcel excel, TimeProvider clock, CrudAuditContext? auditContext = null, ICrudAuditSink? audit = null)
 {
     public async Task<CrudPage<StoreOutRow>> SearchAsync(StoreOutSearch search, CancellationToken ct)
     {
@@ -152,6 +152,7 @@ public sealed class StoreOuts(ICrudDbContext db, ItemEvents events, HoldingsExce
     /// <summary>Xoá một lượt (nhập nhầm). Lượt còn mở: bản sách về kho nếu không còn lượt mở nào khác.</summary>
     public async Task DeleteAsync(Guid publicId, CancellationToken ct)
     {
+        var reason = ChangeReason.Require(null, auditContext?.Capture().Reason, "xoá lượt ra vào kho");
         var tx = await db.Set<StoreOut>().FirstOrDefaultAsync(x => x.PublicId == publicId, ct) ?? throw new NotFoundException("Lượt ra vào kho", publicId);
         var item = await db.Set<Item>().FirstOrDefaultAsync(x => x.Id == tx.ItemId, ct);
         db.Set<StoreOut>().Remove(tx);
@@ -161,7 +162,7 @@ public sealed class StoreOuts(ICrudDbContext db, ItemEvents events, HoldingsExce
             item.BringBack();
             await events.PublishAsync(item, deleted: false, ct);
         }
-        if (item is not null) await AuditAsync(item, $"ĐKCB {item.Barcode}: xoá lượt ra vào kho", ct);
+        if (item is not null) await AuditAsync(item, $"ĐKCB {item.Barcode}: xoá lượt ra vào kho ({reason})", ct);
         await db.SaveChangesAsync(ct);
     }
 

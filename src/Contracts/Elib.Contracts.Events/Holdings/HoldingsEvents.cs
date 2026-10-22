@@ -42,3 +42,21 @@ public sealed record StoreChanged : IntegrationEvent
     public required string Name { get; init; }
     public bool Deleted { get; init; }
 }
+
+/// <summary>
+/// Bản sách đã báo mất được khôi phục (tìm thấy). Nếu bản mất khi đang mượn (<see cref="CardNo"/> có giá trị), circulation đề xuất điều chỉnh
+/// phiếu phạt tương ứng (hoàn dòng phạt mất) chờ người có thẩm quyền duyệt — không tự mở lượt mượn, không tự hoàn tiền.
+/// </summary>
+public sealed record ItemLossReversed : IntegrationEvent
+{
+    public required Guid ItemPublicId { get; init; }
+    public required string Barcode { get; init; }
+
+    /// <summary>Thẻ bạn đọc làm mất (bản mất khi đang mượn); null = mất do thư viện báo mất.</summary>
+    public string? CardNo { get; init; }
+
+    public required string Reason { get; init; }
+
+    /// <summary>"Họ tên (tên đăng nhập)" người khôi phục.</summary>
+    public string? ActorName { get; init; }
+}

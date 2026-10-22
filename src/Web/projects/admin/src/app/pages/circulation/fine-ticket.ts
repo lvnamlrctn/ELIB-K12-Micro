@@ -2,10 +2,14 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Api, FineLine, FineReason, FineTicketDetail, errorMessage } from '../../core/api';
 import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
+import { EntityHistoryDialog } from '../../shared/entity-history';
+import { PaymentDialog } from '../payment/payment-dialog';
+import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { Loading } from '../../shared/ui';
 
 interface EditLine { id: number | null; reasonCode: string; amount: number; barcode: string | null; title: string | null; overdueDays: number; dueAt: string | null; loanOpen: boolean; }
@@ -16,17 +20,28 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
  */
 @Component({
   selector: 'app-fine-ticket',
-  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, TranslatePipe],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, ReasonDialog, EntityHistoryDialog, PaymentDialog, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <a routerLink="/fines" class="icon-btn text-gray-500 hover:bg-gray-100" [title]="'FINE_TICKET_PAGE.BACK' | translate"><span class="material-icons">arrow_back</span></a>
       <h4 class="page-title">{{ 'FINE_TICKET_PAGE.TITLE' | translate: { code: detail()?.ticket?.code ?? '' } }}</h4>
       @if (detail(); as d) {
         <span [class]="d.ticket.status === 2 ? 'badge-on' : 'badge-info'">{{ (d.ticket.status === 2 ? 'FINES_PAGE.DONE' : 'FINES_PAGE.OPEN') | translate }}</span>
+        @if (canPay() && d.ticket.remaining > 0) {
+          <button type="button" class="btn-primary !py-1 ml-auto" (click)="paying.set(true)"><span class="material-icons text-[18px]">qr_code_2</span> {{ 'PAYMENT_DIALOG.COLLECT' | translate }}</button>
+        }
+        <button type="button" class="btn-secondary !py-1" [class.ml-auto]="!(canPay() && d.ticket.remaining > 0)" (click)="historyOpen.set(true)"><span class="material-icons text-[18px]">history</span> {{ 'FINE_TICKET_PAGE.HISTORY' | translate }}</button>
       }
     </div>
 
     @if (detail(); as d) {
+      @for (r of d.pendingRequests ?? []; track r.publicId) {
+        <div class="alert-info mb-4" role="status">
+          <div class="font-medium">{{ 'FINE_TICKET_PAGE.PENDING_TITLE' | translate: { kind: r.kindName } }}</div>
+          <div class="text-sm">{{ r.summary }} — {{ 'FINE_TICKET_PAGE.PENDING_BY' | translate: { name: r.requestedByName ?? '—', date: (r.requestedAt | ldate: 'dd/MM/yyyy HH:mm') } }}</div>
+          <div class="text-xs text-gray-600">{{ 'REASON_DIALOG.REASON' | translate }}: {{ r.reason }}</div>
+        </div>
+      }
       <div class="panel">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
           <div><div class="text-gray-500 text-xs">{{ 'FINE_TICKET_PAGE.READER' | translate }}</div><div class="font-medium">{{ d.ticket.readerName ?? '—' }}</div><div class="font-mono text-xs text-gray-500">{{ d.ticket.cardNo }}</div></div>
@@ -100,7 +115,7 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
           <div>
             <label for="ft-paid" class="field-label">{{ 'FINE_TICKET_PAGE.PAID' | translate }}</label>
             <div class="flex gap-2">
-              <input id="ft-paid" type="number" min="0" class="input" [(ngModel)]="paid" [disabled]="!can('edit')" />
+              <input id="ft-paid" type="number" [min]="d.ticket.paid" class="input" [(ngModel)]="paid" [disabled]="!can('edit')" [title]="'FINE_TICKET_PAGE.PAID_TIP' | translate" />
               @if (can('edit')) { <button class="btn-secondary !px-2 whitespace-nowrap" [title]="'FINE_TICKET_PAGE.PAY_ALL_TIP' | translate" (click)="payAll()">{{ 'FINE_TICKET_PAGE.PAY_ALL' | translate }}</button> }
             </div>
           </div>
@@ -112,6 +127,33 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
             <label for="ft-note" class="field-label">{{ 'COMMON.NOTE' | translate }}</label>
             <input id="ft-note" class="input" maxlength="1000" [(ngModel)]="note" [disabled]="!can('edit')" />
           </div>
+          @if (d.payments?.length) {
+            <div class="md:col-span-4">
+              <div class="flex items-center justify-between mb-1">
+                <div class="field-label !mb-0">{{ 'FINE_TICKET_PAGE.PAYMENTS' | translate }}</div>
+                @if (can('edit') && d.ticket.paid > 0) {
+                  <button type="button" class="btn-secondary !py-1 text-amber-700" (click)="adjusting.set(true)"><span class="material-icons text-[16px]">undo</span> {{ 'FINE_TICKET_PAGE.ADJUST' | translate }}</button>
+                }
+              </div>
+              <table class="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
+                <thead class="bg-gray-50 text-gray-500"><tr>
+                  <th class="px-2 py-1 text-left">{{ 'FINE_TICKET_PAGE.PAY_DATE' | translate }}</th><th class="px-2 py-1 text-left">{{ 'FINE_TICKET_PAGE.PAY_KIND' | translate }}</th>
+                  <th class="px-2 py-1 text-right">{{ 'FINE_TICKET_PAGE.AMOUNT' | translate }}</th><th class="px-2 py-1 text-left">{{ 'FINE_TICKET_PAGE.PAY_BY' | translate }}</th><th class="px-2 py-1 text-left">{{ 'REASON_DIALOG.REASON' | translate }}</th>
+                </tr></thead>
+                <tbody>
+                  @for (p of d.payments; track p.id) {
+                    <tr class="border-t border-gray-100">
+                      <td class="px-2 py-1 whitespace-nowrap">{{ p.paidAt | ldate: 'dd/MM/yyyy HH:mm' }}</td>
+                      <td class="px-2 py-1">{{ methodKey(p.method) | translate }}</td>
+                      <td class="px-2 py-1 text-right font-medium" [class.text-red-600]="p.amount < 0">{{ p.amount | lnumber: '1.0-0' }}</td>
+                      <td class="px-2 py-1">{{ p.byName ?? '—' }}</td>
+                      <td class="px-2 py-1 text-gray-500">{{ p.reason ?? p.note ?? '' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
         </div>
         @if (can('edit')) {
           <div class="flex justify-end gap-2 mt-4">
@@ -127,6 +169,21 @@ interface EditLine { id: number | null; reasonCode: string; amount: number; barc
     } @else if (!busy()) {
       <div class="panel text-gray-500">{{ 'FINE_TICKET_PAGE.NOT_FOUND' | translate }}</div>
     }
+
+    @if (reasonFor(); as r) {
+      <app-reason-dialog title="FINE_TICKET_PAGE.REASON_TITLE" message="FINE_TICKET_PAGE.REASON_MSG" [preview]="r.preview"
+                         (confirmed)="reasonGiven($event)" (cancelled)="reasonFor.set(null)" />
+    }
+    @if (adjusting()) {
+      <app-reason-dialog title="FINE_TICKET_PAGE.ADJUST_TITLE" message="FINE_TICKET_PAGE.ADJUST_MSG" [showAmount]="true" amountLabel="FINE_TICKET_PAGE.ADJUST_AMOUNT"
+                         confirmText="FINE_TICKET_PAGE.ADJUST" (confirmed)="adjust($event)" (cancelled)="adjusting.set(false)" />
+    }
+    @if (paying() && detail(); as p) {
+      <app-payment-dialog sourceService="circulation" [sourceId]="p.ticket.publicId" (closed)="paying.set(false)" (paid)="reload()" />
+    }
+    @if (historyOpen() && detail(); as h) {
+      <app-entity-history entityType="FineTicket" [publicId]="h.ticket.publicId" title="FINE_TICKET_PAGE.HISTORY" [labels]="historyLabels" (closed)="historyOpen.set(false)" />
+    }
   `,
 })
 export class FineTicketPage implements OnInit {
@@ -141,6 +198,15 @@ export class FineTicketPage implements OnInit {
   protected readonly lines = signal<EditLine[]>([]);
   protected readonly busy = signal(false);
   protected readonly version = signal(0);
+  protected readonly reasonFor = signal<{ status: number; preview: { label: string; from: string; to: string }[] } | null>(null);
+  protected readonly adjusting = signal(false);
+  protected readonly paying = signal(false);
+  protected readonly canPay = computed(() => this.session.can('PAYMENT_TRANSACTIONS:add') && (this.session.features()?.modules ?? []).includes('PAYMENT'));
+  protected readonly historyOpen = signal(false);
+  protected readonly historyLabels: Record<string, string> = {
+    status: 'FINE_TICKET_PAGE.H_STATUS', total: 'FINE_TICKET_PAGE.TOTAL', discount: 'FINE_TICKET_PAGE.DISCOUNT', paid: 'FINE_TICKET_PAGE.PAID',
+    remaining: 'FINE_TICKET_PAGE.REMAINING', note: 'COMMON.NOTE', manualAmount: 'FINE_TICKET_PAGE.TOTAL', lines: 'FINE_TICKET_PAGE.H_LINES',
+  };
   protected readonly editable = computed(() => this.can('edit') && this.detail()?.ticket.status === 1);
   protected readonly total = computed(() => {
     this.version();
@@ -186,6 +252,15 @@ export class FineTicketPage implements OnInit {
     return this.session.can(`FINES:${action}`);
   }
 
+  protected methodKey(method: string): string {
+    switch (method) {
+      case 'QR': return 'FINE_TICKET_PAGE.METHOD_QR';
+      case 'ADJUST': return 'FINE_TICKET_PAGE.METHOD_ADJUST';
+      case 'CARRY': return 'FINE_TICKET_PAGE.METHOD_CARRY';
+      default: return 'FINE_TICKET_PAGE.METHOD_CASH';
+    }
+  }
+
   protected reasonChanged(l: EditLine): void {
     const reason = this.reasons().find((r) => r.code === l.reasonCode);
     const d = this.detail();
@@ -209,12 +284,42 @@ export class FineTicketPage implements OnInit {
     this.paid = Math.max(0, this.total() - (Number(this.discount) || 0));
   }
 
-  protected async save(status: number): Promise<void> {
+  /** Thao tác quan trọng (đổi giảm trừ, sửa/xoá dòng phạt, mở lại phiếu) — hỏi lý do trước khi gửi; server vẫn kiểm lại. */
+  private sensitiveChanges(status: number): { label: string; from: string; to: string }[] {
+    const d = this.detail();
+    if (!d) return [];
+    const out: { label: string; from: string; to: string }[] = [];
+    if ((Number(this.discount) || 0) !== d.ticket.discount) out.push({ label: 'FINE_TICKET_PAGE.DISCOUNT', from: String(d.ticket.discount), to: String(Number(this.discount) || 0) });
+    if (d.ticket.status === 2 && status === 1) out.push({ label: 'FINE_TICKET_PAGE.H_STATUS', from: '2', to: '1' });
+    if (this.lines().length === 0 && (Number(this.manualAmount) || 0) !== (d.ticket.manualAmount ?? d.ticket.total)) out.push({ label: 'FINE_TICKET_PAGE.TOTAL', from: String(d.ticket.manualAmount ?? d.ticket.total), to: String(Number(this.manualAmount) || 0) });
+    if (this.editable()) {
+      if (this.deleted.length) out.push({ label: 'FINE_TICKET_PAGE.H_DELETED', from: String(this.deleted.length), to: '0' });
+      for (const l of this.lines()) {
+        const old = d.lines.find((x) => x.id === l.id);
+        if (old && (old.reasonCode !== l.reasonCode || old.amount !== (Number(l.amount) || 0))) out.push({ label: 'FINE_TICKET_PAGE.H_LINE', from: `${old.reasonCode} ${old.amount}`, to: `${l.reasonCode} ${Number(l.amount) || 0}` });
+      }
+    }
+    return out;
+  }
+
+  protected save(status: number): void {
+    const preview = this.sensitiveChanges(status);
+    if (preview.length) this.reasonFor.set({ status, preview });
+    else void this.doSave(status, null);
+  }
+
+  protected reasonGiven(result: ReasonResult): void {
+    const ask = this.reasonFor();
+    this.reasonFor.set(null);
+    if (ask) void this.doSave(ask.status, result.reason);
+  }
+
+  private async doSave(status: number, reason: string | null): Promise<void> {
     const d = this.detail();
     if (!d) return;
     this.busy.set(true);
     try {
-      const saved = await this.api.saveFineTicket(d.ticket.publicId, {
+      const result = await this.api.saveFineTicket(d.ticket.publicId, {
         status,
         discount: Number(this.discount) || 0,
         paid: Number(this.paid) || 0,
@@ -224,14 +329,45 @@ export class FineTicketPage implements OnInit {
           ? this.lines().map((l) => ({ id: l.id, reasonCode: l.reasonCode, amount: Number(l.amount) || 0, barcode: l.id === null ? l.barcode?.trim() || null : null }))
           : [],
         deletedLineIds: this.editable() ? this.deleted : [],
+        reason,
       });
-      this.apply(saved);
-      this.toastr.success(status === 2 ? 'FINE_TICKET_PAGE.COMPLETED' : 'FINE_TICKET_PAGE.SAVED', { code: saved.ticket.code });
+      this.afterSave(result, status === 2 ? 'FINE_TICKET_PAGE.COMPLETED' : 'FINE_TICKET_PAGE.SAVED');
+    } catch (e) {
+      // Server là nơi quyết định cuối: cần lý do mà giao diện chưa hỏi → hỏi rồi thử lại.
+      if (e instanceof HttpErrorResponse && (e.error as { code?: string } | null)?.code === 'REASON_REQUIRED' && !reason) this.reasonFor.set({ status, preview: [] });
+      else this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async adjust(result: ReasonResult): Promise<void> {
+    const d = this.detail();
+    if (!d) return;
+    this.adjusting.set(false);
+    this.busy.set(true);
+    try {
+      this.afterSave(await this.api.adjustFineTicket(d.ticket.publicId, { amount: -(result.amount ?? 0), reason: result.reason }), 'FINE_TICKET_PAGE.ADJUSTED');
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private afterSave(result: { detail: FineTicketDetail | null; pending: { message: string } | null }, successKey: string): void {
+    if (result.detail) {
+      this.apply(result.detail);
+      this.toastr.success(successKey, { code: result.detail.ticket.code });
+    } else if (result.pending) {
+      this.toastr.info('FINE_TICKET_PAGE.PENDING_SENT');
+      void this.reload();
+    }
+  }
+
+  protected async reload(): Promise<void> {
+    const d = this.detail();
+    if (d) this.apply(await this.api.fineTicket(d.ticket.publicId));
   }
 
   private apply(d: FineTicketDetail): void {

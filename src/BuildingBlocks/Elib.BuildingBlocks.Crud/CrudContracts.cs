@@ -35,6 +35,17 @@ public enum CrudChange
 
     /// <summary>Nhập hàng loạt từ Excel — một dòng nhật ký cho cả lần nhập.</summary>
     Imported,
+
+    /// <summary>Đề nghị thay đổi vượt thẩm quyền, đang chờ người có quyền duyệt (chưa áp dụng).</summary>
+    Requested,
+
+    /// <summary>Yêu cầu thay đổi được người có thẩm quyền duyệt (và đã áp dụng).</summary>
+    Approved,
+
+    Rejected,
+
+    /// <summary>Hoàn tác một thao tác trước đó bằng bản ghi điều chỉnh riêng (không sửa ngược lịch sử).</summary>
+    Reversed,
 }
 
 /// <summary>DbContext của service — <see cref="DbContext"/> đã có sẵn hai method này, chỉ cần khai báo interface.</summary>

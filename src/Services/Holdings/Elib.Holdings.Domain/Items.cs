@@ -57,6 +57,14 @@ public sealed class Item : TenantEntity
 
     public Guid BibPublicId { get; private set; }
     public long? StoreId { get; private set; }
+
+    /// <summary>Giá sách (ShelfReplica) và ngăn theo DDC mà bản sách đang nằm — null = chưa xếp vào giá/ngăn nào (monolith: Barcode.MapObjectId/MapShelfRowId).</summary>
+    public Guid? ShelfPublicId { get; private set; }
+
+    public Guid? ShelfRowPublicId { get; private set; }
+    public DateTimeOffset? ShelvedAt { get; private set; }
+
+    public ItemLocation Location => new(StoreId, ShelfPublicId, ShelfRowPublicId);
     public string Status { get; private set; } = ItemStatus.Unshelved;
     public string? Note { get; private set; }
     public long Version { get; private set; }
@@ -93,6 +101,7 @@ public sealed class Item : TenantEntity
 
     public void Update(long? storeId, string? note)
     {
+        if (StoreId != storeId) (ShelfPublicId, ShelfRowPublicId) = (null, null); // giá thuộc kho cũ — không còn đúng
         StoreId = storeId;
         var n = note?.Trim();
         Note = string.IsNullOrEmpty(n) ? null : n.Length <= 500 ? n : throw new BusinessRuleException("NOTE_INVALID", "Ghi chú tối đa 500 ký tự.");
@@ -110,12 +119,28 @@ public sealed class Item : TenantEntity
     }
 
     /// <summary>
+    /// Xếp vào giá/ngăn (xếp giá trực quan và xếp giá lại): chưa xếp giá → sẵn sàng; đã sẵn sàng thì đổi vị trí. Mất/thanh lý/xuất kho/đang mượn
+    /// không xếp được. Không đổi kho (giá thuộc kho nào là việc của nơi gọi kiểm tra).
+    /// </summary>
+    public void Place(Guid shelfPublicId, Guid? rowPublicId, DateTimeOffset at)
+    {
+        if (OnLoan) throw OnLoanError("trả sách trước khi xếp lại giá");
+        if (Status == ItemStatus.OutOfStore) throw OutOfStore("nhập kho trước khi xếp giá");
+        if (Status == ItemStatus.Lost) throw new BusinessRuleException("ITEM_LOST", $"ĐKCB {Barcode} đã mất.");
+        if (Status == ItemStatus.Liquidated) throw Liquidated();
+        if (shelfPublicId == Guid.Empty) throw new BusinessRuleException("SHELF_REQUIRED", "Chọn giá sách.");
+        (ShelfPublicId, ShelfRowPublicId, ShelvedAt) = (shelfPublicId, rowPublicId, at);
+        Status = ItemStatus.Available;
+        Version++;
+    }
+
+    /// <summary>
     /// Áp trạng thái lượt mượn từ circulation. Cùng lượt: chỉ nhận version lớn hơn; lượt khác: chỉ nhận lượt mượn sau lượt đang giữ
     /// (event tới lệch thứ tự không ghi đè). Lượt đóng vì mất tài liệu (<paramref name="closedItemStatus"/> = L) → bản sách sang "Mất".
     /// Trả về true khi trạng thái bản sách đổi (cần phát ItemChanged).
     /// </summary>
     public bool ApplyLoan(Guid loanPublicId, long version, string cardNo, DateTimeOffset loanedAt, DateTimeOffset dueAt, bool returned,
-        string? closedItemStatus)
+        string? closedItemStatus, bool reopened = false)
     {
         if (LoanPublicId == loanPublicId ? version <= LoanVersion : LoanedAt is { } current && loanedAt <= current) return false;
         LoanPublicId = loanPublicId;
@@ -124,6 +149,13 @@ public sealed class Item : TenantEntity
         LoanedAt = loanedAt;
         LoanDueAt = dueAt;
         OnLoan = !returned;
+        if (reopened && !returned && Status == ItemStatus.Lost)
+        {
+            // Lượt đóng vì mất được mở lại (đóng nhầm): bản sách không còn mất, đang được bạn đọc mượn.
+            Status = ItemStatus.Available;
+            Version++;
+            return true;
+        }
         if (!returned || closedItemStatus is null || closedItemStatus == Status || !ItemStatus.Names.ContainsKey(closedItemStatus)) return false;
         Status = closedItemStatus;
         Version++;
@@ -143,10 +175,10 @@ public sealed class Item : TenantEntity
     }
 
     /// <summary>Khôi phục bản đã báo mất (tìm thấy lại) → sẵn sàng phục vụ.</summary>
-    public void RestoreFound()
+    public void RestoreFound(string? previousStatus = null)
     {
         if (Status != ItemStatus.Lost) throw new BusinessRuleException("ITEM_NOT_LOST", $"ĐKCB {Barcode} không ở trạng thái mất.");
-        SetStatus(ItemStatus.Available);
+        SetStatus(previousStatus == ItemStatus.Unshelved ? ItemStatus.Unshelved : ItemStatus.Available);
     }
 
     /// <summary>Thanh lý — chặn bản đang mượn, đang xuất kho (monolith sau ELIB-LRC 10-04). Bản đã báo mất thanh lý được.</summary>
@@ -159,10 +191,11 @@ public sealed class Item : TenantEntity
     }
 
     /// <summary>Huỷ thanh lý: về "Mất" nếu bản còn bản ghi báo mất, ngược lại về sẵn sàng.</summary>
-    public void CancelLiquidation(bool stillLost)
+    public void CancelLiquidation(bool stillLost, string? previousStatus = null)
     {
         if (Status != ItemStatus.Liquidated) throw new BusinessRuleException("ITEM_NOT_LIQUIDATED", $"ĐKCB {Barcode} không ở trạng thái thanh lý.");
-        SetStatus(stillLost ? ItemStatus.Lost : ItemStatus.Available);
+        // Biết trạng thái trước khi thanh lý thì trả đúng trạng thái đó; bản ghi cũ chưa lưu thì suy từ việc còn bản ghi báo mất không.
+        SetStatus(previousStatus is ItemStatus.Lost or ItemStatus.Unshelved or ItemStatus.Available ? previousStatus : stillLost ? ItemStatus.Lost : ItemStatus.Available);
     }
 
     /// <summary>Xuất kho tạm (photo, triển lãm, chuyển đơn vị khác…) — không cho mượn tới khi nhập lại.</summary>
@@ -189,6 +222,7 @@ public sealed class Item : TenantEntity
         if (Status == ItemStatus.OutOfStore) throw OutOfStore("nhập kho trước khi chuyển");
         if (Status == ItemStatus.Lost) throw new BusinessRuleException("ITEM_LOST", $"ĐKCB {Barcode} đã mất.");
         if (Status == ItemStatus.Liquidated) throw Liquidated();
+        if (StoreId != storeId) (ShelfPublicId, ShelfRowPublicId) = (null, null); // giá thuộc kho cũ — không còn đúng
         StoreId = storeId;
         Version++;
     }
@@ -203,7 +237,7 @@ public sealed class Item : TenantEntity
         var value = NormalizeBarcode(barcode);
         var (prefix, number) = Split(value);
         (Barcode, BarcodeKey, Prefix, Number) = (value, Key(value), prefix, number);
-        if (storeId is not null) StoreId = storeId;
+        if (storeId is not null && storeId != StoreId) (StoreId, ShelfPublicId, ShelfRowPublicId) = (storeId, null, null);
         Version++;
     }
 

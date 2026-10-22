@@ -72,7 +72,7 @@ public sealed record CompleteResult(int Done, IReadOnlyList<SkippedItem> Skipped
 /// nguồn; "Hoàn thành" chuyển các bản sang kho nhận (bỏ qua bản đang mượn, xuất kho, mất, thanh lý hoặc đã rời kho nguồn — ghi lý do
 /// trên dòng), phát ItemChanged, rồi khoá phiếu.
 /// </summary>
-public sealed class StoreMoveResource(ICrudDbContext db, ItemResource items, ItemEvents events, TimeProvider clock)
+public sealed class StoreMoveResource(ICrudDbContext db, ItemResource items, ItemEvents events, ItemMovements movements, TimeProvider clock)
     : CrudResource<StoreMoveResource, StoreMove, StoreMoveSearch, StoreMoveRequest, StoreMoveDto>(db)
 {
     protected override string EntityName => "Phiếu điều chuyển kho";
@@ -193,7 +193,9 @@ public sealed class StoreMoveResource(ICrudDbContext db, ItemResource items, Ite
             try
             {
                 if (item.StoreId != move.FromStoreId) throw new BusinessRuleException("ITEM_NOT_IN_STORE", $"ĐKCB {item.Barcode} không còn ở kho nguồn.");
+                var from = item.Location;
                 item.MoveTo(move.ToStoreId);
+                movements.Record(item, MovementKind.Move, from, item.Status, $"Phiếu điều chuyển số {move.Id}");
             }
             catch (BusinessRuleException ex)
             {
@@ -242,6 +244,14 @@ public sealed class DeliverySearch : CrudSearch
     public int? DeliveryStatus { get; set; }
     /// <summary>true = đã ký nhận, false = chưa.</summary>
     public bool? Confirmed { get; set; }
+
+    // Bộ lọc nâng cao của màn "Đơn phân bổ" (ELIB-LRC: mã từ–đến, người giao, người nhận, ngày giao từ–đến).
+    public long? CodeFrom { get; set; }
+    public long? CodeTo { get; set; }
+    public string? DelivererName { get; set; }
+    public string? ReceiverName { get; set; }
+    public DateOnly? DeliveredFrom { get; set; }
+    public DateOnly? DeliveredTo { get; set; }
 }
 
 public sealed record DeliveryDto(
@@ -257,7 +267,7 @@ public sealed record DeliveryReceiptOption(Guid PublicId, long Code, string? Nam
 /// phiếu giao nhận nào; ký nhận (khi "Đã nhận đủ") → các bản còn "chưa xếp giá" sang sẵn sàng phục vụ ở kho nhận của phiếu, phiếu khoá.
 /// Chọn đơn nhận (phiếu nhận đã hoàn tất của phân hệ bổ sung) thì màn chọn sách liệt kê bản của đơn đó; vẫn tìm được theo MFN/ĐKCB/nhan đề.
 /// </summary>
-public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, ItemEvents events, TimeProvider clock)
+public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, ItemEvents events, ItemMovements movements, TimeProvider clock)
     : CrudResource<DeliveryResource, Delivery, DeliverySearch, DeliveryRequest, DeliveryDto>(db)
 {
     protected override string EntityName => "Phiếu giao nhận";
@@ -281,6 +291,22 @@ public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, Item
     {
         if (search.DeliveryStatus is { } status) query = query.Where(x => x.Status == status);
         if (search.Confirmed is { } confirmed) query = confirmed ? query.Where(x => x.SignedAt != null) : query.Where(x => x.SignedAt == null);
+        if (search.CodeFrom is { } from) query = query.Where(x => x.Id >= from);
+        if (search.CodeTo is { } to) query = query.Where(x => x.Id <= to);
+        if (search.DeliveredFrom is { } dFrom) query = query.Where(x => x.DeliveredOn >= dFrom);
+        if (search.DeliveredTo is { } dTo) query = query.Where(x => x.DeliveredOn <= dTo);
+#pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang lower() của SQL
+        if (!string.IsNullOrWhiteSpace(search.DelivererName))
+        {
+            var name = search.DelivererName.Trim().ToLowerInvariant();
+            query = query.Where(x => x.DelivererName != null && x.DelivererName.ToLower().Contains(name));
+        }
+        if (!string.IsNullOrWhiteSpace(search.ReceiverName))
+        {
+            var name = search.ReceiverName.Trim().ToLowerInvariant();
+            query = query.Where(x => x.ReceiverName != null && x.ReceiverName.ToLower().Contains(name));
+        }
+#pragma warning restore CA1862, CA1304, CA1311
         if (search.Term is { } term)
         {
 #pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang lower() của SQL
@@ -399,7 +425,9 @@ public sealed class DeliveryResource(ICrudDbContext db, ItemResource items, Item
                 skipped.Add(new SkippedItem(item.Barcode, $"Đang ở trạng thái \"{ItemStatus.Names.GetValueOrDefault(item.Status, item.Status)}\"."));
                 continue;
             }
+            var from = item.Location;
             item.Shelve(delivery.StoreId);
+            movements.Record(item, MovementKind.Shelve, from, ItemStatus.Unshelved, $"Ký nhận đơn phân bổ số {delivery.Id}");
             await events.PublishAsync(item, deleted: false, ct);
             shelved++;
         }

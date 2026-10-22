@@ -1,7 +1,11 @@
 using System.Linq.Expressions;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.Circulation.Domain;
+using Elib.Contracts.Events;
+using Elib.Contracts.Events.Payment;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Elib.Circulation.Application;
@@ -29,7 +33,8 @@ public sealed record PhotocopyTotals(int Count, decimal Total, decimal Paid, dec
 public sealed record PhotocopyPaidRequest(Guid PublicId, bool Paid);
 
 /// <summary>Sao chụp tài liệu (monolith: CPhotoController, quyền C_PHOTO). Bạn đọc theo số thẻ, tài liệu theo ĐKCB (bản sao cùng DB).</summary>
-public sealed class PhotocopyResource(ICrudDbContext db, Replicas replicas, TimeProvider clock)
+public sealed class PhotocopyResource(
+    ICrudDbContext db, Replicas replicas, TimeProvider clock, IPublishEndpoint publisher, ITenantContext tenantContext, ICurrentActor actor)
     : CrudResource<PhotocopyResource, Photocopy, PhotocopySearch, PhotocopyRequest, PhotocopyDto>(db)
 {
     protected override string EntityName => "Phiếu sao chụp";
@@ -44,6 +49,57 @@ public sealed class PhotocopyResource(ICrudDbContext db, Replicas replicas, Time
         x.Barcode, x.Mfn,
         Db.Set<BibSnapshot>().Where(b => b.Mfn == x.Mfn).Select(b => b.Title).FirstOrDefault(),
         x.FromPage, x.ToPage, x.Copies, x.UnitPrice, x.Total, x.Paid, x.PhotoDate, x.Note, x.CreatedAt);
+
+    protected override Task OnSavingAsync(Photocopy entity, CrudChange change, CancellationToken ct) =>
+        change == CrudChange.Deleted ? PublishWaivedAsync(entity, ct) : PublishChargeAsync(entity, ct);
+
+    /// <summary>Báo dịch vụ thanh toán số còn phải thu của phiếu sao chụp (đã thu = 0).</summary>
+    private Task PublishChargeAsync(Photocopy photo, CancellationToken ct, string? justRecordedCode = null)
+    {
+        if (photo.PublicId == Guid.Empty) photo.PublicId = Guid.CreateVersion7();
+        return publisher.Publish(ToCharge(photo, tenantContext.RequireTenantId(), justRecordedCode ?? photo.PaymentCode, new EventActor(actor.Id, actor.Kind)), ct);
+    }
+
+    private Task PublishWaivedAsync(Photocopy photo, CancellationToken ct) => publisher.Publish(new ChargeWaived
+    {
+        TenantId = tenantContext.RequireTenantId(), Actor = new EventActor(actor.Id, actor.Kind), SourceService = "circulation", SourceId = photo.PublicId, Version = photo.Version + 1,
+    }, ct);
+
+    public static ChargeIssued ToCharge(Photocopy photo, long tenantId, string? lastPaymentCode, EventActor? actor = null) => new()
+    {
+        TenantId = tenantId, Actor = actor ?? EventActor.System, SourceService = "circulation", SourceId = photo.PublicId, Kind = "PHOTOCOPY",
+        ReaderPublicId = photo.ReaderPublicId, CardNo = photo.CardNo, Label = $"Sao chụp {photo.Barcode} (tr. {photo.FromPage}–{photo.ToPage} × {photo.Copies} bản)",
+        Amount = photo.Paid ? 0 : Math.Round(photo.Total, 0, MidpointRounding.AwayFromZero), Version = photo.Version, LastPaymentCode = lastPaymentCode,
+    };
+
+    /// <summary>Phiếu sao chụp chưa thu theo id tăng dần — payment dựng khoản thu lần đầu cho phiếu lập trước khi dùng thanh toán.</summary>
+    public async Task<(IReadOnlyList<ChargeIssued> Items, long? Next)> OpenChargesAsync(long afterId, int take, CancellationToken ct)
+    {
+        var size = Math.Clamp(take, 1, 1000);
+        var rows = await Set.AsNoTracking().Where(p => p.Id > afterId && !p.Paid && p.Total > 0).OrderBy(p => p.Id).Take(size).ToListAsync(ct);
+        var tenantId = tenantContext.RequireTenantId();
+        return ([.. rows.Select(p => ToCharge(p, tenantId, p.PaymentCode))], rows.Count == size ? rows[^1].Id : null);
+    }
+
+    /// <summary>Tiền về qua cổng thanh toán: đánh dấu đã thu (idempotent theo mã giao dịch). Đã thu bằng cách khác trước đó thì ghi nhật ký cảnh báo cần hoàn tiền.</summary>
+    public async Task<bool> ApplyPaymentAsync(PaymentSucceeded e, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!string.Equals(e.SourceService, "circulation", StringComparison.OrdinalIgnoreCase) || e.Kind != "PHOTOCOPY") return false;
+        var photo = await Set.FirstOrDefaultAsync(p => p.PublicId == e.SourceId, ct);
+        if (photo is null) return false;
+        if (photo.PaymentCode == e.TransactionCode) return true;
+        var alreadyPaid = photo.Paid;
+        photo.MarkPaidByGateway(e.TransactionCode);
+        await PublishChargeAsync(photo, ct, e.TransactionCode);
+        if (AuditSink is not null)
+            await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Photocopy), EntityName, photo.PublicId, CrudChange.Updated,
+                alreadyPaid
+                    ? $"CẦN HOÀN TIỀN: phiếu sao chụp đã thu trước đó nhưng tiền {e.Amount:N0}đ vẫn về qua {e.Provider} (mã {e.TransactionCode})"
+                    : $"Thu {e.Amount:N0}đ qua {e.Provider} (mã {e.TransactionCode})"), ct);
+        await Db.SaveChangesAsync(ct);
+        return true;
+    }
 
     protected override Photocopy Create(PhotocopyRequest request) => throw new NotSupportedException("Phiếu sao chụp tạo qua CreateAsync.");
 
@@ -93,6 +149,7 @@ public sealed class PhotocopyResource(ICrudDbContext db, Replicas replicas, Time
         ArgumentNullException.ThrowIfNull(request);
         var photo = await LoadAsync(request.PublicId, ct);
         photo.SetPaid(request.Paid);
+        await PublishChargeAsync(photo, ct);
         await AuditAsync(photo, CrudChange.Updated, ct);
         await Db.SaveChangesAsync(ct);
         return await GetAsync(photo.Id, ct);

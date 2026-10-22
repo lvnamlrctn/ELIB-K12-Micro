@@ -197,6 +197,6 @@ export function numericColumns(rows: string[][]): number[] {
 /** "Từ ngày dd/MM/yyyy đến ngày dd/MM/yyyy" (yyyy-MM-dd vào); không lọc ngày → rỗng. */
 export function periodLine(from: string | null | undefined, to: string | null | undefined): string {
   const date = (v: string) => v.split('-').reverse().join('/');
-  if (from && to) return `Từ ngày ${date(from)} đến ngày ${date(to)}`;
-  return from ? `Từ ngày ${date(from)}` : to ? `Đến ngày ${date(to)}` : '';
+  if (from && to) return `Từ ngày ${date(from)} đến ngày ${date(to)}`; // i18n-data: dòng ngày in trên báo cáo (mẫu văn bản hành chính)
+  return from ? `Từ ngày ${date(from)}` : to ? `Đến ngày ${date(to)}` : ''; // i18n-data: dòng ngày in trên báo cáo (mẫu văn bản hành chính)
 }

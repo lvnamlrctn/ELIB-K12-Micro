@@ -26,6 +26,7 @@ public static class SpaceEndpoints
         api.MapPost("/spaces/{publicId:guid}/SetMaintenance", [Permission("SPACE_ROOMS", "edit")]
             (Guid publicId, SetMaintenanceRequest request, SpaceResource r, CancellationToken ct) => r.SetMaintenanceAsync(publicId, request, ct)).WithTags("Spaces");
         api.MapCrud<FixtureResource>("/fixtures", "SPACE_FIXTURES").WithTags("Fixtures");
+        api.MapCrud<ShelfRowResource>("/shelf-rows", "SPACE_FIXTURES").WithTags("ShelfRows");
         api.MapPost("/fixtures/{publicId:guid}/Place", [Permission("SPACE_FIXTURES", "edit")]
             (Guid publicId, PlaceFixtureRequest request, FixtureResource r, CancellationToken ct) => r.PlaceAsync(publicId, request, ct)).WithTags("Fixtures");
         api.MapGet("/stores", [Permission("SPACE_FIXTURES", "view")]

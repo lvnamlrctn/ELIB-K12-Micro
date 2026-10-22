@@ -1,4 +1,6 @@
 using System.Linq.Expressions;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Elib.BuildingBlocks.Crud;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
@@ -29,10 +31,11 @@ public sealed record LoanDto(
     long Id, Guid PublicId, Guid ReaderPublicId, string CardNo, string? ReaderName, Guid ItemPublicId, string Barcode, long Mfn,
     string? Title, string? Author, long? CircPlaceId, string? StoreName, DateTimeOffset LoanedAt, DateTimeOffset DueAt,
     DateTimeOffset? ReturnedAt, int RenewCount, string? Note, long Version,
-    long? StoreId = null, long? ReturnCircPlaceId = null, string? LoanedByName = null, string? ReturnedByName = null, bool ReturnedLate = false)
+    long? StoreId = null, long? ReturnCircPlaceId = null, string? LoanedByName = null, string? ReturnedByName = null, bool ReturnedLate = false,
+    string? CloseKind = null, string? CloseReason = null, int ReopenCount = 0)
 {
     /// <summary>Bạn đọc tự xem (OPAC) — không lộ tên cán bộ thao tác.</summary>
-    public LoanDto ForReader() => this with { LoanedByName = null, ReturnedByName = null };
+    public LoanDto ForReader() => this with { LoanedByName = null, ReturnedByName = null, CloseReason = null };
 }
 
 /// <summary>Bạn đọc ở quầy (monolith: ReaderSnapshot) — thông tin thẻ, lý do không được mượn, các lượt đang mượn, chính sách áp dụng.</summary>
@@ -61,14 +64,37 @@ public sealed record RenewRequest(Guid LoanId, string Reason);
 
 public sealed record LoanNoteRequest(Guid LoanId, string? Note, string Reason);
 
+/// <summary>Đóng cưỡng bức / mở lại một lượt mượn — lý do bắt buộc; vượt thẩm quyền thì chờ duyệt (BORROW:approve).</summary>
+public sealed record LoanActionRequest(Guid LoanId, string Reason);
+
+/// <summary>Đã áp dụng (<see cref="Loan"/>) hoặc chờ duyệt (<see cref="Pending"/>, HTTP 202, chưa đổi gì).</summary>
+public sealed record LoanActionOutcome(LoanDto? Loan, PendingApproval? Pending);
+
+/// <summary>Các thao tác lượt mượn cân nhắc phê duyệt (quyền BORROW:approve; mặc định luôn cần duyệt, đơn vị chỉnh được).</summary>
+public static class LoanApprovals
+{
+    public const string ForceClose = "LOAN_FORCE_CLOSE";
+    public const string Reopen = "LOAN_REOPEN";
+
+    /// <summary>Đóng lượt mượn vì mất tài liệu qua dòng phạt "Mất" của phiếu phạt (ngưỡng theo số lượt đóng một lần).</summary>
+    public const string CloseLost = "LOAN_CLOSE_LOST";
+
+    public static readonly ApprovalKind[] Kinds =
+    [
+        new(ForceClose, "BORROW", nameof(Loan), "Lượt mượn", "Đóng cưỡng bức lượt mượn", "Đóng lượt mượn không có sách trả về (bạn đọc đã rời trường, mất dấu…)."),
+        new(Reopen, "BORROW", nameof(Loan), "Lượt mượn", "Mở lại lượt mượn đã đóng", "Hoàn tác trả nhầm / đóng nhầm: lượt mượn trở lại đang mở."),
+        new(CloseLost, "BORROW", nameof(FineTicket), "Phiếu phạt", "Đóng lượt mượn vì mất tài liệu", "Dòng phạt \"Mất tài liệu\" của phiếu phạt đóng lượt mượn và báo kho đổi bản sách sang Mất."),
+    ];
+}
+
 /// <summary>
 /// Lượt mượn (monolith: CirculationLoanController + CirculationHistoryController, quyền BORROW / LOAN_HISTORY). Đọc bản sao bạn đọc,
 /// bản sách, biểu ghi trong cùng DB (docs 03: mượn vẫn chạy khi patron/holdings/catalog down). Mọi thay đổi phát
 /// <see cref="LoanChanged"/> (outbox, cùng transaction).
 /// </summary>
 public sealed class LoanResource(
-    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ICurrentActor actor, TimeProvider clock,
-    CrudAuditContext? auditContext = null)
+    ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ApprovalService approvals, ICurrentActor actor,
+    TimeProvider clock, CrudAuditContext? auditContext = null)
     : CrudResource<LoanResource, Loan, LoanSearch, LoanNoteRequest, LoanDto>(db)
 {
     public const int MaxCheckout = 200;
@@ -87,7 +113,7 @@ public sealed class LoanResource(
         x.CircPlaceId,
         Db.Set<ItemReplica>().Where(i => i.ItemPublicId == x.ItemPublicId).Select(i => i.StoreName).FirstOrDefault(),
         x.LoanedAt, x.DueAt, x.ReturnedAt, x.RenewCount, x.Note, x.Version,
-        x.StoreId, x.ReturnCircPlaceId, x.LoanedByName, x.ReturnedByName, x.ReturnedLate);
+        x.StoreId, x.ReturnCircPlaceId, x.LoanedByName, x.ReturnedByName, x.ReturnedLate, x.CloseKind, x.CloseReason, x.ReopenCount);
 
     protected override Loan Create(LoanNoteRequest request) => throw new NotSupportedException("Lượt mượn tạo qua CheckoutAsync.");
 
@@ -427,16 +453,142 @@ public sealed class LoanResource(
     /// <summary>Người đang thao tác ("Họ tên (tên đăng nhập)" từ token; trạm SIP2/việc nền lấy theo người đã đặt).</summary>
     public string? StaffName() => auditContext?.Capture().ActorName;
 
-    private Task Record(Loan loan, CrudChange change, string summary, CancellationToken ct) =>
-        AuditSink?.RecordAsync(new CrudAuditEntry(nameof(Loan), EntityName, loan.PublicId, change, summary), ct) ?? Task.CompletedTask;
+    private Task Record(Loan loan, CrudChange change, string summary, CancellationToken ct, JsonObject? changes = null, string? reason = null) =>
+        AuditSink?.RecordAsync(new CrudAuditEntry(nameof(Loan), EntityName, loan.PublicId, change, summary, changes, reason), ct) ?? Task.CompletedTask;
 
-    private static string RequireReason(string? reason, string what)
+    private sealed record LoanSnapshot(string State, string? CloseKind, string? CloseReason, DateTimeOffset? ReturnedAt, int ReopenCount);
+
+    private static readonly JsonSerializerOptions SnapshotJson = new(JsonSerializerDefaults.Web);
+
+    private static LoanSnapshot Snapshot(Loan l) => new(l.IsOpen ? "open" : "closed", l.CloseKind, l.CloseReason, l.ReturnedAt, l.ReopenCount);
+
+    private static JsonObject ToObject(object snapshot) => JsonSerializer.SerializeToNode(snapshot, SnapshotJson)!.AsObject();
+
+    private async Task<Loan> RequireLoanAsync(Guid id, CancellationToken ct) =>
+        await Set.FirstOrDefaultAsync(x => x.PublicId == id, ct) ?? throw new NotFoundException(EntityName, id);
+
+    private static string Label(Loan loan) => $"ĐKCB {loan.Barcode} — thẻ {loan.CardNo}";
+
+    /// <summary>
+    /// Đóng cưỡng bức lượt mượn đang mở (bạn đọc đã rời trường, mất dấu tài liệu nhưng không tính phạt mất…): lượt đóng, bản sách KHÔNG đổi
+    /// trạng thái (về sẵn sàng như đã trả), không sinh phiếu phạt. Lý do bắt buộc, lưu trước/sau; mặc định phải chờ người có BORROW:approve duyệt.
+    /// </summary>
+    public async Task<LoanActionOutcome> ForceCloseAsync(LoanActionRequest request, CancellationToken ct)
     {
-        var r = reason?.Trim();
-        return r is { Length: > 0 and <= 500 } ? r : throw new BusinessRuleException("REASON_REQUIRED", $"Nhập lý do {what} (tối đa 500 ký tự).");
+        ArgumentNullException.ThrowIfNull(request);
+        var reason = ChangeReason.Require(request.Reason, null, "đóng cưỡng bức lượt mượn");
+        var loan = await RequireLoanAsync(request.LoanId, ct);
+        if (!loan.IsOpen) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", $"ĐKCB {loan.Barcode} đã đóng lúc {loan.ReturnedAt:dd/MM/yyyy HH:mm}.");
+        if (await approvals.RequiresAsync(LoanApprovals.ForceClose, null, null, null, ct))
+        {
+            var after = Snapshot(loan) with { State = "closed", CloseKind = Loan.CloseForced, CloseReason = reason };
+            return new LoanActionOutcome(null, await approvals.SubmitAsync(LoanApprovals.ForceClose, loan.PublicId, Label(loan),
+                $"Đóng cưỡng bức {Label(loan)}", request with { Reason = reason }, ToObject(Snapshot(loan)), ToObject(after), reason, null, null, loan.Version, ct));
+        }
+        return new LoanActionOutcome(await ApplyForceCloseAsync(loan, reason, ct), null);
     }
+
+    /// <summary>Chạy lại đóng cưỡng bức đã được duyệt (người duyệt là người thao tác).</summary>
+    public async Task ApplyApprovedForceCloseAsync(Guid loanId, string reason, CancellationToken ct) =>
+        await ApplyForceCloseAsync(await RequireLoanAsync(loanId, ct), reason, ct);
+
+    private async Task<LoanDto> ApplyForceCloseAsync(Loan loan, string reason, CancellationToken ct)
+    {
+        var before = Snapshot(loan);
+        loan.ForceClose(clock.GetUtcNow(), actor.Id, StaffName(), reason);
+        await PublishAsync(loan, ct);
+        var item = await Db.Set<ItemReplica>().FirstOrDefaultAsync(i => i.ItemPublicId == loan.ItemPublicId, ct);
+        if (item is not null) await holds.AssignNextAsync(item, ct, returningLoan: loan.PublicId); // bản trở lại sẵn sàng: giữ cho người đặt mượn kế tiếp
+        await Record(loan, CrudChange.Updated, $"Đóng cưỡng bức {Label(loan)}", ct, CrudDiff.Compute(before, Snapshot(loan)), reason);
+        await Db.SaveChangesAsync(ct);
+        return (await ToDtosAsync([loan], ct))[0];
+    }
+
+    /// <summary>
+    /// Mở lại lượt mượn đã đóng (hoàn tác trả nhầm / đóng nhầm). Chặn khi bản đã được mượn lại hoặc đang giữ cho người đặt mượn, hoặc khi
+    /// phiếu phạt liên quan đã thu tiền / còn dòng "Mất" (phải điều chỉnh phiếu trước, không để tiền và trạng thái lệch nhau).
+    /// </summary>
+    public async Task<LoanActionOutcome> ReopenAsync(LoanActionRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var reason = ChangeReason.Require(request.Reason, null, "mở lại lượt mượn");
+        var loan = await RequireLoanAsync(request.LoanId, ct);
+        if (loan.IsOpen) throw new BusinessRuleException("LOAN_NOT_CLOSED", $"Lượt mượn {loan.Barcode} đang mở.");
+        await EnsureReopenableAsync(loan, ct);
+        if (await approvals.RequiresAsync(LoanApprovals.Reopen, null, null, null, ct))
+        {
+            var after = Snapshot(loan) with { State = "open", CloseKind = null, CloseReason = null, ReturnedAt = null };
+            return new LoanActionOutcome(null, await approvals.SubmitAsync(LoanApprovals.Reopen, loan.PublicId, Label(loan),
+                $"Mở lại lượt mượn {Label(loan)}", request with { Reason = reason }, ToObject(Snapshot(loan)), ToObject(after), reason, null, null, loan.Version, ct));
+        }
+        return new LoanActionOutcome(await ApplyReopenAsync(loan, reason, ct), null);
+    }
+
+    public async Task ApplyApprovedReopenAsync(Guid loanId, string reason, CancellationToken ct)
+    {
+        var loan = await RequireLoanAsync(loanId, ct);
+        await EnsureReopenableAsync(loan, ct); // điều kiện có thể đổi từ lúc đề nghị
+        await ApplyReopenAsync(loan, reason, ct);
+    }
+
+    public Task<long?> VersionAsync(Guid loanId, CancellationToken ct) =>
+        Set.AsNoTracking().Where(x => x.PublicId == loanId).Select(x => (long?)x.Version).FirstOrDefaultAsync(ct);
+
+    private async Task<LoanDto> ApplyReopenAsync(Loan loan, string reason, CancellationToken ct)
+    {
+        var before = Snapshot(loan);
+        loan.Reopen();
+        await publisher.PublishAsync(loan, ct, reopened: true);
+        await Record(loan, CrudChange.Reversed, $"Mở lại lượt mượn {Label(loan)}", ct, CrudDiff.Compute(before, Snapshot(loan)), reason);
+        await Db.SaveChangesAsync(ct);
+        return (await ToDtosAsync([loan], ct))[0];
+    }
+
+    private async Task EnsureReopenableAsync(Loan loan, CancellationToken ct)
+    {
+        if (await Set.AnyAsync(x => x.ItemPublicId == loan.ItemPublicId && x.Id != loan.Id && (x.ReturnedAt == null || x.LoanedAt > loan.LoanedAt), ct))
+            throw new BusinessRuleException("LOAN_ITEM_REBORROWED", $"ĐKCB {loan.Barcode} đã được mượn lại sau lượt này — không mở lại được.", 409);
+        if (await holds.HeldAsync(loan.ItemPublicId, ct) is not null)
+            throw new BusinessRuleException("LOAN_REOPEN_HELD", $"ĐKCB {loan.Barcode} đang giữ cho người đặt mượn — huỷ đặt mượn trước khi mở lại lượt.", 409);
+        var lines = await Db.Set<FineLine>().Where(l => l.LoanPublicId == loan.PublicId).Select(l => new { l.FineTicketId, l.ReasonId }).ToListAsync(ct);
+        if (lines.Count == 0) return;
+        var ticketIds = lines.Select(l => l.FineTicketId).Distinct().ToList();
+        var tickets = await Db.Set<FineTicket>().AsNoTracking().Where(t => ticketIds.Contains(t.Id)).ToListAsync(ct);
+        if (tickets.FirstOrDefault(t => t.Paid != 0 || t.Status == FineTicketStatus.Done) is { } paid)
+            throw new BusinessRuleException("LOAN_REOPEN_PAID_FINE",
+                $"Phiếu phạt {paid.Code} liên quan đã thu tiền hoặc hoàn thành — dùng \"Điều chỉnh\" / mở lại phiếu trước khi mở lại lượt mượn.", 409);
+        var lostReasons = await Db.Set<FineReason>().IgnoreQueryFilters(["SoftDelete"]).Where(r => r.ItemStatus == Loan.LostStatus).Select(r => r.Id).ToListAsync(ct);
+        if (lines.Any(l => lostReasons.Contains(l.ReasonId)))
+            throw new BusinessRuleException("LOAN_REOPEN_LOST_LINE",
+                "Phiếu phạt còn dòng \"Mất tài liệu\" của lượt mượn này — xoá dòng đó khỏi phiếu trước khi mở lại lượt mượn.", 409);
+    }
+
+    private static string RequireReason(string? reason, string what) => ChangeReason.Require(reason, null, what);
 
     private static DateTimeOffset VietnamStart(DateOnly date) => Loan.VietnamStart(date);
 
     private Task PublishAsync(Loan loan, CancellationToken ct) => publisher.PublishAsync(loan, ct);
+
+}
+
+/// <summary>Áp dụng yêu cầu lượt mượn đã duyệt (đóng cưỡng bức / mở lại) dưới danh nghĩa người duyệt.</summary>
+public sealed class LoanChangeHandler(LoanResource loans) : IChangeRequestHandler
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    public bool CanHandle(string kind) => kind is LoanApprovals.ForceClose or LoanApprovals.Reopen;
+
+    public Task<long?> CurrentVersionAsync(ChangeRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return loans.VersionAsync(request.TargetPublicId, cancellationToken);
+    }
+
+    public async Task ApplyAsync(ChangeRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var payload = JsonSerializer.Deserialize<LoanActionRequest>(request.PayloadJson, Json)!;
+        if (request.Kind == LoanApprovals.ForceClose) await loans.ApplyApprovedForceCloseAsync(payload.LoanId, request.Reason, cancellationToken);
+        else await loans.ApplyApprovedReopenAsync(payload.LoanId, request.Reason, cancellationToken);
+    }
 }

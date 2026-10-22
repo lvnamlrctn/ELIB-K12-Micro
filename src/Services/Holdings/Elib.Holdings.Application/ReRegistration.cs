@@ -26,7 +26,7 @@ public sealed record ReRegisterImportResult(int Total, int Applied, bool DryRun,
 /// circulation giữ mã cũ để quầy trả bằng mã quét (monolith đổi luôn mã trong mọi bảng lịch sử; ở đây lịch sử là ảnh chụp lúc mượn,
 /// bản sao ở circulation/search cập nhật qua ItemChanged).
 /// </summary>
-public sealed class BarcodeReRegistration(ICrudDbContext db, ItemEvents events, ItemResource items, ICrudAuditSink? audit = null)
+public sealed class BarcodeReRegistration(ICrudDbContext db, ItemEvents events, ItemResource items, ItemMovements movements, ICrudAuditSink? audit = null)
 {
     private static readonly IReadOnlyList<CrudImportColumn> Columns =
     [
@@ -109,8 +109,9 @@ public sealed class BarcodeReRegistration(ICrudDbContext db, ItemEvents events, 
 
     private async Task ApplyAsync(Item item, string newBarcode, long? storeId, CancellationToken ct)
     {
-        var old = item.Barcode;
+        var (old, from) = (item.Barcode, item.Location);
         item.ReRegister(newBarcode, storeId);
+        movements.Record(item, MovementKind.ReRegister, from, item.Status, $"{old} → {item.Barcode}");
         await events.PublishAsync(item, deleted: false, ct);
         if (audit is not null)
             await audit.RecordAsync(new CrudAuditEntry(nameof(Item), "Bản sách", item.PublicId, CrudChange.Updated, $"Đăng ký lại mã vạch {old} → {item.Barcode}",

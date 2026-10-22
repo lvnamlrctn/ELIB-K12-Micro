@@ -44,6 +44,7 @@ services:
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD:?chạy ./init-env.sh trước}
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD:?chạy ./init-env.sh trước}
       SPACE_DB_PASSWORD: ${SPACE_DB_PASSWORD:?chạy ./init-env.sh trước}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -80,6 +81,7 @@ services:
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD}
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD}
       SPACE_DB_PASSWORD: ${SPACE_DB_PASSWORD}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -170,6 +172,7 @@ services:
       Identity__Clients__svc-search__ClientSecret: ${SVC_SEARCH_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-digital__ClientSecret: ${SVC_DIGITAL_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-space__ClientSecret: ${SVC_SPACE_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-payment__ClientSecret: ${SVC_PAYMENT_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -215,6 +218,8 @@ services:
       Provisioning__DeployedServices__6: search
       Provisioning__DeployedServices__7: acquisition
       Provisioning__DeployedServices__8: digital
+      Provisioning__DeployedServices__9: space
+      Provisioning__DeployedServices__10: payment
 
   notification:
     build:
@@ -453,6 +458,25 @@ services:
       ServiceClient__ClientSecret: ${SVC_SPACE_SECRET}
       Patron__Url: http://patron:8080
 
+  # GĐ2: thanh toán QR (VietQR/Sepay, VNPAY) cho phí phạt, sao chụp, cấp lại thẻ; webhook công khai qua gateway theo host đơn vị.
+  payment:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Payment/Elib.Payment.Api/Elib.Payment.Api.csproj
+        ASSEMBLY: Elib.Payment.Api
+    image: elib/payment:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__PaymentDb: Host=postgres;Database=elib_payment;Username=payment_app;Password=${PAYMENT_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_PAYMENT_SECRET}
+
   admin-web:
     build:
       context: ../..
@@ -494,6 +518,8 @@ services:
       circulation: { condition: service_started }
       search: { condition: service_started }
       digital: { condition: service_started }
+      space: { condition: service_started }
+      payment: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

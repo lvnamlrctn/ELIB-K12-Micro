@@ -4,6 +4,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { LDatePipe, LNumberPipe, Language } from '../core/i18n';
 import { Api, CrudClient, CrudPage as Page, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
+import { PaymentDialog } from '../pages/payment/payment-dialog';
 import { ImportDialog } from './import-dialog';
 import { ToastrService } from './toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from './ui';
@@ -95,6 +96,8 @@ export interface CrudRowAction {
   title: string;
   /** Hành động quyền cần có trên module của màn. */
   action: string;
+  /** Mở hộp thoại thu phí bằng mã QR cho dòng này (nguồn khoản thu = service của màn, id = publicId) — cần thêm quyền PAYMENT_TRANSACTIONS:add. */
+  payment?: boolean;
   /** Chỉ hiện ở dòng thoả điều kiện (ví dụ một tham số cụ thể). */
   show?: (row: Record<string, unknown>) => boolean;
   /** Ô nhập trước khi chạy (mở hộp thoại nhỏ) — ví dụ tài khoản thử để kiểm tra kết nối. */
@@ -120,7 +123,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog],
+  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, PaymentDialog],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -226,7 +229,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                 <td class="td">
                   <div class="flex items-center justify-center space-x-2">
                     @for (a of c.rowActions ?? []; track a.title) {
-                      @if (can(a.action) && (!a.show || a.show(row))) {
+                      @if (can(a.action) && (!a.payment || session.can('PAYMENT_TRANSACTIONS:add')) && (!a.show || a.show(row))) {
                         <button (click)="runRowAction(a, row); $event.stopPropagation()" [disabled]="busyRow() === row.publicId"
                                 class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="a.title | translate">
                           <span class="material-icons text-[18px]" [class.animate-spin]="busyRow() === row.publicId">{{ busyRow() === row.publicId ? 'autorenew' : a.icon }}</span>
@@ -392,6 +395,10 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
       <app-import-dialog [title]="c.title" [resource]="c.resource" [service]="c.service ?? 'tenant'" (closed)="importing.set(false)" (imported)="search()" />
     }
 
+    @if (paying(); as p) {
+      <app-payment-dialog [sourceService]="c.service ?? 'circulation'" [sourceId]="p.publicId" (closed)="paying.set(null)" (paid)="search()" />
+    }
+
     @if (deleting().length) {
       <app-confirm-delete [busy]="saving()"
                           [message]="deleting().length > 1 ? 'COMMON.DELETE_SELECTED_CONFIRM' : 'COMMON.DELETE_CONFIRM_IRREVERSIBLE'" [messageParams]="{ count: deleting().length }"
@@ -403,7 +410,8 @@ export class CrudPage implements OnInit {
   readonly config = input.required<CrudConfig>();
 
   private readonly api = inject(Api);
-  private readonly session = inject(Session);
+  protected readonly session = inject(Session);
+  protected readonly paying = signal<Row | null>(null);
   private readonly toastr = inject(ToastrService);
   protected readonly language = inject(Language);
   private client!: CrudClient<Row>;
@@ -584,6 +592,10 @@ export class CrudPage implements OnInit {
   }
 
   protected async runRowAction(action: CrudRowAction, row: Row, values?: Record<string, string>): Promise<void> {
+    if (action.payment) {
+      this.paying.set(row);
+      return;
+    }
     if (action.inputs?.length && !values) {
       this.actionDialog.set({ action, row, values: {} });
       return;

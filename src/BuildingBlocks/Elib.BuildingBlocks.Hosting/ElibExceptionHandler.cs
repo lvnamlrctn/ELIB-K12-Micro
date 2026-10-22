@@ -22,6 +22,8 @@ public sealed partial class ElibExceptionHandler(IProblemDetailsService problemD
             TenantAccessDeniedException t => (StatusCodes.Status403Forbidden, "TENANT_ACCESS_DENIED", t.Message),
             BadHttpRequestException b => (b.StatusCode, "BAD_REQUEST", b.Message),
             OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested => (499, "CLIENT_CLOSED", (string?)null),
+            _ when IsConcurrencyConflict(exception) => (StatusCodes.Status409Conflict, "CONCURRENCY_CONFLICT",
+                "Dữ liệu vừa được người khác thay đổi — hãy tải lại rồi thử lại."),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_ERROR", (string?)null),
         };
 
@@ -42,6 +44,10 @@ public sealed partial class ElibExceptionHandler(IProblemDetailsService problemD
             },
         });
     }
+
+    /// <summary>EF Core DbUpdateConcurrencyException (token đồng thời không khớp) — nhận theo tên để Hosting không phụ thuộc EF.</summary>
+    private static bool IsConcurrencyConflict(Exception exception) =>
+        exception.GetType().Name == "DbUpdateConcurrencyException" || exception.InnerException is { } inner && IsConcurrencyConflict(inner);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Lỗi không xử lý: {Method} {Path}")]
     private static partial void LogUnhandled(ILogger logger, Exception exception, string method, string path);

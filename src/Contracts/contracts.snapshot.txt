@@ -45,9 +45,12 @@ type Elib.Contracts.Events.Catalog.BibChanged class : Elib.Contracts.Events.Inte
   Title : System.String required
   Version : System.Int64
 type Elib.Contracts.Events.Circulation.LoanChanged class : Elib.Contracts.Events.IntegrationEvent
+  ActorName : System.String?
   Barcode : System.String required
   CardNo : System.String required
   CircPlaceId : Nullable<System.Int64>
+  CloseKind : System.String?
+  CloseReason : System.String?
   ClosedItemStatus : System.String?
   DueAt : System.DateTimeOffset required
   ItemPublicId : System.Guid required
@@ -56,6 +59,7 @@ type Elib.Contracts.Events.Circulation.LoanChanged class : Elib.Contracts.Events
   Mfn : System.Int64 required
   ReaderPublicId : System.Guid required
   RenewCount : System.Int32
+  Reopened : System.Boolean
   ReturnedAt : Nullable<System.DateTimeOffset>
   Version : System.Int64
 type Elib.Contracts.Events.EventActor class
@@ -71,6 +75,12 @@ type Elib.Contracts.Events.Holdings.ItemChanged class : Elib.Contracts.Events.In
   StoreId : Nullable<System.Int64>
   StoreName : System.String?
   Version : System.Int64
+type Elib.Contracts.Events.Holdings.ItemLossReversed class : Elib.Contracts.Events.IntegrationEvent
+  ActorName : System.String?
+  Barcode : System.String required
+  CardNo : System.String?
+  ItemPublicId : System.Guid required
+  Reason : System.String required
 type Elib.Contracts.Events.Holdings.StoreChanged class : Elib.Contracts.Events.IntegrationEvent
   Code : System.String required
   Deleted : System.Boolean
@@ -99,6 +109,38 @@ type Elib.Contracts.Events.Patron.ReaderChanged class : Elib.Contracts.Events.In
   ReaderTypeName : System.String?
   Status : System.Int32
   Version : System.Int64
+type Elib.Contracts.Events.Payment.ChargeIssued class : Elib.Contracts.Events.IntegrationEvent
+  Amount : System.Decimal required
+  CardNo : System.String required
+  Kind : System.String required
+  Label : System.String required
+  LastPaymentCode : System.String?
+  ReaderPublicId : System.Guid required
+  SourceId : System.Guid required
+  SourceService : System.String required
+  Version : System.Int64
+type Elib.Contracts.Events.Payment.ChargeSettled class : Elib.Contracts.Events.IntegrationEvent
+  SourceId : System.Guid required
+  SourceService : System.String required
+  Version : System.Int64
+type Elib.Contracts.Events.Payment.ChargeWaived class : Elib.Contracts.Events.IntegrationEvent
+  SourceId : System.Guid required
+  SourceService : System.String required
+  Version : System.Int64
+type Elib.Contracts.Events.Payment.PaymentExpired class : Elib.Contracts.Events.IntegrationEvent
+  SourceId : System.Guid required
+  SourceService : System.String required
+  TransactionCode : System.String required
+type Elib.Contracts.Events.Payment.PaymentSucceeded class : Elib.Contracts.Events.IntegrationEvent
+  Amount : System.Decimal required
+  Kind : System.String required
+  Late : System.Boolean
+  PaidAt : System.DateTimeOffset required
+  Provider : System.String required
+  ReaderPublicId : System.Guid required
+  SourceId : System.Guid required
+  SourceService : System.String required
+  TransactionCode : System.String required
 type Elib.Contracts.Events.Platform.AuditRecorded class : Elib.Contracts.Events.IntegrationEvent
   Action : System.String required
   ActorName : System.String?
@@ -188,6 +230,34 @@ type Elib.Contracts.Events.Platform.UserUpserted class : Elib.Contracts.Events.I
   SourceVersion : System.Int64 required
   UserId : System.Int64 required
   UserName : System.String required
+type Elib.Contracts.Events.Space.FloorChanged class : Elib.Contracts.Events.IntegrationEvent
+  BuildingName : System.String?
+  CanvasHeight : System.Double
+  CanvasWidth : System.Double
+  Deleted : System.Boolean
+  FloorNumber : Nullable<System.Int32>
+  FloorPublicId : System.Guid required
+  LayoutImageUrl : System.String?
+  Name : System.String required
+type Elib.Contracts.Events.Space.ShelfChanged class : Elib.Contracts.Events.IntegrationEvent
+  Code : System.String required
+  ColorHex : System.String?
+  Deleted : System.Boolean
+  FloorPublicId : System.Guid required
+  Height : Nullable<System.Double>
+  Name : System.String required
+  PositionX : Nullable<System.Double>
+  PositionY : Nullable<System.Double>
+  Rows : IReadOnlyList<Elib.Contracts.Events.Space.ShelfRowState>
+  ShelfPublicId : System.Guid required
+  StorePublicId : Nullable<System.Guid>
+  Width : Nullable<System.Double>
+type Elib.Contracts.Events.Space.ShelfRowState class
+  DdcEnd : System.String required
+  DdcStart : System.String required
+  Description : System.String?
+  RowIndex : System.Int32 required
+  RowPublicId : System.Guid required
 type Elib.Contracts.Events.SystemEvent abstract
   Actor : Elib.Contracts.Events.EventActor
   EventId : System.Guid

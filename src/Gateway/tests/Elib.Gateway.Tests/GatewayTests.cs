@@ -49,6 +49,24 @@ public sealed class GatewayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Payment_webhook_keeps_the_gateway_key_header_and_tells_the_service_which_library_called()
+    {
+        var client = _gateway.ClientFor("truong-a.thuvientn.vn");
+        using var request = new HttpRequestMessage(HttpMethod.Post, U("/hooks/sepay")) { Content = JsonContent.Create(new { id = 1 }) };
+        request.Headers.TryAddWithoutValidation("Authorization", "Apikey sepay-secret");
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var echo = (await response.Content.ReadFromJsonAsync<Echo>())!;
+        Assert.Equal("/hooks/sepay", echo.Path);
+        Assert.Equal("Apikey sepay-secret", echo.Headers["Authorization"]); // khoá Sepay đi nguyên tới service để kiểm
+        Assert.Equal("11", echo.Headers["X-Tenant-Id"]);
+        Assert.True(GatewaySignature.Verify(GatewayFactory.SigningKey, 11, echo.Headers["X-Gw-Signature"]));
+        // Địa chỉ quay lại của VNPAY dựng từ host mà service nhìn thấy — phải là host của thư viện chứ không phải tên container.
+        Assert.Equal("truong-a.thuvientn.vn", echo.Headers.GetValueOrDefault("X-Forwarded-Host") ?? echo.Headers["Host"]);
+    }
+
+    [Fact]
     public async Task Client_supplied_tenant_headers_are_replaced()
     {
         var client = _gateway.ClientFor("truong-a.thuvientn.vn");

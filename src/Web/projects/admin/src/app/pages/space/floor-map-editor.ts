@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   Api, STATUS_ACTIVE, STATUS_INACTIVE, SPACE_CATEGORIES, SPACE_CONDITION_STATUSES, SPACE_FIXTURE_TYPES, SPACE_KIND_ROOM, SPACE_KIND_STUDY, SpaceBuilding, SpaceFixture,
-  SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceLockerCabinet, SpaceLockerCompartment, SpaceLockerLoan, SpaceRoom, SpaceStoreOption,
+  SpaceFixtureEquipment, SpaceFloor, SpaceFloorUtility, SpaceShelfRow, SpaceLockerCabinet, SpaceLockerCompartment, SpaceLockerLoan, SpaceRoom, SpaceStoreOption,
   errorMessage,
 } from '../../core/api';
 import { Language } from '../../core/i18n';
@@ -290,6 +290,35 @@ type DragTarget = { kind: 'room'; item: SpaceRoom } | { kind: 'fixture'; item: S
           }
         </form>
 
+        @if (f.publicId && f.objectType === 'SHELF') {
+          <!-- Ngăn theo khoảng DDC (monolith: MapShelfRow) — xếp giá trực quan gợi ý bản sách vào đúng ngăn theo DDC. -->
+          <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div class="text-xs font-medium text-amber-800 flex items-center gap-1 mb-1">
+              <span class="material-icons text-[16px]">view_stream</span>{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_ROWS' | translate: { count: shelfRows().length } }}
+            </div>
+            <p class="text-[11px] text-amber-700/80 mb-2">{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_ROWS_HINT' | translate }}</p>
+            @if (shelfRows().length) {
+              <ul class="space-y-1 mb-2">
+                @for (r of shelfRows(); track r.id) {
+                  <li class="flex items-center justify-between gap-2 bg-white rounded px-2 py-1 text-xs">
+                    <span><b>{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_ROW_N' | translate: { n: r.rowIndex } }}</b> · {{ r.ddcStart }} – {{ r.ddcEnd }}@if (r.description) { <span class="text-gray-400"> — {{ r.description }}</span> }</span>
+                    <button type="button" class="material-icons text-[16px] text-gray-400 hover:text-red-600" [title]="'COMMON.DELETE' | translate" (click)="deleteShelfRow(r)">delete</button>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="grid grid-cols-5 gap-1.5">
+              <input type="number" min="1" class="input !py-1 text-xs" [(ngModel)]="rowIndex" name="srIndex" [placeholder]="'SPACE_FLOOR_MAP_PAGE.SHELF_ROW_NO' | translate" />
+              <input class="input !py-1 text-xs font-mono" maxlength="30" [(ngModel)]="rowFrom" name="srFrom" [placeholder]="'SPACE_FLOOR_MAP_PAGE.DDC_FROM' | translate" />
+              <input class="input !py-1 text-xs font-mono" maxlength="30" [(ngModel)]="rowTo" name="srTo" [placeholder]="'SPACE_FLOOR_MAP_PAGE.DDC_TO' | translate" />
+              <input class="input !py-1 text-xs col-span-2" maxlength="500" [(ngModel)]="rowDesc" name="srDesc" [placeholder]="'COMMON.NOTE' | translate" />
+            </div>
+            <button type="button" class="btn-secondary !py-1 text-xs w-full mt-1.5" (click)="addShelfRow(f.publicId)">
+              <span class="material-icons text-[14px] align-middle mr-1">add</span>{{ 'SPACE_FLOOR_MAP_PAGE.SHELF_ROW_ADD' | translate }}
+            </button>
+          </div>
+        }
+
         @if (f.publicId) {
           <div class="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-3">
             <div class="text-xs font-medium text-violet-800 flex items-center gap-1 mb-2">
@@ -496,6 +525,12 @@ export class SpaceFloorMapEditor implements OnInit, OnDestroy {
   protected readonly lockerOpenLoans = signal<SpaceLockerLoan[]>([]);
   protected lockerScanCardNo = '';
 
+  protected readonly shelfRows = signal<SpaceShelfRow[]>([]);
+  protected rowIndex: number | null = null;
+  protected rowFrom = '';
+  protected rowTo = '';
+  protected rowDesc = '';
+
   protected readonly equipment = signal<SpaceFixtureEquipment[]>([]);
   protected equipmentName = '';
   protected equipmentQty: number | null = null;
@@ -681,6 +716,8 @@ export class SpaceFloorMapEditor implements OnInit, OnDestroy {
       this.equipmentQty = null;
       this.equipmentStatus = 1;
       void this.loadEquipment(x.id);
+      this.shelfRows.set([]);
+      if (x.objectType === 'SHELF') void this.loadShelfRows(x.id);
     }
   }
 
@@ -768,6 +805,40 @@ export class SpaceFloorMapEditor implements OnInit, OnDestroy {
 
   protected conditionLabel(status: number): string {
     return this.conditionOptions.find((c) => c.value === status)?.label ?? 'SPACE_FLOOR_MAP_PAGE.CONDITION_1';
+  }
+
+  private async loadShelfRows(fixtureId: number): Promise<void> {
+    const rows = await this.api.crud<SpaceShelfRow>('shelf-rows', 'space').searchAll({ fixtureId });
+    this.shelfRows.set(rows);
+    this.rowIndex = Math.max(0, ...rows.map((r) => r.rowIndex)) + 1; // số ngăn kế tiếp
+  }
+
+  protected async addShelfRow(fixturePublicId: string): Promise<void> {
+    const fixture = this.fixtures().find((x) => x.publicId === fixturePublicId);
+    if (!fixture || !this.rowIndex || !this.rowFrom.trim() || !this.rowTo.trim()) {
+      this.toastr.warning('SPACE_FLOOR_MAP_PAGE.SHELF_ROW_REQUIRED');
+      return;
+    }
+    try {
+      await this.api.crud<SpaceShelfRow>('shelf-rows', 'space').add({
+        fixtureId: fixture.id, rowIndex: this.rowIndex, ddcStart: this.rowFrom.trim(), ddcEnd: this.rowTo.trim(), description: this.rowDesc.trim() || null,
+      });
+      this.rowFrom = '';
+      this.rowTo = '';
+      this.rowDesc = '';
+      await this.loadShelfRows(fixture.id);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  protected async deleteShelfRow(r: SpaceShelfRow): Promise<void> {
+    try {
+      await this.api.crud('shelf-rows', 'space').delete(r.publicId);
+      await this.loadShelfRows(r.fixtureId);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
   }
 
   private async loadEquipment(fixtureId: number): Promise<void> {

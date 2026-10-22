@@ -12,6 +12,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<FloorResource>();
         services.AddCrudResource<SpaceResource>();
         services.AddCrudResource<FixtureResource>();
+        services.AddScoped<ShelfEvents>();
+        services.AddCrudResource<ShelfRowResource>();
         services.AddCrudResource<FixtureEquipmentResource>();
         services.AddCrudResource<FloorUtilityResource>();
         services.AddCrudResource<LockerCabinetResource>();

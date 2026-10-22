@@ -91,6 +91,10 @@ public sealed class FineTicket : TenantEntity
 
     public string? Note { get; private set; }
     public List<FineLine> Lines { get; private set; } = [];
+    public List<FinePayment> Payments { get; private set; } = [];
+
+    /// <summary>Tăng sau mỗi thay đổi — yêu cầu chờ duyệt ghi lại để phát hiện phiếu đã đổi lúc duyệt.</summary>
+    public long Version { get; private set; }
 
     public string Code => FormatCode(Number);
 
@@ -118,6 +122,24 @@ public sealed class FineTicket : TenantEntity
         return line;
     }
 
+    /// <summary>
+    /// Ghi một khoản thanh toán/điều chỉnh (số có dấu: điều chỉnh âm = hoàn/giảm khoản đã thu). <see cref="Paid"/> luôn bằng tổng các khoản.
+    /// Không bao giờ sửa khoản cũ — sai thì thêm khoản điều chỉnh có lý do.
+    /// </summary>
+    public FinePayment AddPayment(decimal amount, string method, string? note, string? reason, string? byName, DateTimeOffset at, string? externalRef = null)
+    {
+        if (amount == 0 || amount < -FineMoney.Max || amount > FineMoney.Max || decimal.Round(amount, 2) != amount)
+            throw new BusinessRuleException("AMOUNT_INVALID", "Số tiền thanh toán/điều chỉnh khác 0 và trong giới hạn cho phép.");
+        var payment = new FinePayment
+        {
+            Amount = amount, Method = method, Note = note?.Trim(), Reason = reason?.Trim(), ByName = byName, PaidAt = at, ExternalRef = externalRef,
+        };
+        Payments.Add(payment);
+        Paid += amount;
+        Recalculate();
+        return payment;
+    }
+
     public void RemoveLine(FineLine line)
     {
         ArgumentNullException.ThrowIfNull(line);
@@ -136,13 +158,12 @@ public sealed class FineTicket : TenantEntity
         Recalculate();
     }
 
-    /// <summary>Giảm trừ, đã nộp, ghi chú, ngày phạt, số tiền phiếu thủ công; trạng thái cuối cùng.</summary>
-    public void Settle(DateTimeOffset? fineDate, decimal? manualAmount, decimal discount, decimal paid, string? note, int status)
+    /// <summary>Giảm trừ, ghi chú, ngày phạt, số tiền phiếu thủ công; trạng thái cuối cùng. Tiền đã nộp chỉ đổi qua <see cref="AddPayment"/>.</summary>
+    public void Settle(DateTimeOffset? fineDate, decimal? manualAmount, decimal discount, string? note, int status)
     {
         if (fineDate is { } d) FineDate = d.ToUniversalTime();
         ManualAmount = manualAmount is { } m ? FineMoney.Validate(m, "Số tiền phạt") : null;
         Discount = FineMoney.Validate(discount, "Giảm trừ");
-        Paid = FineMoney.Validate(paid, "Tiền đã nộp");
         var n = note?.Trim();
         Note = string.IsNullOrEmpty(n) ? null : n.Length <= MaxNoteLength ? n : throw new BusinessRuleException("NOTE_INVALID", $"Ghi chú tối đa {MaxNoteLength} ký tự.");
         Recalculate();
@@ -154,6 +175,7 @@ public sealed class FineTicket : TenantEntity
 
     private void Recalculate()
     {
+        Version++;
         Total = Lines.Count > 0 ? Lines.Sum(l => l.Amount) : ManualAmount ?? 0;
         Remaining = Total - Discount - Paid;
     }
@@ -171,4 +193,32 @@ public sealed class FineLine : Entity, ITenantOwned
     public string? Barcode { get; set; }
     public long? Mfn { get; set; }
     public int OverdueDays { get; set; }
+}
+
+public static class FinePaymentMethod
+{
+    public const string Cash = "CASH";
+
+    /// <summary>Thu qua mã QR (VietQR/VNPAY/Sepay) — dùng cho dịch vụ thanh toán; <see cref="FinePayment.ExternalRef"/> chống ghi trùng.</summary>
+    public const string Qr = "QR";
+
+    public const string Adjustment = "ADJUST";
+
+    /// <summary>Số đã thu trước khi có bản ghi thanh toán (chuyển từ cột Paid cũ).</summary>
+    public const string Carry = "CARRY";
+}
+
+/// <summary>Một khoản thu/điều chỉnh của phiếu phạt — bất biến, không xoá. Tiền đã nộp của phiếu = tổng các khoản.</summary>
+public sealed class FinePayment : TenantEntity
+{
+    public long FineTicketId { get; set; }
+    public decimal Amount { get; set; }
+    public string Method { get; set; } = FinePaymentMethod.Cash;
+    public string? Note { get; set; }
+    public string? Reason { get; set; }
+    public string? ByName { get; set; }
+    public DateTimeOffset PaidAt { get; set; }
+
+    /// <summary>Mã giao dịch bên ngoài (IPN) — duy nhất theo đơn vị nên IPN gửi trùng không ghi hai lần.</summary>
+    public string? ExternalRef { get; set; }
 }

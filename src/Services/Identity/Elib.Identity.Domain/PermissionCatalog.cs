@@ -20,6 +20,9 @@ public static class PermissionCatalog
     public const string Edit = "edit";
     public const string Delete = "delete";
 
+    /// <summary>Duyệt yêu cầu thay đổi vượt thẩm quyền (không thuộc Crud — cấp riêng cho người có thẩm quyền).</summary>
+    public const string Approve = "approve";
+
     private static readonly string[] Crud = [View, Add, Edit, Delete];
     private const string ReaderGroup = "Quản lý bạn đọc";
     private const string ReaderParams = "Quản lý bạn đọc / Tham số bạn đọc";
@@ -36,6 +39,8 @@ public static class PermissionCatalog
     private const string AcquisitionLicense = "ACQUISITION";
     private const string SearchGroup = "Tra cứu";
     private const string SearchLicense = "SEARCH";
+    private const string PaymentGroup = "Thanh toán";
+    private const string PaymentLicense = "PAYMENT";
     private const string DigitalGroup = "Tài liệu số";
     private const string DigitalParams = "Tài liệu số / Tham số tài liệu số";
     private const string DigitalLicense = "DIGITAL";
@@ -45,6 +50,7 @@ public static class PermissionCatalog
     public static readonly IReadOnlyList<PermissionModule> All =
     [
         new("READERS", "Bạn đọc", ReaderGroup, Crud),
+        new("READER_CARD_FEES", "Phí cấp lại thẻ", ReaderGroup, [View, Add, Edit]),
         new("GROUPREADER", "Nhóm bạn đọc", ReaderGroup, Crud),
         new("READER_TYPES", "Loại bạn đọc", ReaderParams, Crud),
         new("CLASSES", "Lớp", ReaderParams, Crud),
@@ -71,8 +77,8 @@ public static class PermissionCatalog
         new("MAP_SHELVING", "Xếp giá", StoreGroup, [View, Edit], HoldingsLicense),
         new("PRINT_LABEL", "In nhãn (mã vạch, nhãn gáy)", StoreGroup, [View], HoldingsLicense),
         new("INVENTORY", "Kiểm kê", StoreGroup, Crud, HoldingsLicense),
-        new("LOST_BOOKS", "Xử lý sách mất", StoreGroup, [View, Add, Edit], HoldingsLicense),
-        new("LIQUIDATES", "Thanh lý", StoreGroup, [View, Add, Edit], HoldingsLicense),
+        new("LOST_BOOKS", "Xử lý sách mất", StoreGroup, [View, Add, Edit, Approve], HoldingsLicense),
+        new("LIQUIDATES", "Thanh lý", StoreGroup, [View, Add, Edit, Approve], HoldingsLicense),
         new("BOOK_OUT_STORE", "Sách ra vào kho", StoreGroup, [View, Edit, Delete], HoldingsLicense),
         new("EXPORT_REASON", "Lý do xuất kho", StoreGroup, Crud, HoldingsLicense),
         new("BOOK_OUT_UNIT", "Đơn vị nhận sách", StoreGroup, Crud, HoldingsLicense),
@@ -90,14 +96,14 @@ public static class PermissionCatalog
         new("BUDGETS", "Kinh phí", AcquisitionParams, Crud, AcquisitionLicense),
         new("FUNDS", "Quỹ", AcquisitionParams, Crud, AcquisitionLicense),
 
-        new("BORROW", "Mượn/Trả", CirculationGroup, [View, Add, Edit], CirculationLicense),
+        new("BORROW", "Mượn/Trả", CirculationGroup, [View, Add, Edit, Approve], CirculationLicense),
         new("REQUEST_BOOKS", "Yêu cầu mượn", CirculationGroup, [View, Add, Edit], CirculationLicense),
         new("LOAN_HISTORY", "Lịch sử lưu thông", CirculationGroup, [View], CirculationLicense),
         new("CIRC_REPORT", "Báo cáo lưu thông", CirculationGroup, [View], CirculationLicense),
         new("C_PHOTO", "Photo copy tài liệu", CirculationGroup, Crud, CirculationLicense),
         new("CIRC_POLICIES", "Chính sách lưu thông", CirculationGroup, Crud, CirculationLicense),
         new("CIRC_PLACES", "Điểm lưu thông", CirculationGroup, Crud, CirculationLicense),
-        new("FINES", "Quản lý phạt", CirculationGroup, Crud, CirculationLicense),
+        new("FINES", "Quản lý phạt", CirculationGroup, [View, Add, Edit, Delete, Approve], CirculationLicense),
         new("FINE_REASONS", "Lý do phạt", CirculationGroup, Crud, CirculationLicense),
         new("SIP2LOG", "Trạm tự phục vụ SIP2", CirculationGroup, Crud, CirculationLicense),
         new("CHECK_IN_OUT", "Check-in / Check-out", CirculationGroup, Crud, CirculationLicense),
@@ -105,6 +111,10 @@ public static class PermissionCatalog
         new("SEARCH_INDEX", "Chỉ mục tra cứu (OPAC)", SearchGroup, [View, Edit], SearchLicense),
         new("SEARCH_STATS", "Thống kê tra cứu", SearchGroup, [View], SearchLicense),
         new("Z3950_CONFIGS", "Máy chủ Z39.50 (liên thư viện)", SearchGroup, Crud, SearchLicense),
+
+        new("PAYMENT_TRANSACTIONS", "Giao dịch thanh toán QR", PaymentGroup, [View, Add], PaymentLicense),
+        new("PAYMENT_RECONCILIATION", "Đối soát thanh toán", PaymentGroup, [View, Edit], PaymentLicense),
+        new("PAYMENT_ACCOUNTS", "Tài khoản nhận tiền", PaymentGroup, [View, Edit], PaymentLicense),
 
         new("DIGITAL_ITEMS", "Tài liệu số", DigitalGroup, Crud, DigitalLicense),
         new("DIGITAL_LOANS", "Mượn/trả/đặt trước tài liệu số", DigitalGroup, [View, Edit], DigitalLicense),
@@ -135,6 +145,7 @@ public static class PermissionCatalog
         new("SYSTEM_PARAMS", "Tham số hệ thống", SystemGroup, Crud),
         new("CURRENCIES", "Tiền tệ", SystemGroup, Crud),
         new("SYSTEM_LOG", "Nhật ký hệ thống", SystemGroup, [View]),
+        new("APPROVAL_RULES", "Thẩm quyền phê duyệt", SystemGroup, [View, Edit]),
 
         new("NOTIFICATION_CONFIG", "Cấu hình email", NotifyGroup, [View, Edit, Delete]),
         new("NOTIFICATION_TEMPLATES", "Mẫu email", NotifyGroup, Crud),

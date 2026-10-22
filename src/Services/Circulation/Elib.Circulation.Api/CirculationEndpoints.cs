@@ -4,6 +4,7 @@ using Elib.BuildingBlocks.Tenancy;
 using Elib.Circulation.Application;
 using Elib.Circulation.Application.Sip2;
 using Elib.Contracts.Events.Circulation;
+using Elib.Contracts.Events.Payment;
 using Elib.Contracts.Events.Platform;
 
 namespace Elib.Circulation.Api;
@@ -43,6 +44,19 @@ public static class CirculationEndpoints
             {
                 var (list, next) = await r.OpenStatesAsync(after ?? 0, take ?? 1000, ct);
                 return new StatePage<LoanChanged>(list, next);
+            }
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
+        // Nội bộ: payment dựng khoản thu lần đầu — các phiếu phạt còn nợ (chỉ service token).
+        app.MapGet("/internal/tenants/{tenantId:long}/charges/open", async (long tenantId, string? kind, long? after, int? take, ITenantContext tenant,
+            FineTicketResource fines, PhotocopyResource photos, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+            {
+                var (list, next) = string.Equals(kind, "PHOTOCOPY", StringComparison.OrdinalIgnoreCase)
+                    ? await photos.OpenChargesAsync(after ?? 0, take ?? 1000, ct)
+                    : await fines.OpenChargesAsync(after ?? 0, take ?? 1000, ct);
+                return new StatePage<ChargeIssued>(list, next);
             }
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
@@ -91,8 +105,10 @@ public static class CirculationEndpoints
             => Results.Created((string?)null, await r.AddAsync(request, ct)));
         fines.MapPost("/BuildForReader", [Permission("FINES", "add")] (BuildFineTicketRequest request, FineTicketResource r, CancellationToken ct)
             => r.BuildForReaderAsync(request, ct));
-        fines.MapPut("/Save/{publicId:guid}", [Permission("FINES", "edit")] (Guid publicId, SaveFineTicketRequest request, FineTicketResource r, CancellationToken ct)
-            => r.SaveAsync(publicId, request, ct));
+        fines.MapPut("/Save/{publicId:guid}", [Permission("FINES", "edit")] async (Guid publicId, SaveFineTicketRequest request, FineTicketResource r, CancellationToken ct)
+            => Outcome(await r.SaveAsync(publicId, request, ct)));
+        fines.MapPost("/Adjust/{publicId:guid}", [Permission("FINES", "edit")] async (Guid publicId, AdjustFinePaymentRequest request, FineTicketResource r, CancellationToken ct)
+            => Outcome(await r.AdjustAsync(publicId, request, ct)));
         fines.MapDelete("/Delete/{publicId:guid}", [Permission("FINES", "delete")] async (Guid publicId, FineTicketResource r, CancellationToken ct) =>
         {
             await r.DeleteAsync(publicId, ct);
@@ -107,6 +123,10 @@ public static class CirculationEndpoints
             => r.CheckoutAsync(request, ct));
         loans.MapPost("/Return", [Permission("BORROW", "edit")] (ReturnRequest request, LoanResource r, CancellationToken ct)
             => r.ReturnAsync(request, ct));
+        loans.MapPost("/ForceClose", [Permission("BORROW", "edit")] async (LoanActionRequest request, LoanResource r, CancellationToken ct)
+            => Outcome(await r.ForceCloseAsync(request, ct)));
+        loans.MapPost("/Reopen", [Permission("BORROW", "edit")] async (LoanActionRequest request, LoanResource r, CancellationToken ct)
+            => Outcome(await r.ReopenAsync(request, ct)));
         loans.MapPost("/Renew", [Permission("BORROW", "edit")] (RenewRequest request, LoanResource r, CancellationToken ct)
             => r.RenewAsync(request, ct));
         loans.MapPost("/Note", [Permission("BORROW", "edit")] (LoanNoteRequest request, LoanResource r, CancellationToken ct)
@@ -137,6 +157,14 @@ public static class CirculationEndpoints
             await r.DeleteAsync(publicId, ct);
             return Results.NoContent();
         });
+        api.MapApprovals();
         return app;
     }
+
+    /// <summary>200 khi đã áp dụng; 202 khi vượt thẩm quyền và chỉ mới tạo yêu cầu chờ duyệt (chưa đổi gì).</summary>
+    private static IResult Outcome(FineSaveOutcome outcome) =>
+        outcome.Pending is { } pending ? Results.Json(pending, statusCode: StatusCodes.Status202Accepted) : Results.Ok(outcome.Detail);
+
+    private static IResult Outcome(LoanActionOutcome outcome) =>
+        outcome.Pending is { } pending ? Results.Json(pending, statusCode: StatusCodes.Status202Accepted) : Results.Ok(outcome.Loan);
 }

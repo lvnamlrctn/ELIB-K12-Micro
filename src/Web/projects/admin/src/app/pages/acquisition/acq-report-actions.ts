@@ -122,7 +122,7 @@ export class AcqReportActions {
     const tr = (k: string) => this.i18n.instant(k) as string;
     const num = (v: number, digits = 0) => v.toLocaleString('vi-VN', { maximumFractionDigits: digits });
     const date = (v: string | null) => (v ? v.split('-').reverse().join('/') : '');
-    const range = (a: string, b: string) => (a && b ? `Từ ngày ${date(a)} đến ngày ${date(b)}` : a ? `Từ ngày ${date(a)}` : b ? `Đến ngày ${date(b)}` : '');
+    const range = (a: string, b: string) => (a && b ? `Từ ngày ${date(a)} đến ngày ${date(b)}` : a ? `Từ ngày ${date(a)}` : b ? `Đến ngày ${date(b)}` : ''); // i18n-data: dòng ngày in trên báo cáo (mẫu văn bản hành chính)
     const base = { title: tr(t.label), subtitle: range(body.from ?? '', body.to ?? ''), total: null as string[] | null, truncated: false };
     switch (kind) {
       case 'list': {

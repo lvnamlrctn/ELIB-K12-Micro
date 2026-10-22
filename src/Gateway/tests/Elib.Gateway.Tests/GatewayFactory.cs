@@ -102,6 +102,13 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Routes:catalog-opac:Match:Path"] = "/api/opac/catalog/{**rest}",
             ["ReverseProxy:Routes:catalog-opac:Transforms:0:PathPattern"] = "/api/opac/{**rest}",
             ["ReverseProxy:Routes:catalog-opac:Metadata:Module"] = "SEARCH",
+            // Webhook thanh toán công khai trên host từng thư viện: giữ nguyên Authorization (khoá Sepay), gắn đơn vị có chữ ký.
+            ["ReverseProxy:Routes:payment-hooks:ClusterId"] = "search",
+            ["ReverseProxy:Routes:payment-hooks:AuthorizationPolicy"] = "anonymous",
+            ["ReverseProxy:Routes:payment-hooks:RateLimiterPolicy"] = "opac",
+            ["ReverseProxy:Routes:payment-hooks:Match:Path"] = "/hooks/{**rest}",
+            ["ReverseProxy:Routes:payment-hooks:Transforms:0:PathPattern"] = "/hooks/{**rest}",
+            ["ReverseProxy:Routes:payment-hooks:Metadata:Module"] = "SEARCH",
             ["ReverseProxy:Routes:circulation-admin:ClusterId"] = "search",
             ["ReverseProxy:Routes:circulation-admin:AuthorizationPolicy"] = "elib-staff",
             ["ReverseProxy:Routes:circulation-admin:Match:Path"] = "/api/admin/circulation/{**rest}",

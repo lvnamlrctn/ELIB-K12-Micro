@@ -44,6 +44,18 @@ public sealed class Loan : TenantEntity
     /// <summary>Lượt đóng không phải do trả sách: trạng thái bản sách holdings phải chuyển sang (L = mất). Null = trả bình thường.</summary>
     public string? ClosedItemStatus { get; private set; }
 
+    public const string CloseReturned = "Returned";
+    public const string CloseLost = "Lost";
+    public const string CloseForced = "Forced";
+
+    /// <summary>Returned / Lost / Forced; null = đang mượn hoặc lượt cũ chưa ghi.</summary>
+    public string? CloseKind { get; private set; }
+
+    public string? CloseReason { get; private set; }
+
+    /// <summary>Số lần lượt này đã được mở lại sau khi đóng.</summary>
+    public int ReopenCount { get; private set; }
+
     /// <summary>Ngày (giờ Việt Nam) đã phát nhắc sắp đến hạn / quá hạn — job nhắc hạn không phát lại.</summary>
     public DateOnly? DueSoonNotifiedOn { get; private set; }
 
@@ -83,6 +95,7 @@ public sealed class Loan : TenantEntity
         ReturnCircPlaceId = circPlaceId;
         ReturnedBy = staffId;
         ReturnedByName = StaffName(staffName);
+        CloseKind = CloseReturned;
         Version++;
     }
 
@@ -93,11 +106,41 @@ public sealed class Loan : TenantEntity
     /// Đóng lượt vì mất tài liệu (monolith: lý do phạt có Status_Reg_Id — BookOut "R" + BookIn, ĐKCB sang "Mất"). Holdings nhận
     /// LoanChanged có <see cref="ClosedItemStatus"/> để đổi trạng thái bản sách.
     /// </summary>
-    public void CloseAsLost(DateTimeOffset now, long? staffId, string? staffName = null)
+    public void CloseAsLost(DateTimeOffset now, long? staffId, string? staffName = null, string? reason = null)
     {
         if (!IsOpen) return;
         ClosedItemStatus = LostStatus;
         Return(now, null, staffId, staffName);
+        CloseKind = CloseLost;
+        CloseReason = reason;
+    }
+
+    /// <summary>
+    /// Đóng cưỡng bức (bạn đọc đã rời trường, mất dấu tài liệu nhưng không tính phạt mất…): đóng lượt như đã trả, KHÔNG đổi trạng thái bản
+    /// sách (bản trở lại sẵn sàng). Bắt buộc lý do; khác trả sách ở chỗ ghi rõ là đóng cưỡng bức để kiểm tra sau.
+    /// </summary>
+    public void ForceClose(DateTimeOffset now, long? staffId, string? staffName, string reason)
+    {
+        if (!IsOpen) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", $"ĐKCB {Barcode} đã đóng lúc {ReturnedAt:dd/MM/yyyy HH:mm}.");
+        Return(now, null, staffId, staffName);
+        CloseKind = CloseForced;
+        CloseReason = reason;
+    }
+
+    /// <summary>Hoàn tác trả nhầm/đóng nhầm: mở lại lượt như chưa đóng (hạn trả giữ nguyên). Ràng buộc nghiệp vụ kiểm ở <c>LoanResource</c>.</summary>
+    public void Reopen()
+    {
+        if (IsOpen) throw new BusinessRuleException("LOAN_NOT_CLOSED", $"Lượt mượn ĐKCB {Barcode} đang mở.");
+        ReturnedAt = null;
+        ReturnedLate = false;
+        ReturnCircPlaceId = null;
+        ReturnedBy = null;
+        ReturnedByName = null;
+        ClosedItemStatus = null;
+        CloseKind = null;
+        CloseReason = null;
+        ReopenCount++;
+        Version++;
     }
 
     public void MarkDueSoonNotified(DateOnly day) => DueSoonNotifiedOn = day;

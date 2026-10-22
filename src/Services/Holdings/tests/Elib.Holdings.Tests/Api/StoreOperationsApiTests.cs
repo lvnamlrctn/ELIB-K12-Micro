@@ -82,14 +82,14 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
 
     private static async Task<ItemDto> Item(HttpClient staff, Guid publicId) => await Read<ItemDto>(await staff.GetAsync(U($"/api/items/GetById/{publicId}")));
 
-    private async Task Loan(long tenantId, ItemDto item, bool returned = false, string? closed = null, long version = 0, Guid? loanId = null)
+    private async Task Loan(long tenantId, ItemDto item, bool returned = false, string? closed = null, long version = 0, Guid? loanId = null, bool reopened = false)
     {
         var now = DateTimeOffset.UtcNow;
         var e = new LoanChanged
         {
             TenantId = tenantId, LoanPublicId = loanId ?? Guid.CreateVersion7(), ReaderPublicId = Guid.CreateVersion7(), CardNo = "HS99",
             ItemPublicId = item.PublicId, Barcode = item.Barcode, Mfn = item.Mfn, LoanedAt = now, DueAt = now.AddDays(14),
-            ReturnedAt = returned ? now : null, ClosedItemStatus = closed, Version = version,
+            ReturnedAt = returned ? now : null, ClosedItemStatus = closed, Version = version, Reopened = reopened,
         };
         await _factory.PublishAsync(e);
         await _factory.WaitConsumedAsync(e);
@@ -118,6 +118,90 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         return form;
     }
 
+    private static readonly string[] ClerkGrants = ["LOST_BOOKS:view", "LOST_BOOKS:add", "LOST_BOOKS:edit", "LIQUIDATES:view", "LIQUIDATES:add", "LIQUIDATES:edit", "CATALOG_BIBS:view", "AB_RECEIPTS:view"];
+
+    [Fact]
+    public async Task Liquidation_needs_a_reason_and_waits_for_approval_by_default_and_keeps_the_decision_and_previous_status()
+    {
+        var tenantId = NewTenant();
+        var admin = Staff(tenantId);
+        var clerk = Staff(tenantId, ClerkGrants);
+        var bib = await PublishBib(tenantId, "Tắt đèn");
+        var items = await Items(admin, bib.Mfn, "TD", 2, shelve: false); // chưa xếp giá (I)
+        await Items(admin, bib.Mfn, "TE", 1);
+
+        Assert.Equal("REASON_REQUIRED", await ErrorCode(await clerk.PostAsJsonAsync(U("/api/liquidations/Liquidate"), new LiquidateRequest(["TD0001"]), Json)));
+        var held = await clerk.PostAsJsonAsync(U("/api/liquidations/Liquidate"),
+            new LiquidateRequest(["TD0001", "TD0002"], Reason: "Hư hỏng nặng", DecisionNo: "QĐ-12/2026", DecisionDate: new DateOnly(2026, 10, 1)), Json);
+        Assert.Equal(HttpStatusCode.Accepted, held.StatusCode);
+        var pending = await Read<PendingApproval>(held);
+        Assert.Equal(StoreApprovals.Liquidate, pending.Kind);
+        Assert.Equal("I", (await Item(admin, items[0].PublicId)).Status); // chưa đổi gì
+
+        Assert.Equal("APPROVAL_FORBIDDEN", await ErrorCode(await clerk.PostAsJsonAsync(U($"/api/approvals/{pending.RequestId}/Approve"), new ApprovalDecisionRequest(), Json)));
+        await Read<ChangeRequestDto>(await admin.PostAsJsonAsync(U($"/api/approvals/{pending.RequestId}/Approve"), new ApprovalDecisionRequest("Đã có quyết định"), Json));
+        var list = await Read<CrudPage<LiquidationRow>>(await admin.PostAsJsonAsync(U("/api/liquidations/Search"), new StoreRecordSearch(), Json));
+        Assert.Equal(2, list.TotalCount);
+        Assert.All(list.Items, r => Assert.Equal(("QĐ-12/2026", new DateOnly(2026, 10, 1), "S"), (r.DecisionNo, r.DecisionDate, r.ItemStatus)));
+
+        // Huỷ thanh lý: lý do bắt buộc, chờ duyệt; bản về ĐÚNG trạng thái trước (chưa xếp giá), bản ghi gốc giữ lại nhưng không còn trong danh sách.
+        Assert.Equal("REASON_REQUIRED", await ErrorCode(await admin.PostAsJsonAsync(U("/api/liquidations/Cancel"), new ItemReasonRequest("TD0001", null), Json)));
+        var cancelHeld = await clerk.PostAsJsonAsync(U("/api/liquidations/Cancel"), new ItemReasonRequest("TD0001", "Thanh lý nhầm"), Json);
+        Assert.Equal(HttpStatusCode.Accepted, cancelHeld.StatusCode);
+        await Read<ChangeRequestDto>(await admin.PostAsJsonAsync(U($"/api/approvals/{(await Read<PendingApproval>(cancelHeld)).RequestId}/Approve"), new ApprovalDecisionRequest(), Json));
+        Assert.Equal("I", (await Item(admin, items[0].PublicId)).Status);
+        Assert.Equal(["TD0002"], (await Read<CrudPage<LiquidationRow>>(await admin.PostAsJsonAsync(U("/api/liquidations/Search"), new StoreRecordSearch(), Json))).Items.Select(r => r.Barcode));
+    }
+
+    [Fact]
+    public async Task Bulk_lost_marking_over_the_threshold_waits_for_approval_and_restoring_a_lost_loan_item_proposes_a_fine_adjustment()
+    {
+        var tenantId = NewTenant();
+        var admin = Staff(tenantId);
+        var clerk = Staff(tenantId, ClerkGrants);
+        var bib = await PublishBib(tenantId, "Dế mèn phiêu lưu ký");
+        var items = await Items(admin, bib.Mfn, "DM", 12);
+
+        // 3 bản: áp dụng ngay (dưới ngưỡng 10).
+        var small = await clerk.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["DM0001", "DM0002", "DM0003"], Reason: "Kiểm kê"), Json);
+        Assert.Equal(HttpStatusCode.OK, small.StatusCode);
+        // 9 bản còn lại + 1 = 10 bản → chờ duyệt, các bản vẫn sẵn sàng.
+        var big = await clerk.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest([.. items.Skip(2).Select(i => i.Barcode)], Reason: "Lũ lụt"), Json);
+        Assert.Equal(HttpStatusCode.Accepted, big.StatusCode);
+        Assert.Equal("R", (await Item(admin, items[11].PublicId)).Status);
+
+        // Khôi phục bản mất khi đang mượn: phát ItemLossReversed để circulation đề xuất điều chỉnh phiếu phạt.
+        var loanId = Guid.CreateVersion7();
+        await Loan(tenantId, items[11], version: 0, loanId: loanId);
+        await Loan(tenantId, items[11], returned: true, closed: "L", version: 1, loanId: loanId);
+        Assert.Equal("L", (await Item(admin, items[11].PublicId)).Status);
+        var restore = await admin.PostAsJsonAsync(U("/api/lost-books/Restore"), new ItemReasonRequest("DM0012", "Tìm thấy ở kho phụ"), Json);
+        Assert.Equal(HttpStatusCode.NoContent, restore.StatusCode); // người có quyền duyệt hoàn tác thẳng
+        var evt = Assert.Single(_factory.PublishedOf<ItemLossReversed>(), e => e.ItemPublicId == items[11].PublicId);
+        Assert.Equal(("HS99", "Tìm thấy ở kho phụ"), (evt.CardNo, evt.Reason));
+        Assert.Equal("R", (await Item(admin, items[11].PublicId)).Status);
+    }
+
+    [Fact]
+    public async Task Reopening_a_loan_closed_as_lost_takes_the_item_off_the_lost_list_and_back_on_loan()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var bib = await PublishBib(tenantId, "Số đỏ");
+        var items = await Items(staff, bib.Mfn, "SO", 1);
+        var loanId = Guid.CreateVersion7();
+        await Loan(tenantId, items[0], version: 0, loanId: loanId);
+        await Loan(tenantId, items[0], returned: true, closed: "L", version: 1, loanId: loanId);
+        Assert.Equal("L", (await Item(staff, items[0].PublicId)).Status);
+        Assert.Single((await Read<CrudPage<LostRow>>(await staff.PostAsJsonAsync(U("/api/lost-books/Search"), new StoreRecordSearch(), Json))).Items, r => r.Barcode == "SO0001");
+
+        await Loan(tenantId, items[0], version: 2, loanId: loanId, reopened: true); // circulation mở lại lượt đóng nhầm
+        var after = await Item(staff, items[0].PublicId);
+        Assert.Equal(("R", true), (after.Status, after.OnLoan));
+        Assert.DoesNotContain((await Read<CrudPage<LostRow>>(await staff.PostAsJsonAsync(U("/api/lost-books/Search"), new StoreRecordSearch(), Json))).Items, r => r.Barcode == "SO0001");
+        Assert.Equal("R", LastEvent(items[0].PublicId).Status);
+    }
+
     [Fact]
     public async Task Lost_books_batch_skips_loans_and_restore_returns_item_to_shelf()
     {
@@ -144,9 +228,9 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
             new StoreRecordSearch { From = new DateOnly(2026, 9, 1), To = new DateOnly(2026, 9, 1) }, Json));
         Assert.Equal(2, dated.TotalCount);
 
-        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsJsonAsync(U("/api/lost-books/Restore"), new BarcodeRequest("cp0001"), Json)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsJsonAsync(U("/api/lost-books/Restore"), new ItemReasonRequest("cp0001", "Hoàn tác theo biên bản"), Json)).StatusCode);
         Assert.Equal("R", (await Item(staff, items[0].PublicId)).Status);
-        var again = await staff.PostAsJsonAsync(U("/api/lost-books/Restore"), new BarcodeRequest("CP0001"), Json);
+        var again = await staff.PostAsJsonAsync(U("/api/lost-books/Restore"), new ItemReasonRequest("CP0001", "Hoàn tác theo biên bản"), Json);
         Assert.Equal("ITEM_NOT_LOST", await ErrorCode(again));
         Assert.Equal(2, (await Read<CrudPage<LostRow>>(await staff.PostAsJsonAsync(U("/api/lost-books/Search"), new StoreRecordSearch(), Json))).TotalCount);
 
@@ -154,7 +238,7 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         Assert.Equal(CrudExcel.ContentType, export.Content.Headers.ContentType?.MediaType);
 
         var viewer = Staff(tenantId, "LOST_BOOKS:view");
-        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["CP0002"]), Json)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["CP0002"], Reason: "Kiểm kê không thấy"), Json)).StatusCode);
     }
 
     [Fact]
@@ -164,7 +248,7 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         var staff = Staff(tenantId);
         var bib = await PublishBib(tenantId, "Vợ nhặt");
         var items = await Items(staff, bib.Mfn, "VN", 3);
-        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["VN0002"]), Json));
+        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["VN0002"], Reason: "Kiểm kê không thấy"), Json));
         await Read<StoreOutRow>(await staff.PostAsJsonAsync(U("/api/store-outs/ScanOut"), new ScanOutRequest("VN0003"), Json));
 
         var result = await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/liquidations/Liquidate"),
@@ -175,11 +259,11 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         Assert.Equal(2, list.TotalCount);
         Assert.All(list.Items, r => Assert.Equal(("Rách nát", "S"), (r.Reason, r.ItemStatus)));
 
-        await Ok(await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new BarcodeRequest("VN0001"), Json));
-        await Ok(await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new BarcodeRequest("VN0002"), Json));
+        await Ok(await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new ItemReasonRequest("VN0001", "Hoàn tác theo biên bản"), Json));
+        await Ok(await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new ItemReasonRequest("VN0002", "Hoàn tác theo biên bản"), Json));
         Assert.Equal("R", (await Item(staff, items[0].PublicId)).Status);
         Assert.Equal("L", (await Item(staff, items[1].PublicId)).Status); // còn bản ghi báo mất
-        Assert.Equal(HttpStatusCode.NotFound, (await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new BarcodeRequest("VN0001"), Json)).StatusCode);
+        Assert.Equal("ITEM_NOT_LIQUIDATED", await ErrorCode(await staff.PostAsJsonAsync(U("/api/liquidations/Cancel"), new ItemReasonRequest("VN0001", "Hoàn tác theo biên bản"), Json)));
     }
 
     [Fact]
@@ -212,7 +296,10 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         // Lượt mở bị xoá (nhập nhầm) → bản sách về kho.
         var wrong = await Read<StoreOutRow>(await clerk.PostAsJsonAsync(U("/api/store-outs/ScanOut"), new ScanOutRequest("SO0002"), Json));
         Assert.Equal(HttpStatusCode.Forbidden, (await clerk.DeleteAsync(U($"/api/store-outs/Delete/{wrong.PublicId}"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await staff.DeleteAsync(U($"/api/store-outs/Delete/{wrong.PublicId}"))).StatusCode);
+        Assert.Equal("REASON_REQUIRED", await ErrorCode(await staff.DeleteAsync(U($"/api/store-outs/Delete/{wrong.PublicId}"))));
+        var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, U($"/api/store-outs/Delete/{wrong.PublicId}"));
+        deleteRequest.Headers.Add("X-Change-Reason", Uri.EscapeDataString("Nhập nhầm"));
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.SendAsync(deleteRequest)).StatusCode);
         Assert.Equal("R", (await Item(staff, items[1].PublicId)).Status);
 
         var history = await Read<CrudPage<StoreOutRow>>(await clerk.PostAsJsonAsync(U("/api/store-outs/Search"), new StoreOutSearch { Keyword = "lan" }, Json));
@@ -232,7 +319,7 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         var items = await Items(staff, bib.Mfn, "TD", 5, kho.Id);
         var elsewhere = (await Items(staff, bib.Mfn, "TX", 1, other.Id))[0];
         await Loan(tenantId, items[3]); // đang mượn — không tính thiếu
-        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["TD0005"]), Json));
+        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["TD0005"], Reason: "Kiểm kê không thấy"), Json));
 
         var inventory = await Read<InventoryDto>(await staff.PostAsJsonAsync(U("/api/inventories/Add"), new InventoryRequest("Kiểm kê HK1", null, kho.Id), Json));
         Task<HttpResponseMessage> Scan(string code) => staff.PostAsJsonAsync(U("/api/inventories/Scan"), new ScanRequest(inventory.PublicId, code), Json);
@@ -355,6 +442,30 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
     }
 
     [Fact]
+    public async Task Delivery_list_filters_by_code_range_people_dates_status_and_signed_state()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        async Task<DeliveryDto> AddDelivery(string deliverer, string receiver, DateOnly on, int status = 1) =>
+            await Read<DeliveryDto>(await staff.PostAsJsonAsync(U("/api/deliveries/Add"),
+                new DeliveryRequest(deliverer, ReceiverName: receiver, DeliveredOn: on, Status: status), Json));
+        async Task<CrudPage<DeliveryDto>> Search(DeliverySearch search) =>
+            await Read<CrudPage<DeliveryDto>>(await staff.PostAsJsonAsync(U("/api/deliveries/Search"), search, Json));
+
+        var a = await AddDelivery("Tổ Bổ sung", "Kho chính", new DateOnly(2026, 9, 1));
+        var b = await AddDelivery("Biên mục", "Kho phụ", new DateOnly(2026, 9, 15), status: 2);
+        var c = await AddDelivery("Tổ bổ sung", "Kho phụ", new DateOnly(2026, 10, 2), status: 2);
+        await Read<CompleteResult>(await staff.PostAsync(U($"/api/deliveries/Sign/{c.PublicId}"), null));
+
+        Assert.Equal([b.Id, c.Id], (await Search(new DeliverySearch { CodeFrom = b.Id, CodeTo = c.Id })).Items.Select(x => x.Id).Order());
+        Assert.Equal([a.Id, c.Id], (await Search(new DeliverySearch { DelivererName = "bổ SUNG" })).Items.Select(x => x.Id).Order());
+        Assert.Equal([b.Id, c.Id], (await Search(new DeliverySearch { ReceiverName = "phụ" })).Items.Select(x => x.Id).Order());
+        Assert.Equal([b.Id], (await Search(new DeliverySearch { DeliveredFrom = new DateOnly(2026, 9, 10), DeliveredTo = new DateOnly(2026, 9, 30) })).Items.Select(x => x.Id));
+        // Hàng đợi "Nhận phân bổ": đã nhận đủ và chưa ký.
+        Assert.Equal([b.Id], (await Search(new DeliverySearch { DeliveryStatus = 2, Confirmed = false })).Items.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task Re_register_renames_barcode_blocks_loans_and_imports_whole_file_or_nothing()
     {
         var tenantId = NewTenant();
@@ -401,7 +512,7 @@ public sealed class StoreOperationsApiTests : IClassFixture<HoldingsApiFactory>,
         await Items(staff, novel.Mfn, "ST", 3, store.Id);
         await Items(staff, maths.Mfn, "SG", 2, store.Id);
         await Items(staff, unknown.Mfn, "SU", 1, shelve: false);
-        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["ST0003"]), Json));
+        await Read<ItemBatchResult>(await staff.PostAsJsonAsync(U("/api/lost-books/MarkLost"), new MarkLostRequest(["ST0003"], Reason: "Kiểm kê không thấy"), Json));
 
         async Task<DocumentStats> Stats(string criterion) =>
             await Read<DocumentStats>(await staff.PostAsJsonAsync(U("/api/statistics/Document"), new DocumentStatsRequest(criterion), Json));

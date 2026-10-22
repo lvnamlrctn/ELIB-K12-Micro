@@ -58,11 +58,28 @@ public sealed class LostRecord : TenantEntity
     /// <summary>Thẻ bạn đọc làm mất (mất khi đang mượn).</summary>
     public string? CardNo { get; private set; }
 
-    public static LostRecord For(Item item, DateOnly lostOn, string? reason, string? cardNo = null) => new()
+    /// <summary>Trạng thái bản sách TRƯỚC khi báo mất — khôi phục trả đúng trạng thái đó (không đoán).</summary>
+    public string? PreviousStatus { get; private set; }
+
+    public DateTimeOffset? ReversedAt { get; private set; }
+    public string? ReversedByName { get; private set; }
+    public string? ReversalReason { get; private set; }
+    public Guid? ReversalRequestId { get; private set; }
+
+    /// <summary>Còn hiệu lực = chưa bị hoàn tác (khôi phục).</summary>
+    public bool IsActive => ReversedAt is null;
+
+    public static LostRecord For(Item item, DateOnly lostOn, string? reason, string? cardNo = null, string? previousStatus = null) => new()
     {
         ItemId = item.Id, Barcode = item.Barcode, StoreId = item.StoreId, LostOn = lostOn,
-        Reason = TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"), CardNo = cardNo,
+        Reason = TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"), CardNo = cardNo, PreviousStatus = previousStatus,
     };
+
+    /// <summary>Hoàn tác báo mất: giữ nguyên bản ghi gốc, ghi ai/khi nào/vì sao hoàn tác (bản ghi không còn hiện ở danh sách sách mất).</summary>
+    public void Reverse(DateTimeOffset at, string? byName, string reason, Guid? requestId = null)
+    {
+        (ReversedAt, ReversedByName, ReversalReason, ReversalRequestId) = (at, byName, TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"), requestId);
+    }
 }
 
 /// <summary>Bản ghi thanh lý (monolith: Thanhly). Huỷ thanh lý = xoá mềm.</summary>
@@ -76,11 +93,32 @@ public sealed class Liquidation : TenantEntity
     public DateOnly LiquidatedOn { get; private set; }
     public string? Reason { get; private set; }
 
-    public static Liquidation For(Item item, DateOnly on, string? reason) => new()
+    /// <summary>Số / ngày quyết định thanh lý (văn bản của thư viện / trường) — để đối chiếu khi kiểm toán.</summary>
+    public string? DecisionNo { get; private set; }
+
+    public DateOnly? DecisionDate { get; private set; }
+
+    /// <summary>Trạng thái bản sách TRƯỚC khi thanh lý — huỷ thanh lý trả đúng trạng thái đó.</summary>
+    public string? PreviousStatus { get; private set; }
+
+    public DateTimeOffset? ReversedAt { get; private set; }
+    public string? ReversedByName { get; private set; }
+    public string? ReversalReason { get; private set; }
+    public Guid? ReversalRequestId { get; private set; }
+
+    public bool IsActive => ReversedAt is null;
+
+    public static Liquidation For(Item item, DateOnly on, string? reason, string? decisionNo = null, DateOnly? decisionDate = null, string? previousStatus = null) => new()
     {
         ItemId = item.Id, Barcode = item.Barcode, StoreId = item.StoreId, LiquidatedOn = on,
-        Reason = TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"),
+        Reason = TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"), DecisionNo = TextRules.Optional(decisionNo, 100, "DECISION_INVALID", "Số quyết định"),
+        DecisionDate = decisionDate, PreviousStatus = previousStatus,
     };
+
+    public void Reverse(DateTimeOffset at, string? byName, string reason, Guid? requestId = null)
+    {
+        (ReversedAt, ReversedByName, ReversalReason, ReversalRequestId) = (at, byName, TextRules.Optional(reason, 500, "REASON_INVALID", "Lý do"), requestId);
+    }
 }
 
 /// <summary>

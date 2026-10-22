@@ -7,7 +7,8 @@ import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
 import { ToastrService } from '../../shared/toastr';
-import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
+import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
+import { Loading, Modal, Paginator } from '../../shared/ui';
 
 /**
  * Quản lý phạt (monolith: /admin/fines + /admin/fine-tickets, quyền FINES). Danh sách phiếu phạt kèm tổng phải thu / đã thu / còn lại
@@ -15,7 +16,7 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-fines',
-  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, Loading, Paginator, Modal, ReasonDialog, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">{{ 'FINES_PAGE.TITLE' | translate }}</h4>
@@ -137,7 +138,8 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
     }
 
     @if (deleting(); as d) {
-      <app-confirm-delete message="FINES_PAGE.DELETE_CONFIRM" [messageParams]="{ code: d.code, card: d.cardNo }" (confirmed)="remove(d)" (cancelled)="deleting.set(null)" />
+      <app-reason-dialog title="FINES_PAGE.DELETE_TITLE" message="FINES_PAGE.DELETE_CONFIRM" [params]="{ code: d.code, card: d.cardNo }" confirmText="COMMON.DELETE"
+                         (confirmed)="remove(d, $event)" (cancelled)="deleting.set(null)" />
     }
   `,
 })
@@ -202,9 +204,9 @@ export class Fines implements OnInit {
     }
   }
 
-  protected async remove(t: FineTicket): Promise<void> {
+  protected async remove(t: FineTicket, result: ReasonResult): Promise<void> {
     try {
-      await this.api.deleteFineTicket(t.publicId);
+      await this.api.deleteFineTicket(t.publicId, result.reason);
       this.toastr.success('FINES_PAGE.DELETED', { code: t.code });
       this.deleting.set(null);
       await this.load();

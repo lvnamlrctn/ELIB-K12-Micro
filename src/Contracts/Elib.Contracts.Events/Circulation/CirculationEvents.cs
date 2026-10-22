@@ -25,5 +25,16 @@ public sealed record LoanChanged : IntegrationEvent
     /// <summary>Lượt đóng không phải do trả sách: trạng thái holdings phải đặt cho bản sách ("L" = mất). Null = trả bình thường.</summary>
     public string? ClosedItemStatus { get; init; }
 
+    /// <summary>Cách đóng lượt: Returned (trả), Lost (mất), Forced (đóng cưỡng bức). Null = đang mượn / dữ liệu cũ.</summary>
+    public string? CloseKind { get; init; }
+
+    public string? CloseReason { get; init; }
+
+    /// <summary>"Họ tên (tên đăng nhập)" người thao tác — để holdings ghi nhật ký có người.</summary>
+    public string? ActorName { get; init; }
+
+    /// <summary>Lượt đã đóng được mở lại (hoàn tác trả nhầm/đóng nhầm): bản đã chuyển "Mất" vì lượt này phải về lại "đang mượn".</summary>
+    public bool Reopened { get; init; }
+
     public long Version { get; init; }
 }

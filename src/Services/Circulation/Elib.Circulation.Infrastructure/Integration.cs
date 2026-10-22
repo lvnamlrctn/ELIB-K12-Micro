@@ -9,6 +9,7 @@ using Elib.Circulation.Application;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Holdings;
 using Elib.Contracts.Events.Patron;
+using Elib.Contracts.Events.Payment;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -90,5 +91,31 @@ public sealed class HttpReplicaSources(IHttpClientFactory clients) : IReplicaSou
                 throw new BusinessRuleException("REPLICA_UNAVAILABLE", $"Chưa có dữ liệu {what} ở lưu thông và service gốc báo lỗi {(int)response.StatusCode} — thử lại sau.", 503);
             return await response.Content.ReadFromJsonAsync<T>(ct);
         }
+    }
+}
+
+/// <summary>Kho tìm thấy lại bản sách bạn đọc đã làm mất → đề xuất hoàn dòng phạt mất (chờ người có thẩm quyền duyệt).</summary>
+public sealed class ItemLossReversedConsumer(FineTicketResource fines, ICrudDbContext db, IModuleLicenseSource licenses, ILogger<ItemLossReversedConsumer> logger)
+    : ElibConsumer<ItemLossReversed>(licenses, logger)
+{
+    protected override string? RequiredModule => "CIRCULATION";
+
+    protected override async Task HandleAsync(ItemLossReversed message, ConsumeContext<ItemLossReversed> context)
+    {
+        await fines.ProposeLostRefundAsync(message, context.CancellationToken);
+        await db.SaveChangesAsync(context.CancellationToken);
+    }
+}
+
+/// <summary>Tiền về qua cổng thanh toán → ghi khoản thu vào phiếu phạt (dịch vụ payment là nguồn sự thật về việc đã thu qua QR).</summary>
+public sealed class PaymentSucceededConsumer(FineTicketResource fines, PhotocopyResource photos, IModuleLicenseSource licenses, ILogger<PaymentSucceededConsumer> logger)
+    : ElibConsumer<PaymentSucceeded>(licenses, logger)
+{
+    protected override string? RequiredModule => "CIRCULATION";
+
+    protected override async Task HandleAsync(PaymentSucceeded message, ConsumeContext<PaymentSucceeded> context)
+    {
+        if (!await fines.ApplyPaymentAsync(message, context.CancellationToken))
+            await photos.ApplyPaymentAsync(message, context.CancellationToken);
     }
 }

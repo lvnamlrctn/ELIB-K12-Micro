@@ -92,6 +92,20 @@
     "CLICK_CHON_NHIEU_FILE_XML": "Click to choose multiple .xml files"
   },
   "OPAC": {
+    "PAYMENT": {
+      "TITLE": "My fees / debts",
+      "CURRENCY": "VND",
+      "PAY_WITH": "Pay with {{provider}}",
+      "PAY_AT_COUNTER": "Pay at the library counter",
+      "NONE": "You have no outstanding debts.",
+      "EXPIRES_IN": "Code expires in {{time}}",
+      "HINT_VIETQR": "Open your banking app and scan — amount and note are pre-filled; keep the transfer note unchanged.",
+      "HINT_VNPAY": "Scan with your banking app or open the VNPAY gateway to pay.",
+      "OPEN_GATEWAY": "Open VNPAY gateway",
+      "EXPIRED": "The code expired. Close this window and create a new one.",
+      "CLOSE": "Close",
+      "PAID": "Your payment was received. Thank you!"
+    },
     "NAVBAR": {
       "HOME": "Home",
       "SEARCH_LINK": "Search",

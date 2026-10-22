@@ -183,4 +183,24 @@ public sealed class AuditApiTests : IClassFixture<AuditApiFactory>, IAsyncLifeti
         var left = await Read<CrudPage<AuditLogDto>>(await Staff(tenantId).PostAsJsonAsync("/api/audit-logs/Search", new AuditLogSearch(), Json));
         Assert.Equal(["Mới"], left.Items.Select(i => i.Summary));
     }
+
+    [Fact]
+    public async Task Fine_ticket_history_is_kept_far_longer_than_ordinary_entries_and_visible_to_fine_staff()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var ticketId = Guid.NewGuid();
+        await _factory.PublishAsync(Entry(tenantId, "UPDATE", "Phiếu cũ 200 ngày", DateTimeOffset.UtcNow.AddDays(-200)) with { EntityType = "FineTicket", EntityId = ticketId.ToString() });
+        await _factory.PublishAsync(Entry(tenantId, "UPDATE", "Phiếu quá 10 năm", DateTimeOffset.UtcNow.AddDays(-4000)) with { EntityType = "FineTicket", EntityId = ticketId.ToString() });
+        await _factory.PublishAsync(Entry(tenantId, "ADD", "Thường cũ 200 ngày", DateTimeOffset.UtcNow.AddDays(-200)));
+        await WaitTenantLogAsync(tenantId, "Phiếu cũ 200 ngày");
+        await WaitTenantLogAsync(tenantId, "Phiếu quá 10 năm");
+        await WaitTenantLogAsync(tenantId, "Thường cũ 200 ngày");
+
+        await _factory.Services.GetRequiredService<AuditRetentionService>().PurgeAsync(CancellationToken.None);
+
+        var history = await Read<List<EntityHistoryDto>>(await Staff(tenantId, "FINES:view").GetAsync(new Uri($"/api/audit-logs/entity/FineTicket/{ticketId}", UriKind.Relative)));
+        Assert.Equal(["Phiếu cũ 200 ngày"], history.Select(h => h.Summary));
+        var all = await Read<CrudPage<AuditLogDto>>(await Staff(tenantId).PostAsJsonAsync("/api/audit-logs/Search", new AuditLogSearch(), Json));
+        Assert.DoesNotContain(all.Items, i => i.Summary == "Thường cũ 200 ngày");
+    }
 }

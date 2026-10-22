@@ -1,11 +1,14 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Api, CircPlace, CrudPage, Loan, LoanSearch, Store, errorMessage, saveFile } from '../../core/api';
+import { Api, CircPlace, CrudPage, Loan, LoanActionResult, LoanSearch, Store, errorMessage, saveFile } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
 import { columnPrefs } from '../../core/preferences';
+import { Session } from '../../core/session';
 import { ColumnPicker } from '../../shared/column-picker';
+import { EntityHistoryDialog } from '../../shared/entity-history';
+import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 
@@ -26,7 +29,7 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
  */
 @Component({
   selector: 'app-loan-history',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ColumnPicker],
+  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ColumnPicker, ReasonDialog, EntityHistoryDialog],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'LOAN_HISTORY_PAGE.TITLE' | translate }}</h4></div>
 
@@ -93,6 +96,7 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
             @if (cols.has('returned')) { <th class="th w-36">{{ 'LOAN_HISTORY_PAGE.RETURNED_AT' | translate }}</th> }
             @if (cols.has('returnedBy')) { <th class="th w-40">{{ 'LOAN_HISTORY_PAGE.RETURNED_BY' | translate }}</th> }
             @if (cols.has('renewals')) { <th class="th w-20 !text-center">{{ 'LOAN_HISTORY_PAGE.RENEWALS' | translate }}</th> }
+            <th class="th w-28 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
           </tr></thead>
           <tbody>
             @for (l of page()?.items ?? []; track l.publicId) {
@@ -107,14 +111,26 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
                 @if (cols.has('returned')) {
                   <td class="td text-[13px]">
                     @if (l.returnedAt) { {{ l.returnedAt | ldate: 'dd/MM/yyyy HH:mm' }} }
-                    <div><span [class]="badge(l)">{{ stateLabel(l) | translate }}</span></div>
+                    <div><span [class]="badge(l)">{{ stateLabel(l) | translate }}</span>
+                      @if (l.closeKind === 'Lost' || l.closeKind === 'Forced') { <span class="badge-danger ml-1" [title]="l.closeReason ?? ''">{{ (l.closeKind === 'Lost' ? 'LOAN_HISTORY_PAGE.CLOSE_Lost' : 'LOAN_HISTORY_PAGE.CLOSE_Forced') | translate }}</span> }
+                      @if (l.reopenCount) { <span class="badge-info ml-1">{{ 'LOAN_HISTORY_PAGE.REOPENED' | translate: { count: l.reopenCount } }}</span> }</div>
                   </td>
                 }
                 @if (cols.has('returnedBy')) { <td class="td text-[13px]">{{ l.returnedByName ?? '—' }}</td> }
                 @if (cols.has('renewals')) { <td class="td text-center">{{ l.renewCount }}</td> }
+                <td class="td text-center whitespace-nowrap">
+                  <button type="button" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="'LOAN_HISTORY_PAGE.HISTORY' | translate" (click)="historyOf.set(l)"><span class="material-icons text-[18px]">history</span></button>
+                  @if (session.can('BORROW:edit')) {
+                    @if (!l.returnedAt) {
+                      <button type="button" class="icon-btn text-red-600 hover:bg-red-50" [title]="'LOAN_HISTORY_PAGE.FORCE_CLOSE' | translate" (click)="acting.set({ loan: l, kind: 'close' })"><span class="material-icons text-[18px]">block</span></button>
+                    } @else {
+                      <button type="button" class="icon-btn text-amber-700 hover:bg-amber-50" [title]="'LOAN_HISTORY_PAGE.REOPEN' | translate" (click)="acting.set({ loan: l, kind: 'reopen' })"><span class="material-icons text-[18px]">undo</span></button>
+                    }
+                  }
+                </td>
               </tr>
             } @empty {
-              <tr><td [attr.colspan]="cols.visible().length + 3" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('LOAN_HISTORY_PAGE.EMPTY' | translate) }}</td></tr>
+              <tr><td [attr.colspan]="cols.visible().length + 4" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('LOAN_HISTORY_PAGE.EMPTY' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -123,11 +139,27 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
         <app-paginator [total]="p.totalCount" [pageIndex]="search.pageIndex!" [pageSize]="search.pageSize!" (pageChange)="onPage($event)" />
       }
     </div>
+
+    @if (acting(); as a) {
+      <app-reason-dialog [title]="a.kind === 'close' ? 'LOAN_HISTORY_PAGE.FORCE_CLOSE_TITLE' : 'LOAN_HISTORY_PAGE.REOPEN_TITLE'"
+                         [message]="a.kind === 'close' ? 'LOAN_HISTORY_PAGE.FORCE_CLOSE_MSG' : 'LOAN_HISTORY_PAGE.REOPEN_MSG'" [params]="{ barcode: a.loan.barcode, card: a.loan.cardNo }"
+                         (confirmed)="act(a.loan, a.kind, $event)" (cancelled)="acting.set(null)" />
+    }
+    @if (historyOf(); as h) {
+      <app-entity-history entityType="Loan" [publicId]="h.publicId" title="LOAN_HISTORY_PAGE.HISTORY" [labels]="historyLabels" (closed)="historyOf.set(null)" />
+    }
   `,
 })
 export class LoanHistory implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  protected readonly session = inject(Session);
+  protected readonly acting = signal<{ loan: Loan; kind: 'close' | 'reopen' } | null>(null);
+  protected readonly historyOf = signal<Loan | null>(null);
+  protected readonly historyLabels: Record<string, string> = {
+    state: 'LOAN_HISTORY_PAGE.H_STATE', closeKind: 'LOAN_HISTORY_PAGE.H_CLOSE_KIND', closeReason: 'LOAN_HISTORY_PAGE.H_CLOSE_REASON',
+    returnedAt: 'LOAN_HISTORY_PAGE.RETURNED_AT', reopenCount: 'LOAN_HISTORY_PAGE.H_REOPEN_COUNT',
+  };
 
   protected search: LoanSearch = rememberedSearch<LoanSearch>('loan-history',
     { keyword: '', state: null, circPlaceId: null, storeId: null, from: null, to: null, pageIndex: 1, pageSize: 10 });
@@ -150,6 +182,18 @@ export class LoanHistory implements OnInit {
     } catch {
       /* không có phân hệ kho hoặc thiếu quyền — chỉ mất bộ lọc kho */
     }
+  }
+
+  protected async act(loan: Loan, kind: 'close' | 'reopen', result: ReasonResult): Promise<void> {
+    this.acting.set(null);
+    try {
+      const r: LoanActionResult = kind === 'close' ? await this.api.forceCloseLoan(loan.publicId, result.reason) : await this.api.reopenLoan(loan.publicId, result.reason);
+      if (r.pending) this.toastr.info('FINE_TICKET_PAGE.PENDING_SENT');
+      else this.toastr.success(kind === 'close' ? 'LOAN_HISTORY_PAGE.CLOSED_OK' : 'LOAN_HISTORY_PAGE.REOPENED_OK');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+    await this.load();
   }
 
   protected overdue(l: Loan): boolean {

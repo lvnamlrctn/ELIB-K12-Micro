@@ -68,9 +68,21 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddElibMessaging<PatronDbContext>(ServiceName, configuration, x =>
         {
             x.AddTenantReplicaConsumers<PatronDbContext>();
+            x.AddConsumer<PaymentSucceededConsumer>();
             x.AddPermissionCacheInvalidation();
         });
         services.AddHealthChecks().AddDbContextCheck<PatronDbContext>("db", tags: [ElibHealthTags.Ready]);
         return services;
+    }
+}
+
+/// <summary>Tiền phí cấp lại thẻ về qua cổng thanh toán → đóng khoản phí của bạn đọc.</summary>
+public sealed class PaymentSucceededConsumer(Elib.Patron.Application.CardFeeService fees, IModuleLicenseSource licenses,
+    Microsoft.Extensions.Logging.ILogger<PaymentSucceededConsumer> logger)
+    : ElibConsumer<Elib.Contracts.Events.Payment.PaymentSucceeded>(licenses, logger)
+{
+    protected override async Task HandleAsync(Elib.Contracts.Events.Payment.PaymentSucceeded message, MassTransit.ConsumeContext<Elib.Contracts.Events.Payment.PaymentSucceeded> context)
+    {
+        await fees.ApplyPaymentAsync(message, context.CancellationToken);
     }
 }

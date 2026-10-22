@@ -22,6 +22,251 @@ namespace Elib.Holdings.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Elib.BuildingBlocks.Crud.ApprovalRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("AmountThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount_threshold");
+
+                    b.Property<int?>("CountThreshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("count_threshold");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal?>("PercentThreshold")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("percent_threshold");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_rules");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_approval_rules_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_approval_rules_tenant_id");
+
+                    b.HasIndex("TenantId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_approval_rules_tenant_id_kind")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("approval_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.BuildingBlocks.Crud.ChangeRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AfterJson")
+                        .HasColumnType("text")
+                        .HasColumnName("after_json");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("text")
+                        .HasColumnName("before_json");
+
+                    b.Property<int?>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<long?>("DecidedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DecidedByName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("decided_by_name");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("decision_note");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("payload_json");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<long?>("RequestedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("RequestedByName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("requested_by_name");
+
+                    b.Property<string>("Status")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("TargetLabel")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("target_label");
+
+                    b.Property<Guid>("TargetPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_public_id");
+
+                    b.Property<long>("TargetVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("target_version");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_change_requests");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_change_requests_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_change_requests_tenant_id");
+
+                    b.HasIndex("TenantId", "RequestedBy")
+                        .HasDatabaseName("ix_change_requests_tenant_id_requested_by");
+
+                    b.HasIndex("TenantId", "TargetPublicId")
+                        .HasDatabaseName("ix_change_requests_tenant_id_target_public_id");
+
+                    b.HasIndex("TenantId", "Status", "Kind")
+                        .HasDatabaseName("ix_change_requests_tenant_id_status_kind");
+
+                    b.ToTable("change_requests", (string)null);
+                });
+
             modelBuilder.Entity("Elib.BuildingBlocks.TenantReplica.TenantModuleReplica", b =>
                 {
                     b.Property<long>("TenantId")
@@ -609,6 +854,72 @@ namespace Elib.Holdings.Infrastructure.Migrations
                     b.ToTable("export_reasons", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Holdings.Domain.FloorReplica", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BuildingName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("building_name");
+
+                    b.Property<double>("CanvasHeight")
+                        .HasColumnType("double precision")
+                        .HasColumnName("canvas_height");
+
+                    b.Property<double>("CanvasWidth")
+                        .HasColumnType("double precision")
+                        .HasColumnName("canvas_width");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<int?>("FloorNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("floor_number");
+
+                    b.Property<Guid>("FloorPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("floor_public_id");
+
+                    b.Property<string>("LayoutImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("layout_image_url");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("SourceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_at");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_floor_replicas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_floor_replicas_tenant_id");
+
+                    b.HasIndex("TenantId", "FloorPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_floor_replicas_tenant_id_floor_public_id");
+
+                    b.ToTable("floor_replicas", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Holdings.Domain.Inventory", b =>
                 {
                     b.Property<long>("Id")
@@ -908,6 +1219,18 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("receipt_public_id");
 
+                    b.Property<Guid?>("ShelfPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shelf_public_id");
+
+                    b.Property<Guid?>("ShelfRowPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shelf_row_public_id");
+
+                    b.Property<DateTimeOffset?>("ShelvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("shelved_at");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(1)
@@ -962,6 +1285,9 @@ namespace Elib.Holdings.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ReceiptPublicId")
                         .HasDatabaseName("ix_items_tenant_id_receipt_public_id");
 
+                    b.HasIndex("TenantId", "ShelfPublicId")
+                        .HasDatabaseName("ix_items_tenant_id_shelf_public_id");
+
                     b.HasIndex("TenantId", "Prefix", "Number")
                         .HasDatabaseName("ix_items_tenant_id_prefix_number");
 
@@ -969,6 +1295,102 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasDatabaseName("ix_items_tenant_id_store_id_status");
 
                     b.ToTable("items", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Holdings.Domain.ItemMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ActorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("barcode");
+
+                    b.Property<Guid?>("FromRowPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_row_public_id");
+
+                    b.Property<Guid?>("FromShelfPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_shelf_public_id");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("from_status");
+
+                    b.Property<long?>("FromStoreId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_store_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("ToRowPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_row_public_id");
+
+                    b.Property<Guid?>("ToShelfPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_shelf_public_id");
+
+                    b.Property<string>("ToStatus")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("to_status");
+
+                    b.Property<long?>("ToStoreId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_store_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_movements");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_item_movements_item_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_item_movements_tenant_id");
+
+                    b.HasIndex("TenantId", "ItemId", "At")
+                        .HasDatabaseName("ix_item_movements_tenant_id_item_id_at");
+
+                    b.ToTable("item_movements", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Holdings.Domain.Liquidation", b =>
@@ -994,6 +1416,15 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by");
 
+                    b.Property<DateOnly?>("DecisionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("decision_date");
+
+                    b.Property<string>("DecisionNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("decision_no");
+
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -1014,6 +1445,11 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("liquidated_on");
 
+                    b.Property<string>("PreviousStatus")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("previous_status");
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uuid")
                         .HasColumnName("public_id");
@@ -1022,6 +1458,24 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
+
+                    b.Property<string>("ReversalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reversal_reason");
+
+                    b.Property<Guid?>("ReversalRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reversal_request_id");
+
+                    b.Property<DateTimeOffset?>("ReversedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reversed_at");
+
+                    b.Property<string>("ReversedByName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reversed_by_name");
 
                     b.Property<long?>("StoreId")
                         .HasColumnType("bigint")
@@ -1109,6 +1563,11 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("lost_on");
 
+                    b.Property<string>("PreviousStatus")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("previous_status");
+
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uuid")
                         .HasColumnName("public_id");
@@ -1117,6 +1576,24 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
+
+                    b.Property<string>("ReversalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reversal_reason");
+
+                    b.Property<Guid?>("ReversalRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reversal_request_id");
+
+                    b.Property<DateTimeOffset?>("ReversedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reversed_at");
+
+                    b.Property<string>("ReversedByName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reversed_by_name");
 
                     b.Property<long?>("StoreId")
                         .HasColumnType("bigint")
@@ -1221,6 +1698,142 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasDatabaseName("ix_receipt_snapshots_tenant_id_receipt_public_id");
 
                     b.ToTable("receipt_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Holdings.Domain.ShelfReplica", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("ColorHex")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("color_hex");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deleted");
+
+                    b.Property<Guid>("FloorPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("floor_public_id");
+
+                    b.Property<double?>("Height")
+                        .HasColumnType("double precision")
+                        .HasColumnName("height");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("name");
+
+                    b.Property<double?>("PositionX")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_x");
+
+                    b.Property<double?>("PositionY")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_y");
+
+                    b.Property<Guid>("ShelfPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shelf_public_id");
+
+                    b.Property<DateTimeOffset>("SourceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_at");
+
+                    b.Property<Guid?>("StorePublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<double?>("Width")
+                        .HasColumnType("double precision")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shelf_replicas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_shelf_replicas_tenant_id");
+
+                    b.HasIndex("TenantId", "ShelfPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shelf_replicas_tenant_id_shelf_public_id");
+
+                    b.HasIndex("TenantId", "StorePublicId")
+                        .HasDatabaseName("ix_shelf_replicas_tenant_id_store_public_id");
+
+                    b.ToTable("shelf_replicas", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Holdings.Domain.ShelfRowReplica", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("DdcEnd")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ddc_end");
+
+                    b.Property<string>("DdcStart")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ddc_start");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("RowIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_index");
+
+                    b.Property<Guid>("RowPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("row_public_id");
+
+                    b.Property<Guid>("ShelfPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shelf_public_id");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shelf_row_replicas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_shelf_row_replicas_tenant_id");
+
+                    b.HasIndex("TenantId", "ShelfPublicId")
+                        .HasDatabaseName("ix_shelf_row_replicas_tenant_id_shelf_public_id");
+
+                    b.ToTable("shelf_row_replicas", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Holdings.Domain.Store", b =>
@@ -1968,6 +2581,16 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasForeignKey("StoreId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_items_stores_store_id");
+                });
+
+            modelBuilder.Entity("Elib.Holdings.Domain.ItemMovement", b =>
+                {
+                    b.HasOne("Elib.Holdings.Domain.Item", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_item_movements_items_item_id");
                 });
 
             modelBuilder.Entity("Elib.Holdings.Domain.Liquidation", b =>

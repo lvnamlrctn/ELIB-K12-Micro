@@ -51,5 +51,5 @@ export const reportMetaInterceptor: HttpInterceptorFn = (req, next) =>
 
 /** "ngày 20 tháng 10 năm 2026" — dòng ngày của chân báo cáo. */
 export function vnDateLine(d: Date = new Date()): string {
-  return `ngày ${String(d.getDate()).padStart(2, '0')} tháng ${String(d.getMonth() + 1).padStart(2, '0')} năm ${d.getFullYear()}`;
+  return `ngày ${String(d.getDate()).padStart(2, '0')} tháng ${String(d.getMonth() + 1).padStart(2, '0')} năm ${d.getFullYear()}`; // i18n-data: dòng ngày in trên báo cáo (mẫu văn bản hành chính)
 }

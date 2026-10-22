@@ -9,12 +9,13 @@ import { LDatePipe, Language, LNumberPipe } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth, ReaderMe } from '../core/reader-auth';
 import { SpaceApi, SpaceBookingStatus, SpaceMyBooking } from '../core/space';
+import { MyCharges } from './my-charges';
 import { ReaderCard } from './reader-card';
 
 /** Tài khoản bạn đọc: chưa đăng nhập → nút đăng nhập; đã đăng nhập → thông tin thẻ, đổi mật khẩu, đăng xuất. */
 @Component({
   selector: 'opac-account',
-  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, TranslatePipe, ReaderCard],
+  imports: [FormsModule, LDatePipe, LNumberPipe, RouterLink, TranslatePipe, ReaderCard, MyCharges],
   template: `
     <div class="max-w-3xl mx-auto px-4 py-8">
       @if (!auth.loggedIn()) {
@@ -186,6 +187,8 @@ import { ReaderCard } from './reader-card';
             }
           </section>
         }
+
+        @if (library.has('PAYMENT')) { <opac-my-charges /> }
 
         @if (library.has('DIGITAL')) {
           <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">

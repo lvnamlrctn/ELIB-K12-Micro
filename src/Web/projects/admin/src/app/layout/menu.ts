@@ -8,10 +8,18 @@ export interface MenuItem {
   link?: string;
   /** Mã module quyền (USER, ORGS…) — hiện khi có quyền MODULE:view. */
   perm?: string;
+  /** Hiện khi có ÍT NHẤT một quyền đầy đủ dạng "MODULE:action" (vd FINES:approve) — thay cho perm khi quyền không phải view. */
+  permAny?: string[];
   /** Phân hệ license (CATALOG…) — nhóm chỉ hiện khi đơn vị đã mua. */
   module?: string;
   children?: MenuItem[];
 }
+
+/** Quyền duyệt yêu cầu thay đổi vượt thẩm quyền (khung phê duyệt) — ai có một trong số này thấy hộp "Chờ phê duyệt". */
+export const APPROVAL_PERMS = ['FINES:approve', 'BORROW:approve', 'LOST_BOOKS:approve', 'LIQUIDATES:approve'];
+
+/** Người đề nghị (không có quyền duyệt) vẫn vào xem "Tôi đã đề nghị" — có một trong các quyền thao tác dẫn tới yêu cầu. */
+export const APPROVAL_VIEW_PERMS = [...APPROVAL_PERMS, 'FINES:view', 'BORROW:view', 'LOST_BOOKS:view', 'LIQUIDATES:view'];
 
 const MODULE_ICONS: Record<string, string> = {
   CATALOG: 'edit_note',
@@ -58,12 +66,14 @@ export class Menu {
     const modules = this.session.features()?.modules ?? [];
     return this.filter([
       { title: 'MENU.DASHBOARD', icon: 'dashboard', link: '/' },
+      { title: 'MENU.APPROVALS', icon: 'fact_check', link: '/approvals', permAny: APPROVAL_VIEW_PERMS },
       {
         title: 'MENU.READER_MGMT',
         icon: 'people',
         children: [
           { title: 'MENU.READERS', icon: 'people', link: '/readers', perm: 'READERS' },
           { title: 'MENU.READER_GROUPS', icon: 'groups', link: '/reader-groups', perm: 'GROUPREADER' },
+          { title: 'MENU.CARD_FEES', icon: 'add_card', link: '/card-fees', perm: 'READER_CARD_FEES' },
           {
             title: 'MENU.READER_PARAMS',
             icon: 'tune',
@@ -161,6 +171,15 @@ export class Menu {
         ],
       },
       {
+        title: 'MENU.PAYMENT_GROUP',
+        icon: MODULE_ICONS['PAYMENT'],
+        module: 'PAYMENT',
+        children: [
+          { title: 'MENU.PAYMENT_TRANSACTIONS', icon: 'receipt_long', link: '/payment-transactions', perm: 'PAYMENT_TRANSACTIONS' },
+          { title: 'MENU.PAYMENT_ACCOUNT', icon: 'account_balance', link: '/payment-account', perm: 'PAYMENT_ACCOUNTS' },
+        ],
+      },
+      {
         title: 'MENU.SPACE_GROUP',
         icon: MODULE_ICONS['SPACE'],
         module: 'SPACE',
@@ -185,8 +204,11 @@ export class Menu {
         children: [
           { title: 'MENU.DOC_SEARCH', icon: 'manage_search', link: '/books', perm: 'DOC_SEARCH' },
           { title: 'MENU.SHELVING', icon: 'shelves', link: '/shelving', perm: 'MAP_SHELVING' },
+          { title: 'MENU.MAP_SHELVING', icon: 'map', link: '/map-shelving', perm: 'MAP_SHELVING' },
+          { title: 'MENU.RESHELVING', icon: 'move_down', link: '/reshelving', perm: 'MAP_SHELVING' },
           { title: 'MENU.PRINT_LABELS', icon: 'label', link: '/print-labels', perm: 'PRINT_LABEL' },
           { title: 'MENU.DELIVERIES', icon: 'local_shipping', link: '/ab-deliverers', perm: 'AB_DELIVERERS' },
+          { title: 'MENU.DELIVERIES_RECEIVE', icon: 'how_to_reg', link: '/ab-deliverers-receive', perm: 'AB_DELIVERERS' },
           { title: 'MENU.STORE_MOVES', icon: 'swap_horiz', link: '/ab-moves', perm: 'AB_MOVES' },
           { title: 'MENU.INVENTORY', icon: 'inventory', link: '/inventory', perm: 'INVENTORY' },
           { title: 'MENU.BOOK_OUT_STORE', icon: 'qr_code_scanner', link: '/book-out-store', perm: 'BOOK_OUT_STORE' },
@@ -216,6 +238,7 @@ export class Menu {
           { title: 'MENU.SYSTEM_PARAMS', icon: 'settings_applications', link: '/system-parameters', perm: 'SYSTEM_PARAMS' },
           { title: 'MENU.CURRENCIES', icon: 'currency_exchange', link: '/currencies', perm: 'CURRENCIES' },
           { title: 'MENU.SYSTEM_LOG', icon: 'receipt_long', link: '/system-logs', perm: 'SYSTEM_LOG' },
+          { title: 'MENU.APPROVAL_RULES', icon: 'verified_user', link: '/approval-rules', perm: 'APPROVAL_RULES' },
           {
             title: 'MENU.NOTIFICATIONS',
             icon: 'mail',
@@ -238,7 +261,7 @@ export class Menu {
       if (item.children) {
         const kids = this.filter(item.children);
         if (kids.length) out.push({ ...item, children: kids });
-      } else if (!item.perm || this.session.can(`${item.perm}:view`)) {
+      } else if (item.permAny ? item.permAny.some((c) => this.session.can(c)) : !item.perm || this.session.can(`${item.perm}:view`)) {
         out.push(item);
       }
     }

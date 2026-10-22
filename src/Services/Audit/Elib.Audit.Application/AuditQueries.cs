@@ -22,6 +22,16 @@ public sealed class AuditOptions
 
     /// <summary>Nhật ký cũ hơn số ngày này bị xoá (chạy mỗi ngày). 0 = giữ mãi.</summary>
     public int RetentionDays { get; set; } = 365;
+
+    /// <summary>
+    /// Nhật ký của các thao tác kiểm soát tiền/tài sản (phiếu phạt, lượt mượn, bản sách, thanh lý, quy tắc duyệt…) giữ lâu hơn để
+    /// đối chiếu khi kiểm toán. Chỉ có tác dụng khi lớn hơn <see cref="RetentionDays"/>; <see cref="RetentionDays"/> = 0 vẫn là giữ mãi.
+    /// </summary>
+    public int ControlledRetentionDays { get; set; } = 1825;
+
+    /// <summary>Các loại bản ghi áp dụng <see cref="ControlledRetentionDays"/>.</summary>
+    public static readonly string[] ControlledEntityTypes =
+        ["FineTicket", "Loan", "Item", "LostRecord", "Liquidation", "ChangeRequest", "ApprovalRule"];
 }
 
 /// <summary>Tìm nhật ký (monolith: UserLog/Search). Keyword tìm trong nội dung, người thực hiện, IP.</summary>

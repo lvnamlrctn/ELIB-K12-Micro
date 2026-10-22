@@ -42,6 +42,8 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
 
         modelBuilder.Entity<Loan>(e =>
         {
+            e.Property(x => x.CloseKind).HasMaxLength(10);
+            e.Property(x => x.CloseReason).HasMaxLength(CrudDiff.MaxReasonLength);
             e.ToTable("loans");
             e.Ignore(x => x.IsOpen);
             e.Property(x => x.CardNo).HasMaxLength(50);
@@ -136,6 +138,7 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.ToTable("fine_tickets");
             e.Ignore(x => x.Code);
             e.Ignore(x => x.IsOpen);
+            e.Property(x => x.Version).IsConcurrencyToken(); // hai người lưu cùng lúc: người sau nhận 409, sổ thanh toán không lệch Paid
             e.Property(x => x.CardNo).HasMaxLength(50);
             e.Property(x => x.ManualAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
@@ -147,7 +150,23 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
             e.HasIndex(x => new { x.TenantId, x.ReaderPublicId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.FineDate });
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.FineTicketId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Payments).WithOne().HasForeignKey(p => p.FineTicketId).OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<FinePayment>(e =>
+        {
+            e.ToTable("fine_payments");
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Method).HasMaxLength(10);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.Reason).HasMaxLength(500);
+            e.Property(x => x.ByName).HasMaxLength(250);
+            e.Property(x => x.ExternalRef).HasMaxLength(100);
+            e.HasIndex(x => new { x.TenantId, x.ExternalRef }).IsUnique().HasFilter("external_ref IS NOT NULL");
+            e.HasIndex(x => new { x.TenantId, x.FineTicketId });
+        });
+
+        ApprovalModel.Configure(modelBuilder);
 
         modelBuilder.Entity<FineLine>(e =>
         {
@@ -169,6 +188,7 @@ public sealed class CirculationDbContext(DbContextOptions<CirculationDbContext> 
         modelBuilder.Entity<Photocopy>(e =>
         {
             e.ToTable("photocopies");
+            e.Property(x => x.PaymentCode).HasMaxLength(30);
             e.Property(x => x.CardNo).HasMaxLength(50);
             e.Property(x => x.Barcode).HasMaxLength(50);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);

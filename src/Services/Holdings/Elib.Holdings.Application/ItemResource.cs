@@ -33,7 +33,8 @@ public sealed record ItemRequest(long? Mfn = null, string? Barcode = null, long?
 public sealed record ItemDto(
     long Id, Guid PublicId, string Barcode, long Mfn, Guid BibPublicId, string? Title, string? Author, string? PublishYear, string? Ddc,
     long? StoreId, string? StoreCode, string? StoreName, string Status, string? Note, long Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
-    bool OnLoan = false, string? LoanCardNo = null, DateTimeOffset? LoanDueAt = null, Guid? ReceiptPublicId = null, long? ReceiptCode = null);
+    bool OnLoan = false, string? LoanCardNo = null, DateTimeOffset? LoanDueAt = null, Guid? ReceiptPublicId = null, long? ReceiptCode = null,
+    Guid? ShelfPublicId = null, string? ShelfName = null, int? ShelfRowIndex = null, string? ShelfRowRange = null);
 
 /// <summary>
 /// Đăng ký ĐKCB theo lô cho một biểu ghi (monolith: RegisterBarcodes / BarcodeNumbering): <see cref="Quantity"/> mã liên tiếp
@@ -53,7 +54,7 @@ public sealed record NextBarcode(string Prefix, long Number, string Barcode);
 /// Bản sách / số đăng ký cá biệt (monolith: Barcode, đăng ký ở CatalogueBookController, xếp giá ở StoreShelvingController).
 /// Mọi thay đổi phát <see cref="ItemChanged"/> (outbox, cùng transaction) cho circulation/search.
 /// </summary>
-public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvents events, TimeProvider clock)
+public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvents events, ItemMovements movements, TimeProvider clock)
     : CrudResource<ItemResource, Item, ItemSearch, ItemRequest, ItemDto>(db)
 {
     public const int MaxBatch = 1000;
@@ -73,7 +74,10 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Code).FirstOrDefault(),
         Db.Set<Store>().Where(s => s.Id == x.StoreId).Select(s => s.Name).FirstOrDefault(),
         x.Status, x.Note, x.Version, x.CreatedAt, x.UpdatedAt, x.OnLoan, x.OnLoan ? x.LoanCardNo : null, x.OnLoan ? x.LoanDueAt : null,
-        x.ReceiptPublicId, Db.Set<ReceiptSnapshot>().Where(r => r.ReceiptPublicId == x.ReceiptPublicId).Select(r => (long?)r.Code).FirstOrDefault());
+        x.ReceiptPublicId, Db.Set<ReceiptSnapshot>().Where(r => r.ReceiptPublicId == x.ReceiptPublicId).Select(r => (long?)r.Code).FirstOrDefault(),
+        x.ShelfPublicId, Db.Set<ShelfReplica>().Where(sh => sh.ShelfPublicId == x.ShelfPublicId).Select(sh => sh.Name).FirstOrDefault(),
+        Db.Set<ShelfRowReplica>().Where(r => r.RowPublicId == x.ShelfRowPublicId).Select(r => (int?)r.RowIndex).FirstOrDefault(),
+        Db.Set<ShelfRowReplica>().Where(r => r.RowPublicId == x.ShelfRowPublicId).Select(r => r.DdcStart + " – " + r.DdcEnd).FirstOrDefault());
 
     protected override Item Create(ItemRequest request) => throw new NotSupportedException("Bản sách tạo qua CreateAsync (cần tra biểu ghi).");
 
@@ -86,6 +90,14 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
     }
 
     protected override void Update(Item entity, ItemRequest request) => entity.Update(request.StoreId, request.Note);
+
+    /// <summary>Sửa kho/ghi chú ở màn bản sách: đổi kho thì ghi lịch sử di chuyển (vị trí giá cũ bị xoá theo <see cref="Item.Update"/>).</summary>
+    protected override async Task UpdateAsync(Item entity, ItemRequest request, CancellationToken ct)
+    {
+        var (from, status) = (entity.Location, entity.Status);
+        await base.UpdateAsync(entity, request, ct);
+        if (entity.StoreId != from.StoreId) movements.Record(entity, MovementKind.Move, from, status, "Sửa thông tin bản sách");
+    }
 
     protected override IQueryable<Item> Filter(IQueryable<Item> query, ItemSearch s)
     {
@@ -221,7 +233,9 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
                 skipped.Add(item.Barcode);
                 continue;
             }
+            var (from, fromStatus) = (item.Location, item.Status);
             item.Shelve(request.StoreId);
+            movements.Record(item, MovementKind.Shelve, from, fromStatus);
             await events.PublishAsync(item, deleted: false, ct);
             shelved++;
         }
@@ -251,10 +265,22 @@ public sealed class ItemResource(ICrudDbContext db, BibSnapshots bibs, ItemEvent
         ArgumentNullException.ThrowIfNull(e);
         var item = await Set.FirstOrDefaultAsync(x => x.PublicId == e.ItemPublicId, ct);
         if (item is null) return;
-        if (!item.ApplyLoan(e.LoanPublicId, e.Version, e.CardNo, e.LoanedAt, e.DueAt, e.ReturnedAt is not null, e.ClosedItemStatus)) return;
+        var wasLost = item.Status == ItemStatus.Lost;
+        if (!item.ApplyLoan(e.LoanPublicId, e.Version, e.CardNo, e.LoanedAt, e.DueAt, e.ReturnedAt is not null, e.ClosedItemStatus, e.Reopened)) return;
+        if (wasLost && item.Status != ItemStatus.Lost)
+        {
+            // Mở lại lượt đã đóng vì mất: bỏ bản ghi báo mất sinh ra từ lượt đó (chỉ bản ghi tự động "mất khi đang mượn").
+            foreach (var record in await Db.Set<LostRecord>().Where(x => x.ItemId == item.Id && x.ReversedAt == null).ToListAsync(ct))
+                record.Reverse(clock.GetUtcNow(), e.ActorName, e.CloseReason ?? "Mở lại lượt mượn đã đóng vì mất");
+            await events.PublishAsync(item, deleted: false, ct);
+            if (AuditSink is not null)
+                await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, item.PublicId, CrudChange.Reversed,
+                    $"ĐKCB {item.Barcode} không còn \"Mất\": lượt mượn của thẻ {e.CardNo} được mở lại ({e.ActorName ?? "?"})", null, e.CloseReason), ct);
+            return;
+        }
         // Mất khi đang mượn cũng có bản ghi báo mất — danh sách sách mất không phải gộp thêm ĐKCB "L" không có bản ghi như monolith.
         if (item.Status == ItemStatus.Lost)
-            Db.Set<LostRecord>().Add(LostRecord.For(item, VietnamDate.Of(e.ReturnedAt ?? clock.GetUtcNow()), "Mất khi đang mượn (phiếu phạt)", e.CardNo));
+            Db.Set<LostRecord>().Add(LostRecord.For(item, VietnamDate.Of(e.ReturnedAt ?? clock.GetUtcNow()), "Mất khi đang mượn (phiếu phạt)", e.CardNo, ItemStatus.Available));
         await events.PublishAsync(item, deleted: false, ct);
         if (AuditSink is not null)
             await AuditSink.RecordAsync(new CrudAuditEntry(nameof(Item), EntityName, item.PublicId, CrudChange.Updated,

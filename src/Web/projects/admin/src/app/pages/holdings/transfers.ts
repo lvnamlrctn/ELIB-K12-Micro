@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   Api, CompleteResult, CrudPage, Delivery, DeliveryReceiptOption, Item, ItemBatchResult, StoreMove, StoreOption, TransferKind, TransferLine, errorMessage,
@@ -12,6 +12,12 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { itemStatus } from './items';
 
 type Transfer = StoreMove | Delivery;
+
+/** Form thông tin ở đầu trang chi tiết đơn phân bổ. */
+interface DeliveryHead {
+  delivererName: string; delivererAddress: string; receiverName: string; receiverAddress: string; deliveredOn: string; receivedOn: string;
+  storeId: number | null; status: number; note: string; receiptPublicId: string | null;
+}
 
 /** Chữ/quyền theo loại phiếu — khoá viết thẳng để công cụ kiểm tra đa ngữ thấy. */
 const KINDS = {
@@ -48,12 +54,37 @@ function isLocked(t: Transfer): boolean {
         <button class="btn-primary" (click)="edit(null)"><span class="material-icons text-[18px]">add</span> {{ k.add | translate }}</button>
       }
     </div>
-    <div class="panel flex gap-3 items-end">
-      <div class="flex-1">
-        <label for="tr-kw" class="field-label">{{ 'TRANSFER.SEARCH_LABEL' | translate }}</label>
-        <input id="tr-kw" class="input" [(ngModel)]="keyword" (keydown.enter)="find()" />
+    <div class="panel">
+      <div class="flex gap-3 items-end">
+        <div class="flex-1">
+          <label for="tr-kw" class="field-label">{{ 'TRANSFER.SEARCH_LABEL' | translate }}</label>
+          <input id="tr-kw" class="input" [(ngModel)]="keyword" (keydown.enter)="find()" />
+        </div>
+        @if (kind === 'deliveries') {
+          <button class="btn-secondary" type="button" (click)="advanced.set(!advanced())"><span class="material-icons text-[18px]">tune</span> {{ 'TRANSFER.ADVANCED' | translate }}</button>
+        }
+        <button class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
       </div>
-      <button class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
+      @if (kind === 'deliveries' && advanced()) {
+        <!-- Bộ lọc nâng cao như màn "Đơn phân bổ" của ELIB-LRC. -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+          <div><label for="tf-cf" class="field-label">{{ 'TRANSFER.CODE_FROM' | translate }}</label><input id="tf-cf" type="number" min="1" class="input" [(ngModel)]="filter.codeFrom" (keydown.enter)="find()" /></div>
+          <div><label for="tf-ct" class="field-label">{{ 'TRANSFER.CODE_TO' | translate }}</label><input id="tf-ct" type="number" min="1" class="input" [(ngModel)]="filter.codeTo" (keydown.enter)="find()" /></div>
+          <div><label for="tf-fdn" class="field-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="tf-fdn" class="input" [(ngModel)]="filter.delivererName" (keydown.enter)="find()" /></div>
+          <div><label for="tf-frn" class="field-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-frn" class="input" [(ngModel)]="filter.receiverName" (keydown.enter)="find()" /></div>
+          <div><label for="tf-df" class="field-label">{{ 'TRANSFER.DELIVERED_FROM' | translate }}</label><input id="tf-df" type="date" class="input" [(ngModel)]="filter.deliveredFrom" /></div>
+          <div><label for="tf-dt" class="field-label">{{ 'TRANSFER.DELIVERED_TO' | translate }}</label><input id="tf-dt" type="date" class="input" [(ngModel)]="filter.deliveredTo" /></div>
+          <div><label for="tf-fs" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>
+            <select id="tf-fs" class="input" [(ngModel)]="filter.deliveryStatus" (change)="find()">
+              <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option><option [ngValue]="1">{{ 'TRANSFER.DELIVERING' | translate }}</option><option [ngValue]="2">{{ 'TRANSFER.RECEIVED' | translate }}</option>
+            </select></div>
+          <div><label for="tf-fc" class="field-label">{{ 'TRANSFER.SIGNED_STATE' | translate }}</label>
+            <select id="tf-fc" class="input" [(ngModel)]="filter.confirmed" (change)="find()">
+              <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option><option [ngValue]="false">{{ 'TRANSFER.UNSIGNED' | translate }}</option><option [ngValue]="true">{{ 'TRANSFER.SIGNED' | translate }}</option>
+            </select></div>
+          <div class="col-span-2 lg:col-span-4 flex justify-end"><button type="button" class="btn-secondary" (click)="resetFilter()">{{ 'TRANSFER.RESET' | translate }}</button></div>
+        </div>
+      }
     </div>
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
       @if (loading()) { <app-loading /> }
@@ -142,6 +173,17 @@ function isLocked(t: Transfer): boolean {
         </ng-container>
       </app-modal>
     }
+    @if (creating(); as c) {
+      <!-- Thêm đơn phân bổ (ELIB-LRC): chỉ hỏi ngày giao, tạo xong vào trang chi tiết để nhập thông tin và thêm bản sách. -->
+      <app-modal [title]="k.add | translate" widthClass="max-w-md" (closed)="creating.set(null)">
+        <div><label for="tc-on" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }} *</label><input id="tc-on" type="date" class="input" [(ngModel)]="c.deliveredOn" /></div>
+        <p class="text-[12px] text-gray-500 mt-3">{{ 'TRANSFER.CREATE_HINT' | translate }}</p>
+        <ng-container footer>
+          <button type="button" class="btn-secondary" (click)="creating.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
+          <button type="button" class="btn-primary" [disabled]="busy() || !c.deliveredOn" (click)="createDelivery(c)">{{ 'TRANSFER.NEXT' | translate }}</button>
+        </ng-container>
+      </app-modal>
+    }
     @if (deleting(); as t) {
       <app-confirm-delete [busy]="busy()" message="TRANSFER.DELETE_CONFIRM" [messageParams]="{ no: t.id }" (confirmed)="remove(t)" (cancelled)="deleting.set(null)" />
     }
@@ -155,9 +197,14 @@ export class Transfers implements OnInit {
   protected readonly text = computed(() => KINDS[this.kind]);
   private readonly client = this.api.crud<Transfer>(this.kind, 'holdings');
 
+  private readonly router = inject(Router);
+
   protected keyword = '';
   protected pageIndex = 1;
   protected pageSize = 10;
+  protected readonly advanced = signal(false);
+  protected readonly creating = signal<{ deliveredOn: string } | null>(null);
+  protected filter = emptyFilter();
   protected readonly page = signal<CrudPage<Transfer> | null>(null);
   protected readonly stores = signal<StoreOption[]>([]);
   protected readonly receipts = signal<DeliveryReceiptOption[]>([]);
@@ -198,7 +245,34 @@ export class Transfers implements OnInit {
     void this.load();
   }
 
+  protected resetFilter(): void {
+    this.filter = emptyFilter();
+    this.find();
+  }
+
+  /** Đơn phân bổ mới: hộp nhỏ hỏi ngày giao rồi sang trang chi tiết (ELIB-LRC). */
+  protected startCreate(): void {
+    this.creating.set({ deliveredOn: new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10) });
+  }
+
+  protected async createDelivery(c: { deliveredOn: string }): Promise<void> {
+    this.busy.set(true);
+    try {
+      const created = await this.client.add({ deliveredOn: c.deliveredOn, status: 1 }) as Delivery;
+      this.creating.set(null);
+      await this.router.navigate([this.text().link, created.publicId]);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected edit(t: Transfer | null): void {
+    if (t === null && this.kind === 'deliveries') {
+      this.startCreate();
+      return;
+    }
     const m = t && 'fromStoreId' in t ? t : null;
     const d = t && !('fromStoreId' in t) ? t : null;
     this.form.set({
@@ -264,13 +338,27 @@ export class Transfers implements OnInit {
   private async load(): Promise<void> {
     this.loading.set(true);
     try {
-      this.page.set(await this.client.search({ keyword: this.keyword.trim() || undefined, pageIndex: this.pageIndex, pageSize: this.pageSize }));
+      const f = this.kind === 'deliveries' ? this.filter : null;
+      this.page.set(await this.client.search({
+        keyword: this.keyword.trim() || undefined, pageIndex: this.pageIndex, pageSize: this.pageSize,
+        ...(f ? {
+          codeFrom: f.codeFrom || null, codeTo: f.codeTo || null, delivererName: f.delivererName.trim() || null, receiverName: f.receiverName.trim() || null,
+          deliveredFrom: f.deliveredFrom || null, deliveredTo: f.deliveredTo || null, deliveryStatus: f.deliveryStatus, confirmed: f.confirmed,
+        } : {}),
+      }));
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
       this.loading.set(false);
     }
   }
+}
+
+function emptyFilter() {
+  return {
+    codeFrom: null as number | null, codeTo: null as number | null, delivererName: '', receiverName: '', deliveredFrom: '', deliveredTo: '',
+    deliveryStatus: null as number | null, confirmed: null as boolean | null,
+  };
 }
 
 /** "Đơn nhận #12 — Mua đợt 1 (05/09/2026) · còn 8 bản" — khoá dịch + tham số. */
@@ -320,6 +408,41 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
         }
       }
     </div>
+
+    @if (transfer(); as t) {
+      @if (locked(t)) { <div class="alert-info !block mb-4 text-sm">{{ 'TRANSFER.LOCKED_HINT' | translate }}</div> }
+    }
+
+    @if (head; as h) {
+      <!-- Thông tin đơn phân bổ (ELIB-LRC: form đầu trang chi tiết + Lưu lại). -->
+      <div class="panel">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-semibold text-gray-800">{{ 'TRANSFER.INFO' | translate }}</div>
+          @if (editable()) {
+            <button class="btn-primary !py-1.5" [disabled]="busy()" (click)="saveHead()"><span class="material-icons text-[18px]">save</span> {{ 'TRANSFER.SAVE_INFO' | translate }}</button>
+          }
+        </div>
+        <fieldset class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" [disabled]="!editable()">
+          <div><label for="th-code" class="form-label">{{ 'TRANSFER.NO' | translate }}</label><input id="th-code" class="input bg-gray-50 font-mono" [value]="'#' + (transfer()?.id ?? '')" readonly /></div>
+          <div><label for="th-dd" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }}</label><input id="th-dd" type="date" class="input" [(ngModel)]="h.deliveredOn" /></div>
+          <div class="sm:col-span-2"><label for="th-rc" class="form-label">{{ 'TRANSFER.RECEIPT' | translate }}</label>
+            <select id="th-rc" class="input" [(ngModel)]="h.receiptPublicId" (ngModelChange)="onHeadReceipt(h)">
+              <option [ngValue]="null">{{ 'TRANSFER.NO_RECEIPT' | translate }}</option>
+              @for (r of receipts(); track r.publicId) { <option [ngValue]="r.publicId">{{ receiptLabel(r) | translate: receiptParams(r) }}</option> }
+            </select></div>
+          <div><label for="th-ss" class="form-label">{{ 'COMMON.STATUS' | translate }}</label>
+            <select id="th-ss" class="input" [(ngModel)]="h.status"><option [ngValue]="1">{{ 'TRANSFER.DELIVERING' | translate }}</option><option [ngValue]="2">{{ 'TRANSFER.RECEIVED' | translate }}</option></select></div>
+          <div><label for="th-dn" class="form-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="th-dn" class="input" maxlength="250" [(ngModel)]="h.delivererName" /></div>
+          <div><label for="th-da" class="form-label">{{ 'TRANSFER.DELIVERER_ADDRESS' | translate }}</label><input id="th-da" class="input" maxlength="500" [(ngModel)]="h.delivererAddress" /></div>
+          <div><label for="th-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="th-rn" class="input" maxlength="250" [(ngModel)]="h.receiverName" /></div>
+          <div><label for="th-ra" class="form-label">{{ 'TRANSFER.RECEIVER_ADDRESS' | translate }}</label><input id="th-ra" class="input" maxlength="500" [(ngModel)]="h.receiverAddress" /></div>
+          <div><label for="th-rd" class="form-label">{{ 'TRANSFER.RECEIVED_ON' | translate }}</label><input id="th-rd" type="date" class="input" [(ngModel)]="h.receivedOn" /></div>
+          <div><label for="th-st" class="form-label">{{ 'TRANSFER.TO_STORE' | translate }}</label>
+            <select id="th-st" class="input" [(ngModel)]="h.storeId"><option [ngValue]="null">—</option>@for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
+          <div class="sm:col-span-2"><label for="th-nt" class="form-label">{{ 'COMMON.NOTE' | translate }}</label><input id="th-nt" class="input" maxlength="500" [(ngModel)]="h.note" /></div>
+        </fieldset>
+      </div>
+    }
 
     @if (result(); as r) {
       <div class="panel text-sm space-y-1">
@@ -414,6 +537,8 @@ export class TransferDetail implements OnInit {
   protected readonly kind = kindOf(inject(ActivatedRoute));
   protected readonly text = computed(() => KINDS[this.kind]);
 
+  protected head: DeliveryHead | null = null;
+  protected readonly stores = signal<StoreOption[]>([]);
   protected codes = '';
   protected pick = { keyword: '', barcodeFrom: '', barcodeTo: '', receiptPublicId: null as string | null, pageIndex: 1, pageSize: 25 };
   protected readonly receipts = signal<DeliveryReceiptOption[]>([]);
@@ -434,6 +559,7 @@ export class TransferDetail implements OnInit {
     const d = this.transfer();
     if (d && !('fromStoreId' in d)) {
       this.pick.receiptPublicId = d.receiptPublicId;
+      this.api.storeOptions().then((s) => this.stores.set(s), () => undefined);
       if (this.editable()) this.api.deliveryReceipts(d.receiptPublicId).then((r) => this.receipts.set(r), () => undefined);
     }
     if (this.editable()) void this.findCandidates();
@@ -521,6 +647,34 @@ export class TransferDetail implements OnInit {
     }
   }
 
+  /** Chọn đơn nhận: kho nhận mặc định theo kho của đơn; màn chọn sách lọc theo đơn đó. */
+  protected onHeadReceipt(h: DeliveryHead): void {
+    const r = this.receipts().find((x) => x.publicId === h.receiptPublicId);
+    if (r?.storeId && h.storeId === null) h.storeId = r.storeId;
+    this.pick.receiptPublicId = h.receiptPublicId;
+    this.findCandidates();
+  }
+
+  protected async saveHead(): Promise<void> {
+    const h = this.head;
+    if (!h) return;
+    const text = (v: string) => v.trim() || null;
+    this.busy.set(true);
+    try {
+      await this.api.crud<Transfer>(this.kind, 'holdings').update(this.id(), {
+        delivererName: text(h.delivererName), delivererAddress: text(h.delivererAddress), receiverName: text(h.receiverName),
+        receiverAddress: text(h.receiverAddress), deliveredOn: h.deliveredOn || null, receivedOn: h.receivedOn || null, storeId: h.storeId,
+        status: h.status, note: text(h.note), receiptPublicId: h.receiptPublicId,
+      });
+      this.toastr.success('COMMON.SAVE_SUCCESS');
+      await this.load();
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async finish(): Promise<void> {
     this.busy.set(true);
     try {
@@ -542,6 +696,11 @@ export class TransferDetail implements OnInit {
       ]);
       this.transfer.set(transfer);
       this.lines.set(lines);
+      this.head = 'fromStoreId' in transfer ? null : {
+        delivererName: transfer.delivererName ?? '', delivererAddress: transfer.delivererAddress ?? '', receiverName: transfer.receiverName ?? '',
+        receiverAddress: transfer.receiverAddress ?? '', deliveredOn: transfer.deliveredOn ?? '', receivedOn: transfer.receivedOn ?? '',
+        storeId: transfer.storeId, status: transfer.status, note: transfer.note ?? '', receiptPublicId: transfer.receiptPublicId,
+      };
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

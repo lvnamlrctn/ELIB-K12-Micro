@@ -8,6 +8,7 @@ using Elib.Notification.Infrastructure;
 using Elib.Catalog.Infrastructure;
 using Elib.Circulation.Infrastructure;
 using Elib.Digital.Infrastructure;
+using Elib.Payment.Infrastructure;
 using Elib.Space.Infrastructure;
 using Elib.Holdings.Infrastructure;
 using Elib.Search.Infrastructure;
@@ -57,17 +58,17 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new AuditDbContext(Options<AuditDbContext>(cs, t), t)),
         new("media", "elib_leak_media", ["media_files"],
             (cs, t) => new MediaDbContext(Options<MediaDbContext>(cs, t), t)),
-        new("patron", "elib_leak_patron", ["readers", "reader_types", "classes", "courses", "reader_groups", "reader_import_jobs", "reader_group_members"],
+        new("patron", "elib_leak_patron", ["readers", "reader_types", "classes", "courses", "reader_groups", "reader_import_jobs", "reader_group_members", "card_fees"],
             (cs, t) => new PatronDbContext(Options<PatronDbContext>(cs, t), t)),
         new("catalog", "elib_leak_catalog", ["bibs", "bib_types", "worksheets", "dictionary_terms", "isbd_configs"],
             (cs, t) => new CatalogDbContext(Options<CatalogDbContext>(cs, t), t)),
-        new("holdings", "elib_leak_holdings", ["store_types", "stores", "items", "bib_snapshots"],
+        new("holdings", "elib_leak_holdings", ["store_types", "stores", "items", "bib_snapshots", "shelf_replicas", "shelf_row_replicas", "floor_replicas", "item_movements", "change_requests", "approval_rules"],
             (cs, t) => new HoldingsDbContext(Options<HoldingsDbContext>(cs, t), t)),
         new("acquisition", "elib_leak_acquisition", ["sources", "suppliers", "budgets", "funds", "bib_snapshots", "purchase_orders", "order_lines",
                 "receipts", "receipt_lines"],
             (cs, t) => new AcquisitionDbContext(Options<AcquisitionDbContext>(cs, t), t)),
         new("circulation", "elib_leak_circulation", ["circ_places", "loan_policies", "loans", "patron_replicas", "item_replicas", "bib_snapshots",
-                "fine_reasons", "fine_tickets", "fine_lines", "holds", "loan_renewals", "photocopies", "sip2_stations", "sip2_logs", "library_visits"],
+                "fine_reasons", "fine_tickets", "fine_lines", "holds", "loan_renewals", "photocopies", "sip2_stations", "sip2_logs", "library_visits", "fine_payments", "change_requests", "approval_rules"],
             (cs, t) => new CirculationDbContext(Options<CirculationDbContext>(cs, t), t)),
         new("search", "elib_leak_search", ["search_bibs", "search_items", "search_sync_states", "search_queries", "z3950_servers"],
             (cs, t) => new SearchDbContext(Options<SearchDbContext>(cs, t), t)),
@@ -77,8 +78,10 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new DigitalDbContext(Options<DigitalDbContext>(cs, t), t)),
         new("space", "elib_leak_space", ["map_buildings", "map_floors", "bookable_spaces", "patron_replicas",
                 "room_opening_hours", "room_special_days", "space_booking_settings", "room_bookings", "room_booking_members", "room_booking_bans",
-                "access_devices", "access_staff_cards", "access_commands", "access_scan_logs"],
+                "access_devices", "access_staff_cards", "access_commands", "access_scan_logs", "shelf_rows"],
             (cs, t) => new SpaceDbContext(Options<SpaceDbContext>(cs, t), t)),
+        new("payment", "elib_leak_payment", ["payment_accounts", "charges", "charge_sync_states", "payment_transactions", "webhook_logs"],
+            (cs, t) => new PaymentDbContext(Options<PaymentDbContext>(cs, t), t)),
     ];
 
     public static ServiceDatabase Get(string service) => Services.Single(s => s.Service == service);

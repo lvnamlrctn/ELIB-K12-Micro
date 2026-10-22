@@ -10,7 +10,7 @@ namespace Elib.BuildingBlocks.Crud;
 
 /// <summary>Một thao tác ghi trên danh mục CRUD cần ghi nhật ký. <see cref="Changes"/>: diff trước/sau (<see cref="CrudDiff"/>).</summary>
 public sealed record CrudAuditEntry(string EntityType, string EntityName, Guid PublicId, CrudChange Change, string? Label,
-    JsonObject? Changes = null);
+    JsonObject? Changes = null, string? Reason = null);
 
 /// <summary>Nơi nhận nhật ký thao tác của <see cref="CrudResource{TSelf,TEntity,TSearch,TRequest,TDto}"/>.</summary>
 public interface ICrudAuditSink
@@ -88,6 +88,10 @@ public sealed class PublishingCrudAuditSink(
             CrudChange.Updated => ("UPDATE", "Sửa"),
             CrudChange.Deleted => ("DELETE", "Xoá"),
             CrudChange.Imported => ("IMPORT", "Nhập từ Excel"),
+            CrudChange.Requested => ("REQUEST", "Đề nghị duyệt"),
+            CrudChange.Approved => ("APPROVE", "Duyệt"),
+            CrudChange.Rejected => ("REJECT", "Từ chối"),
+            CrudChange.Reversed => ("REVERSE", "Hoàn tác"),
             _ => ("CHANGE_STATUS", "Đổi trạng thái"),
         };
         return publisher.Publish(new AuditRecorded
@@ -100,7 +104,8 @@ public sealed class PublishingCrudAuditSink(
             EntityType = entry.EntityType,
             EntityId = entry.PublicId.ToString(),
             Summary = $"{verb} {entry.EntityName.ToLowerInvariant()}" + (string.IsNullOrWhiteSpace(entry.Label) ? "" : $": {entry.Label}"),
-            ChangesJson = CrudDiff.ToJson(entry.Changes, origin is null ? CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString()) : origin.Reason),
+            ChangesJson = CrudDiff.ToJson(entry.Changes,
+                entry.Reason ?? (origin is null ? CrudDiff.Reason(ctx?.Request.Headers[CrudDiff.ReasonHeader].ToString()) : origin.Reason)),
             IpAddress = origin is null ? ctx?.Connection.RemoteIpAddress?.ToString() : origin.IpAddress,
             CorrelationId = ctx?.TraceIdentifier,
         }, cancellationToken);

@@ -39,6 +39,14 @@ public static class HoldingsEndpoints
             => r.NextAsync(prefix, digits ?? 6, ct));
         items.MapPost("/Shelve", [Permission("MAP_SHELVING", "edit")] (ShelveRequest request, ItemResource r, CancellationToken ct)
             => r.ShelveAsync(request, ct));
+        // Xếp giá trực quan và xếp giá lại (ELIB-LRC: StoreMapShelving): bản sách + gợi ý theo DDC, sơ đồ giá của kho, xếp vào giá/ngăn.
+        var shelving = api.MapGroup("/map-shelving").WithTags("MapShelving");
+        shelving.MapPost("/Search", [Permission("MAP_SHELVING", "view")] (MapShelvingSearch search, MapShelvingResource r, CancellationToken ct) => r.SearchAsync(search, ct));
+        shelving.MapGet("/Shelves", [Permission("MAP_SHELVING", "view")] (long storeId, MapShelvingResource r, CancellationToken ct) => r.ShelvesAsync(storeId, ct));
+        shelving.MapPost("/Place", [Permission("MAP_SHELVING", "edit")] (PlaceRequest request, MapShelvingResource r, CancellationToken ct) => r.PlaceAsync(request, ct));
+        // Lịch sử di chuyển của một bản sách (xếp giá, xếp giá lại, chuyển kho, đăng ký lại mã vạch).
+        items.MapGet("/Movements/{publicId:guid}", [PermissionAny("CATALOG_BIBS:view", "DOC_SEARCH:view", "MAP_SHELVING:view", "LOST_BOOKS:view")] (Guid publicId, ItemMovements m, CancellationToken ct)
+            => m.ListAsync(publicId, ct));
         // In nhãn mã vạch ĐKCB / nhãn gáy (ELIB-LRC: In mã vạch, In nhãn môn loại) — cán bộ biên mục in ngay khi đăng ký cá biệt.
         items.MapPost("/Labels", [PermissionAny("PRINT_LABEL:view", "CATALOG_BIBS:view")] (ItemLabelRequest request, ItemResource r, CancellationToken ct)
             => r.LabelsAsync(request, ct));
@@ -95,6 +103,7 @@ public static class HoldingsEndpoints
         });
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
         api.MapStoreOperationEndpoints();
+        api.MapApprovals();
         return app;
     }
 }

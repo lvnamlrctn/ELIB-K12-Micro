@@ -109,6 +109,13 @@
     <Project Path="src/Services/Notification/Elib.Notification.Infrastructure/Elib.Notification.Infrastructure.csproj" />
     <Project Path="src/Services/Notification/tests/Elib.Notification.Tests/Elib.Notification.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Payment/">
+    <Project Path="src/Services/Payment/Elib.Payment.Api/Elib.Payment.Api.csproj" />
+    <Project Path="src/Services/Payment/Elib.Payment.Application/Elib.Payment.Application.csproj" />
+    <Project Path="src/Services/Payment/Elib.Payment.Domain/Elib.Payment.Domain.csproj" />
+    <Project Path="src/Services/Payment/Elib.Payment.Infrastructure/Elib.Payment.Infrastructure.csproj" />
+    <Project Path="src/Services/Payment/tests/Elib.Payment.Tests/Elib.Payment.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Space/">
     <Project Path="src/Services/Space/Elib.Space.Api/Elib.Space.Api.csproj" />
     <Project Path="src/Services/Space/Elib.Space.Application/Elib.Space.Application.csproj" />

@@ -23,6 +23,12 @@ public sealed class Photocopy : TenantEntity
     public decimal UnitPrice { get; private set; }
     public decimal Total { get; private set; }
     public bool Paid { get; private set; }
+
+    /// <summary>Tăng sau mỗi thay đổi — dịch vụ thanh toán bỏ qua event cũ hơn.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>Mã giao dịch QR đã thu phiếu này (nếu có) — gửi kèm khoản thu để payment biết nguồn đã ghi nhận.</summary>
+    public string? PaymentCode { get; private set; }
     public DateOnly PhotoDate { get; private set; }
     public string? Note { get; private set; }
 
@@ -55,9 +61,22 @@ public sealed class Photocopy : TenantEntity
         if (Total > FineMoney.Max) throw new BusinessRuleException("AMOUNT_INVALID", "Thành tiền quá lớn.");
         PhotoDate = date;
         Paid = paid;
+        Version++;
         var n = note?.Trim();
         Note = string.IsNullOrEmpty(n) ? null : n.Length <= 500 ? n : throw new BusinessRuleException("NOTE_INVALID", "Ghi chú tối đa 500 ký tự.");
     }
 
-    public void SetPaid(bool paid) => Paid = paid;
+    public void SetPaid(bool paid)
+    {
+        Paid = paid;
+        Version++;
+    }
+
+    /// <summary>Tiền về qua cổng thanh toán: đánh dấu đã thu và nhớ mã giao dịch (cũng là khoá chống ghi hai lần).</summary>
+    public void MarkPaidByGateway(string transactionCode)
+    {
+        Paid = true;
+        PaymentCode = transactionCode;
+        Version++;
+    }
 }

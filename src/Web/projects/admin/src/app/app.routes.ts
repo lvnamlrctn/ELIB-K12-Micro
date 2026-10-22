@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { anyPermissionGuard, authGuard, permissionGuard, systemGuard, tenantGuard } from './core/guards';
+import { APPROVAL_VIEW_PERMS } from './layout/menu';
 import { Shell } from './layout/shell';
 import { Callback } from './pages/callback';
 import { Home } from './pages/home';
@@ -118,6 +119,9 @@ export const routes: Routes = [
           { path: path + '/:id', loadComponent: () => import('./pages/holdings/transfers').then((m) => m.TransferDetail), canActivate: [tenantGuard, permissionGuard(perm)], data: { kind }, title },
         ];
       }),
+      { path: 'map-shelving', loadComponent: () => import('./pages/holdings/map-shelving').then((m) => m.MapShelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], data: { mode: 'shelve' }, title: 'MAP_SHELVING_PAGE.TITLE' },
+      { path: 'reshelving', loadComponent: () => import('./pages/holdings/map-shelving').then((m) => m.MapShelving), canActivate: [tenantGuard, permissionGuard('MAP_SHELVING')], data: { mode: 'reshelve' }, title: 'MAP_SHELVING_PAGE.RESHELVE_TITLE' },
+      { path: 'ab-deliverers-receive', loadComponent: () => import('./pages/holdings/delivery-receive').then((m) => m.DeliveryReceive), canActivate: [tenantGuard, permissionGuard('AB_DELIVERERS')], title: 'TRANSFER.RECEIVE_TITLE' },
       // Bổ sung (acquisition)
       { path: 'ab-orders', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.Orders), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
       { path: 'ab-orders/:id', loadComponent: () => import('./pages/acquisition/orders').then((m) => m.OrderDetail), canActivate: [tenantGuard, permissionGuard('AB_ORDERS')], title: 'ACQ_ORDER.TITLE' },
@@ -159,6 +163,8 @@ export const routes: Routes = [
         canActivate: [tenantGuard, anyPermissionGuard('CATALOG_BIBS:add', 'Z3950_CONFIGS:view')],
         title: 'Z3950_PAGE.TITLE' },
       { path: 'search-stats', loadComponent: () => import('./pages/search/search-stats').then((m) => m.SearchStats), canActivate: [tenantGuard, permissionGuard('SEARCH_STATS')], title: 'SEARCH_STATS_PAGE.ROUTE_TITLE' },
+      { path: 'approvals', loadComponent: () => import('./pages/circulation/approvals').then((m) => m.Approvals), canActivate: [tenantGuard, anyPermissionGuard(...APPROVAL_VIEW_PERMS)], title: 'APPROVALS_PAGE.TITLE' },
+      { path: 'approval-rules', loadComponent: () => import('./pages/tenant/approval-rules').then((m) => m.ApprovalRules), canActivate: [tenantGuard, permissionGuard('APPROVAL_RULES')], title: 'APPROVAL_RULES_PAGE.TITLE' },
       { path: 'fines', loadComponent: () => import('./pages/circulation/fines').then((m) => m.Fines), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'FINES_PAGE.TITLE' },
       { path: 'fine-ticket/:publicId', loadComponent: () => import('./pages/circulation/fine-ticket').then((m) => m.FineTicketPage), canActivate: [tenantGuard, permissionGuard('FINES')], title: 'PAGE_TITLE.FINE_TICKET' },
       { path: 'borrow', loadComponent: () => import('./pages/circulation/borrow').then((m) => m.Borrow), canActivate: [tenantGuard, permissionGuard('BORROW')], title: 'BORROW_PAGE.TITLE' },
@@ -201,6 +207,9 @@ export const routes: Routes = [
       { path: 'space-bookings', loadComponent: () => import('./pages/space/bookings').then((m) => m.SpaceBookings), canActivate: [tenantGuard, permissionGuard('SPACE_BOOKINGS')], title: 'SPACE_BOOKINGS_PAGE.TITLE' },
       { path: 'space-bans', loadComponent: () => import('./pages/space/bans').then((m) => m.SpaceBans), canActivate: [tenantGuard, permissionGuard('SPACE_BANS')], title: 'SPACE_BANS_PAGE.TITLE' },
       { path: 'space-hours', loadComponent: () => import('./pages/space/hours').then((m) => m.SpaceHours), canActivate: [tenantGuard, permissionGuard('SPACE_HOURS')], title: 'SPACE_HOURS_PAGE.TITLE' },
+      { path: 'payment-transactions', loadComponent: () => import('./pages/payment/transactions').then((m) => m.PaymentTransactions), canActivate: [tenantGuard, permissionGuard('PAYMENT_TRANSACTIONS')], title: 'PAYMENT_TX.TITLE' },
+      { path: 'payment-account', loadComponent: () => import('./pages/payment/account').then((m) => m.PaymentAccountPage), canActivate: [tenantGuard, permissionGuard('PAYMENT_ACCOUNTS')], title: 'PAYMENT_ACCOUNT.TITLE' },
+      { path: 'card-fees', loadComponent: () => import('./pages/patron/card-fees').then((m) => m.CardFees), canActivate: [tenantGuard, permissionGuard('READER_CARD_FEES')], title: 'CARD_FEES.TITLE' },
       { path: 'space-settings', loadComponent: () => import('./pages/space/settings').then((m) => m.SpaceSettingsPage), canActivate: [tenantGuard, permissionGuard('SPACE_SETTINGS')], title: 'SPACE_SETTINGS_PAGE.TITLE' },
       { path: 'space-report', loadComponent: () => import('./pages/space/report').then((m) => m.SpaceReportPage), canActivate: [tenantGuard, permissionGuard('SPACE_REPORT')], title: 'SPACE_REPORT_PAGE.TITLE' },
       { path: 'space-access', loadComponent: () => import('./pages/space/access').then((m) => m.SpaceAccess), canActivate: [tenantGuard, permissionGuard('SPACE_ACCESS')], title: 'SPACE_ACCESS_PAGE.TITLE' },

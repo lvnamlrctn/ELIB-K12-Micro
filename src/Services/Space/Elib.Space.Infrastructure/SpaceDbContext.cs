@@ -158,6 +158,16 @@ public sealed class SpaceDbContext(DbContextOptions<SpaceDbContext> options, ITe
             e.HasOne<MapFloor>().WithMany().HasForeignKey(x => x.FloorId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<ShelfRow>(e =>
+        {
+            e.ToTable("shelf_rows");
+            e.Property(x => x.DdcStart).HasMaxLength(ShelfRow.MaxDdcLength);
+            e.Property(x => x.DdcEnd).HasMaxLength(ShelfRow.MaxDdcLength);
+            e.Property(x => x.Description).HasMaxLength(ShelfRow.MaxDescriptionLength);
+            e.HasIndex(x => new { x.TenantId, x.FixtureId, x.RowIndex }).IsUnique().HasFilter("is_deleted = false");
+            e.HasOne<MapFixture>().WithMany().HasForeignKey(x => x.FixtureId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<MapFixtureEquipment>(e =>
         {
             e.ToTable("map_fixture_equipment");

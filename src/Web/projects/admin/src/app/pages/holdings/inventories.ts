@@ -447,8 +447,9 @@ export class InventoryDetail implements OnInit {
     const barcodes = (this.missing()?.items ?? []).map((m) => m.barcode);
     this.busy.set(true);
     try {
-      const r = await this.api.markLost({ barcodes, lostOn: null, reason: this.inventory()?.name ?? null });
-      this.toastr.success('STORE_RECORD.LOST_DONE', { count: r.done });
+      const o = await this.api.markLost({ barcodes, lostOn: null, reason: `Kiểm kê không thấy: ${this.inventory()?.name ?? ''}`.trim() }); // i18n-data: lý do ghi vào nhật ký
+      if (o.pending) this.toastr.info('FINE_TICKET_PAGE.PENDING_SENT');
+      else this.toastr.success('STORE_RECORD.LOST_DONE', { count: o.result?.done ?? 0 });
       await this.refresh();
     } catch (e) {
       this.toastr.error(errorMessage(e));

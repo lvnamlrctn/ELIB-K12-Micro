@@ -294,7 +294,7 @@ def system_steps(sysb, accounts, admin_user):
     else:
         s, _, body = sysb.request("POST", "/api/system/tenant/tenants", token=sys_token, json_body={
             "code": TENANT_CODE, "name": "Trường demo nền tảng mới", "subdomain": SUBDOMAIN,
-            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION"]]})
+            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION", "PAYMENT"]]})
         expect(s == 201, f"tạo đơn vị {TENANT_CODE}", body)
         tenant = json.loads(body)
     for _ in range(60):
@@ -380,7 +380,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
     modules = set(json.loads(body)["modules"]) if s == 200 else set()
     required = {"CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"}  # ACQUISITION: có khi quản trị nền tảng đã bán (bước 2) — không bắt buộc ở --tenant-only
-    expect(required <= modules <= required | {"ACQUISITION"}, f"menu theo license: {sorted(modules)}", body)
+    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT"}, f"menu theo license: {sorted(modules)}", body)
     s, _, body = tb.request("GET", "/api/admin/identity/users", token=token)
     expect(s == 200 and any(u["userName"] == admin_user for u in json.loads(body)["items"]), "API người dùng của đơn vị", body)
 
@@ -1107,9 +1107,11 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     line = (ticket.get("lines") or [{}])[0]
     expect(line.get("reasonCode") == "MATTL" and line.get("loanOpen"), f"lập phiếu phạt {ticket.get('ticket', {}).get('code')}: dòng \"Mất tài liệu\"", body[:300])
     s, _, body = tb.request("PUT", f"{L}/fine-tickets/Save/{ticket['ticket']['publicId']}", token=token, json_body={
-        "status": 2, "discount": 0, "paid": 50000, "note": "E2E đền sách", "lines": [{"id": line["id"], "reasonCode": "MATTL", "amount": 50000}], "deletedLineIds": []})
+        "status": 2, "discount": 0, "paid": 50000, "note": "E2E đền sách", "lines": [{"id": line["id"], "reasonCode": "MATTL", "amount": 50000}], "deletedLineIds": [],
+        "reason": "E2E: bạn đọc làm mất sách, đền đủ tiền"})
     saved = json.loads(body) if s == 200 else {}
     expect(saved.get("ticket", {}).get("remaining") == 0 and not saved["lines"][0]["loanOpen"], "lưu phiếu: nộp đủ 50.000đ, lượt mượn đóng vì mất", body[:300])
+    expect([p["amount"] for p in saved.get("payments", [])] == [50000], "sổ thanh toán ghi đúng một khoản thu 50.000đ", body[:300])
     status = None
     for _ in range(20):  # holdings nhận LoanChanged (ClosedItemStatus = L)
         s, _, body = tb.request("POST", f"{H}/items/Lookup", token=token, json_body={"keyword": f"{lprefix}001"})
@@ -1237,6 +1239,13 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         acquisition_steps(tb, token, tag, book, kc, admin_user)
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Bổ sung — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
+
+    print("21b. Thanh toán QR (service payment): VietQR/Sepay + VNPAY, webhook đã ký, gửi lại, sai số tiền")
+    s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
+    if s == 200 and "PAYMENT" in json.loads(body)["modules"]:
+        payment_steps(tb, token, tag, lcard)
+    else:
+        print("  [BỎ QUA] đơn vị chưa có phân hệ Thanh toán — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
 
     print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
@@ -1449,6 +1458,99 @@ def acquisition_steps(tb, token, tag, book, kc, admin_user):
     expect(s == 200 and any(b["mfn"] == bibs[0]["mfn"] and b["catalogedOn"] == today for b in newbooks.get("items", [])), "thư mục sách mới theo ngày biên mục (catalog gửi kèm trong BibChanged)", text[:300])
     s, text, store_report = post(f"{H}/store-book-report/Search", {"storeId": kc["id"], "from": today, "to": today, "pageIndex": 1, "pageSize": 100})
     expect(s == 200 and any(r["receiptCode"] == receipt["id"] and r["receivedOn"] == today for r in store_report["rows"]), "báo cáo sách trong kho lọc theo ngày nhận của đơn nhận", text[:300])
+
+
+def payment_steps(tb, token, tag, card):
+    """21b. Thanh toán QR: đúng luồng thật — cấu hình tài khoản nhận tiền, phiếu phạt → khoản thu (sự kiện) → mã QR → webhook đã ký của cổng →
+    phiếu phạt đóng + sổ thanh toán có khoản QR. Cổng là giả lập (chữ ký tự tính bằng khoá thử của đơn vị) — cần tài khoản sandbox thật mới kiểm được phía cổng."""
+    P, L = "/api/admin/payment", "/api/admin/circulation"
+    sepay_key, hash_secret = f"e2e-sepay-{tag}", f"e2e-hash-{tag}"
+
+    def call(method, path, body=None, headers=None, authed=True):
+        s, _, text = tb.request(method, path, token=token if authed else None, json_body=body, headers=headers)
+        return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    s, text, _ = call("PUT", f"{P}/payment-account", {
+        "vietQrEnabled": True, "bankBin": "970422", "accountNo": "0123456789", "accountName": "Thu vien E2E", "sepayApiKey": sepay_key, "clearSepayApiKey": False,
+        "vnPayEnabled": True, "vnPayTmnCode": "ELIBE2E", "vnPayHashSecret": hash_secret, "clearVnPayHashSecret": False, "vnPayPaymentUrl": None, "expireMinutes": 15})
+    expect(s == 200 and sepay_key not in text and hash_secret not in text, "lưu tài khoản nhận tiền (VietQR + VNPAY), bí mật không hiện lại", text[:300])
+
+    def new_ticket(amount):
+        s, text, ticket = call("POST", f"{L}/fine-tickets/Add", {"cardNo": card, "amount": amount, "note": f"E2E thanh toán QR {tag}"})
+        expect(s == 201, f"lập phiếu phạt thủ công {ticket.get('code')} ({amount:,}đ)", text[:200])
+        return ticket
+
+    def create_payment(ticket, provider):
+        for _ in range(30):  # ChargeIssued đi circulation → RabbitMQ → payment
+            s, text, pay = call("POST", f"{P}/payments/Create", {"sourceService": "circulation", "sourceId": ticket["publicId"], "provider": provider})
+            if s == 201: return pay
+            time.sleep(1)
+        fail(f"không sinh được mã {provider}: {s} {text[:200]}")
+
+    def ticket_detail(ticket):
+        s, text, d = call("GET", f"{L}/fine-tickets/Detail/{ticket['publicId']}")
+        return d if s == 200 else {}
+
+    def wait_done(ticket):
+        d = {}
+        for _ in range(30):
+            d = ticket_detail(ticket)
+            if d.get("ticket", {}).get("status") == 2: break
+            time.sleep(1)
+        return d
+
+    # --- VietQR + webhook Sepay
+    t1 = new_ticket(50000)
+    pay = create_payment(t1, "VietQR")
+    expect(pay["qrContent"].startswith("000201") and pay["amount"] == 50000 and pay["transactionCode"] in pay["qrContent"], f"mã VietQR {pay['transactionCode']} đúng số tiền + nội dung", pay["qrContent"][:80])
+    hook = {"id": int(time.time()), "gateway": "MBBank", "transactionDate": time.strftime("%Y-%m-%d %H:%M:%S"), "accountNumber": "0123456789", "code": None,
+            "content": f"CT DEN {pay['transactionCode'].lower()} E2E", "transferType": "in", "transferAmount": 50000, "referenceCode": f"FT{tag}", "description": "E2E"}
+    s, _, _ = call("POST", "/hooks/sepay", hook, headers={"Authorization": "Apikey sai-khoa"}, authed=False)
+    expect(s == 401, "webhook Sepay sai khoá bị từ chối (401)")
+    s, _, _ = call("POST", "/hooks/sepay", {**hook, "transferAmount": 1000}, headers={"Authorization": f"Apikey {sepay_key}"}, authed=False)
+    s2, _, txs = call("POST", f"{P}/payments/Search", {"keyword": pay["transactionCode"], "pageIndex": 1, "pageSize": 5})
+    row = (txs.get("page", {}).get("items") or [{}])[0]
+    expect(s == 200 and row.get("status") == "Pending" and row.get("needsReview"), "Sepay báo sai số tiền: không ghi nhận, đánh dấu cần đối soát", str(row)[:200])
+    s, _, _ = call("POST", "/hooks/sepay", hook, headers={"Authorization": f"Apikey {sepay_key}"}, authed=False)
+    expect(s == 200, "webhook Sepay đúng khoá + đúng số tiền")
+    d = wait_done(t1)
+    qr = [p for p in d.get("payments", []) if p["method"] == "QR"]
+    expect(d.get("ticket", {}).get("remaining") == 0 and len(qr) == 1, "phiếu phạt tự hoàn thành, sổ thanh toán có một khoản QR", str(d.get("payments"))[:200])
+    call("POST", "/hooks/sepay", hook, headers={"Authorization": f"Apikey {sepay_key}"}, authed=False)
+    time.sleep(2)
+    d = ticket_detail(t1)
+    expect(len([p for p in d.get("payments", []) if p["method"] == "QR"]) == 1, "webhook gửi lại: vẫn chỉ một khoản QR")
+    s, _, again = call("POST", f"{P}/payments/Create", {"sourceService": "circulation", "sourceId": t1["publicId"], "provider": "VietQR"})
+    expect(s == 409, "phiếu đã thu đủ không sinh thêm mã (CHARGE_CLOSED)", str(again)[:150])
+
+    # --- VNPAY IPN đã ký
+    t2 = new_ticket(80000)
+    vn = create_payment(t2, "VNPAY")
+    expect(vn["qrContent"].startswith("https://") and "vnp_SecureHash=" in vn["qrContent"] and "vnp_Amount=8000000" in vn["qrContent"], "URL VNPAY đã ký, số tiền × 100", vn["qrContent"][:120])
+
+    def ipn(amount, response="00"):
+        params = {"vnp_TmnCode": "ELIBE2E", "vnp_TxnRef": vn["transactionCode"], "vnp_Amount": str(amount * 100), "vnp_ResponseCode": response, "vnp_TransactionStatus": response,
+                  "vnp_TransactionNo": "14000" + tag[-3:], "vnp_BankCode": "NCB", "vnp_PayDate": time.strftime("%Y%m%d%H%M%S"), "vnp_OrderInfo": "E2E"}
+        query = "&".join(f"{k}={urllib.parse.quote_plus(v)}" for k, v in sorted(params.items()))
+        sig = __import__("hmac").new(hash_secret.encode(), query.encode(), hashlib.sha512).hexdigest()
+        s, _, text = tb.request("GET", f"/hooks/vnpay/ipn?{query}&vnp_SecureHash={sig}")
+        return json.loads(text).get("RspCode") if s == 200 else f"HTTP {s}"
+
+    s, _, text = tb.request("GET", f"/hooks/vnpay/ipn?vnp_TxnRef={vn['transactionCode']}&vnp_Amount=8000000&vnp_SecureHash=deadbeef")
+    expect(json.loads(text).get("RspCode") == "97", "IPN VNPAY sai chữ ký → 97")
+    expect(ipn(1000) == "04", "IPN VNPAY sai số tiền → 04")
+    expect(ipn(80000, "24") == "00", "IPN VNPAY khách huỷ → xác nhận, không ghi nhận")
+    expect(ticket_detail(t2).get("ticket", {}).get("remaining") == 80000, "phiếu chưa bị thu khi cổng báo thất bại / sai số tiền")
+    expect(ipn(80000) == "00", "IPN VNPAY hợp lệ → 00")
+    expect(ipn(80000) == "02", "IPN VNPAY gửi lại → 02 (đã xác nhận)")
+    d = wait_done(t2)
+    expect(d.get("ticket", {}).get("remaining") == 0 and len([p for p in d.get("payments", []) if p["method"] == "QR"]) == 1, "phiếu VNPAY hoàn thành, một khoản QR")
+
+    s, _, totals = call("POST", f"{P}/payments/Search", {"transactionStatus": "Paid", "pageIndex": 1, "pageSize": 50})
+    paid_codes = {r["transactionCode"] for r in totals.get("page", {}).get("items", [])}
+    expect({pay["transactionCode"], vn["transactionCode"]} <= paid_codes and totals["totals"]["paid"] >= 130000, f"đối soát: đã thu {totals.get('totals', {}).get('paid')}đ trong danh sách giao dịch")
+    s, _, logs = call("POST", f"{P}/webhook-logs/Search", {"pageIndex": 1, "pageSize": 20})
+    expect(s == 200 and logs.get("totalCount", 0) >= 6 and sepay_key not in json.dumps(logs), "nhật ký webhook có đủ lời gọi, không chứa khoá")
 
 
 if __name__ == "__main__":

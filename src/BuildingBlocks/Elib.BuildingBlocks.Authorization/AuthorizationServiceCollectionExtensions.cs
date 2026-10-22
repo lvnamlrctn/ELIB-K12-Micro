@@ -59,6 +59,8 @@ public static class AuthorizationServiceCollectionExtensions
         services.Replace(ServiceDescriptor.Singleton<IAuthorizationPolicyProvider, ElibAuthorizationPolicyProvider>());
         services.Replace(ServiceDescriptor.Singleton<IAuthorizationMiddlewareResultHandler, ElibAuthorizationResultHandler>());
         services.TryAddScoped<IPermissionChecker, PermissionChecker>();
+        services.AddHttpContextAccessor();
+        services.TryAddScoped<IActorPermissions, ActorPermissions>();
         services.AddScoped<IAuthorizationHandler, PermissionHandler>();
         services.AddScoped<IAuthorizationHandler, ModuleHandler>();
         services.AddScoped<IAuthorizationHandler, SystemContextHandler>();

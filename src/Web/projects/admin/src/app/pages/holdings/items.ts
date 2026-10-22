@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { RouterLink } from '@angular/router';
-import { Api, CrudClient, CrudPage, ITEM_STATUSES, Item, ItemSearch, Store, errorMessage } from '../../core/api';
+import { Api, CrudClient, CrudPage, ITEM_STATUSES, Item, ItemMovement, ItemSearch, Store, errorMessage } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
@@ -77,12 +77,14 @@ export function itemStatus(code: string, onLoan = false): { name: string; badge:
                   <div class="text-[11px] text-gray-400">MFN {{ it.mfn }}@if (it.ddc) { · DDC {{ it.ddc }} }@if (it.publishYear) { · {{ it.publishYear }} }</div>
                 </td>
                 <td class="td">{{ it.author ?? '—' }}</td>
-                <td class="td">{{ it.storeCode ? it.storeCode + ' — ' + it.storeName : '—' }}</td>
+                <td class="td">{{ it.storeCode ? it.storeCode + ' — ' + it.storeName : '—' }}
+                  @if (it.shelfName) { <div class="text-[11px] text-gray-500">{{ it.shelfName }}@if (it.shelfRowIndex) { — {{ 'SPACE_FLOOR_MAP_PAGE.SHELF_ROW_N' | translate: { n: it.shelfRowIndex } }} }</div> }</td>
                 <td class="td text-center"><span [class]="statusOf(it.status, it.onLoan).badge">{{ statusOf(it.status, it.onLoan).name | translate }}</span>
                   @if (it.onLoan) { <div class="text-[11px] text-gray-500">{{ 'ITEMS_PAGE.LOAN_INFO' | translate: { card: it.loanCardNo, due: (it.loanDueAt | ldate: 'dd/MM/yyyy') } }}</div> }</td>
                 <td class="td text-[13px] text-gray-600">{{ it.note ?? '' }}</td>
                 <td class="td">
                   <div class="flex items-center justify-center gap-1.5">
+                    <button (click)="showHistory(it)" class="icon-btn bg-gray-50 text-gray-600 hover:bg-gray-100" [title]="'ITEMS_PAGE.MOVEMENTS' | translate"><span class="material-icons text-[18px]">history</span></button>
                     @if (session.can('CATALOG_BIBS:edit')) {
                       <button (click)="edit(it)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[18px]">edit</span></button>
                     }
@@ -124,6 +126,31 @@ export function itemStatus(code: string, onLoan = false): { name: string; badge:
         </ng-container>
       </app-modal>
     }
+    @if (history(); as h) {
+      <!-- Lịch sử di chuyển của bản sách: xếp giá, xếp giá lại, chuyển kho, đăng ký lại mã vạch. -->
+      <app-modal [title]="'ITEMS_PAGE.MOVEMENTS_TITLE' | translate: { barcode: h.item.barcode }" widthClass="max-w-3xl" (closed)="history.set(null)">
+        @if (h.rows === null) { <p class="text-sm text-gray-500">{{ 'COMMON.LOADING' | translate }}</p> }
+        @else if (!h.rows.length) { <p class="text-sm text-gray-500">{{ 'ITEMS_PAGE.NO_MOVEMENTS' | translate }}</p> }
+        @else {
+          <ol class="space-y-2">
+            @for (m of h.rows; track m.id) {
+              <li class="border border-gray-200 rounded-lg p-3 text-sm">
+                <div class="flex flex-wrap items-center gap-2"><b>{{ m.kindName }}</b>
+                  <span class="text-gray-500">{{ m.at | ldate: 'dd/MM/yyyy HH:mm' }}</span>
+                  @if (m.actorName) { <span class="text-gray-500">· {{ m.actorName }}</span> }
+                  @if (m.fromStatus !== m.toStatus) { <span class="text-[12px]">{{ m.fromStatus }} → {{ m.toStatus }}</span> }</div>
+                @if (m.fromStore !== m.toStore) { <div class="text-[13px]">{{ 'ITEMS_PAGE.STORE' | translate }}: {{ m.fromStore ?? '—' }} → {{ m.toStore ?? '—' }}</div> }
+                @if (m.fromShelf !== m.toShelf || m.fromRow !== m.toRow) {
+                  <div class="text-[13px]">{{ 'ITEMS_PAGE.SHELF' | translate }}: {{ m.fromShelf ?? '—' }}@if (m.fromRow) { / {{ m.fromRow }} } → {{ m.toShelf ?? '—' }}@if (m.toRow) { / {{ m.toRow }} }</div>
+                }
+                @if (m.reason) { <div class="text-[12px] text-gray-500 mt-1">{{ m.reason }}</div> }
+              </li>
+            }
+          </ol>
+        }
+        <ng-container footer><button type="button" class="btn-secondary" (click)="history.set(null)">{{ 'COMMON.CLOSE' | translate }}</button></ng-container>
+      </app-modal>
+    }
     @if (deleting(); as it) {
       <app-confirm-delete [busy]="saving()" message="ITEMS_PAGE.DELETE_CONFIRM" [messageParams]="{ barcode: it.barcode, title: it.title ?? '' }" (confirmed)="remove(it)" (cancelled)="deleting.set(null)" />
     }
@@ -143,6 +170,7 @@ export class Items implements OnInit {
   protected readonly saving = signal(false);
   protected readonly editing = signal<Item | null>(null);
   protected readonly deleting = signal<Item | null>(null);
+  protected readonly history = signal<{ item: Item; rows: ItemMovement[] | null } | null>(null);
   protected form: { storeId: number | null; note: string } = { storeId: null, note: '' };
 
   async ngOnInit(): Promise<void> {
@@ -151,6 +179,16 @@ export class Items implements OnInit {
       this.stores.set(await this.api.crud<Store>('stores', 'holdings').searchAll());
     } catch {
       /* thiếu quyền xem kho — chỉ mất bộ lọc kho */
+    }
+  }
+
+  protected async showHistory(item: Item): Promise<void> {
+    this.history.set({ item, rows: null });
+    try {
+      this.history.set({ item, rows: await this.api.itemMovements(item.publicId) });
+    } catch (e) {
+      this.history.set(null);
+      this.toastr.error(errorMessage(e));
     }
   }
 

@@ -183,3 +183,47 @@ public sealed class MapFloorUtility : TenantEntity
         IconName = icon is null || icon.Length <= 50 ? icon : throw new BusinessRuleException("ICON_INVALID", "Tên biểu tượng tối đa 50 ký tự.");
     }
 }
+
+/// <summary>
+/// Ngăn của một giá sách theo khoảng DDC (monolith: map.MapShelfRow, quyền SPACE_FIXTURES). Bản sách có DDC trong khoảng
+/// [<see cref="DdcStart"/>, <see cref="DdcEnd"/>] — hoặc bắt đầu bằng <see cref="DdcEnd"/> (ví dụ "339.5" thuộc khoảng 330–339) — thuộc ngăn này.
+/// Các ngăn cùng giá không chồng khoảng DDC.
+/// </summary>
+public sealed class ShelfRow : TenantEntity
+{
+    public const int MaxDdcLength = 30;
+    public const int MaxDescriptionLength = 500;
+
+    private ShelfRow() { }
+
+    public long FixtureId { get; private set; }
+    public int RowIndex { get; private set; }
+    public string DdcStart { get; private set; } = "";
+    public string DdcEnd { get; private set; } = "";
+    public string? Description { get; private set; }
+
+    public static ShelfRow Create(long fixtureId, int rowIndex, string ddcStart, string ddcEnd, string? description)
+    {
+        var row = new ShelfRow { FixtureId = fixtureId };
+        row.Update(rowIndex, ddcStart, ddcEnd, description);
+        return row;
+    }
+
+    public void Update(int rowIndex, string ddcStart, string ddcEnd, string? description)
+    {
+        RowIndex = rowIndex >= 1 ? rowIndex : throw new BusinessRuleException("ROW_INDEX_INVALID", "Số thứ tự ngăn phải từ 1.");
+        var start = (ddcStart ?? "").Trim();
+        var end = (ddcEnd ?? "").Trim();
+        if (start.Length is 0 or > MaxDdcLength || end.Length is 0 or > MaxDdcLength)
+            throw new BusinessRuleException("DDC_INVALID", $"DDC từ/đến bắt buộc, tối đa {MaxDdcLength} ký tự.");
+        if (string.CompareOrdinal(start, end) > 0)
+            throw new BusinessRuleException("DDC_RANGE_INVALID", "DDC từ phải nhỏ hơn hoặc bằng DDC đến.");
+        (DdcStart, DdcEnd) = (start, end);
+        var d = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Description = d is null || d.Length <= MaxDescriptionLength ? d : throw new BusinessRuleException("DESCRIPTION_TOO_LONG", $"Mô tả tối đa {MaxDescriptionLength} ký tự.");
+    }
+
+    /// <summary>Hai khoảng chồng nhau? Khoảng đến được mở rộng theo tiền tố ("339" gồm cả "339.5").</summary>
+    public static bool Overlaps(string startA, string endA, string startB, string endB) =>
+        string.CompareOrdinal(startA, endB + '\uffff') <= 0 && string.CompareOrdinal(startB, endA + '\uffff') <= 0;
+}

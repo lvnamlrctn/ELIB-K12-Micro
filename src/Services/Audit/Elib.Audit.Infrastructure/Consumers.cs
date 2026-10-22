@@ -63,11 +63,15 @@ public sealed partial class AuditRetentionService(IServiceScopeFactory scopes, I
     public async Task<int> PurgeAsync(CancellationToken ct)
     {
         if (options.Value.RetentionDays <= 0) return 0;
-        var cutoff = clock.GetUtcNow().AddDays(-options.Value.RetentionDays);
+        var now = clock.GetUtcNow();
+        var cutoff = now.AddDays(-options.Value.RetentionDays);
+        var controlledCutoff = now.AddDays(-Math.Max(options.Value.RetentionDays, options.Value.ControlledRetentionDays));
+        var controlled = AuditOptions.ControlledEntityTypes;
         using var scope = scopes.CreateScope();
         using var system = scope.ServiceProvider.GetRequiredService<ITenantContext>().UseSystem();
         var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        var removed = await db.AuditLogs.IgnoreQueryFilters().Where(l => l.OccurredAt < cutoff).ExecuteDeleteAsync(ct)
+        var removed = await db.AuditLogs.IgnoreQueryFilters()
+                          .Where(l => controlled.Contains(l.EntityType) ? l.OccurredAt < controlledCutoff : l.OccurredAt < cutoff).ExecuteDeleteAsync(ct)
                       + await db.PlatformAuditLogs.Where(l => l.OccurredAt < cutoff).ExecuteDeleteAsync(ct);
         if (removed > 0) LogPurged(logger, removed, options.Value.RetentionDays);
         return removed;

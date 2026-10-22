@@ -83,6 +83,9 @@ public sealed class HoldingsApiFactory : WebApplicationFactory<Program>
 
     public Task PublishAsync<T>(T message) where T : class => Services.GetRequiredService<IBus>().Publish(message);
 
+    /// <summary>Phát theo kiểu thật của event (khi biến được khai báo bằng kiểu cơ sở).</summary>
+    public Task PublishAsAsync(object message) => Services.GetRequiredService<IBus>().Publish(message, message.GetType());
+
     /// <summary>Chờ consumer xử lý xong event (theo EventId).</summary>
     public Task WaitConsumedAsync(Elib.Contracts.Events.IntegrationEvent e) =>
         WaitForAsync(() => Task.FromResult(Consumed.OfType<Elib.Contracts.Events.IntegrationEvent>().FirstOrDefault(c => c.EventId == e.EventId)), e.GetType().Name);
