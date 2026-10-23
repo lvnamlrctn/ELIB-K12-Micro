@@ -6,7 +6,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import {
   DigitalApi, DigitalItemDetail, DigitalLoan, DigitalLoanStatus, DigitalReservation, DigitalReservationStatus, DigitalReview,
 } from '../core/digital';
-import { Language } from '../core/i18n';
+import { LDatePipe, Language } from '../core/i18n';
 import { Library } from '../core/library';
 import { ReaderAuth } from '../core/reader-auth';
 
@@ -16,7 +16,7 @@ import { ReaderAuth } from '../core/reader-auth';
  */
 @Component({
   selector: 'opac-ebook-detail',
-  imports: [FormsModule, RouterLink, TranslatePipe],
+  imports: [FormsModule, LDatePipe, RouterLink, TranslatePipe],
   template: `
     <div class="max-w-5xl mx-auto px-4 py-6">
       <a routerLink="/thu-vien-so" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
@@ -140,7 +140,7 @@ import { ReaderAuth } from '../core/reader-auth';
                           (click)="auth.login(router.url)">
                     <span class="material-icons text-[18px]">login</span>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
                 } @else if (myLoan(); as loan) {
-                  <p class="text-green-700">{{ 'OPAC.DIGITAL.LOAN_ACTIVE' | translate: { date: loan.expiresAt ? (loan.expiresAt.slice(0, 10)) : ('OPAC.DIGITAL.NO_LIMIT' | translate) } }}</p>
+                  <p class="text-green-700">{{ 'OPAC.DIGITAL.LOAN_ACTIVE' | translate: { date: loan.expiresAt ? (loan.expiresAt | ldate) : ('OPAC.DIGITAL.NO_LIMIT' | translate) } }}</p>
                   @if (borrowError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="borrowBusy()" (click)="returnLoan(loan)"
                           class="mt-3 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">
@@ -148,7 +148,7 @@ import { ReaderAuth } from '../core/reader-auth';
                 } @else if (myReservation(); as resv) {
                   <p [class.text-green-700]="resv.status === ReservationStatus.Ready">
                     {{ (resv.status === ReservationStatus.Ready ? 'OPAC.DIGITAL.RESERVATION_READY' : 'OPAC.DIGITAL.RESERVATION_WAITING')
-                      | translate: { date: resv.readyExpiresAt?.slice(0, 10), position: resv.queuePosition } }}
+                      | translate: { date: (resv.readyExpiresAt | ldate), position: resv.queuePosition } }}
                   </p>
                   @if (borrowError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="borrowBusy()" (click)="cancelReservation(resv)"

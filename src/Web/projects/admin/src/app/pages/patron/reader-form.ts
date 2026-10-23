@@ -7,6 +7,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
+import { DateInput } from '../../shared/date-input';
 
 type ReaderForm = Omit<Reader, 'id' | 'publicId' | 'fullName' | 'status' | 'lockReason' | 'createdAt' | 'photoId'> & { publicId: string | null };
 
@@ -25,7 +26,7 @@ const BLANK: ReaderForm = {
  */
 @Component({
   selector: 'app-reader-form',
-  imports: [FormsModule, Modal, TranslatePipe, CameraCapture],
+  imports: [DateInput, FormsModule, Modal, TranslatePipe, CameraCapture],
   template: `
     <app-modal [title]="f.publicId ? 'READER.EDIT_TITLE' : 'READER.ADD_TITLE'" widthClass="max-w-4xl" (closed)="closed.emit()">
       <div class="flex flex-col md:flex-row gap-6">
@@ -82,7 +83,7 @@ const BLANK: ReaderForm = {
           <div><label class="form-label" for="r-first">{{ 'READER.LAST_NAME' | translate }} <span class="text-red-500">*</span></label>
             <input id="r-first" name="first" class="input" [(ngModel)]="f.firstName" required /></div>
           <div><label class="form-label" for="r-birth">{{ 'READER.BIRTH_DATE' | translate }}</label>
-            <input id="r-birth" name="birth" type="date" class="input" [(ngModel)]="f.birthDate" /></div>
+            <app-date-input fieldId="r-birth" name="birth" [(ngModel)]="f.birthDate"></app-date-input></div>
           <div><label class="form-label" for="r-sex">{{ 'READER.GENDER' | translate }}</label>
             <select id="r-sex" name="sex" class="input" [(ngModel)]="f.sex"><option [ngValue]="null">—</option>
               <option [ngValue]="1">{{ 'READER.GENDER_MALE' | translate }}</option><option [ngValue]="0">{{ 'READER.GENDER_FEMALE' | translate }}</option></select></div>
@@ -109,9 +110,9 @@ const BLANK: ReaderForm = {
           <div><label class="form-label" for="r-phone">{{ 'READER.PHONE' | translate }}</label>
             <input id="r-phone" name="phone" class="input" [(ngModel)]="f.phone" /></div>
           <div><label class="form-label" for="r-issue">{{ 'READER.ISSUED_DATE' | translate }}</label>
-            <input id="r-issue" name="issue" type="date" class="input" [(ngModel)]="f.issueDate" /></div>
+            <app-date-input fieldId="r-issue" name="issue" [(ngModel)]="f.issueDate"></app-date-input></div>
           <div><label class="form-label" for="r-exp">{{ 'READER.EXPIRED_DATE' | translate }}</label>
-            <input id="r-exp" name="exp" type="date" class="input" [(ngModel)]="f.expireDate" />
+            <app-date-input fieldId="r-exp" name="exp" [(ngModel)]="f.expireDate"></app-date-input>
             <p class="text-xs text-gray-500 mt-1">{{ 'READER.EXPIRE_EMPTY_HINT' | translate }}</p></div>
           <div class="sm:col-span-2 lg:col-span-3"><label class="form-label" for="r-addr">{{ 'READER.ADDRESS' | translate }}</label>
             <input id="r-addr" name="addr" class="input" [(ngModel)]="f.address" /></div>

@@ -5,6 +5,7 @@ import { Api, CrudPage, Sip2Log, errorMessage } from '../../core/api';
 import { LDatePipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /** Lệnh SIP2 hay gặp — hiện tên thay mã. */
 const COMMANDS = ['93', '99', '63', '23', '17', '11', '09', '29', '65', '35', '37'] as const;
@@ -12,7 +13,7 @@ const COMMANDS = ['93', '99', '63', '23', '17', '11', '09', '29', '65', '35', '3
 /** Nhật ký giao dịch của trạm tự phục vụ SIP2 (monolith: Sip2Log, quyền SIP2LOG) — mật khẩu trạm/bạn đọc đã che (CO***, AD***). */
 @Component({
   selector: 'app-sip2-logs',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'SIP2.LOG_TITLE' | translate }}</h4></div>
 
@@ -39,11 +40,11 @@ const COMMANDS = ['93', '99', '63', '23', '17', '11', '09', '29', '65', '35', '3
         </div>
         <div>
           <label for="s2-from" class="field-label">{{ 'SIP2.FROM' | translate }}</label>
-          <input id="s2-from" type="date" class="input" [(ngModel)]="from" (change)="search()" />
+          <app-date-input fieldId="s2-from" [(ngModel)]="from" (ngModelChange)="search()"></app-date-input>
         </div>
         <div>
           <label for="s2-to" class="field-label">{{ 'SIP2.TO' | translate }}</label>
-          <input id="s2-to" type="date" class="input" [(ngModel)]="to" (change)="search()" />
+          <app-date-input fieldId="s2-to" [(ngModel)]="to" (ngModelChange)="search()"></app-date-input>
         </div>
       </div>
     </div>

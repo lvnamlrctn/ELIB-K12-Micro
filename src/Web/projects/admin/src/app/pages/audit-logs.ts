@@ -5,6 +5,7 @@ import { Api, AuditLog, CrudPage, errorMessage } from '../core/api';
 import { LDatePipe } from '../core/i18n';
 import { ToastrService } from '../shared/toastr';
 import { Loading, Paginator } from '../shared/ui';
+import { DateInput } from '../shared/date-input';
 
 /** Mã thao tác có tên dịch (AUDIT.ACTION.<mã>); mã lạ hiện nguyên văn. */
 const KNOWN_ACTIONS = new Set([
@@ -20,7 +21,7 @@ const WARN = new Set(['REJECT', 'REVERSE', 'IMPERSONATION_STARTED', 'USER_ROLES'
  */
 @Component({
   selector: 'app-audit-logs',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5">
       <h4 class="page-title">{{ (platform() ? 'AUDIT.TITLE_PLATFORM' : scope() === 'catalog' ? 'AUDIT.TITLE_CATALOG' : 'AUDIT.TITLE_TENANT') | translate }}</h4>
@@ -44,11 +45,11 @@ const WARN = new Set(['REJECT', 'REVERSE', 'IMPERSONATION_STARTED', 'USER_ROLES'
         </div>
         <div>
           <label for="from" class="field-label">{{ 'AUDIT.FROM' | translate }}</label>
-          <input id="from" type="date" class="input" [(ngModel)]="from" (change)="search()" />
+          <app-date-input fieldId="from" [(ngModel)]="from" (ngModelChange)="search()"></app-date-input>
         </div>
         <div>
           <label for="to" class="field-label">{{ 'AUDIT.TO' | translate }}</label>
-          <input id="to" type="date" class="input" [(ngModel)]="to" (change)="search()" />
+          <app-date-input fieldId="to" [(ngModel)]="to" (ngModelChange)="search()"></app-date-input>
         </div>
       </div>
       <div class="flex justify-end mt-4">

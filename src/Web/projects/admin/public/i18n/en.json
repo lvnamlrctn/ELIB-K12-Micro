@@ -4410,5 +4410,23 @@
     "AI_NOTHING": "The AI made no suggestion",
     "IMPORT_HINT_DSPACE": "A .zip in DSpace Simple Archive layout: each folder is a document with dublin_core.xml, an optional contents list and the PDF files. Other file types are skipped.",
     "IMPORT_PICK_DSPACE": "Click to choose a .zip file"
+  },
+  "DATE": {
+    "PICK": "Pick a date",
+    "TIME": "Hour:minute",
+    "TODAY": "Today",
+    "CLEAR": "Clear date",
+    "PREV": "Previous month",
+    "NEXT": "Next month",
+    "PREV_YEAR": "Back 1 year",
+    "NEXT_YEAR": "Forward 1 year",
+    "MONTH_YEAR": "{{m}}/{{y}}",
+    "WD_MON": "Mo",
+    "WD_TUE": "Tu",
+    "WD_WED": "We",
+    "WD_THU": "Th",
+    "WD_FRI": "Fr",
+    "WD_SAT": "Sa",
+    "WD_SUN": "Su"
   }
 }

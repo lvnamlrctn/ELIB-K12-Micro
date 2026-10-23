@@ -9,6 +9,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 import { ACQ_REPORTS, AcqReportActions, AcqReportKind } from './acq-report-actions';
+import { DateInput } from '../../shared/date-input';
 
 type Tab = AcqReportKind;
 
@@ -28,7 +29,7 @@ const emptyRequest = (): AcqReportRequest => ({
  */
 @Component({
   selector: 'app-acq-reports',
-  imports: [FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'ACQ_REPORT.TITLE' | translate }}</h4></div>
     <div class="flex flex-wrap gap-2 mb-4">
@@ -39,9 +40,9 @@ const emptyRequest = (): AcqReportRequest => ({
 
     <div class="panel grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
       <div><label for="rp-f" class="field-label">{{ (tab() === 'newbooks' ? 'ACQ_REPORT.CATALOGED_FROM' : 'STORE_STATS.RECEIVED_FROM') | translate }}</label>
-        <input id="rp-f" type="date" class="input" [(ngModel)]="request.from" /></div>
+        <app-date-input fieldId="rp-f" [(ngModel)]="request.from"></app-date-input></div>
       <div><label for="rp-t" class="field-label">{{ (tab() === 'newbooks' ? 'ACQ_REPORT.CATALOGED_TO' : 'STORE_STATS.RECEIVED_TO') | translate }}</label>
-        <input id="rp-t" type="date" class="input" [(ngModel)]="request.to" /></div>
+        <app-date-input fieldId="rp-t" [(ngModel)]="request.to"></app-date-input></div>
       @if (tab() !== 'newbooks') {
         <div><label for="rp-s" class="field-label">{{ (tab() === 'allocation' || tab() === 'register' ? 'ITEMS_PAGE.STORE' : 'ACQ_RECEIPT.STORE') | translate }}</label>
           <select id="rp-s" class="input" [(ngModel)]="request.storeId"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
@@ -55,8 +56,8 @@ const emptyRequest = (): AcqReportRequest => ({
         <div><label for="rp-fund" class="field-label">{{ 'ACQ.FUND' | translate }}</label>
           <select id="rp-fund" class="input" [(ngModel)]="request.fundId"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
             @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
-        <div><label for="rp-crf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><input id="rp-crf" type="date" class="input" [(ngModel)]="request.createdFrom" /></div>
-        <div><label for="rp-crt" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><input id="rp-crt" type="date" class="input" [(ngModel)]="request.createdTo" /></div>
+        <div><label for="rp-crf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><app-date-input fieldId="rp-crf" [(ngModel)]="request.createdFrom"></app-date-input></div>
+        <div><label for="rp-crt" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><app-date-input fieldId="rp-crt" [(ngModel)]="request.createdTo"></app-date-input></div>
         <div><label for="rp-cf" class="field-label">{{ 'ACQ_REPORT.CODE_FROM' | translate }}</label><input id="rp-cf" type="number" min="1" class="input" [(ngModel)]="request.receiptCodeFrom" /></div>
         <div><label for="rp-ct" class="field-label">{{ 'ACQ_REPORT.CODE_TO' | translate }}</label><input id="rp-ct" type="number" min="1" class="input" [(ngModel)]="request.receiptCodeTo" /></div>
         <div><label for="rp-st" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>

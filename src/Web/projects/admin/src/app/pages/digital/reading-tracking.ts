@@ -5,6 +5,7 @@ import { Api, ReadingSessionPage, ReadingStats, errorMessage } from '../../core/
 import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Theo dõi đọc tài liệu số (LRC: ReadingTracking, quyền DIGITAL_READING): thống kê theo khoảng ngày (lượt đọc, bạn đọc, thời gian đọc, lượt xem/tải,
@@ -12,13 +13,13 @@ import { Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-reading-tracking',
-  imports: [FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5 flex items-end gap-3 flex-wrap">
       <h4 class="page-title">{{ 'READING_PAGE.TITLE' | translate }}</h4>
       <div class="ml-auto flex items-end gap-2 flex-wrap">
-        <div><label for="rt-from" class="form-label">{{ 'READING_PAGE.FROM' | translate }}</label><input id="rt-from" type="date" class="input" [(ngModel)]="from" /></div>
-        <div><label for="rt-to" class="form-label">{{ 'READING_PAGE.TO' | translate }}</label><input id="rt-to" type="date" class="input" [(ngModel)]="to" /></div>
+        <div><label for="rt-from" class="form-label">{{ 'READING_PAGE.FROM' | translate }}</label><app-date-input fieldId="rt-from" [(ngModel)]="from"></app-date-input></div>
+        <div><label for="rt-to" class="form-label">{{ 'READING_PAGE.TO' | translate }}</label><app-date-input fieldId="rt-to" [(ngModel)]="to"></app-date-input></div>
         <div><label for="rt-kw" class="form-label">{{ 'COMMON.SEARCH' | translate }}</label><input id="rt-kw" class="input" [(ngModel)]="keyword" (keydown.enter)="load()" /></div>
         <button type="button" class="btn-primary" [disabled]="loading()" (click)="load()"><span class="material-icons text-[18px]">query_stats</span> {{ 'READING_PAGE.VIEW' | translate }}</button>
       </div>

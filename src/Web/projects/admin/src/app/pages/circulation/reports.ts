@@ -6,6 +6,7 @@ import { Api, CircPlace, CirculationReport, CirculationReportRequest, errorMessa
 import { ToastrService } from '../../shared/toastr';
 import { ACQ_PRINT_MAX_ROWS, numericColumns, openReportPrint, periodLine } from '../acquisition/report-print';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 const REPORT_TYPES: { value: number; label: string; hint: string }[] = [
   { value: 1, label: 'CIRC_REPORT_PAGE.TYPE.1', hint: 'CIRC_REPORT_PAGE.HINT.1' },
@@ -26,7 +27,7 @@ type Named = { id: number; name: string; publicId: string };
 /** Báo cáo lưu thông (monolith: /admin/circulation-report, quyền CIRC_REPORT) — 11 loại, xem theo trang hoặc xuất Excel. */
 @Component({
   selector: 'app-circulation-reports',
-  imports: [FormsModule, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'CIRC_REPORT_PAGE.TITLE' | translate }}</h4></div>
 
@@ -41,11 +42,11 @@ type Named = { id: number; name: string; publicId: string };
         </div>
         <div>
           <label for="rp-from" class="field-label">{{ 'CIRC_REPORT_PAGE.FROM' | translate }}</label>
-          <input id="rp-from" type="date" class="input" [(ngModel)]="request.from" />
+          <app-date-input fieldId="rp-from" [(ngModel)]="request.from"></app-date-input>
         </div>
         <div>
           <label for="rp-to" class="field-label">{{ 'CIRC_REPORT_PAGE.TO' | translate }}</label>
-          <input id="rp-to" type="date" class="input" [(ngModel)]="request.to" />
+          <app-date-input fieldId="rp-to" [(ngModel)]="request.to"></app-date-input>
         </div>
         <div>
           <label for="rp-place" class="field-label">{{ 'CIRC_REPORT_PAGE.PLACE' | translate }}</label>

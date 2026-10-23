@@ -490,5 +490,23 @@
     "READER_PASSWORD_IS_CARDNO": "The new password must not be your card number.",
     "ACCOUNT_LOCKED": "The account is temporarily locked after too many failed attempts. Please try again later.",
     "HTTP": "Error {{status}}"
+  },
+  "DATE": {
+    "PICK": "Pick a date",
+    "TIME": "Hour:minute",
+    "TODAY": "Today",
+    "CLEAR": "Clear date",
+    "PREV": "Previous month",
+    "NEXT": "Next month",
+    "PREV_YEAR": "Back 1 year",
+    "NEXT_YEAR": "Forward 1 year",
+    "MONTH_YEAR": "{{m}}/{{y}}",
+    "WD_MON": "Mo",
+    "WD_TUE": "Tu",
+    "WD_WED": "We",
+    "WD_THU": "Th",
+    "WD_FRI": "Fr",
+    "WD_SAT": "Sa",
+    "WD_SUN": "Su"
   }
 }

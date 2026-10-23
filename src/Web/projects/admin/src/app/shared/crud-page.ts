@@ -9,6 +9,7 @@ import { PaymentDialog } from '../pages/payment/payment-dialog';
 import { ImportDialog } from './import-dialog';
 import { ToastrService } from './toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from './ui';
+import { DateInput } from './date-input';
 
 /** Mọi nhãn (title, label, placeholder, hint, options[].label…) là khoá dịch hoặc câu sẵn — template luôn qua pipe translate. */
 export interface CrudColumn {
@@ -130,7 +131,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, PaymentDialog, MediaPicker],
+  imports: [DateInput, FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, PaymentDialog, MediaPicker],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -314,7 +315,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                     </div>
                   }
                   @case ('date') {
-                    <input [id]="'f-' + f.key" [name]="f.key" type="date" class="input" [(ngModel)]="item[f.key]" [required]="!!f.required" [disabled]="locked(f, item)" />
+                    <app-date-input [id]="'f-' + f.key" [name]="f.key" [(ngModel)]="item[f.key]" [required]="!!f.required" [disabled]="locked(f, item)"></app-date-input>
                   }
                   @case ('select') {
                     <select [id]="'f-' + f.key" [name]="f.key" class="input" [(ngModel)]="item[f.key]" [disabled]="locked(f, item)">

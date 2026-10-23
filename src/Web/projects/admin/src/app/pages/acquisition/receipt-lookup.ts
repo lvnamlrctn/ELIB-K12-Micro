@@ -8,6 +8,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 import { AcqReportActions, AcqReportKind } from './acq-report-actions';
+import { DateInput } from '../../shared/date-input';
 
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
 
@@ -35,7 +36,7 @@ const emptyRequest = (): AcqReportRequest => ({
  */
 @Component({
   selector: 'app-acq-receipt-lookup',
-  imports: [FormsModule, RouterLink, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
       <h4 class="page-title !mb-0">{{ 'ACQ_LOOKUP.TITLE' | translate }}</h4>
@@ -59,14 +60,14 @@ const emptyRequest = (): AcqReportRequest => ({
               <select id="lk-st" class="input" [(ngModel)]="r.completed" (ngModelChange)="find()"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
                 <option [ngValue]="false">{{ 'ACQ_RECEIPT.DRAFT' | translate }}</option><option [ngValue]="true">{{ 'ACQ_RECEIPT.COMPLETED' | translate }}</option></select></div>
             <div><label for="lk-au" class="field-label">{{ 'ACQ_DUP.AUTHOR' | translate }}</label><input id="lk-au" class="input" [placeholder]="'ACQ_LOOKUP.AUTHOR_PH' | translate" [(ngModel)]="r.author" (keydown.enter)="find()" /></div>
-            <div><label for="lk-rf" class="field-label">{{ 'ACQ_RECEIPT.RECEIVED_FROM' | translate }}</label><input id="lk-rf" type="date" class="input" [(ngModel)]="r.from" (keydown.enter)="find()" /></div>
-            <div><label for="lk-rt" class="field-label">{{ 'ACQ_LOOKUP.RECEIVED_TO' | translate }}</label><input id="lk-rt" type="date" class="input" [(ngModel)]="r.to" (keydown.enter)="find()" /></div>
+            <div><label for="lk-rf" class="field-label">{{ 'ACQ_RECEIPT.RECEIVED_FROM' | translate }}</label><app-date-input fieldId="lk-rf" [(ngModel)]="r.from" (keydown.enter)="find()"></app-date-input></div>
+            <div><label for="lk-rt" class="field-label">{{ 'ACQ_LOOKUP.RECEIVED_TO' | translate }}</label><app-date-input fieldId="lk-rt" [(ngModel)]="r.to" (keydown.enter)="find()"></app-date-input></div>
             <div><label for="lk-src" class="field-label">{{ 'ACQ.SOURCE' | translate }}</label>
               <select id="lk-src" class="input" [(ngModel)]="r.sourceId" (ngModelChange)="find()"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
                 @for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
             <div><label for="lk-yr" class="field-label">{{ 'ACQ_DUP.YEAR_SHORT' | translate }}</label><input id="lk-yr" class="input" maxlength="4" [placeholder]="'ACQ_LOOKUP.YEAR_PH' | translate" [(ngModel)]="r.publishYear" (keydown.enter)="find()" /></div>
-            <div><label for="lk-cr" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><input id="lk-cr" type="date" class="input" [(ngModel)]="r.createdFrom" (keydown.enter)="find()" /></div>
-            <div><label for="lk-crt" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><input id="lk-crt" type="date" class="input" [(ngModel)]="r.createdTo" (keydown.enter)="find()" /></div>
+            <div><label for="lk-cr" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><app-date-input fieldId="lk-cr" [(ngModel)]="r.createdFrom" (keydown.enter)="find()"></app-date-input></div>
+            <div><label for="lk-crt" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><app-date-input fieldId="lk-crt" [(ngModel)]="r.createdTo" (keydown.enter)="find()"></app-date-input></div>
             <div><label for="lk-fund" class="field-label">{{ 'ACQ.FUND' | translate }}</label>
               <select id="lk-fund" class="input" [(ngModel)]="r.fundId" (ngModelChange)="find()"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
                 @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>

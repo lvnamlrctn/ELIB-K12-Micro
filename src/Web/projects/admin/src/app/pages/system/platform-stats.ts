@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, PlatformStatsRequest, TenantSummary, errorMessage, saveFile } from '../../core/api';
 import { LNumberPipe, Language } from '../../core/i18n';
+import { DateInput } from '../../shared/date-input';
 
 type Tab = 'readers' | 'loans' | 'fines' | 'items';
 /** now: số liệu hiện tại (không theo kỳ lọc); money: tiền (đồng). */
@@ -58,7 +59,7 @@ const TABS: { key: Tab; label: string; icon: string; hint?: string }[] = [
  */
 @Component({
   selector: 'app-platform-stats',
-  imports: [FormsModule, LNumberPipe, TranslatePipe],
+  imports: [DateInput, FormsModule, LNumberPipe, TranslatePipe],
   template: `
     <div class="mb-4 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">{{ 'PLATFORM_STATS.TITLE' | translate }}</h4>
@@ -94,9 +95,9 @@ const TABS: { key: Tab; label: string; icon: string; hint?: string }[] = [
           }
         </div>
         <div><label for="ps-from" class="form-label">{{ 'PLATFORM_STATS.FROM' | translate }}</label>
-          <input id="ps-from" type="date" class="input" [(ngModel)]="from" /></div>
+          <app-date-input fieldId="ps-from" [(ngModel)]="from"></app-date-input></div>
         <div><label for="ps-to" class="form-label">{{ 'PLATFORM_STATS.TO' | translate }}</label>
-          <input id="ps-to" type="date" class="input" [(ngModel)]="to" /></div>
+          <app-date-input fieldId="ps-to" [(ngModel)]="to"></app-date-input></div>
         <div class="flex gap-1 flex-wrap pb-0.5">
           @for (p of presets; track p.key) {
             <button type="button" class="btn-secondary !py-1.5 !px-2 !text-xs" (click)="preset(p.key)">{{ p.label | translate }}</button>

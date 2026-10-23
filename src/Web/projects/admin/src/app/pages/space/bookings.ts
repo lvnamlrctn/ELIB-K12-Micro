@@ -10,6 +10,7 @@ import { CameraCapture, CapturedPhoto } from '../../shared/camera';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Modal, Paginator } from '../../shared/ui';
 import jsQR from 'jsqr';
+import { DateInput } from '../../shared/date-input';
 
 const STATUS_PENDING = 1;
 const STATUS_APPROVED = 2;
@@ -21,7 +22,7 @@ const STATUS_CHECKED_IN = 3;
  */
 @Component({
   selector: 'app-space-bookings',
-  imports: [FormsModule, LDatePipe, Loading, Modal, Paginator, TranslatePipe, CameraCapture],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Modal, Paginator, TranslatePipe, CameraCapture],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">{{ 'SPACE_BOOKINGS_PAGE.TITLE' | translate }}</h4>
@@ -52,11 +53,11 @@ const STATUS_CHECKED_IN = 3;
         </div>
         <div>
           <label class="field-label">{{ 'COMMON.FROM' | translate }}</label>
-          <input type="date" class="input" [(ngModel)]="search.from" (change)="find()" />
+          <app-date-input [(ngModel)]="search.from" (ngModelChange)="find()"></app-date-input>
         </div>
         <div>
           <label class="field-label">{{ 'COMMON.TO' | translate }}</label>
-          <input type="date" class="input" [(ngModel)]="search.to" (change)="find()" />
+          <app-date-input [(ngModel)]="search.to" (ngModelChange)="find()"></app-date-input>
         </div>
       </div>
     </div>

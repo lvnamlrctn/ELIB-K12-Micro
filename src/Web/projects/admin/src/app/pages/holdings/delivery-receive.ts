@@ -7,6 +7,7 @@ import { LDatePipe } from '../../core/i18n';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Modal, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Nhận phân bổ sách (ELIB-LRC: /admin/ab-deliverers-receive): hàng đợi các đơn phân bổ đã "Nhận đủ" mà chưa ký — thủ kho xem đơn và
@@ -14,7 +15,7 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-delivery-receive',
-  imports: [FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'TRANSFER.RECEIVE_TITLE' | translate }}</h4>
       <p class="text-sm text-gray-500">{{ 'TRANSFER.RECEIVE_HINT' | translate }}</p></div>
@@ -23,8 +24,8 @@ import { Loading, Modal, Paginator } from '../../shared/ui';
       <div><label for="dr-ct" class="field-label">{{ 'TRANSFER.CODE_TO' | translate }}</label><input id="dr-ct" type="number" min="1" class="input" [(ngModel)]="filter.codeTo" (keydown.enter)="find()" /></div>
       <div><label for="dr-dn" class="field-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="dr-dn" class="input" [(ngModel)]="filter.delivererName" (keydown.enter)="find()" /></div>
       <div><label for="dr-rn" class="field-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="dr-rn" class="input" [(ngModel)]="filter.receiverName" (keydown.enter)="find()" /></div>
-      <div><label for="dr-df" class="field-label">{{ 'TRANSFER.DELIVERED_FROM' | translate }}</label><input id="dr-df" type="date" class="input" [(ngModel)]="filter.deliveredFrom" /></div>
-      <div><label for="dr-dt" class="field-label">{{ 'TRANSFER.DELIVERED_TO' | translate }}</label><input id="dr-dt" type="date" class="input" [(ngModel)]="filter.deliveredTo" /></div>
+      <div><label for="dr-df" class="field-label">{{ 'TRANSFER.DELIVERED_FROM' | translate }}</label><app-date-input fieldId="dr-df" [(ngModel)]="filter.deliveredFrom"></app-date-input></div>
+      <div><label for="dr-dt" class="field-label">{{ 'TRANSFER.DELIVERED_TO' | translate }}</label><app-date-input fieldId="dr-dt" [(ngModel)]="filter.deliveredTo"></app-date-input></div>
       <div class="col-span-2 lg:col-span-6 flex justify-end gap-2">
         <button class="btn-secondary" type="button" (click)="reset()">{{ 'TRANSFER.RESET' | translate }}</button>
         <button class="btn-primary" type="button" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>

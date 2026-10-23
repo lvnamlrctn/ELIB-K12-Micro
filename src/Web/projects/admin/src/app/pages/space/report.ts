@@ -7,6 +7,7 @@ import { Api, SPACE_CATEGORIES, SpaceReport, errorMessage, saveFile } from '../.
 import { Loading } from '../../shared/ui';
 import { ToastrService } from '../../shared/toastr';
 import { openReportPrint, periodLine } from '../acquisition/report-print';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Báo cáo đặt phòng (monolith: RoomBookingReportService, quyền SPACE_REPORT) — bản gọn hơn bản gốc: không có histogram
@@ -14,13 +15,13 @@ import { openReportPrint, periodLine } from '../acquisition/report-print';
  */
 @Component({
   selector: 'app-space-report',
-  imports: [FormsModule, Loading, TranslatePipe],
+  imports: [DateInput, FormsModule, Loading, TranslatePipe],
   template: `
     <div class="mb-5 flex items-end gap-3 flex-wrap">
       <h4 class="page-title">{{ 'SPACE_REPORT_PAGE.TITLE' | translate }}</h4>
       <div class="ml-auto flex items-end gap-2 flex-wrap">
-        <div><label class="form-label">{{ 'COMMON.FROM' | translate }}</label><input type="date" class="input" [(ngModel)]="from" /></div>
-        <div><label class="form-label">{{ 'COMMON.TO' | translate }}</label><input type="date" class="input" [(ngModel)]="to" /></div>
+        <div><label class="form-label">{{ 'COMMON.FROM' | translate }}</label><app-date-input [(ngModel)]="from"></app-date-input></div>
+        <div><label class="form-label">{{ 'COMMON.TO' | translate }}</label><app-date-input [(ngModel)]="to"></app-date-input></div>
         <div>
           <label class="form-label">{{ 'SPACE_CAT.CATEGORY' | translate }}</label>
           <select class="input" [(ngModel)]="category">

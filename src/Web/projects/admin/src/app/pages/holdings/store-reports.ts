@@ -8,6 +8,7 @@ import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 import { ACQ_PRINT_MAX_ROWS, openReportPrint, periodLine } from '../acquisition/report-print';
 import { itemStatus } from './items';
+import { DateInput } from '../../shared/date-input';
 
 const CRITERIA: { value: string; label: string }[] = [
   { value: 'bibtype', label: 'STORE_STATS.BY_TYPE' },
@@ -19,7 +20,7 @@ const CRITERIA: { value: string; label: string }[] = [
 /** Thống kê tài liệu kho (monolith: /admin/statistics-document, quyền STAT_DOC) theo loại tài liệu, lớp DDC, kho, trạng thái. */
 @Component({
   selector: 'app-store-stats',
-  imports: [FormsModule, Loading, TranslatePipe],
+  imports: [DateInput, FormsModule, Loading, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'STORE_STATS.TITLE' | translate }}</h4></div>
     <div class="panel grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
@@ -36,8 +37,8 @@ const CRITERIA: { value: string; label: string }[] = [
           @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }
         </select>
       </div>
-      <div><label for="st-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="st-f" type="date" class="input" [(ngModel)]="request.from" /></div>
-      <div><label for="st-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="st-t" type="date" class="input" [(ngModel)]="request.to" /></div>
+      <div><label for="st-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><app-date-input fieldId="st-f" [(ngModel)]="request.from"></app-date-input></div>
+      <div><label for="st-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><app-date-input fieldId="st-t" [(ngModel)]="request.to"></app-date-input></div>
       <div class="flex gap-2 justify-end">
         <button class="btn-secondary" [disabled]="busy() || !stats()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>
@@ -137,7 +138,7 @@ export class StoreStats implements OnInit {
 /** Báo cáo sách trong kho (monolith: /admin/store-book-report, quyền STORE_BOOK_REPORT): bản chưa mất/thanh lý, tổng theo kho. */
 @Component({
   selector: 'app-store-book-report',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'STORE_BOOK_REPORT.TITLE' | translate }}</h4></div>
     <div class="panel grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
@@ -148,8 +149,8 @@ export class StoreStats implements OnInit {
           @for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }
         </select>
       </div>
-      <div><label for="sb-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><input id="sb-f" type="date" class="input" [(ngModel)]="request.from" /></div>
-      <div><label for="sb-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><input id="sb-t" type="date" class="input" [(ngModel)]="request.to" /></div>
+      <div><label for="sb-f" class="field-label">{{ 'STORE_STATS.RECEIVED_FROM' | translate }}</label><app-date-input fieldId="sb-f" [(ngModel)]="request.from"></app-date-input></div>
+      <div><label for="sb-t" class="field-label">{{ 'STORE_STATS.RECEIVED_TO' | translate }}</label><app-date-input fieldId="sb-t" [(ngModel)]="request.to"></app-date-input></div>
       <div class="flex gap-2 justify-end">
         <button class="btn-secondary" [disabled]="busy() || !report()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'REPORT_PRINT.PRINT' | translate }}</button>
         <button class="btn-secondary" [disabled]="busy()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>

@@ -8,6 +8,7 @@ import { MediaPicker } from '../../shared/media-picker';
 import { RichText } from '../../shared/rich-text';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 interface NewsForm {
   publicId: string | null; id: number | null;
@@ -33,7 +34,7 @@ const fromLocal = (value: string): string | null => (value ? new Date(value).toI
  */
 @Component({
   selector: 'app-portal-news',
-  imports: [FormsModule, LDatePipe, Modal, ConfirmDelete, Loading, Paginator, StatusBadge, RichText, MediaPicker, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Modal, ConfirmDelete, Loading, Paginator, StatusBadge, RichText, MediaPicker, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'PORTAL_NEWS_PAGE.TITLE' | translate }}</h4></div>
 
@@ -132,8 +133,8 @@ const fromLocal = (value: string): string | null => (value ? new Date(value).toI
           <div><label class="form-label" for="n-kw">{{ 'PORTAL_NEWS_PAGE.KEYWORD' | translate }}</label><input id="n-kw" class="input" name="keyword" maxlength="500" [(ngModel)]="f.keyword" /></div>
           <div><label class="form-label" for="n-lang">{{ 'PORTAL_NEWS_PAGE.LANGUAGE' | translate }}</label>
             <select id="n-lang" class="input" name="language" [(ngModel)]="f.language"><option value="">{{ 'PORTAL_NEWS_PAGE.ALL_LANGUAGES' | translate }}</option><option value="vi">{{ 'PORTAL_NEWS_PAGE.LANG_VI' | translate }}</option><option value="en">{{ 'PORTAL_NEWS_PAGE.LANG_EN' | translate }}</option></select></div>
-          <div><label class="form-label" for="n-start">{{ 'PORTAL_NEWS_PAGE.START' | translate }}</label><input id="n-start" type="datetime-local" class="input" name="start" [(ngModel)]="f.startTime" /></div>
-          <div><label class="form-label" for="n-end">{{ 'PORTAL_NEWS_PAGE.END' | translate }}</label><input id="n-end" type="datetime-local" class="input" name="end" [(ngModel)]="f.endTime" /></div>
+          <div><label class="form-label" for="n-start">{{ 'PORTAL_NEWS_PAGE.START' | translate }}</label><app-date-input fieldId="n-start" name="start" [(ngModel)]="f.startTime" withTime></app-date-input></div>
+          <div><label class="form-label" for="n-end">{{ 'PORTAL_NEWS_PAGE.END' | translate }}</label><app-date-input fieldId="n-end" name="end" [(ngModel)]="f.endTime" withTime></app-date-input></div>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="featured" [(ngModel)]="f.featured" /> {{ 'PORTAL_NEWS_PAGE.FEATURED' | translate }}</label>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="allowComment" [(ngModel)]="f.allowComment" /> {{ 'PORTAL_NEWS_PAGE.ALLOW_COMMENT' | translate }}</label>
           <div><label class="form-label" for="n-mt">{{ 'PORTAL_NEWS_PAGE.META_TITLE' | translate }}</label><input id="n-mt" class="input" name="metaTitle" maxlength="250" [(ngModel)]="f.metaTitle" /></div>

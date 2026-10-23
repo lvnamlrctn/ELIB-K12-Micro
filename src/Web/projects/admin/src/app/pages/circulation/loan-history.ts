@@ -11,6 +11,7 @@ import { EntityHistoryDialog } from '../../shared/entity-history';
 import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 type LoanColumn = 'store' | 'loaned' | 'loanedBy' | 'due' | 'returned' | 'returnedBy' | 'renewals';
 const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
@@ -29,7 +30,7 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
  */
 @Component({
   selector: 'app-loan-history',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ColumnPicker, ReasonDialog, EntityHistoryDialog],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ColumnPicker, ReasonDialog, EntityHistoryDialog],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'LOAN_HISTORY_PAGE.TITLE' | translate }}</h4></div>
 
@@ -65,11 +66,11 @@ const COLUMNS: { key: LoanColumn; label: string; shown: boolean }[] = [
         </div>
         <div>
           <label for="lh-from" class="field-label">{{ 'LOAN_HISTORY_PAGE.FROM' | translate }}</label>
-          <input id="lh-from" type="date" class="input" [(ngModel)]="search.from" (change)="find()" />
+          <app-date-input fieldId="lh-from" [(ngModel)]="search.from" (ngModelChange)="find()"></app-date-input>
         </div>
         <div>
           <label for="lh-to" class="field-label">{{ 'LOAN_HISTORY_PAGE.TO' | translate }}</label>
-          <input id="lh-to" type="date" class="input" [(ngModel)]="search.to" (change)="find()" />
+          <app-date-input fieldId="lh-to" [(ngModel)]="search.to" (ngModelChange)="find()"></app-date-input>
         </div>
       </div>
       <div class="flex justify-end gap-2 mt-4">

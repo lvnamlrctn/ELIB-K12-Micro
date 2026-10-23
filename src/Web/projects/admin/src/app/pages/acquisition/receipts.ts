@@ -17,6 +17,7 @@ import { BibLookupDialog } from './bib-lookup-dialog';
 import { BibMarcNew } from './bib-marc-new';
 import { BibSource } from './bib-source';
 import { PAYMENT_METHODS, loadCurrencies, today } from './orders';
+import { DateInput } from '../../shared/date-input';
 
 const EMPTY_OPTIONS: AcquisitionOptions = { sources: [], suppliers: [], budgets: [], funds: [] };
 
@@ -46,7 +47,7 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
 /** Phiếu nhận / đơn nhận (monolith: /admin/ab-receipts, quyền AB_RECEIPTS): danh sách, thêm/sửa/xoá phiếu chưa hoàn tất. */
 @Component({
   selector: 'app-acq-receipts',
-  imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
     <div class="mb-5 flex justify-between items-center gap-2 flex-wrap">
       <h4 class="page-title">{{ 'ACQ_RECEIPT.TITLE' | translate }}</h4>
@@ -75,10 +76,10 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
         <select id="ar-fund" class="input" [(ngModel)]="fundId" (change)="find()"><option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
           @for (o of options().funds; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select>
       </div>
-      <div><label for="ar-cf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><input id="ar-cf" type="date" class="input" [(ngModel)]="createdFrom" /></div>
-      <div><label for="ar-ct" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><input id="ar-ct" type="date" class="input" [(ngModel)]="createdTo" /></div>
-      <div><label for="ar-f" class="field-label">{{ 'ACQ_RECEIPT.RECEIVED_FROM' | translate }}</label><input id="ar-f" type="date" class="input" [(ngModel)]="from" /></div>
-      <div><label for="ar-t" class="field-label">{{ 'COMMON.TO' | translate }}</label><input id="ar-t" type="date" class="input" [(ngModel)]="to" /></div>
+      <div><label for="ar-cf" class="field-label">{{ 'ACQ_RECEIPT.CREATED_FROM' | translate }}</label><app-date-input fieldId="ar-cf" [(ngModel)]="createdFrom"></app-date-input></div>
+      <div><label for="ar-ct" class="field-label">{{ 'ACQ_RECEIPT.CREATED_TO' | translate }}</label><app-date-input fieldId="ar-ct" [(ngModel)]="createdTo"></app-date-input></div>
+      <div><label for="ar-f" class="field-label">{{ 'ACQ_RECEIPT.RECEIVED_FROM' | translate }}</label><app-date-input fieldId="ar-f" [(ngModel)]="from"></app-date-input></div>
+      <div><label for="ar-t" class="field-label">{{ 'COMMON.TO' | translate }}</label><app-date-input fieldId="ar-t" [(ngModel)]="to"></app-date-input></div>
       <button class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
     </div>
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
@@ -130,7 +131,7 @@ function receiptStatus(r: Receipt): { label: string; badge: string } {
           <div><label for="rc-name" class="form-label">{{ 'ACQ_RECEIPT.NAME' | translate }} <span class="text-red-500">*</span></label>
             <input id="rc-name" name="name" class="input" maxlength="250" required [(ngModel)]="c.name" [class.!border-red-400]="c.touched && !c.name.trim()" /></div>
           <div><label for="rc-on" class="form-label">{{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }}</label>
-            <input id="rc-on" name="on" type="date" class="input" [(ngModel)]="c.receivedOn" /></div>
+            <app-date-input fieldId="rc-on" name="on" [(ngModel)]="c.receivedOn"></app-date-input></div>
           <p class="text-xs text-gray-500">{{ 'ACQ_RECEIPT.CREATE_HINT' | translate }}</p>
         </form>
         <ng-container footer>
@@ -264,7 +265,7 @@ interface RegisterForm {
  */
 @Component({
   selector: 'app-acq-receipt-detail',
-  imports: [FormsModule, RouterLink, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource, BibLookupDialog, BibMarcNew, NgTemplateOutlet, UnsavedConfirm],
+  imports: [DateInput, FormsModule, RouterLink, LNumberPipe, Loading, Paginator, Modal, TranslatePipe, BibSource, BibLookupDialog, BibMarcNew, NgTemplateOutlet, UnsavedConfirm],
   template: `
     <div class="mb-4 flex flex-wrap gap-3 justify-between items-center">
       <div class="flex items-center gap-3">
@@ -302,7 +303,7 @@ interface RegisterForm {
               <div class="sm:col-span-2"><label for="rh-name" class="form-label">{{ 'ACQ_RECEIPT.NAME' | translate }} <span class="text-red-500">*</span></label>
                 <input id="rh-name" class="input" maxlength="250" [(ngModel)]="h.name" (ngModelChange)="dirty = true" [class.!border-red-400]="!h.name.trim()" /></div>
               <div><label for="rh-on" class="form-label">{{ 'ACQ_RECEIPT.RECEIVED_ON' | translate }}</label>
-                <input id="rh-on" type="date" class="input" [(ngModel)]="h.receivedOn" (ngModelChange)="dirty = true" /></div>
+                <app-date-input fieldId="rh-on" [(ngModel)]="h.receivedOn" (ngModelChange)="dirty = true"></app-date-input></div>
               <div><label for="rh-src" class="form-label">{{ 'ACQ.SOURCE' | translate }}</label>
                 <select id="rh-src" class="input" [(ngModel)]="h.sourceId" (ngModelChange)="dirty = true"><option [ngValue]="null">{{ 'ACQ_RECEIPT.CHOOSE' | translate }}</option>
                   @for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>

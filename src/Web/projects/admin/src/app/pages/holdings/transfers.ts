@@ -10,6 +10,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { itemStatus } from './items';
+import { DateInput } from '../../shared/date-input';
 
 type Transfer = StoreMove | Delivery;
 
@@ -45,7 +46,7 @@ function isLocked(t: Transfer): boolean {
  */
 @Component({
   selector: 'app-transfers',
-  imports: [FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
     @let k = text();
     <div class="mb-5 flex justify-between items-center">
@@ -72,8 +73,8 @@ function isLocked(t: Transfer): boolean {
           <div><label for="tf-ct" class="field-label">{{ 'TRANSFER.CODE_TO' | translate }}</label><input id="tf-ct" type="number" min="1" class="input" [(ngModel)]="filter.codeTo" (keydown.enter)="find()" /></div>
           <div><label for="tf-fdn" class="field-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="tf-fdn" class="input" [(ngModel)]="filter.delivererName" (keydown.enter)="find()" /></div>
           <div><label for="tf-frn" class="field-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-frn" class="input" [(ngModel)]="filter.receiverName" (keydown.enter)="find()" /></div>
-          <div><label for="tf-df" class="field-label">{{ 'TRANSFER.DELIVERED_FROM' | translate }}</label><input id="tf-df" type="date" class="input" [(ngModel)]="filter.deliveredFrom" /></div>
-          <div><label for="tf-dt" class="field-label">{{ 'TRANSFER.DELIVERED_TO' | translate }}</label><input id="tf-dt" type="date" class="input" [(ngModel)]="filter.deliveredTo" /></div>
+          <div><label for="tf-df" class="field-label">{{ 'TRANSFER.DELIVERED_FROM' | translate }}</label><app-date-input fieldId="tf-df" [(ngModel)]="filter.deliveredFrom"></app-date-input></div>
+          <div><label for="tf-dt" class="field-label">{{ 'TRANSFER.DELIVERED_TO' | translate }}</label><app-date-input fieldId="tf-dt" [(ngModel)]="filter.deliveredTo"></app-date-input></div>
           <div><label for="tf-fs" class="field-label">{{ 'COMMON.STATUS' | translate }}</label>
             <select id="tf-fs" class="input" [(ngModel)]="filter.deliveryStatus" (change)="find()">
               <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option><option [ngValue]="1">{{ 'TRANSFER.DELIVERING' | translate }}</option><option [ngValue]="2">{{ 'TRANSFER.RECEIVED' | translate }}</option>
@@ -144,7 +145,7 @@ function isLocked(t: Transfer): boolean {
               <select id="tf-to" class="input" [(ngModel)]="f.toStoreId">@for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
             <div><label for="tf-dn" class="form-label">{{ 'TRANSFER.DELIVERER' | translate }}</label><input id="tf-dn" class="input" maxlength="250" [(ngModel)]="f.delivererName" /></div>
             <div><label for="tf-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-rn" class="input" maxlength="250" [(ngModel)]="f.receiverName" /></div>
-            <div><label for="tf-mo" class="form-label">{{ 'TRANSFER.DATE' | translate }}</label><input id="tf-mo" type="date" class="input" [(ngModel)]="f.movedOn" /></div>
+            <div><label for="tf-mo" class="form-label">{{ 'TRANSFER.DATE' | translate }}</label><app-date-input fieldId="tf-mo" [(ngModel)]="f.movedOn"></app-date-input></div>
           } @else {
             <div class="col-span-2"><label for="tf-rc" class="form-label">{{ 'TRANSFER.RECEIPT' | translate }}</label>
               <select id="tf-rc" class="input" [(ngModel)]="f.receiptPublicId" (ngModelChange)="onReceipt(f)">
@@ -156,8 +157,8 @@ function isLocked(t: Transfer): boolean {
             <div><label for="tf-da" class="form-label">{{ 'TRANSFER.DELIVERER_ADDRESS' | translate }}</label><input id="tf-da" class="input" maxlength="500" [(ngModel)]="f.delivererAddress" /></div>
             <div><label for="tf-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="tf-rn" class="input" maxlength="250" [(ngModel)]="f.receiverName" /></div>
             <div><label for="tf-ra" class="form-label">{{ 'TRANSFER.RECEIVER_ADDRESS' | translate }}</label><input id="tf-ra" class="input" maxlength="500" [(ngModel)]="f.receiverAddress" /></div>
-            <div><label for="tf-dd" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }}</label><input id="tf-dd" type="date" class="input" [(ngModel)]="f.deliveredOn" /></div>
-            <div><label for="tf-rd" class="form-label">{{ 'TRANSFER.RECEIVED_ON' | translate }}</label><input id="tf-rd" type="date" class="input" [(ngModel)]="f.receivedOn" /></div>
+            <div><label for="tf-dd" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }}</label><app-date-input fieldId="tf-dd" [(ngModel)]="f.deliveredOn"></app-date-input></div>
+            <div><label for="tf-rd" class="form-label">{{ 'TRANSFER.RECEIVED_ON' | translate }}</label><app-date-input fieldId="tf-rd" [(ngModel)]="f.receivedOn"></app-date-input></div>
             <div><label for="tf-st" class="form-label">{{ 'TRANSFER.TO_STORE' | translate }}</label>
               <select id="tf-st" class="input" [(ngModel)]="f.storeId"><option [ngValue]="null">—</option>@for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
             <div><label for="tf-ss" class="form-label">{{ 'COMMON.STATUS' | translate }}</label>
@@ -176,7 +177,7 @@ function isLocked(t: Transfer): boolean {
     @if (creating(); as c) {
       <!-- Thêm đơn phân bổ (ELIB-LRC): chỉ hỏi ngày giao, tạo xong vào trang chi tiết để nhập thông tin và thêm bản sách. -->
       <app-modal [title]="k.add | translate" widthClass="max-w-md" (closed)="creating.set(null)">
-        <div><label for="tc-on" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }} *</label><input id="tc-on" type="date" class="input" [(ngModel)]="c.deliveredOn" /></div>
+        <div><label for="tc-on" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }} *</label><app-date-input fieldId="tc-on" [(ngModel)]="c.deliveredOn"></app-date-input></div>
         <p class="text-[12px] text-gray-500 mt-3">{{ 'TRANSFER.CREATE_HINT' | translate }}</p>
         <ng-container footer>
           <button type="button" class="btn-secondary" (click)="creating.set(null)">{{ 'COMMON.CANCEL' | translate }}</button>
@@ -383,7 +384,7 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
  */
 @Component({
   selector: 'app-transfer-detail',
-  imports: [FormsModule, RouterLink, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, Loading, Paginator, TranslatePipe],
   template: `
     @let k = text();
     <div class="mb-5 flex flex-wrap gap-3 justify-between items-center">
@@ -424,7 +425,7 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
         </div>
         <fieldset class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" [disabled]="!editable()">
           <div><label for="th-code" class="form-label">{{ 'TRANSFER.NO' | translate }}</label><input id="th-code" class="input bg-gray-50 font-mono" [value]="'#' + (transfer()?.id ?? '')" readonly /></div>
-          <div><label for="th-dd" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }}</label><input id="th-dd" type="date" class="input" [(ngModel)]="h.deliveredOn" /></div>
+          <div><label for="th-dd" class="form-label">{{ 'TRANSFER.DELIVERED_ON' | translate }}</label><app-date-input fieldId="th-dd" [(ngModel)]="h.deliveredOn"></app-date-input></div>
           <div class="sm:col-span-2"><label for="th-rc" class="form-label">{{ 'TRANSFER.RECEIPT' | translate }}</label>
             <select id="th-rc" class="input" [(ngModel)]="h.receiptPublicId" (ngModelChange)="onHeadReceipt(h)">
               <option [ngValue]="null">{{ 'TRANSFER.NO_RECEIPT' | translate }}</option>
@@ -436,7 +437,7 @@ function transferStatus(t: Transfer): { label: string; badge: string } {
           <div><label for="th-da" class="form-label">{{ 'TRANSFER.DELIVERER_ADDRESS' | translate }}</label><input id="th-da" class="input" maxlength="500" [(ngModel)]="h.delivererAddress" /></div>
           <div><label for="th-rn" class="form-label">{{ 'TRANSFER.RECEIVER' | translate }}</label><input id="th-rn" class="input" maxlength="250" [(ngModel)]="h.receiverName" /></div>
           <div><label for="th-ra" class="form-label">{{ 'TRANSFER.RECEIVER_ADDRESS' | translate }}</label><input id="th-ra" class="input" maxlength="500" [(ngModel)]="h.receiverAddress" /></div>
-          <div><label for="th-rd" class="form-label">{{ 'TRANSFER.RECEIVED_ON' | translate }}</label><input id="th-rd" type="date" class="input" [(ngModel)]="h.receivedOn" /></div>
+          <div><label for="th-rd" class="form-label">{{ 'TRANSFER.RECEIVED_ON' | translate }}</label><app-date-input fieldId="th-rd" [(ngModel)]="h.receivedOn"></app-date-input></div>
           <div><label for="th-st" class="form-label">{{ 'TRANSFER.TO_STORE' | translate }}</label>
             <select id="th-st" class="input" [(ngModel)]="h.storeId"><option [ngValue]="null">—</option>@for (s of stores(); track s.id) { <option [ngValue]="s.id">{{ s.code }} — {{ s.name }}</option> }</select></div>
           <div class="sm:col-span-2"><label for="th-nt" class="form-label">{{ 'COMMON.NOTE' | translate }}</label><input id="th-nt" class="input" maxlength="500" [(ngModel)]="h.note" /></div>

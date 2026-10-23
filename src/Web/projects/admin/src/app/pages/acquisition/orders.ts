@@ -8,6 +8,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { BibPicker } from './bib-picker';
+import { DateInput } from '../../shared/date-input';
 
 /** Tình trạng đơn đặt: 1 mới lập, 2 đã gửi đặt, 3 đã huỷ. */
 export const ORDER_STATUSES: { code: number; name: string; badge: string }[] = [
@@ -45,7 +46,7 @@ interface OrderForm {
 /** Đơn đặt bổ sung (monolith: /admin/ab-orders, quyền AB_ORDERS): danh sách, thêm/sửa/xoá đầu đơn; mở đơn để lập dòng đặt. */
 @Component({
   selector: 'app-acq-orders',
-  imports: [FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, LNumberPipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
     <div class="mb-5 flex justify-between items-center">
       <h4 class="page-title">{{ 'ACQ_ORDER.TITLE' | translate }}</h4>
@@ -111,8 +112,8 @@ interface OrderForm {
       <app-modal [title]="(f.publicId ? 'COMMON.MODAL_EDIT_TITLE' : 'ACQ_ORDER.ADD') | translate" widthClass="max-w-2xl" (closed)="form.set(null)">
         <div class="grid grid-cols-2 gap-4">
           <div class="col-span-2"><label for="of-name" class="form-label">{{ 'ACQ_ORDER.NAME' | translate }} *</label><input id="of-name" class="input" maxlength="250" [(ngModel)]="f.name" /></div>
-          <div><label for="of-od" class="form-label">{{ 'ACQ_ORDER.ORDERED_ON' | translate }}</label><input id="of-od" type="date" class="input" [(ngModel)]="f.orderedOn" /></div>
-          <div><label for="of-dd" class="form-label">{{ 'ACQ_ORDER.DUE_ON' | translate }}</label><input id="of-dd" type="date" class="input" [(ngModel)]="f.dueOn" /></div>
+          <div><label for="of-od" class="form-label">{{ 'ACQ_ORDER.ORDERED_ON' | translate }}</label><app-date-input fieldId="of-od" [(ngModel)]="f.orderedOn"></app-date-input></div>
+          <div><label for="of-dd" class="form-label">{{ 'ACQ_ORDER.DUE_ON' | translate }}</label><app-date-input fieldId="of-dd" [(ngModel)]="f.dueOn"></app-date-input></div>
           <div><label for="of-src" class="form-label">{{ 'ACQ.SOURCE' | translate }}</label>
             <select id="of-src" class="input" [(ngModel)]="f.sourceId"><option [ngValue]="null">—</option>@for (o of options().sources; track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }</select></div>
           <div><label for="of-sup" class="form-label">{{ 'ACQ.SUPPLIER' | translate }}</label>

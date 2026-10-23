@@ -9,6 +9,7 @@ import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
 import { itemStatus } from './items';
+import { DateInput } from '../../shared/date-input';
 
 type Kind = 'lost' | 'liquidation';
 type Row = (LostRow | LiquidationRow) & { date: string; cardNo?: string | null; decisionNo?: string | null };
@@ -32,7 +33,7 @@ const KINDS = {
  */
 @Component({
   selector: 'app-store-records',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, ReasonDialog, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, ReasonDialog, TranslatePipe],
   template: `
     @let k = text();
     <div class="mb-5"><h4 class="page-title">{{ k.title | translate }}</h4></div>
@@ -43,13 +44,13 @@ const KINDS = {
           <label for="sr-codes" class="form-label">{{ 'STORE_RECORD.CODES' | translate }}</label>
           <textarea id="sr-codes" rows="8" class="input font-mono text-[13px]" [(ngModel)]="codes" placeholder="VV000001&#10;VV000002"></textarea>
           <label for="sr-date" class="form-label mt-3">{{ k.date | translate }}</label>
-          <input id="sr-date" type="date" class="input" [(ngModel)]="actDate" />
+          <app-date-input fieldId="sr-date" [(ngModel)]="actDate"></app-date-input>
           <label for="sr-reason" class="form-label mt-3">{{ 'STORE_RECORD.REASON' | translate }} <span class="text-red-600">*</span></label>
           <input id="sr-reason" class="input" maxlength="500" [(ngModel)]="reason" />
           @if (kind() !== 'lost') {
             <div class="grid grid-cols-2 gap-2 mt-3">
               <div><label for="sr-dno" class="form-label">{{ 'STORE_RECORD.DECISION_NO' | translate }}</label><input id="sr-dno" class="input" maxlength="100" [(ngModel)]="decisionNo" /></div>
-              <div><label for="sr-ddate" class="form-label">{{ 'STORE_RECORD.DECISION_DATE' | translate }}</label><input id="sr-ddate" type="date" class="input" [(ngModel)]="decisionDate" /></div>
+              <div><label for="sr-ddate" class="form-label">{{ 'STORE_RECORD.DECISION_DATE' | translate }}</label><app-date-input fieldId="sr-ddate" [(ngModel)]="decisionDate"></app-date-input></div>
             </div>
           }
           <button type="button" class="btn-primary w-full justify-center mt-4" [disabled]="busy() || !codeList().length || !reason.trim()" (click)="act()">
@@ -81,11 +82,11 @@ const KINDS = {
           </div>
           <div>
             <label for="sr-from" class="field-label">{{ 'COMMON.FROM' | translate }}</label>
-            <input id="sr-from" type="date" class="input" [(ngModel)]="search.from" />
+            <app-date-input fieldId="sr-from" [(ngModel)]="search.from"></app-date-input>
           </div>
           <div>
             <label for="sr-to" class="field-label">{{ 'COMMON.TO' | translate }}</label>
-            <input id="sr-to" type="date" class="input" [(ngModel)]="search.to" />
+            <app-date-input fieldId="sr-to" [(ngModel)]="search.to"></app-date-input>
           </div>
           <div class="md:col-span-5 flex justify-end gap-2">
             <button class="btn-secondary" [disabled]="loading()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>

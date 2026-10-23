@@ -7,6 +7,7 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Sách ra vào kho (monolith: /admin/book-out-store, quyền BOOK_OUT_STORE): quét ĐKCB xuất kho tạm (photo, triển lãm, cho đơn vị
@@ -14,7 +15,7 @@ import { Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-store-outs',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ReasonDialog],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe, ReasonDialog],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'STORE_OUT.TITLE' | translate }}</h4></div>
 
@@ -103,11 +104,11 @@ import { Loading, Paginator } from '../../shared/ui';
       </div>
       <div>
         <label for="sf-from" class="field-label">{{ 'STORE_OUT.OUT_FROM' | translate }}</label>
-        <input id="sf-from" type="date" class="input" [(ngModel)]="search.outFrom" />
+        <app-date-input fieldId="sf-from" [(ngModel)]="search.outFrom"></app-date-input>
       </div>
       <div>
         <label for="sf-to" class="field-label">{{ 'STORE_OUT.OUT_TO' | translate }}</label>
-        <input id="sf-to" type="date" class="input" [(ngModel)]="search.outTo" />
+        <app-date-input fieldId="sf-to" [(ngModel)]="search.outTo"></app-date-input>
       </div>
       <div class="md:col-span-6 flex justify-end gap-2">
         <button class="btn-secondary" [disabled]="loading()" (click)="export()"><span class="material-icons text-[18px]">download</span> {{ 'COMMON.EXPORT_EXCEL' | translate }}</button>

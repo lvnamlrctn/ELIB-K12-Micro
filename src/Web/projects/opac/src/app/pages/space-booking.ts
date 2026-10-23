@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Language, LDatePipe } from '../core/i18n';
 import { ReaderAuth } from '../core/reader-auth';
+import { DateInput } from '../core/date-input';
 import {
   SpaceApi, SpaceBoardRoom, SpaceBookingStatus, SpaceBookingSummary, SpaceBuildingSummary, SpaceFloorBoard, SpaceFloorSummary,
   SpaceMemberSummary, SpaceRoomSummary,
@@ -21,7 +22,7 @@ interface Cell { startMin: number; status: CellStatus; title: string | null; }
  */
 @Component({
   selector: 'opac-space-booking',
-  imports: [FormsModule, LDatePipe, RouterLink, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, RouterLink, TranslatePipe],
   template: `
     <div class="max-w-6xl mx-auto px-4 py-8">
       <h1 class="text-2xl font-semibold text-slate-900">{{ 'OPAC.SPACE.TITLE' | translate }}</h1>
@@ -38,7 +39,7 @@ interface Cell { startMin: number; status: CellStatus; title: string | null; }
         </select>
         <div>
           <label class="text-xs text-slate-500 block">{{ 'OPAC.SPACE.DATE' | translate }}</label>
-          <input type="date" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" [(ngModel)]="date" (change)="loadBoard()" [disabled]="!floorId()" />
+          <app-date-input [(ngModel)]="date" (ngModelChange)="loadBoard()" [disabled]="!floorId()"></app-date-input>
         </div>
       </div>
 

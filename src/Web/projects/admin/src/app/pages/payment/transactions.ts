@@ -7,6 +7,7 @@ import { Session } from '../../core/session';
 import { ReasonDialog, ReasonResult } from '../../shared/reason-dialog';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Giao dịch thanh toán QR và đối soát: lọc theo trạng thái/cổng/ngày, tổng đã thu / đang chờ / cần đối soát, và xử lý các giao dịch cần can thiệp tay
@@ -14,7 +15,7 @@ import { Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-payment-transactions',
-  imports: [FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, ReasonDialog, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, LNumberPipe, Loading, Paginator, ReasonDialog, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">{{ 'PAYMENT_TX.TITLE' | translate }}</h4>
@@ -37,8 +38,8 @@ import { Loading, Paginator } from '../../shared/ui';
         <select id="pt-pr" class="input" [(ngModel)]="search.provider" (change)="find()">
           <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option><option value="VietQR">VietQR</option><option value="VNPAY">VNPAY</option>
         </select></div>
-      <div><label class="field-label" for="pt-from">{{ 'COMMON.FROM' | translate }}</label><input id="pt-from" type="date" class="input" [(ngModel)]="search.from" (change)="find()" /></div>
-      <div><label class="field-label" for="pt-to">{{ 'COMMON.TO' | translate }}</label><input id="pt-to" type="date" class="input" [(ngModel)]="search.to" (change)="find()" /></div>
+      <div><label class="field-label" for="pt-from">{{ 'COMMON.FROM' | translate }}</label><app-date-input fieldId="pt-from" [(ngModel)]="search.from" (ngModelChange)="find()"></app-date-input></div>
+      <div><label class="field-label" for="pt-to">{{ 'COMMON.TO' | translate }}</label><app-date-input fieldId="pt-to" [(ngModel)]="search.to" (ngModelChange)="find()"></app-date-input></div>
       <label class="md:col-span-6 flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="search.needsReview === true" (ngModelChange)="search.needsReview = $event ? true : null; find()" /> {{ 'PAYMENT_TX.ONLY_REVIEW' | translate }}</label>
     </div>
 

@@ -72,12 +72,23 @@ const ALIGN_CLASSES = ['img-left', 'img-center', 'img-right'];
     .prose-editor .tiptap a { color: #1d4ed8; text-decoration: underline; }
     .prose-editor .tiptap img { max-width: 100%; height: auto; }
     .prose-editor .tiptap img.img-left { float: left; margin: 0 1rem 0.5rem 0; }
-    .prose-editor .tiptap :has(> img.img-left) { float: left; margin: 0 1rem 0.5rem 0; }
-    .prose-editor .tiptap :has(> img.img-right) { float: right; margin: 0 0 0.5rem 1rem; }
-    .prose-editor .tiptap :has(> img.img-center) { display: block; width: fit-content; margin: 0.5rem auto; }
     .prose-editor .tiptap img.img-right { float: right; margin: 0 0 0.5rem 1rem; }
     .prose-editor .tiptap img.img-center { display: block; margin: 0.5rem auto; }
     .prose-editor .tiptap img.ProseMirror-selectednode { outline: 2px solid #2563eb; }
+    .prose-editor .tiptap [data-resize-container] { max-width: 100%; width: fit-content; }
+    .prose-editor .tiptap [data-resize-container]:has(img.img-left) { float: left; margin: 0 1rem 0.5rem 0; }
+    .prose-editor .tiptap [data-resize-container]:has(img.img-right) { float: right; margin: 0 0 0.5rem 1rem; }
+    .prose-editor .tiptap [data-resize-container]:has(img.img-center) { margin: 0.5rem auto; }
+    .prose-editor .tiptap [data-resize-container] img { float: none; margin: 0; display: block; }
+    .prose-editor .tiptap [data-resize-container].ProseMirror-selectednode img { outline: 2px solid #2563eb; }
+    .prose-editor .tiptap [data-resize-handle] { display: none; width: 12px; height: 12px; background: #2563eb; border: 2px solid #fff; border-radius: 3px; box-shadow: 0 0 0 1px #2563eb; z-index: 5; }
+    .prose-editor .tiptap[contenteditable='true'] [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+    .prose-editor .tiptap[contenteditable='true'] [data-resize-container]:hover [data-resize-handle],
+    .prose-editor .tiptap[contenteditable='true'] [data-resize-container][data-resize-state='true'] [data-resize-handle] { display: block; }
+    .prose-editor .tiptap [data-resize-handle='top-left'] { transform: translate(-50%, -50%); cursor: nwse-resize; }
+    .prose-editor .tiptap [data-resize-handle='top-right'] { transform: translate(50%, -50%); cursor: nesw-resize; }
+    .prose-editor .tiptap [data-resize-handle='bottom-left'] { transform: translate(-50%, 50%); cursor: nesw-resize; }
+    .prose-editor .tiptap [data-resize-handle='bottom-right'] { transform: translate(50%, 50%); cursor: nwse-resize; }
     .prose-editor .tiptap table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }
     .prose-editor .tiptap td, .prose-editor .tiptap th { border: 1px solid #cbd5e1; padding: 4px 8px; min-width: 40px; vertical-align: top; }
     .prose-editor .tiptap th { background: #f1f5f9; }

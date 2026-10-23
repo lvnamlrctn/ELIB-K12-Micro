@@ -490,5 +490,23 @@
     "READER_PASSWORD_IS_CARDNO": "Mật khẩu mới không được trùng số thẻ.",
     "ACCOUNT_LOCKED": "Tài khoản đang bị khoá tạm do nhập sai nhiều lần. Vui lòng thử lại sau.",
     "HTTP": "Lỗi {{status}}"
+  },
+  "DATE": {
+    "PICK": "Chọn ngày",
+    "TIME": "Giờ:phút",
+    "TODAY": "Hôm nay",
+    "CLEAR": "Xóa ngày",
+    "PREV": "Tháng trước",
+    "NEXT": "Tháng sau",
+    "PREV_YEAR": "Lùi 1 năm",
+    "NEXT_YEAR": "Tới 1 năm",
+    "MONTH_YEAR": "Tháng {{m}}/{{y}}",
+    "WD_MON": "T2",
+    "WD_TUE": "T3",
+    "WD_WED": "T4",
+    "WD_THU": "T5",
+    "WD_FRI": "T6",
+    "WD_SAT": "T7",
+    "WD_SUN": "CN"
   }
 }

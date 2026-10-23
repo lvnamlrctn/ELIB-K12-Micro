@@ -10,11 +10,12 @@ import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { itemStatus } from './items';
+import { DateInput } from '../../shared/date-input';
 
 /** Đợt kiểm kê (monolith: /admin/inventory, quyền INVENTORY): thêm/sửa/kết thúc/xoá đợt, mở đợt để quét. */
 @Component({
   selector: 'app-inventories',
-  imports: [FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, LDatePipe, Loading, Paginator, Modal, ConfirmDelete, TranslatePipe],
   template: `
     <div class="mb-5 flex justify-between items-center">
       <h4 class="page-title">{{ 'INVENTORY_PAGE.TITLE' | translate }}</h4>
@@ -74,7 +75,7 @@ import { itemStatus } from './items';
       <app-modal [title]="(e.publicId ? 'INVENTORY_PAGE.EDIT' : 'INVENTORY_PAGE.ADD') | translate" (closed)="editing.set(null)">
         <div class="space-y-4">
           <div><label for="ie-name" class="form-label">{{ 'INVENTORY_PAGE.NAME' | translate }} *</label><input id="ie-name" class="input" maxlength="250" [(ngModel)]="e.name" /></div>
-          <div><label for="ie-date" class="form-label">{{ 'INVENTORY_PAGE.STARTED_ON' | translate }}</label><input id="ie-date" type="date" class="input" [(ngModel)]="e.startedOn" /></div>
+          <div><label for="ie-date" class="form-label">{{ 'INVENTORY_PAGE.STARTED_ON' | translate }}</label><app-date-input fieldId="ie-date" [(ngModel)]="e.startedOn"></app-date-input></div>
           <div>
             <label for="ie-store" class="form-label">{{ 'INVENTORY_PAGE.STORE' | translate }}</label>
             <select id="ie-store" class="input" [(ngModel)]="e.storeId">

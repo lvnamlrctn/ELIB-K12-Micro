@@ -6,6 +6,7 @@ import { LDatePipe } from '../../core/i18n';
 import { clampPage, rememberSearch, rememberedSearch } from '../../core/list-state';
 import { ToastrService } from '../../shared/toastr';
 import { Loading, Paginator } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Lịch sử vào/ra thư viện (monolith: Receiption/Check/SearchHistory, quyền CHECK_IN_OUT) — gồm cả lượt đang ở trong
@@ -13,7 +14,7 @@ import { Loading, Paginator } from '../../shared/ui';
  */
 @Component({
   selector: 'app-checkin-history',
-  imports: [FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'CHECKIN_HISTORY_PAGE.TITLE' | translate }}</h4></div>
 
@@ -40,13 +41,13 @@ import { Loading, Paginator } from '../../shared/ui';
         </div>
         <div>
           <label for="ch-from" class="field-label">{{ 'LOAN_HISTORY_PAGE.FROM' | translate }}</label>
-          <input id="ch-from" type="date" class="input" [(ngModel)]="search.from" (change)="find()" />
+          <app-date-input fieldId="ch-from" [(ngModel)]="search.from" (ngModelChange)="find()"></app-date-input>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-3">
         <div>
           <label for="ch-to" class="field-label">{{ 'LOAN_HISTORY_PAGE.TO' | translate }}</label>
-          <input id="ch-to" type="date" class="input" [(ngModel)]="search.to" (change)="find()" />
+          <app-date-input fieldId="ch-to" [(ngModel)]="search.to" (ngModelChange)="find()"></app-date-input>
         </div>
       </div>
       <div class="flex justify-end gap-2 mt-4">

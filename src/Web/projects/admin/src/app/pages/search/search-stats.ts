@@ -5,6 +5,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { Api, SearchStatsSummary, errorMessage } from '../../core/api';
 import { LDatePipe, LNumberPipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
+import { DateInput } from '../../shared/date-input';
 
 /**
  * Thống kê chất lượng tìm kiếm OPAC (service search, quyền SEARCH_STATS): lượt tìm, tỉ lệ không có kết quả, tỉ lệ bạn đọc mở kết quả,
@@ -12,13 +13,13 @@ import { ToastrService } from '../../shared/toastr';
  */
 @Component({
   selector: 'app-search-stats',
-  imports: [LDatePipe, LNumberPipe, FormsModule, PercentPipe, TranslatePipe],
+  imports: [DateInput, LDatePipe, LNumberPipe, FormsModule, PercentPipe, TranslatePipe],
   template: `
     <div class="mb-5 flex items-end gap-3 flex-wrap">
       <h4 class="page-title">{{ 'SEARCH_STATS_PAGE.TITLE' | translate }}</h4>
       <div class="ml-auto flex items-end gap-2 flex-wrap">
-        <div><label for="ss-from" class="form-label">{{ 'SEARCH_STATS_PAGE.FROM' | translate }}</label><input id="ss-from" type="date" class="input" [(ngModel)]="from" /></div>
-        <div><label for="ss-to" class="form-label">{{ 'SEARCH_STATS_PAGE.TO' | translate }}</label><input id="ss-to" type="date" class="input" [(ngModel)]="to" /></div>
+        <div><label for="ss-from" class="form-label">{{ 'SEARCH_STATS_PAGE.FROM' | translate }}</label><app-date-input fieldId="ss-from" [(ngModel)]="from"></app-date-input></div>
+        <div><label for="ss-to" class="form-label">{{ 'SEARCH_STATS_PAGE.TO' | translate }}</label><app-date-input fieldId="ss-to" [(ngModel)]="to"></app-date-input></div>
         <button type="button" class="btn-primary" [disabled]="loading()" (click)="load()"><span class="material-icons text-[18px]">query_stats</span> Xem</button>
       </div>
     </div>

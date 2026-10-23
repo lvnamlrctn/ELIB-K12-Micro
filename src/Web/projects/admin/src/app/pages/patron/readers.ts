@@ -19,6 +19,7 @@ import { ReaderImport } from './reader-import';
 import { ReaderPassword, accountLabel } from './reader-password';
 import { MAX_PRINT, PRINT_KEY } from './reader-print';
 import { ReaderExport, ReaderPhotos } from './reader-tools';
+import { DateInput } from '../../shared/date-input';
 
 /** Cột của bảng bạn đọc — người dùng chọn hiện/ẩn (nhớ theo tài khoản), mặc định như ELIB-LRC. */
 type ColumnKey = 'cardNo' | 'fullName' | 'sex' | 'birthDate' | 'readerType' | 'class' | 'course' | 'org' | 'ethnicity' | 'degree'
@@ -54,7 +55,7 @@ const VIEW_KEY = 'elib.readers.view';
  */
 @Component({
   selector: 'app-readers',
-  imports: [FormsModule, NgTemplateOutlet, ColumnPicker, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport, ReaderBatch, ReaderHistory,
+  imports: [DateInput, FormsModule, NgTemplateOutlet, ColumnPicker, LDatePipe, TranslatePipe, Loading, Modal, Paginator, StatusBadge, ConfirmDelete, ReaderImport, ReaderBatch, ReaderHistory,
     ReaderExport, ReaderPhotos, ReaderPassword, ReaderFormDialog],
   providers: [ReaderCatalogs],
   template: `
@@ -111,13 +112,13 @@ const VIEW_KEY = 'elib.readers.view';
               <option [ngValue]="true">{{ 'READER.EXPIRED' | translate }}</option>
             </select></div>
           <div><label for="f-if" class="field-label">{{ 'READER.ISSUED_FROM' | translate }}</label>
-            <input id="f-if" name="if" type="date" class="input" [(ngModel)]="search.issuedFrom" /></div>
+            <app-date-input fieldId="f-if" name="if" [(ngModel)]="search.issuedFrom"></app-date-input></div>
           <div><label for="f-it" class="field-label">{{ 'READER.ISSUED_TO' | translate }}</label>
-            <input id="f-it" name="it" type="date" class="input" [(ngModel)]="search.issuedTo" /></div>
+            <app-date-input fieldId="f-it" name="it" [(ngModel)]="search.issuedTo"></app-date-input></div>
           <div><label for="f-ef" class="field-label">{{ 'READER.EXPIRED_FROM' | translate }}</label>
-            <input id="f-ef" name="ef" type="date" class="input" [(ngModel)]="search.expiredFrom" /></div>
+            <app-date-input fieldId="f-ef" name="ef" [(ngModel)]="search.expiredFrom"></app-date-input></div>
           <div><label for="f-et" class="field-label">{{ 'READER.EXPIRED_TO' | translate }}</label>
-            <input id="f-et" name="et" type="date" class="input" [(ngModel)]="search.expiredTo" /></div>
+            <app-date-input fieldId="f-et" name="et" [(ngModel)]="search.expiredTo"></app-date-input></div>
         }
         <div class="sm:col-span-2 xl:col-span-6 flex justify-between items-center gap-2 flex-wrap">
           <button type="button" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1" (click)="moreFilters.set(!moreFilters())">

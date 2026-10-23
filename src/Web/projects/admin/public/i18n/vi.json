@@ -4410,5 +4410,23 @@
     "AI_NOTHING": "AI không đưa ra gợi ý nào",
     "IMPORT_HINT_DSPACE": "Một file .zip theo chuẩn DSpace Simple Archive: mỗi thư mục là một tài liệu gồm dublin_core.xml, contents (tuỳ chọn) và các file PDF. File khác PDF bị bỏ qua.",
     "IMPORT_PICK_DSPACE": "Click để chọn file .zip"
+  },
+  "DATE": {
+    "PICK": "Chọn ngày",
+    "TIME": "Giờ:phút",
+    "TODAY": "Hôm nay",
+    "CLEAR": "Xóa ngày",
+    "PREV": "Tháng trước",
+    "NEXT": "Tháng sau",
+    "PREV_YEAR": "Lùi 1 năm",
+    "NEXT_YEAR": "Tới 1 năm",
+    "MONTH_YEAR": "Tháng {{m}}/{{y}}",
+    "WD_MON": "T2",
+    "WD_TUE": "T3",
+    "WD_WED": "T4",
+    "WD_THU": "T5",
+    "WD_FRI": "T6",
+    "WD_SAT": "T7",
+    "WD_SUN": "CN"
   }
 }

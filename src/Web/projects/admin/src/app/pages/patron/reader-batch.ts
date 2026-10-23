@@ -5,6 +5,7 @@ import { Api, ReaderImportJob, ReaderSearch, ReaderSelection, ReaderSelectionPre
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ReaderCatalogs } from './reader-catalogs';
+import { DateInput } from '../../shared/date-input';
 
 export type ReaderBatchMode = 'update' | 'groups';
 
@@ -23,7 +24,7 @@ interface BatchOutcome { updated: number; failed: number; errors: string[]; }
  */
 @Component({
   selector: 'app-reader-batch',
-  imports: [FormsModule, Modal, TranslatePipe],
+  imports: [DateInput, FormsModule, Modal, TranslatePipe],
   template: `
     <app-modal [title]="(mode() === 'update' ? 'READER_BATCH.TITLE_UPDATE' : 'READER_BATCH.TITLE_GROUPS') | translate" widthClass="max-w-2xl" (closed)="closed.emit()">
       @if (job() || outcome()) {
@@ -81,8 +82,8 @@ interface BatchOutcome { updated: number; failed: number; errors: string[]; }
           <div class="sm:col-span-2"><label class="form-label" for="b-org">{{ 'READER.ORG' | translate }}</label>
             <select id="b-org" class="input" [(ngModel)]="change.orgId"><option [ngValue]="null">{{ 'READER.KEEP' | translate }}</option>
               @for (o of c.orgOptions(); track o.id) { <option [ngValue]="o.id">{{ indent(o.depth) }}{{ o.name }}</option> }</select></div>
-          <div><label class="form-label" for="b-issue">{{ 'READER.ISSUED_DATE' | translate }}</label><input id="b-issue" type="date" class="input" [(ngModel)]="change.issueDate" /></div>
-          <div><label class="form-label" for="b-exp">{{ 'READER.EXPIRED_DATE' | translate }}</label><input id="b-exp" type="date" class="input" [(ngModel)]="change.expireDate" /></div>
+          <div><label class="form-label" for="b-issue">{{ 'READER.ISSUED_DATE' | translate }}</label><app-date-input fieldId="b-issue" [(ngModel)]="change.issueDate"></app-date-input></div>
+          <div><label class="form-label" for="b-exp">{{ 'READER.EXPIRED_DATE' | translate }}</label><app-date-input fieldId="b-exp" [(ngModel)]="change.expireDate"></app-date-input></div>
           <div class="sm:col-span-2"><label class="form-label" for="b-reason">{{ 'READER_HISTORY.REASON' | translate }}</label>
             <input id="b-reason" class="input" maxlength="500" [(ngModel)]="reason" [placeholder]="'READER_HISTORY.REASON_PH' | translate" /></div>
         </div>

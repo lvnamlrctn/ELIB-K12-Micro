@@ -10,6 +10,7 @@ import { ItemCover } from './item-cover';
 import { ItemForm } from './item-form';
 import { ItemExport, ItemImport, ItemMove, OptionItem, TOGGLE_CLASS, stamp } from './item-tools';
 import { ContentStatus, ItemCapabilities, ItemsApi } from './items-api';
+import { DateInput } from '../../shared/date-input';
 
 type TreeRow = { id: number; publicId: string; name: string; parentId: number | null; sortOrder: number };
 type NamedRow = { id: number; publicId: string; name: string };
@@ -32,7 +33,7 @@ const emptyFilters = (): Filters => ({
  */
 @Component({
   selector: 'app-digital-items',
-  imports: [FormsModule, RouterLink, ConfirmDelete, ItemCover, ItemExport, ItemForm, ItemImport, ItemMove, Loading, Modal, Paginator, TranslatePipe],
+  imports: [DateInput, FormsModule, RouterLink, ConfirmDelete, ItemCover, ItemExport, ItemForm, ItemImport, ItemMove, Loading, Modal, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'DIGITAL_DOC.TITLE' | translate }}</h4></div>
 
@@ -63,8 +64,8 @@ const emptyFilters = (): Filters => ({
             <option [ngValue]="null">{{ 'DIGITAL_DOC.YEAR_FROM' | translate }}</option>@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
           <select class="input" [(ngModel)]="filters.yearTo" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.YEAR_TO' | translate">
             <option [ngValue]="null">{{ 'DIGITAL_DOC.YEAR_TO' | translate }}</option>@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
-          <input type="date" class="input" [(ngModel)]="filters.submittedFrom" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.SUBMITTED_FROM' | translate" />
-          <input type="date" class="input" [(ngModel)]="filters.submittedTo" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.SUBMITTED_TO' | translate" />
+          <app-date-input [(ngModel)]="filters.submittedFrom" (ngModelChange)="find()" [ariaLabel]="'DIGITAL_DOC.SUBMITTED_FROM' | translate"></app-date-input>
+          <app-date-input [(ngModel)]="filters.submittedTo" (ngModelChange)="find()" [ariaLabel]="'DIGITAL_DOC.SUBMITTED_TO' | translate"></app-date-input>
 
           <div class="xl:col-span-3"></div>
           <button type="button" class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>

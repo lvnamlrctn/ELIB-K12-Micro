@@ -5,6 +5,7 @@ import { Api, SPACE_CATEGORIES, SpaceSpecialDay, SpaceWeeklyHourRow, errorMessag
 import { LDatePipe } from '../../core/i18n';
 import { ToastrService } from '../../shared/toastr';
 import { ConfirmDelete, Loading, Modal } from '../../shared/ui';
+import { DateInput } from '../../shared/date-input';
 
 const WEEKDAYS = ['SPACE_HOURS_PAGE.SUN', 'SPACE_HOURS_PAGE.MON', 'SPACE_HOURS_PAGE.TUE', 'SPACE_HOURS_PAGE.WED',
   'SPACE_HOURS_PAGE.THU', 'SPACE_HOURS_PAGE.FRI', 'SPACE_HOURS_PAGE.SAT'];
@@ -12,7 +13,7 @@ const WEEKDAYS = ['SPACE_HOURS_PAGE.SUN', 'SPACE_HOURS_PAGE.MON', 'SPACE_HOURS_P
 /** Giờ mở cửa hàng tuần + ngày đặc biệt (monolith: RoomOpeningHour/RoomSpecialDay, quyền SPACE_HOURS). */
 @Component({
   selector: 'app-space-hours',
-  imports: [FormsModule, LDatePipe, Loading, Modal, ConfirmDelete, TranslatePipe],
+  imports: [DateInput, FormsModule, LDatePipe, Loading, Modal, ConfirmDelete, TranslatePipe],
   template: `
     <div class="mb-5 flex items-center gap-3 flex-wrap">
       <h4 class="page-title">{{ 'SPACE_HOURS_PAGE.TITLE' | translate }}</h4>
@@ -88,7 +89,7 @@ const WEEKDAYS = ['SPACE_HOURS_PAGE.SUN', 'SPACE_HOURS_PAGE.MON', 'SPACE_HOURS_P
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="field-label">{{ 'SPACE_HOURS_PAGE.DATE' | translate }} <span class="text-red-500">*</span></label>
-            <input type="date" class="input" [(ngModel)]="newDay.date" [ngModelOptions]="{ standalone: true }" />
+            <app-date-input [(ngModel)]="newDay.date" [ngModelOptions]="{ standalone: true }"></app-date-input>
           </div>
           <div>
             <label class="field-label">{{ 'SPACE_CAT.CATEGORY' | translate }}</label>
