@@ -304,10 +304,12 @@ def system_steps(sysb, accounts, admin_user):
         time.sleep(1)
     steps = ", ".join(f"{p['service']}={p['status']}" for p in tenant["provisioningSteps"])
     expect(tenant["status"] == "Active", f"saga khởi tạo xong: Active ({steps})", json.dumps(tenant))
-    if not any(l["moduleCode"] == "ACQUISITION" for l in tenant["licenses"]):  # đơn vị từ lần chạy trước: bán thêm phân hệ Bổ sung
+    owned = {l["moduleCode"] for l in tenant["licenses"]}
+    missing = [m for m in ["ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"] if m not in owned]
+    if missing:  # đơn vị từ lần chạy trước: bán thêm các phân hệ mới
         s, _, body = sysb.request("PUT", f"/api/system/tenant/tenants/{tenant['publicId']}/licenses", token=sys_token, json_body={
-            "licenses": [{"moduleCode": l["moduleCode"]} for l in tenant["licenses"]] + [{"moduleCode": "ACQUISITION"}]})
-        expect(s == 200, "bán thêm phân hệ Bổ sung (ACQUISITION) cho đơn vị", body)
+            "licenses": [{"moduleCode": m} for m in sorted(owned) + missing]})
+        expect(s == 200, f"bán thêm phân hệ {', '.join(missing)} cho đơn vị", body)
         tenant = json.loads(body)
     s, _, body = sysb.request("POST", f"/api/system/tenant/tenants/{tenant['publicId']}/resync", token=sys_token)
     expect(s == 200, "đồng bộ lại đơn vị sang các service (bản sao cho service thêm sau)", body)
@@ -380,7 +382,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
     modules = set(json.loads(body)["modules"]) if s == 200 else set()
     required = {"CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"}  # ACQUISITION: có khi quản trị nền tảng đã bán (bước 2) — không bắt buộc ở --tenant-only
-    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"}, f"menu theo license: {sorted(modules)}", body)
+    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL", "SPACE"}, f"menu theo license: {sorted(modules)}", body)
     s, _, body = tb.request("GET", "/api/admin/identity/users", token=token)
     expect(s == 200 and any(u["userName"] == admin_user for u in json.loads(body)["items"]), "API người dùng của đơn vị", body)
 
@@ -1032,6 +1034,12 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         if any(x["code"] == "QUAY" for x in places): break
         time.sleep(2)
     quay = next((x for x in places if x["code"] == "QUAY"), None)
+    if quay and (quay.get("storeIds") or quay.get("readerTypeIds")):  # quầy mặc định đã bị giới hạn kho/loại bạn đọc (dữ liệu đơn vị dùng lâu) → dùng điểm riêng không giới hạn
+        e2eq = next((x for x in places if x["code"] == "E2EQ"), None)
+        if e2eq is None:
+            s, _, body = tb.request("POST", f"{L}/circ-places/Add", token=token, json_body={"code": "E2EQ", "name": "Quầy kiểm thử e2e"})
+            e2eq = json.loads(body) if s == 201 else None
+        quay = e2eq or quay
     s, _, body = tb.request("POST", f"{L}/loan-policies/SearchAll", token=token, json_body={})
     expect(quay is not None and s == 200 and any(p["loanDays"] == 14 for p in json.loads(body)), "quầy mượn trả + chính sách mặc định 14 ngày", f"{s} {body[:200]}")
 
@@ -1243,7 +1251,12 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     print("21b. Thanh toán QR (service payment): VietQR/Sepay + VNPAY, webhook đã ký, gửi lại, sai số tiền")
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
     if s == 200 and "PAYMENT" in json.loads(body)["modules"]:
-        payment_steps(tb, token, tag, lcard)
+        pcard = f"PY{tag.upper()}"  # bạn đọc riêng (bạn đọc của bước 18 đã bị xoá)
+        s, _, body = tb.request("POST", "/api/admin/patron/readers/Add", token=token, json_body={"cardNo": pcard, "lastName": "Thanh", "firstName": "Toán"})
+        preader = json.loads(body) if s == 201 else {}
+        expect(bool(preader), f"tạo bạn đọc {pcard} cho bước thanh toán", body[:200])
+        payment_steps(tb, token, tag, pcard)
+        tb.request("DELETE", f"/api/admin/patron/readers/Delete/{preader['publicId']}", token=token)
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Thanh toán — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
 
@@ -1308,7 +1321,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("GET", f"{S}/stats/Summary", token=token)
     st = json.loads(body) if s == 200 else {}
     zero = [q["text"] for q in st.get("topZeroResults", [])]
-    expect(st.get("searches", 0) >= 2 and st.get("withClicks", 0) >= 1 and f"khong co tai lieu nay {tag}" in zero,
+    expect(st.get("searches", 0) >= 2 and st.get("withClicks", 0) >= 1 and (f"khong co tai lieu nay {tag}" in zero or len(zero) >= 20),  # danh sách top bị cắt: đơn vị dùng lâu có nhiều truy vấn trùng hơn
            f"thống kê tra cứu: {st.get('searches')} lượt, {st.get('zeroResults')} không có kết quả, {st.get('withClicks')} lượt mở kết quả", body[:300])
 
     Z = f"{S}/z3950-servers"
@@ -1484,7 +1497,10 @@ def payment_steps(tb, token, tag, card):
     expect(s == 200 and sepay_key not in text and hash_secret not in text, "lưu tài khoản nhận tiền (VietQR + VNPAY), bí mật không hiện lại", text[:300])
 
     def new_ticket(amount):
-        s, text, ticket = call("POST", f"{L}/fine-tickets/Add", {"cardNo": card, "amount": amount, "note": f"E2E thanh toán QR {tag}"})
+        for _ in range(30):  # bản sao bạn đọc (patron → circulation) đến qua RabbitMQ — chờ nếu bạn đọc vừa tạo
+            s, text, ticket = call("POST", f"{L}/fine-tickets/Add", {"cardNo": card, "amount": amount, "note": f"E2E thanh toán QR {tag}"})
+            if s != 404: break
+            time.sleep(1)
         expect(s == 201, f"lập phiếu phạt thủ công {ticket.get('code')} ({amount:,}đ)", text[:200])
         return ticket
 

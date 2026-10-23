@@ -28,6 +28,8 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    # 15 service × pool tối đa 8 = 120 kết nối; mặc định Npgsql 100/service từng làm cạn 100 slot (53300) khi chạy e2e.
+    command: ["postgres", "-c", "max_connections=200"]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?chạy ./init-env.sh trước}
@@ -154,7 +156,7 @@ services:
       rabbitmq: { condition: service_healthy }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__IdentityDb: Host=postgres;Database=elib_identity;Username=identity_app;Password=${IDENTITY_DB_PASSWORD}
+      ConnectionStrings__IdentityDb: Host=postgres;Database=elib_identity;Username=identity_app;Password=${IDENTITY_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       # Issuer là URL công khai — trùng với host trình duyệt dùng để đăng nhập.
       # Sau nginx có TLS: IDENTITY_ISSUER=https://<DEV_DOMAIN>/ (xem README, mục "Tên miền thật").
@@ -208,7 +210,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__TenantDb: Host=postgres;Database=elib_tenant;Username=tenant_app;Password=${TENANT_DB_PASSWORD}
+      ConnectionStrings__TenantDb: Host=postgres;Database=elib_tenant;Username=tenant_app;Password=${TENANT_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_TENANT_SECRET}
       # Provisioning chỉ chờ TenantSeeded từ các service đang chạy trong môi trường này.
@@ -240,7 +242,7 @@ services:
       mailpit: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__NotificationDb: Host=postgres;Database=elib_notification;Username=notification_app;Password=${NOTIFICATION_DB_PASSWORD}
+      ConnectionStrings__NotificationDb: Host=postgres;Database=elib_notification;Username=notification_app;Password=${NOTIFICATION_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_NOTIFICATION_SECRET}
       # SMTP nền tảng của DEV = Mailpit (thư không ra internet).
@@ -263,7 +265,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__AuditDb: Host=postgres;Database=elib_audit;Username=audit_app;Password=${AUDIT_DB_PASSWORD}
+      ConnectionStrings__AuditDb: Host=postgres;Database=elib_audit;Username=audit_app;Password=${AUDIT_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_AUDIT_SECRET}
       Audit__RetentionDays: "365"
@@ -282,7 +284,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__MediaDb: Host=postgres;Database=elib_media;Username=media_app;Password=${MEDIA_DB_PASSWORD}
+      ConnectionStrings__MediaDb: Host=postgres;Database=elib_media;Username=media_app;Password=${MEDIA_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       # Endpoint phải trùng địa chỉ cluster "minio" của gateway: URL ký cho host này, gateway chuyển tiếp với đúng Host đó.
       Storage__Endpoint: minio:9000
@@ -304,7 +306,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__PatronDb: Host=postgres;Database=elib_patron;Username=patron_app;Password=${PATRON_DB_PASSWORD}
+      ConnectionStrings__PatronDb: Host=postgres;Database=elib_patron;Username=patron_app;Password=${PATRON_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PATRON_SECRET}
       Media__Url: http://media:8080
@@ -327,7 +329,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__CatalogDb: Host=postgres;Database=elib_catalog;Username=catalog_app;Password=${CATALOG_DB_PASSWORD}
+      ConnectionStrings__CatalogDb: Host=postgres;Database=elib_catalog;Username=catalog_app;Password=${CATALOG_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_CATALOG_SECRET}
 
@@ -346,7 +348,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__HoldingsDb: Host=postgres;Database=elib_holdings;Username=holdings_app;Password=${HOLDINGS_DB_PASSWORD}
+      ConnectionStrings__HoldingsDb: Host=postgres;Database=elib_holdings;Username=holdings_app;Password=${HOLDINGS_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_HOLDINGS_SECRET}
       Catalog__Url: http://catalog:8080
@@ -366,7 +368,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__AcquisitionDb: Host=postgres;Database=elib_acquisition;Username=acquisition_app;Password=${ACQUISITION_DB_PASSWORD}
+      ConnectionStrings__AcquisitionDb: Host=postgres;Database=elib_acquisition;Username=acquisition_app;Password=${ACQUISITION_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
       Catalog__Url: http://catalog:8080
@@ -387,7 +389,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__CirculationDb: Host=postgres;Database=elib_circulation;Username=circulation_app;Password=${CIRCULATION_DB_PASSWORD}
+      ConnectionStrings__CirculationDb: Host=postgres;Database=elib_circulation;Username=circulation_app;Password=${CIRCULATION_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_CIRCULATION_SECRET}
       Patron__Url: http://patron:8080
@@ -413,7 +415,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__SearchDb: Host=postgres;Database=elib_search;Username=search_app;Password=${SEARCH_DB_PASSWORD}
+      ConnectionStrings__SearchDb: Host=postgres;Database=elib_search;Username=search_app;Password=${SEARCH_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_SEARCH_SECRET}
       Catalog__Url: http://catalog:8080
@@ -436,7 +438,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__DigitalDb: Host=postgres;Database=elib_digital;Username=digital_app;Password=${DIGITAL_DB_PASSWORD}
+      ConnectionStrings__DigitalDb: Host=postgres;Database=elib_digital;Username=digital_app;Password=${DIGITAL_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_DIGITAL_SECRET}
       Patron__Url: http://patron:8080
@@ -458,7 +460,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__SpaceDb: Host=postgres;Database=elib_space;Username=space_app;Password=${SPACE_DB_PASSWORD}
+      ConnectionStrings__SpaceDb: Host=postgres;Database=elib_space;Username=space_app;Password=${SPACE_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_SPACE_SECRET}
       Patron__Url: http://patron:8080
@@ -478,7 +480,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__PaymentDb: Host=postgres;Database=elib_payment;Username=payment_app;Password=${PAYMENT_DB_PASSWORD}
+      ConnectionStrings__PaymentDb: Host=postgres;Database=elib_payment;Username=payment_app;Password=${PAYMENT_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PAYMENT_SECRET}
 
@@ -497,7 +499,7 @@ services:
       identity: { condition: service_started }
     environment:
       <<: *dotnet-env
-      ConnectionStrings__PortalDb: Host=postgres;Database=elib_portal;Username=portal_app;Password=${PORTAL_DB_PASSWORD}
+      ConnectionStrings__PortalDb: Host=postgres;Database=elib_portal;Username=portal_app;Password=${PORTAL_DB_PASSWORD};Maximum Pool Size=8
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PORTAL_SECRET}
 
