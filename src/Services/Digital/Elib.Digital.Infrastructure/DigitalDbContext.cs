@@ -195,6 +195,23 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.HasIndex(x => new { x.TenantId, x.At });
         });
 
+        modelBuilder.Entity<EbookContentState>(e =>
+        {
+            e.ToTable("ebook_content_states");
+            e.Property(x => x.Status).HasMaxLength(10);
+            e.Property(x => x.Error).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId }).IsUnique().HasFilter("is_deleted = false");
+            e.HasIndex(x => new { x.Status, x.RequestedAt });
+        });
+
+        modelBuilder.Entity<EbookChunk>(e =>
+        {
+            e.ToTable("ebook_chunks");
+            e.Property(x => x.Text).HasMaxLength(EbookChunk.MaxTextLength);
+            e.Property(x => x.SearchText).HasMaxLength(EbookChunk.MaxTextLength);
+            e.HasIndex(x => new { x.TenantId, x.EbookItemId, x.Ordinal });
+        });
+
         modelBuilder.Entity<MetadataSchema>(e =>
         {
             e.ToTable("metadata_schemas");

@@ -5,6 +5,8 @@ using Elib.BuildingBlocks.Tenancy;
 using Elib.Contracts.Events.Digital;
 using Elib.Contracts.Events.Platform;
 using Elib.Digital.Application;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Elib.Digital.Api;
 
@@ -15,6 +17,9 @@ namespace Elib.Digital.Api;
 public static class DigitalEndpoints
 {
     public const string Module = "DIGITAL";
+
+    /// <summary>Trần dung lượng gói ZIP nhập DSpace (nginx và gateway phải cho phép bằng hoặc lớn hơn).</summary>
+    public const long MaxDspaceUploadBytes = 512L * 1024 * 1024;
 
     private static ItemImportDefaults ImportDefaults(IFormCollection form)
     {
@@ -103,6 +108,35 @@ public static class DigitalEndpoints
                 foreach (var (_, stream) in files) await stream.DisposeAsync();
             }
         }).DisableAntiforgery();
+
+        // Công cụ nhập liệu (LRC: tra ISBN, "Gợi ý AI") và khả năng tích hợp đang bật để giao diện ẩn nút của dịch vụ chưa cấu hình.
+        items.MapGet("/Capabilities", [Permission("DIGITAL_ITEMS", "view")] (EbookItemTools t) => t.Capabilities());
+        items.MapGet("/LookupIsbn", [PermissionAny("DIGITAL_ITEMS:add", "DIGITAL_ITEMS:edit")] (string? isbn, EbookItemTools t, CancellationToken ct)
+            => t.LookupIsbnAsync(isbn, ct));
+        items.MapPost("/SuggestClassification", [PermissionAny("DIGITAL_ITEMS:add", "DIGITAL_ITEMS:edit")] (SuggestClassificationRequest request, EbookItemTools t, CancellationToken ct)
+            => t.SuggestAsync(request, ct));
+
+        // Đồng bộ nội dung (trích chữ PDF + vector hóa chạy nền) và trạng thái.
+        items.MapPost("/SyncContent", [Permission("DIGITAL_ITEMS", "edit")] (ItemSelection selection, EbookItemResource r, CancellationToken ct)
+            => r.RequestContentSyncAsync(selection, ct));
+        // Cán bộ tìm trong nội dung: thấy cả tài liệu ẩn và mọi đoạn trích, và được dùng tìm theo ngữ nghĩa (cần Ollama).
+        items.MapPost("/SearchContent", [Permission("DIGITAL_ITEMS", "view")] (ContentSearchRequest request, OpacContentSearch search, CancellationToken ct)
+            => search.SearchAsync(request, staff: true, ct));
+        items.MapPost("/ContentStatus", [Permission("DIGITAL_ITEMS", "view")] (ContentStatusRequest request, EbookItemResource r, CancellationToken ct)
+            => r.ContentStatusAsync(request.PublicIds, ct));
+
+        // Gói DSpace Simple Archive: xuất kèm file PDF, nhập gói ZIP (metadata + file). Gói có thể lớn nên nâng trần thân yêu cầu cho riêng hai đường này.
+        items.MapPost("/ExportWithFiles", [Permission("DIGITAL_ITEMS", "view")] async (ItemExportRequest request, EbookItemResource r, TimeProvider clock, CancellationToken ct)
+            => Results.File(await r.ExportDspaceWithFilesAsync(request, ct), "application/zip", $"dspace-saf-{clock.GetUtcNow():yyyyMMddHHmmss}.zip"));
+        items.MapPost("/ImportDspace", [Permission("DIGITAL_ITEMS", "add")] async (HttpRequest http, EbookItemResource r, CancellationToken ct) =>
+        {
+            var form = await http.ReadFormAsync(ct);
+            var file = form.Files.GetFile("file") ?? throw new BusinessRuleException("IMPORT_FILE_EMPTY", "Chưa chọn gói ZIP.");
+            if (file.Length is 0 or > MaxDspaceUploadBytes)
+                throw new BusinessRuleException("IMPORT_FILE_SIZE", $"Gói rỗng hoặc lớn hơn {MaxDspaceUploadBytes / 1024 / 1024} MB.");
+            await using var content = file.OpenReadStream();
+            return await r.ImportDspaceAsync(content, ImportDefaults(form), ct);
+        }).DisableAntiforgery().WithMetadata(new RequestSizeLimitAttribute(MaxDspaceUploadBytes), new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxDspaceUploadBytes });
 
         // Ô chọn liên kết sách in của màn thêm/sửa tài liệu số (quyết định #2) — proxy sang catalog, không giữ bản sao.
         items.MapGet("/bib-options", [Permission("DIGITAL_ITEMS", "view")] (string? q, ICatalogBibLookup bibs, CancellationToken ct) =>

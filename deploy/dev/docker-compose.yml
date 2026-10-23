@@ -444,6 +444,13 @@ services:
       Patron__Url: http://patron:8080
       Catalog__Url: http://catalog:8080
       Media__Url: http://media:8080
+      # Tích hợp ngoài của màn Tài liệu số — TẮT khi để trống. Đặt trong .env trên máy DEV (không ghi vào file nào của repo):
+      #   DIGITAL_AI_API_KEY    khóa Gemini cho "Gợi ý AI" phân loại (https://generativelanguage.googleapis.com)
+      #   DIGITAL_OLLAMA_URL    địa chỉ Ollama gọi được từ container, vd http://10.0.0.5:11434, để vector hóa nội dung (nomic-embed-text)
+      Digital__Ai__ApiKey: ${DIGITAL_AI_API_KEY:-}
+      Digital__Ai__Model: ${DIGITAL_AI_MODEL:-gemini-3.1-flash-lite}
+      Digital__Ollama__BaseUrl: ${DIGITAL_OLLAMA_URL:-}
+      Digital__Ollama__EmbeddingModel: ${DIGITAL_OLLAMA_MODEL:-nomic-embed-text}
 
   # GĐ2: không gian & mượn phòng — sơ đồ tầng trực quan, đặt phòng, kiểm soát cửa RFID; bản sao bạn đọc (thiếu thì hỏi patron).
   space:

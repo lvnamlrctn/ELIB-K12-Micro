@@ -4384,6 +4384,27 @@
     "PERMISSION_SAVED": "Đã lưu phân quyền",
     "BULK_PUBLISH": "Xuất bản ({{count}})",
     "BULK_HIDE": "Ẩn ({{count}})",
-    "BULK_STATUS_DONE": "Đã đổi trạng thái các tài liệu đã chọn"
+    "BULK_STATUS_DONE": "Đã đổi trạng thái các tài liệu đã chọn",
+    "EXPORT_WITH_FILES": "Xuất Metadata kèm file",
+    "EXPORT_WITH_FILES_HINT": "Gói DSpace gồm metadata và các file PDF (tối đa 200 tài liệu, 1.000 file một lần).",
+    "SYNC_CONTENT": "Đồng bộ nội dung ({{count}})",
+    "SYNC_QUEUED": "Đã đưa {{count}} tài liệu vào hàng đợi đồng bộ nội dung",
+    "SYNC_SKIPPED_TITLE": "Tài liệu chưa đồng bộ được",
+    "SYNC_SKIPPED_HINT": "Các tài liệu sau chưa được đưa vào hàng đợi:",
+    "CONTENT_PENDING": "Chờ đồng bộ nội dung",
+    "CONTENT_RUNNING": "Đang đồng bộ nội dung",
+    "CONTENT_DONE": "Đã lập chỉ mục {{count}} đoạn",
+    "CONTENT_NO_TEXT": "PDF không có chữ (chưa hỗ trợ OCR)",
+    "CONTENT_FAILED": "Đồng bộ nội dung lỗi",
+    "ISBN_LOOKUP": "Tra ISBN",
+    "ISBN_FILLED": "Đã điền thông tin từ {{source}}",
+    "ISBN_NOT_FOUND": "Không tìm thấy sách với ISBN này",
+    "ISBN_NEEDS_VALUE": "Nhập ISBN trước khi tra",
+    "AI_SUGGEST": "Gợi ý AI",
+    "AI_APPLIED": "Đã áp dụng gợi ý của AI",
+    "AI_NEEDS_TITLE": "Nhập nhan đề trước khi nhờ AI gợi ý",
+    "AI_NOTHING": "AI không đưa ra gợi ý nào",
+    "IMPORT_HINT_DSPACE": "Một file .zip theo chuẩn DSpace Simple Archive: mỗi thư mục là một tài liệu gồm dublin_core.xml, contents (tuỳ chọn) và các file PDF. File khác PDF bị bỏ qua.",
+    "IMPORT_PICK_DSPACE": "Click để chọn file .zip"
   }
 }

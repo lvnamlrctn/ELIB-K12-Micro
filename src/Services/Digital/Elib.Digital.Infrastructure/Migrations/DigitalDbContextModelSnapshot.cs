@@ -393,6 +393,95 @@ namespace Elib.Digital.Infrastructure.Migrations
                     b.ToTable("ebook_bookmarks", (string)null);
                 });
 
+            modelBuilder.Entity("Elib.Digital.Domain.EbookChunk", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<long>("EbookItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ebook_item_id");
+
+                    b.PrimitiveCollection<float[]>("Embedding")
+                        .HasColumnType("real[]")
+                        .HasColumnName("embedding");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int>("Page")
+                        .HasColumnType("integer")
+                        .HasColumnName("page");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("search_text");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ebook_chunks");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_chunks_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_ebook_chunks_tenant_id");
+
+                    b.HasIndex("TenantId", "EbookItemId", "Ordinal")
+                        .HasDatabaseName("ix_ebook_chunks_tenant_id_ebook_item_id_ordinal");
+
+                    b.ToTable("ebook_chunks", (string)null);
+                });
+
             modelBuilder.Entity("Elib.Digital.Domain.EbookCollection", b =>
                 {
                     b.Property<long>("Id")
@@ -497,6 +586,111 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasDatabaseName("ix_ebook_collections_tenant_id_parent_id");
 
                     b.ToTable("ebook_collections", (string)null);
+                });
+
+            modelBuilder.Entity("Elib.Digital.Domain.EbookContentState", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ChunkCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("chunk_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<long?>("DeletedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<long>("EbookItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ebook_item_id");
+
+                    b.Property<int>("EmbeddedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("embedded_count");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("PageCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_count");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ebook_content_states");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_content_states_public_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_ebook_content_states_tenant_id");
+
+                    b.HasIndex("Status", "RequestedAt")
+                        .HasDatabaseName("ix_ebook_content_states_status_requested_at");
+
+                    b.HasIndex("TenantId", "EbookItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_content_states_tenant_id_ebook_item_id")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("ebook_content_states", (string)null);
                 });
 
             modelBuilder.Entity("Elib.Digital.Domain.EbookDigType", b =>

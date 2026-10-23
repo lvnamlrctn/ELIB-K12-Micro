@@ -46,6 +46,25 @@ public static class MediaEndpoints
                 return await s.DownloadEbookFileAsync(id, ct);
         }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
 
+        // Nội bộ: digital đọc/ghi luồng file tài liệu số (lập chỉ mục nội dung, xuất/nhập gói DSpace) — chỉ purpose ebook-file, chỉ service token.
+        app.MapGet("/internal/tenants/{tenantId:long}/ebook-files/{id:guid}/content", async (long tenantId, Guid id, ITenantContext tenant, MediaService s, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+            {
+                var (content, contentType) = await s.OpenEbookFileAsync(id, ct);
+                return Results.Stream(content, contentType);
+            }
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+        app.MapPost("/internal/tenants/{tenantId:long}/ebook-files", async (long tenantId, string? fileName, HttpRequest request, MediaService s, CancellationToken ct) =>
+        {
+            var size = request.ContentLength ?? 0;
+            if (size <= 0) throw new BusinessRuleException("MEDIA_LENGTH_REQUIRED", "Thiếu Content-Length của file.");
+            if (request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+                limit.MaxRequestBodySize = size;
+            var file = await s.UploadEbookFileAsync(tenantId, fileName ?? "", size, request.Body, ct);
+            return Results.Ok(new { fileId = file.Id });
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
         // Nội bộ: digital xin vé upload hộ bạn đọc đã tự xác thực (nộp tài liệu qua OPAC) — chỉ mục đích ServiceRequestable
         // (MediaService tự kiểm), và hoàn tất bằng chính CompleteSystemAsync đã có (chuyển ngữ cảnh đơn vị rồi complete như
         // thường, không cần thêm một bản sao logic complete riêng).

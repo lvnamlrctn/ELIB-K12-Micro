@@ -55,7 +55,8 @@ public sealed record EbookItemDto(
     IReadOnlyList<EbookIdentifier> Identifiers, int TotalFile);
 
 /// <summary>Tài liệu số (LRC: EbookItemController, quyền DIGITAL_ITEMS) — trang quản trị bespoke (có file đính kèm + liên kết sách in).</summary>
-public sealed partial class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock, EbookStatePublisher states)
+public sealed partial class EbookItemResource(
+    ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock, EbookStatePublisher states, IMediaFileStore store)
     : CrudResource<EbookItemResource, EbookItem, EbookItemSearch, EbookItemFields, EbookItemDto>(db)
 {
     private readonly DigitalOptions _options = options.Value;

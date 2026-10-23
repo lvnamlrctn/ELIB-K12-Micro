@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -5,6 +6,7 @@ import { Api, BibLinkOption, EbookItem, MetadataField, STATUS_ACTIVE, STATUS_INA
 import { ToastrService } from '../../shared/toastr';
 import { Modal } from '../../shared/ui';
 import { ItemCover } from './item-cover';
+import { ItemCapabilities, ItemsApi } from './items-api';
 import { OptionItem, TOGGLE_CLASS } from './item-tools';
 
 interface PersonRow { last: string; first: string; title: string; }
@@ -191,7 +193,13 @@ const blank = (): Form => ({
         </div>
 
         <div>
-          <label [class]="label">{{ 'DIGITAL_DOC.KEYWORDS' | translate }}</label>
+          <div class="flex items-center justify-between">
+            <label [class]="label">{{ 'DIGITAL_DOC.KEYWORDS' | translate }}</label>
+            @if (caps()?.ai) {
+              <button type="button" class="mb-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-600 text-white text-xs hover:bg-violet-700 disabled:opacity-50" [disabled]="suggesting()" (click)="suggest(f)">
+                <span class="material-icons text-[15px]" [class.animate-spin]="suggesting()">{{ suggesting() ? 'autorenew' : 'auto_awesome' }}</span> {{ 'DIGITAL_DOC.AI_SUGGEST' | translate }}</button>
+            }
+          </div>
           @for (k of f.keywords; track $index) {
             <div class="flex gap-2 mb-1.5">
               <input class="input" [name]="'kw' + $index" [(ngModel)]="f.keywords[$index]" [attr.aria-label]="'DIGITAL_DOC.KEYWORDS' | translate" />
@@ -208,6 +216,10 @@ const blank = (): Form => ({
               <select class="input col-span-3" [name]="'it' + $index" [(ngModel)]="n.type" [attr.aria-label]="'DIGITAL_DOC.NUMBERS' | translate">@for (t of idTypes; track t.value) { <option [value]="t.value">{{ t.label }}</option> }</select>
               <input class="input col-span-7" [name]="'iv' + $index" [(ngModel)]="n.value" maxlength="300" [placeholder]="'DIGITAL_DOC.VALUE_PH' | translate" [attr.aria-label]="'DIGITAL_DOC.VALUE_PH' | translate" />
               <div class="col-span-2 flex">
+                @if (n.type === 'isbn' && caps()?.isbn) {
+                  <button type="button" class="icon-btn text-violet-600" [disabled]="lookingUp()" (click)="lookupIsbn(f, n)" [title]="'DIGITAL_DOC.ISBN_LOOKUP' | translate">
+                    <span class="material-icons text-[18px]" [class.animate-spin]="lookingUp()">{{ lookingUp() ? 'autorenew' : 'travel_explore' }}</span></button>
+                }
                 @if (f.identifiers.length > 1) { <button type="button" class="icon-btn text-red-600" (click)="f.identifiers.splice($index, 1)" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[18px]">remove_circle</span></button> }
                 @if ($last) { <button type="button" class="icon-btn text-blue-600" (click)="f.identifiers.push({ type: 'issn', value: '' })" [title]="'COMMON.ADD_BTN' | translate"><span class="material-icons text-[18px]">add_circle</span></button> }
               </div>
@@ -259,6 +271,7 @@ const blank = (): Form => ({
 export class ItemForm implements OnInit {
   private readonly api = inject(Api);
   private readonly toastr = inject(ToastrService);
+  private readonly itemsApi = inject(ItemsApi);
   private readonly client = this.api.crud<EbookItem>('items', 'digital');
 
   /** Tài liệu đang sửa; bỏ trống = thêm mới. */
@@ -282,12 +295,16 @@ export class ItemForm implements OnInit {
   protected readonly saving = signal(false);
   protected readonly uploadingCover = signal(false);
   protected readonly coverDialog = signal(false);
+  protected readonly caps = signal<ItemCapabilities | null>(null);
+  protected readonly lookingUp = signal(false);
+  protected readonly suggesting = signal(false);
   protected readonly metaFields = signal<MetadataField[]>([]);
   protected metaRows: MetaRow[] = [];
   protected bibQuery = '';
   protected readonly bibResults = signal<BibLinkOption[]>([]);
 
   ngOnInit(): void {
+    this.itemsApi.capabilities().then((c) => this.caps.set(c)).catch(() => this.caps.set(null)); // thiếu quyền xem → ẩn nút tích hợp
     const it = this.item();
     if (!it) return;
     const people = (list: { last: string | null; first: string | null; title?: string | null }[]): PersonRow[] =>
@@ -332,6 +349,63 @@ export class ItemForm implements OnInit {
       this.toastr.error(errorMessage(e));
     } finally {
       this.uploadingCover.set(false);
+    }
+  }
+
+  /** Điền thông tin từ ISBN (Google Books / Open Library): chỉ điền các ô còn trống, không ghi đè công sức đã nhập. */
+  protected async lookupIsbn(f: Form, row: IdRow): Promise<void> {
+    const isbn = row.value.trim();
+    if (!isbn) {
+      this.toastr.warning('DIGITAL_DOC.ISBN_NEEDS_VALUE');
+      return;
+    }
+    this.lookingUp.set(true);
+    try {
+      const m = await this.itemsApi.lookupIsbn(isbn);
+      if (!f.title.trim() && m.title) f.title = m.subtitle ? `${m.title}: ${m.subtitle}` : m.title;
+      if (!f.authors.some((a) => a.last.trim() || a.first.trim()) && m.authors.length) f.authors = m.authors.map((name) => ({ last: name, first: '', title: '' }));
+      if (!f.publisher.trim() && m.publisher) f.publisher = m.publisher;
+      const year = /\d{4}/.exec(m.publishDate ?? '');
+      if (!f.publishYear.trim() && year) f.publishYear = year[0];
+      if (!f.page.trim() && m.pages) f.page = String(m.pages);
+      if (!f.abstract.trim() && m.description) f.abstract = m.description;
+      if (m.language && LANGUAGES.some((l) => l.value === m.language)) f.language = m.language;
+      if (!f.keywords.some((k) => k.trim()) && m.categories.length) f.keywords = m.categories.slice(0, 6);
+      this.form.set({ ...f });
+      this.toastr.success('DIGITAL_DOC.ISBN_FILLED', { source: m.source });
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && e.status === 404) this.toastr.warning('DIGITAL_DOC.ISBN_NOT_FOUND');
+      else this.toastr.error(errorMessage(e));
+    } finally {
+      this.lookingUp.set(false);
+    }
+  }
+
+  /** Gợi ý chủ đề / nhóm ngành / từ khoá bằng AI từ nhan đề + tóm tắt; người dùng vẫn chỉnh được trước khi lưu. */
+  protected async suggest(f: Form): Promise<void> {
+    if (!f.title.trim()) {
+      this.toastr.warning('DIGITAL_DOC.AI_NEEDS_TITLE');
+      return;
+    }
+    this.suggesting.set(true);
+    try {
+      const s = await this.itemsApi.suggestClassification(f.title.trim(), (f.abstract || f.description).trim() || null);
+      let changed = false;
+      if (s.subjectId != null) { f.subjectId = s.subjectId; changed = true; }
+      if (s.topicId != null) { f.topicId = s.topicId; changed = true; }
+      const have = new Set(f.keywords.map((k) => k.trim().toLowerCase()).filter(Boolean));
+      const fresh = s.keywords.filter((k) => !have.has(k.trim().toLowerCase()));
+      if (fresh.length) {
+        f.keywords = [...f.keywords.filter((k) => k.trim()), ...fresh];
+        changed = true;
+      }
+      this.form.set({ ...f });
+      if (changed) this.toastr.success('DIGITAL_DOC.AI_APPLIED');
+      else this.toastr.info('DIGITAL_DOC.AI_NOTHING');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.suggesting.set(false);
     }
   }
 

@@ -231,6 +231,32 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
         return new DownloadDto(await storage.PresignGetAsync(file.Bucket, file.ObjectKey, expiry), clock.GetUtcNow() + expiry);
     }
 
+    /// <summary>
+    /// Luồng nội dung file tài liệu số cho digital (service token): lập chỉ mục nội dung, xuất gói DSpace kèm file. CHỈ mục đích ebook-file đã xong của đơn vị hiện tại —
+    /// digital tự kiểm quyền (cán bộ có DIGITAL_ITEMS) trước khi gọi; ở đây không cấp nội dung của loại file khác.
+    /// </summary>
+    public async Task<(Stream Content, string ContentType)> OpenEbookFileAsync(Guid fileId, CancellationToken ct)
+    {
+        var file = await FindAsync(fileId, ct);
+        if (file.Status != MediaFileStatus.Ready || file.Purpose != MediaPurpose.EbookFile.Code) throw new NotFoundException("file", fileId);
+        var stream = await storage.OpenReadAsync(file.Bucket, file.ObjectKey, ct) ?? throw new NotFoundException("file", fileId);
+        return (stream, file.ContentType);
+    }
+
+    /// <summary>
+    /// Digital tải thẳng một PDF lên (nhập gói DSpace): tạo bản ghi chờ, ghi nội dung theo luồng rồi hoàn tất như upload thường (kiểm dung lượng + magic bytes).
+    /// Chỉ mục đích ebook-file; dung lượng khai báo phải khớp thực tế (kho từ chối nếu luồng ngắn/dài hơn khai báo).
+    /// </summary>
+    public async Task<MediaFileDto> UploadEbookFileAsync(long tenantId, string fileName, long size, Stream content, CancellationToken ct)
+    {
+        using var _ = tenant.Use(tenantId);
+        var file = MediaFile.Create(tenantId, MediaPurpose.EbookFile, fileName, "application/pdf", size, _options.PrivateBucket, clock.GetUtcNow());
+        db.Files.Add(file);
+        await db.SaveChangesAsync(ct);
+        await storage.PutStreamAsync(file.Bucket, file.ObjectKey, content, size, "application/pdf", ct);
+        return await CompleteAsync(file.PublicId, ct);
+    }
+
     public const int MaxUrlsPerCall = 100;
 
     /// <summary>

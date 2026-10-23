@@ -338,7 +338,11 @@
       "SUBMIT_REVIEW": "Submit review",
       "REVIEW_SUBMITTED": "Review submitted, pending approval.",
       "MY_FAVORITES": "Favorite digital items",
-      "NO_FAVORITES": "You have no favorite digital items."
+      "NO_FAVORITES": "You have no favorite digital items.",
+      "IN_CONTENT": "Search inside documents",
+      "IN_CONTENT_PAGE": "Page {{page}}",
+      "IN_CONTENT_LOCKED": "This document needs borrowing or a sign-in — open it to read the content.",
+      "IN_CONTENT_MIN": "Enter at least 2 characters to search inside documents."
     },
     "SUBMIT_DOC": {
       "TITLE": "Submit a document",

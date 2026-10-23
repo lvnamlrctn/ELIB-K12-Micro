@@ -34,6 +34,10 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
     public FakeCatalogBibLookup CatalogBibs { get; } = new();
     public FakeMediaFileAccess Media { get; } = new();
     public FakeMediaUploadTicket Uploads { get; } = new();
+    public FakeIsbnLookup Isbn { get; } = new();
+    public FakeClassificationAi Ai { get; } = new();
+    public FakeTextEmbedder Embedder { get; } = new();
+    public FakeMediaFileStore Store { get; } = new();
 
     /// <summary>Đồng hồ của service — test tua tới để có lượt hết hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
@@ -72,6 +76,14 @@ public sealed class DigitalApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IMediaFileAccess>(Media);
             services.RemoveAll<IMediaUploadTicket>();
             services.AddSingleton<IMediaUploadTicket>(Uploads);
+            services.RemoveAll<IIsbnLookup>();
+            services.AddSingleton<IIsbnLookup>(Isbn);
+            services.RemoveAll<IClassificationAi>();
+            services.AddSingleton<IClassificationAi>(Ai);
+            services.RemoveAll<ITextEmbedder>();
+            services.AddSingleton<ITextEmbedder>(Embedder);
+            services.RemoveAll<IMediaFileStore>();
+            services.AddSingleton<IMediaFileStore>(Store);
         });
     }
 
@@ -209,4 +221,84 @@ public sealed class TestClock(DateTimeOffset start) : TimeProvider
     public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref _ticks), TimeSpan.Zero);
 
     public void Advance(TimeSpan by) => Interlocked.Add(ref _ticks, by.Ticks);
+}
+
+/// <summary>Tra ISBN giả: test đặt sẵn sách "tìm được"; ISBN sai định dạng bị từ chối như bản thật.</summary>
+public sealed class FakeIsbnLookup : IIsbnLookup
+{
+    public ConcurrentDictionary<string, IsbnMetadata> Books { get; } = new();
+
+    public Task<IsbnMetadata?> FindAsync(string isbn, CancellationToken ct)
+    {
+        if (!IsbnFormat.TryNormalize(isbn, out var normalized))
+            throw new BusinessRuleException("ISBN_INVALID", "ISBN không hợp lệ (10 hoặc 13 chữ số, đúng chữ số kiểm).");
+        return Task.FromResult(Books.GetValueOrDefault(normalized));
+    }
+}
+
+/// <summary>AI giả: bật/tắt theo test, trả kết quả đặt sẵn và ghi lại lời gọi gần nhất.</summary>
+public sealed class FakeClassificationAi : IClassificationAi
+{
+    public bool IsEnabled { get; set; }
+    public ClassificationSuggestion? Result { get; set; }
+    public (string Title, string? Description, IReadOnlyList<ClassificationOption> Subjects, IReadOnlyList<ClassificationOption> Topics)? LastCall { get; private set; }
+
+    public bool Enabled => IsEnabled;
+
+    public Task<ClassificationSuggestion?> SuggestAsync(
+        string title, string? description, IReadOnlyList<ClassificationOption> subjects, IReadOnlyList<ClassificationOption> topics, CancellationToken ct)
+    {
+        LastCall = (title, description, subjects, topics);
+        return Task.FromResult(Result);
+    }
+}
+
+/// <summary>Vector hóa giả: băm từng từ vào 16 chiều rồi chuẩn hóa — hai văn bản chung từ thì gần nhau. <see cref="Fail"/> giả lập Ollama sập.</summary>
+public sealed class FakeTextEmbedder : ITextEmbedder
+{
+    public bool IsEnabled { get; set; }
+    public bool Fail { get; set; }
+    private int _calls;
+    public int Calls => _calls;
+
+    public bool Enabled => IsEnabled;
+
+    public Task<float[]> EmbedAsync(string text, bool query, CancellationToken ct)
+    {
+        Interlocked.Increment(ref _calls);
+        if (Fail) throw new HttpRequestException("Ollama sập (giả lập test).");
+        var vector = new float[16];
+        foreach (var word in text.ToLowerInvariant().Split([' ', '.', ',', '-'], StringSplitOptions.RemoveEmptyEntries))
+            vector[(word.Aggregate(17, (h, c) => (h * 31 + c) & 0x7fffffff)) % 16] += 1;
+        var norm = (float)Math.Sqrt(vector.Sum(v => v * v));
+        if (norm > 0) for (var i = 0; i < vector.Length; i++) vector[i] /= norm;
+        return Task.FromResult(vector);
+    }
+}
+
+/// <summary>Kho file giả cho đọc/ghi luồng: file đặt sẵn theo mã media; mã không có → NotFound như media thật.</summary>
+public sealed class FakeMediaFileStore : IMediaFileStore
+{
+    public ConcurrentDictionary<Guid, byte[]> Files { get; } = new();
+    public ConcurrentQueue<(string Name, long Size)> Uploaded { get; } = new();
+
+    public Guid Add(byte[] content)
+    {
+        var id = Guid.CreateVersion7();
+        Files[id] = content;
+        return id;
+    }
+
+    public Task<Stream> OpenReadAsync(Guid mediaFileId, CancellationToken ct) =>
+        Files.TryGetValue(mediaFileId, out var bytes) ? Task.FromResult<Stream>(new MemoryStream(bytes, writable: false)) : throw new NotFoundException("File", mediaFileId);
+
+    public async Task<Guid> UploadAsync(string fileName, long size, Stream content, CancellationToken ct)
+    {
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, ct);
+        if (buffer.Length != size) throw new BusinessRuleException("MEDIA_TOO_LARGE", "Dung lượng khai báo không khớp.");
+        if (buffer.Length < 5 || !buffer.ToArray().AsSpan(0, 4).SequenceEqual("%PDF"u8)) throw new BusinessRuleException("MEDIA_TYPE_INVALID", "Không phải PDF.");
+        Uploaded.Enqueue((fileName, size));
+        return Add(buffer.ToArray());
+    }
 }

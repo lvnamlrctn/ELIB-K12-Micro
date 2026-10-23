@@ -59,6 +59,12 @@ public interface IObjectStorage
 
     Task PutAsync(string bucket, string key, ReadOnlyMemory<byte> content, string contentType, CancellationToken cancellationToken);
 
+    /// <summary>Ghi object từ luồng có độ dài biết trước — không nạp cả nội dung vào bộ nhớ (file tài liệu tới hàng trăm MB).</summary>
+    Task PutStreamAsync(string bucket, string key, Stream content, long size, string contentType, CancellationToken cancellationToken);
+
+    /// <summary>Luồng đọc object; người gọi đóng luồng khi xong. null nếu object không tồn tại.</summary>
+    Task<Stream?> OpenReadAsync(string bucket, string key, CancellationToken cancellationToken);
+
     /// <summary>Xoá object; không lỗi nếu object không còn.</summary>
     Task DeleteAsync(string bucket, string key, CancellationToken cancellationToken);
 }
@@ -129,6 +135,53 @@ public sealed class MinioObjectStorage : IObjectStorage
         using var stream = new MemoryStream(content.ToArray(), writable: false);
         await _client.PutObjectAsync(new PutObjectArgs().WithBucket(bucket).WithObject(key)
             .WithStreamData(stream).WithObjectSize(stream.Length).WithContentType(contentType), cancellationToken);
+    }
+
+    public async Task PutStreamAsync(string bucket, string key, Stream content, long size, string contentType, CancellationToken cancellationToken) =>
+        await _client.PutObjectAsync(new PutObjectArgs().WithBucket(bucket).WithObject(key)
+            .WithStreamData(content).WithObjectSize(size).WithContentType(contentType), cancellationToken);
+
+    private static readonly HttpClient InternalHttp = new() { Timeout = Timeout.InfiniteTimeSpan };
+
+    /// <summary>Đọc qua URL ký ở địa chỉ nội bộ của MinIO (không đi qua gateway) để có luồng thật sự — client MinIO chỉ đưa luồng cho callback.</summary>
+    public async Task<Stream?> OpenReadAsync(string bucket, string key, CancellationToken cancellationToken)
+    {
+        var url = await _client.PresignedGetObjectAsync(new PresignedGetObjectArgs().WithBucket(bucket).WithObject(key).WithExpiry(Seconds(TimeSpan.FromMinutes(5))));
+        var response = await InternalHttp.GetAsync(new Uri(url), HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        return new DisposingStream(await response.Content.ReadAsStreamAsync(cancellationToken), response);
+    }
+
+    private sealed class DisposingStream(Stream inner, IDisposable owner) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override int Read(Span<byte> buffer) => inner.Read(buffer);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => inner.ReadAsync(buffer, cancellationToken);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+                owner.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     public Task DeleteAsync(string bucket, string key, CancellationToken cancellationToken) =>

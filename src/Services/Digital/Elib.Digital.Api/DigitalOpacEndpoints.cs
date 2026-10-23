@@ -18,6 +18,9 @@ public static class DigitalOpacEndpoints
         opac.MapPost("/items/Search", (OpacItemSearch search, OpacItems items, CancellationToken ct) => items.SearchAsync(search, ct));
         opac.MapGet("/items/{publicId:guid}", (Guid publicId, OpacItems items, CancellationToken ct) => items.GetAsync(publicId, ct));
 
+        // Tìm trong nội dung tài liệu (đã đồng bộ nội dung): từ khóa, hoặc ngữ nghĩa khi bật Ollama. Đoạn trích chỉ hiện với tài liệu công khai.
+        opac.MapPost("/content/search", (ContentSearchRequest request, OpacContentSearch search, CancellationToken ct) => search.SearchAsync(request, staff: false, ct));
+
         // URL đọc/tải file — token bạn đọc gắn kèm nếu có (route nằm trong READER_APIS) nhưng không bắt buộc: tài liệu miễn phí
         // (Free) đọc được không cần đăng nhập, còn lại EbookFileAccess tự đòi quyền mượn.
         opac.MapGet("/items/{publicId:guid}/files/{filePublicId:guid}/url",

@@ -25,6 +25,8 @@ export interface DigitalSearchRequest {
   keyword?: string | null; collectionId?: number | null; subjectId?: number | null; topicId?: number | null; typeId?: number | null;
   pageIndex?: number; pageSize?: number;
 }
+/** Một kết quả tìm trong nội dung: snippet chỉ có với tài liệu công khai (Free). */
+export interface DigitalContentHit { publicId: string; title: string; author: string | null; coverUrl: string | null; free: boolean; page: number; snippet: string | null; score: number; }
 export interface DigitalPage<T> { items: T[]; totalCount: number; pageIndex: number; pageSize: number; totalPages: number; }
 export interface DigitalFileUrl { url: string; expiresAt: string | null; }
 
@@ -71,6 +73,9 @@ export class DigitalApi {
 
   search(request: DigitalSearchRequest) {
     return firstValueFrom(this.http.post<DigitalPage<DigitalItemSummary>>('/api/opac/digital/browse/items/Search', request));
+  }
+  contentSearch(q: string) {
+    return firstValueFrom(this.http.post<DigitalContentHit[]>('/api/opac/digital/browse/content/search', { q, take: 20 }));
   }
   detail(publicId: string) {
     return firstValueFrom(this.http.get<DigitalItemDetail>(`/api/opac/digital/browse/items/${publicId}`));

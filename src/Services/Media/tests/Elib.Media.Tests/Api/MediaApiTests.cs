@@ -312,6 +312,36 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task Service_uploads_and_streams_back_an_ebook_pdf_but_not_other_purposes()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var service = _factory.CreateClient().WithClaims(TestClaims.Service);
+        var pdf = "%PDF-1.4 nội dung"u8.ToArray();
+
+        // Tải thẳng (nhập gói DSpace): media ghi, kiểm magic bytes, trả id file.
+        var upload = new ByteArrayContent(pdf);
+        var response = await service.PostAsync(U($"/internal/tenants/{tenantId}/ebook-files?fileName=sach.pdf"), upload);
+        var fileId = (await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("fileId").GetGuid();
+
+        var read = await service.GetAsync(U($"/internal/tenants/{tenantId}/ebook-files/{fileId}/content"));
+        Assert.Equal(pdf, await read.Content.ReadAsByteArrayAsync());
+        Assert.Equal("application/pdf", read.Content.Headers.ContentType?.MediaType);
+
+        // Đơn vị khác không đọc được; nội dung không phải PDF bị từ chối; file mục đích khác không đọc được qua đường này.
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{Interlocked.Increment(ref _nextTenantId)}/ebook-files/{fileId}/content"))).StatusCode);
+        var notPdf = await service.PostAsync(U($"/internal/tenants/{tenantId}/ebook-files?fileName=gia.pdf"), new ByteArrayContent("<html>x</html>"u8.ToArray()));
+        Assert.Equal((HttpStatusCode.BadRequest, "MEDIA_TYPE_INVALID"), (notPdf.StatusCode, await ErrorCode(notPdf)));
+        var photo = await Ticket(Staff(tenantId), "attachment", "image/png", PngBytes.Length, "tep.png");
+        _factory.Storage.Upload(photo.UploadUrl, PngBytes);
+        await Read<MediaFileDto>(await Staff(tenantId).PostAsync(U($"/api/files/{photo.FileId}/complete"), null));
+        Assert.Equal(HttpStatusCode.NotFound, (await service.GetAsync(U($"/internal/tenants/{tenantId}/ebook-files/{photo.FileId}/content"))).StatusCode);
+
+        // Token cán bộ không gọi được hai đường nội bộ này.
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId).GetAsync(U($"/internal/tenants/{tenantId}/ebook-files/{fileId}/content"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Staff(tenantId).PostAsync(U($"/internal/tenants/{tenantId}/ebook-files?fileName=a.pdf"), new ByteArrayContent(pdf))).StatusCode);
+    }
+
+    [Fact]
     public async Task Docx_content_is_detected_by_magic_bytes_for_document_submission()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

@@ -115,6 +115,16 @@ public sealed class InMemoryObjectStorage : IObjectStorage
         return Task.CompletedTask;
     }
 
+    public async Task PutStreamAsync(string bucket, string key, Stream content, long size, string contentType, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        Objects[Id(bucket, key)] = (buffer.ToArray(), contentType);
+    }
+
+    public Task<Stream?> OpenReadAsync(string bucket, string key, CancellationToken cancellationToken) =>
+        Task.FromResult<Stream?>(Objects.TryGetValue(Id(bucket, key), out var o) ? new MemoryStream(o.Content, writable: false) : null);
+
     public Task DeleteAsync(string bucket, string key, CancellationToken cancellationToken)
     {
         Objects.TryRemove(Id(bucket, key), out _);

@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import { DigitalApi, DigitalCatalogNode, DigitalItemSummary, DigitalPage } from '../core/digital';
+import { DigitalApi, DigitalCatalogNode, DigitalContentHit, DigitalItemSummary, DigitalPage } from '../core/digital';
 import { Language } from '../core/i18n';
 
 const PAGE_SIZE = 20;
@@ -24,6 +24,10 @@ const PAGE_SIZE = 20;
                  [placeholder]="'OPAC.DIGITAL.SEARCH_PH' | translate" />
           <button type="submit" class="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium">{{ 'OPAC.SEARCH.SEARCH_BTN' | translate }}</button>
         </form>
+        <label class="mt-3 mr-4 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+          <input type="checkbox" class="rounded border-slate-300" [ngModel]="inContent" (ngModelChange)="setContent($event)" name="inContent" />
+          {{ 'OPAC.DIGITAL.IN_CONTENT' | translate }}
+        </label>
         <a routerLink="/nop-tai-lieu" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
           <span class="material-icons text-[18px]">upload_file</span>{{ 'OPAC.SUBMIT_DOC.NAV_LINK' | translate }}</a>
       </div>
@@ -62,6 +66,25 @@ const PAGE_SIZE = 20;
 
         @if (error()) { <div class="bg-red-50 text-red-700 rounded-lg px-4 py-3 text-sm mb-4">{{ error() }}</div> }
 
+        @if (inContent) {
+          <ul class="space-y-3">
+            @for (h of hits() ?? []; track h.publicId) {
+              <li class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition">
+                <a [routerLink]="['/thu-vien-so', h.publicId]" class="font-semibold text-slate-900 hover:text-blue-700">{{ h.title }}</a>
+                <div class="text-sm text-slate-600 mt-0.5">{{ h.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }} · {{ 'OPAC.DIGITAL.IN_CONTENT_PAGE' | translate: { page: h.page } }}</div>
+                @if (h.snippet) { <p class="mt-2 text-sm text-slate-700 bg-slate-50 border-l-4 border-blue-300 px-3 py-2 rounded-r">{{ h.snippet }}</p> }
+                @else { <p class="mt-2 text-xs text-slate-500">{{ 'OPAC.DIGITAL.IN_CONTENT_LOCKED' | translate }}</p> }
+              </li>
+            } @empty {
+              @if (!loading() && hits()) {
+                <li class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
+                  <span class="material-icons text-5xl text-slate-300">search_off</span>
+                  <p class="mt-2">{{ (q.trim().length < 2 ? 'OPAC.DIGITAL.IN_CONTENT_MIN' : 'OPAC.SEARCH.NO_RESULT_HINT') | translate }}</p>
+                </li>
+              }
+            }
+          </ul>
+        } @else {
         <ul class="space-y-3">
           @for (i of result()?.items ?? []; track i.publicId) {
             <li class="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 hover:border-blue-300 transition">
@@ -95,7 +118,9 @@ const PAGE_SIZE = 20;
           }
         </ul>
 
-        @if (pages() > 1) {
+        }
+
+        @if (!inContent && pages() > 1) {
           <nav class="mt-6 flex items-center justify-center gap-1 text-sm">
             <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40" [disabled]="page <= 1" (click)="go(page - 1)">{{ 'COMMON.PREV' | translate }}</button>
             <span class="px-3 text-slate-600">{{ 'OPAC.COMMON.PAGE_OF' | translate: { page, pages: pages() } }}</span>
@@ -114,6 +139,7 @@ export class EbookSearch implements OnInit {
   private readonly language = inject(Language);
 
   protected readonly result = signal<DigitalPage<DigitalItemSummary> | null>(null);
+  protected readonly hits = signal<DigitalContentHit[] | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly brokenCovers = signal(new Set<string>());
@@ -122,6 +148,8 @@ export class EbookSearch implements OnInit {
   protected readonly topics = signal<DigitalCatalogNode[]>([]);
 
   protected q = '';
+  /** Tìm trong nội dung (các tài liệu đã đồng bộ nội dung) thay vì nhan đề/tác giả — tham số nd=1 trên URL. */
+  protected inContent = false;
   protected collectionId: number | null = null;
   protected subjectId: number | null = null;
   protected topicId: number | null = null;
@@ -136,6 +164,7 @@ export class EbookSearch implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       this.params = p;
       this.q = p.get('q') ?? '';
+      this.inContent = p.get('nd') === '1';
       this.collectionId = num(p.get('bst'));
       this.subjectId = num(p.get('ml'));
       this.topicId = num(p.get('cd'));
@@ -155,6 +184,10 @@ export class EbookSearch implements OnInit {
 
   protected submit(): void {
     this.navigate({ q: this.q.trim() || null, trang: null });
+  }
+
+  protected setContent(on: boolean): void {
+    this.navigate({ nd: on ? '1' : null, trang: null });
   }
 
   protected setFilter(param: string, value: number | null): void {
@@ -178,6 +211,10 @@ export class EbookSearch implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
+      if (this.inContent) {
+        this.hits.set(this.q.trim().length >= 2 ? await this.api.contentSearch(this.q.trim()) : []);
+        return;
+      }
       const result = await this.api.search({
         keyword: this.q.trim() || null, collectionId: this.collectionId, subjectId: this.subjectId, topicId: this.topicId,
         pageIndex: this.page, pageSize: PAGE_SIZE,

@@ -1267,6 +1267,8 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         digital_portal_steps(tb, token, tag)
         print("21d. Quản lý tài liệu số như LRC: trường giàu, lọc nâng cao, chuyển bộ sưu tập hàng loạt, xuất/nhập Excel và Dublin Core, file, phân quyền bộ sưu tập")
         digital_docs_steps(tb, token, tag)
+        print("21e. Tài liệu số: tra ISBN, AI, đồng bộ nội dung PDF → tìm trong nội dung (OPAC), xuất gói DSpace kèm file → nhập lại")
+        digital_content_steps(tb, token, tag)
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Thư viện số / Cổng thông tin — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
 
@@ -1667,6 +1669,102 @@ def digital_docs_steps(tb, token, tag):
     if mine: call("POST", f"{D}/items/BulkDelete", {"publicIds": mine})
     call("DELETE", f"{D}/collections/Delete/{src['publicId']}")
     call("DELETE", f"{D}/collections/Delete/{dst['publicId']}")
+
+
+def make_pdf(text):
+    """PDF một trang có lớp văn bản (font chuẩn Helvetica) — đủ để trích chữ; không cần thư viện."""
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    ]
+    stream = f"BT /F1 12 Tf 50 750 Td ({text}) Tj ET"
+    objects.append(f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream")
+    objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode()
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    return out + f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+
+
+def digital_content_steps(tb, token, tag):
+    """21e. Tra ISBN, gợi ý AI, đồng bộ nội dung PDF (trích chữ chạy nền) → tìm trong nội dung ở OPAC, gói DSpace kèm file xuất → nhập lại."""
+    D = "/api/admin/digital"
+
+    def call(method, path, body=None, authed=True):
+        s, _, text = tb.request(method, path, token=token if authed else None, json_body=body)
+        return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    s, text, caps = call("GET", f"{D}/items/Capabilities")
+    expect(s == 200 and caps.get("isbn") is True and caps.get("content") is True, "khả năng tích hợp của màn tài liệu số", text[:200])
+    print(f"  [THÔNG TIN]  AI gợi ý: {'bật' if caps.get('ai') else 'tắt (chưa cấu hình DIGITAL_AI_API_KEY)'}; vector hóa: {'bật' if caps.get('embedding') else 'tắt (chưa cấu hình DIGITAL_OLLAMA_URL)'}")
+
+    s, text, _ = call("GET", f"{D}/items/LookupIsbn?isbn=123")
+    expect(s == 400 and "ISBN_INVALID" in text, "tra ISBN sai định dạng bị từ chối", text[:200])
+    s, text, book = call("GET", f"{D}/items/LookupIsbn?isbn=9780747532699")
+    print(f"  [{'OK' if s == 200 and book.get('title') else 'CẢNH BÁO'}]  tra ISBN 9780747532699 (Google Books/Open Library): {book.get('title') if s == 200 else 'không ra được Internet / không có kết quả'}")
+    s, text, _ = call("POST", f"{D}/items/SuggestClassification", {"title": "Kinh tế vi mô", "description": "Giáo trình"})
+    expect((s == 200) if caps.get("ai") else (s == 503 and "AI_DISABLED" in text), "gợi ý AI: " + ("có phản hồi" if caps.get("ai") else "tắt khi chưa cấu hình khóa"), text[:200])
+
+    # --- file PDF thật: xin vé upload media → PUT → hoàn tất → tạo tài liệu và gắn file
+    phrase = f"noi dung e2e {tag} marginal utility"
+    pdf = make_pdf(phrase)
+    s, _, body = tb.request("POST", "/api/admin/media/files/uploads", token=token,
+                            json_body={"purpose": "ebook-file", "fileName": "e2e.pdf", "contentType": "application/pdf", "size": len(pdf)})
+    ticket = json.loads(body) if s == 200 else {}
+    expect(s == 200 and ticket.get("fileId"), "xin vé upload file tài liệu số", body[:200])
+    tb.request("PUT", ticket.get("uploadUrl", "/x"), raw=(pdf, "application/pdf"))
+    s, _, body = tb.request("POST", f"/api/admin/media/files/{ticket.get('fileId')}/complete", token=token)
+    expect(s == 200, "hoàn tất upload PDF", body[:200])
+
+    title = f"Nội dung PDF e2e {tag}"
+    s, text, item = call("POST", f"{D}/items/Add", {"title": title, "author": "Tác giả nội dung", "free": True, "status": 2})
+    expect(s == 201, "tạo tài liệu để đồng bộ nội dung", text[:200])
+    s, text, attached = call("POST", f"{D}/files/Add", {"ebookItemPublicId": item["publicId"], "mediaFileId": ticket["fileId"], "type": "Document", "fileExt": "pdf", "fileSize": len(pdf)})
+    expect(s == 201, "gắn file PDF vào tài liệu", text[:200])
+
+    # --- đồng bộ nội dung: việc nền trích chữ (chu kỳ ~20 giây)
+    s, text, queued = call("POST", f"{D}/items/SyncContent", {"publicIds": [item["publicId"]]})
+    expect(s == 200 and queued.get("queued") == 1, "đưa tài liệu vào hàng đợi đồng bộ nội dung", text[:200])
+    status = {}
+    for _ in range(40):
+        s, text, rows = call("POST", f"{D}/items/ContentStatus", {"publicIds": [item["publicId"]]})
+        status = rows[0] if s == 200 and rows else {}
+        if status.get("status") in ("done", "failed", "no_text"):
+            break
+        time.sleep(3)
+    expect(status.get("status") == "done" and status.get("chunkCount", 0) >= 1 and status.get("pageCount") == 1,
+           f"đồng bộ nội dung: {status.get('status')} ({status.get('chunkCount')} đoạn, {status.get('embeddedCount')} có vector) {status.get('error') or ''}", str(status)[:300])
+
+    s, text, hits = call("POST", "/api/opac/digital/browse/content/search", {"q": f"e2e {tag} marginal"}, authed=False)
+    mine = [h for h in hits if h.get("publicId") == item["publicId"]] if s == 200 and isinstance(hits, list) else []
+    expect(mine and mine[0].get("page") == 1 and "marginal utility" in (mine[0].get("snippet") or ""), "OPAC: tìm trong nội dung thấy tài liệu kèm trang và đoạn trích", text[:300])
+    s, text, _ = call("POST", "/api/opac/digital/browse/content/search", {"q": "x"}, authed=False)
+    expect(s == 400 and "CONTENT_QUERY_INVALID" in text, "tìm trong nội dung: câu tìm quá ngắn bị từ chối", text[:200])
+
+    # --- xuất gói DSpace kèm file rồi nhập lại
+    s, h, packed = tb.request("POST", f"{D}/items/ExportWithFiles", token=token, json_body={"selection": {"publicIds": [item["publicId"]]}}, binary=True)
+    with zipfile.ZipFile(io.BytesIO(packed)) as z:
+        names = z.namelist()
+        pdf_back = z.read("item_001/document.pdf") if "item_001/document.pdf" in names else b""
+    expect(s == 200 and pdf_back == pdf and "item_001/dublin_core.xml" in names and "item_001/contents" in names, "xuất gói DSpace kèm file (PDF đúng từng byte)", str(names))
+    s, text, imported = call_multipart(tb, token, f"{D}/items/ImportDspace", [("file", "goi.zip", packed, "application/zip")], {"published": "true"})
+    expect(s == 200 and imported.get("imported") == 1 and imported.get("failed") == 0, "nhập gói DSpace (metadata + PDF)", text[:300])
+    s, text, found = call("POST", f"{D}/items/Search", {"title": title.lower(), "pageSize": 10})
+    copies = [i for i in found.get("items", []) if i["publicId"] != item["publicId"]] if s == 200 else []
+    expect(len(copies) == 1 and copies[0].get("totalFile") == 1, "tài liệu nhập từ gói có đúng 1 file", text[:300])
+
+    # --- dọn: xoá file rồi tài liệu (tài liệu còn file thì không xoá được)
+    for it in [item] + copies:
+        s, text, files = call("POST", f"{D}/files/Search", {"ebookItemPublicId": it["publicId"], "pageSize": 20})
+        for f in files.get("items", []) if s == 200 else []:
+            call("DELETE", f"{D}/files/Delete/{f['publicId']}")
+    call("POST", f"{D}/items/BulkDelete", {"publicIds": [item["publicId"]] + [c["publicId"] for c in copies]})
 
 
 def call_multipart(tb, token, path, files, fields):

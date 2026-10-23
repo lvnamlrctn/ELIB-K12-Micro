@@ -154,12 +154,19 @@ public sealed partial class EbookItemResource
         return await ImportRowsAsync(rows, ct);
     }
 
-    private async Task<ItemImportResult> ImportRowsAsync(IEnumerable<(string Label, Func<EbookItemFields> Build)> rows, CancellationToken ct)
+    private Task<ItemImportResult> ImportRowsAsync(IEnumerable<(string Label, Func<EbookItemFields> Build)> rows, CancellationToken ct) =>
+        ImportCoreAsync(rows.Select(r => (r.Label, r.Build, (Func<EbookItem, CancellationToken, Task<IEnumerable<string>>>?)null)), ct);
+
+    /// <summary>
+    /// Nhập từng dòng độc lập. <c>After</c> chạy sau khi tài liệu đã lưu (gắn file của gói DSpace) và trả các cảnh báo; lỗi của nó không làm mất tài liệu đã nhập.
+    /// </summary>
+    private async Task<ItemImportResult> ImportCoreAsync(
+        IEnumerable<(string Label, Func<EbookItemFields> Build, Func<EbookItem, CancellationToken, Task<IEnumerable<string>>>? After)> rows, CancellationToken ct)
     {
         var imported = 0;
         var errors = new List<string>();
         var warnings = new List<string>();
-        foreach (var (label, build) in rows)
+        foreach (var (label, build, after) in rows)
         {
             EbookItem? entity = null;
             try
@@ -182,6 +189,17 @@ public sealed partial class EbookItemResource
                 await ValidateAsync(entity, ct);
                 await AddCoreAsync(entity, ct);
                 imported++;
+                if (after is not null)
+                {
+                    try
+                    {
+                        warnings.AddRange((await after(entity, ct)).Select(w => w.StartsWith(label, StringComparison.Ordinal) ? w : $"{label}: {w}"));
+                    }
+                    catch (Exception e) when (e is BusinessRuleException or IOException or InvalidDataException or HttpRequestException)
+                    {
+                        warnings.Add($"{label}: đã nhập tài liệu nhưng không gắn được file ({e.Message}).");
+                    }
+                }
             }
             catch (BusinessRuleException e)
             {

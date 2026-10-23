@@ -45,16 +45,16 @@ export const TOGGLE_CLASS = 'w-10 h-5 bg-gray-300 rounded-full peer-checked:bg-b
           @for (k of kinds; track k) {
             <button type="button" role="tab" class="px-4 py-2 text-sm font-medium border-b-2 -mb-px" [attr.aria-selected]="kind() === k"
               [class]="kind() === k ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'" (click)="setKind(k)">
-              {{ k === 'excel' ? 'Excel' : 'XML' }}</button>
+              {{ k === 'excel' ? 'Excel' : k === 'xml' ? 'XML' : 'DSpace (ZIP)' }}</button>
           }
         </div>
         <p class="text-xs text-gray-500 flex gap-1.5 mb-3"><span class="material-icons text-[16px]">info</span>
-          {{ (kind() === 'excel' ? 'DIGITAL_DOC.IMPORT_HINT_EXCEL' : 'DIGITAL_DOC.IMPORT_HINT_XML') | translate }}</p>
+          {{ (kind() === 'excel' ? 'DIGITAL_DOC.IMPORT_HINT_EXCEL' : kind() === 'xml' ? 'DIGITAL_DOC.IMPORT_HINT_XML' : 'DIGITAL_DOC.IMPORT_HINT_DSPACE') | translate }}</p>
         <label class="flex flex-col items-center justify-center py-5 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-50 text-gray-500 mb-4">
           <span class="material-icons text-[28px]">upload_file</span>
           @if (files().length) { <span class="text-sm text-emerald-700 font-medium text-center px-3">{{ names() }}</span> }
-          @else { <span class="text-sm">{{ (kind() === 'excel' ? 'DIGITAL_DOC.IMPORT_PICK_EXCEL' : 'DIGITAL_DOC.IMPORT_PICK_XML') | translate }}</span> }
-          <input type="file" class="hidden" [accept]="kind() === 'excel' ? '.xlsx' : '.xml,text/xml'" [multiple]="kind() === 'xml'" (change)="pick($event)" />
+          @else { <span class="text-sm">{{ (kind() === 'excel' ? 'DIGITAL_DOC.IMPORT_PICK_EXCEL' : kind() === 'xml' ? 'DIGITAL_DOC.IMPORT_PICK_XML' : 'DIGITAL_DOC.IMPORT_PICK_DSPACE') | translate }}</span> }
+          <input type="file" class="hidden" [accept]="kind() === 'excel' ? '.xlsx' : kind() === 'xml' ? '.xml,text/xml' : '.zip,application/zip'" [multiple]="kind() === 'xml'" (change)="pick($event)" />
         </label>
         <div class="text-sm font-semibold text-blue-700 mb-2">{{ 'DIGITAL_DOC.IMPORT_OPTIONS' | translate }}</div>
         <div class="grid grid-cols-3 gap-3 mb-3 text-sm text-gray-700">
@@ -101,8 +101,8 @@ export class ItemImport {
   readonly imported = output<void>();
 
   protected readonly toggle = TOGGLE_CLASS;
-  protected readonly kinds: ('excel' | 'xml')[] = ['excel', 'xml'];
-  protected readonly kind = signal<'excel' | 'xml'>('excel');
+  protected readonly kinds: ('excel' | 'xml' | 'dspace')[] = ['excel', 'xml', 'dspace'];
+  protected readonly kind = signal<'excel' | 'xml' | 'dspace'>('excel');
   protected readonly files = signal<File[]>([]);
   protected readonly running = signal(false);
   protected readonly result = signal<ItemImportResult | null>(null);
@@ -118,7 +118,7 @@ export class ItemImport {
     return files.length <= 3 ? files.map((f) => f.name).join(', ') : `${files.slice(0, 3).map((f) => f.name).join(', ')} … (${files.length})`;
   }
 
-  protected setKind(kind: 'excel' | 'xml'): void {
+  protected setKind(kind: 'excel' | 'xml' | 'dspace'): void {
     this.kind.set(kind);
     this.files.set([]);
   }

@@ -338,7 +338,11 @@
       "SUBMIT_REVIEW": "Gửi đánh giá",
       "REVIEW_SUBMITTED": "Đã gửi đánh giá, chờ thư viện duyệt.",
       "MY_FAVORITES": "Tài liệu số yêu thích",
-      "NO_FAVORITES": "Bạn đọc chưa yêu thích tài liệu số nào."
+      "NO_FAVORITES": "Bạn đọc chưa yêu thích tài liệu số nào.",
+      "IN_CONTENT": "Tìm trong nội dung tài liệu",
+      "IN_CONTENT_PAGE": "Trang {{page}}",
+      "IN_CONTENT_LOCKED": "Tài liệu cần mượn hoặc đăng nhập — mở tài liệu để đọc nội dung.",
+      "IN_CONTENT_MIN": "Nhập ít nhất 2 ký tự để tìm trong nội dung."
     },
     "SUBMIT_DOC": {
       "TITLE": "Nộp tài liệu",

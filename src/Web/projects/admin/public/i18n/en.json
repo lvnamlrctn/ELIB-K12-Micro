@@ -4384,6 +4384,27 @@
     "PERMISSION_SAVED": "Permissions saved",
     "BULK_PUBLISH": "Publish ({{count}})",
     "BULK_HIDE": "Hide ({{count}})",
-    "BULK_STATUS_DONE": "Status of the selected documents changed"
+    "BULK_STATUS_DONE": "Status of the selected documents changed",
+    "EXPORT_WITH_FILES": "Export metadata with files",
+    "EXPORT_WITH_FILES_HINT": "DSpace package with metadata and the PDF files (up to 200 documents and 1,000 files at a time).",
+    "SYNC_CONTENT": "Sync content ({{count}})",
+    "SYNC_QUEUED": "{{count}} documents queued for content sync",
+    "SYNC_SKIPPED_TITLE": "Documents not synced",
+    "SYNC_SKIPPED_HINT": "These documents were not queued:",
+    "CONTENT_PENDING": "Waiting for content sync",
+    "CONTENT_RUNNING": "Syncing content",
+    "CONTENT_DONE": "{{count}} passages indexed",
+    "CONTENT_NO_TEXT": "PDF has no text layer (no OCR yet)",
+    "CONTENT_FAILED": "Content sync failed",
+    "ISBN_LOOKUP": "Look up ISBN",
+    "ISBN_FILLED": "Filled in from {{source}}",
+    "ISBN_NOT_FOUND": "No book found for this ISBN",
+    "ISBN_NEEDS_VALUE": "Enter an ISBN first",
+    "AI_SUGGEST": "AI suggestion",
+    "AI_APPLIED": "AI suggestion applied",
+    "AI_NEEDS_TITLE": "Enter the title before asking the AI",
+    "AI_NOTHING": "The AI made no suggestion",
+    "IMPORT_HINT_DSPACE": "A .zip in DSpace Simple Archive layout: each folder is a document with dublin_core.xml, an optional contents list and the PDF files. Other file types are skipped.",
+    "IMPORT_PICK_DSPACE": "Click to choose a .zip file"
   }
 }

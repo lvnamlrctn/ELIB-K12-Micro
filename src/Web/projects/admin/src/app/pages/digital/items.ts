@@ -9,7 +9,7 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { ItemCover } from './item-cover';
 import { ItemForm } from './item-form';
 import { ItemExport, ItemImport, ItemMove, OptionItem, TOGGLE_CLASS, stamp } from './item-tools';
-import { ItemsApi } from './items-api';
+import { ContentStatus, ItemCapabilities, ItemsApi } from './items-api';
 
 type TreeRow = { id: number; publicId: string; name: string; parentId: number | null; sortOrder: number };
 type NamedRow = { id: number; publicId: string; name: string };
@@ -76,6 +76,7 @@ const emptyFilters = (): Filters => ({
       @if (can('view')) {
         <button type="button" class="btn-primary" [disabled]="busy()" (click)="exportDialog.set(true)"><span class="material-icons text-[18px]">file_download</span> {{ 'DIGITAL_DOC.EXPORT_EXCEL' | translate }}</button>
         <button type="button" class="btn-primary" [disabled]="busy()" (click)="exportMetadata()"><span class="material-icons text-[18px]">download</span> {{ 'DIGITAL_DOC.EXPORT_METADATA' | translate }}</button>
+        <button type="button" class="btn-primary" [disabled]="busy()" (click)="exportWithFiles()" [title]="'DIGITAL_DOC.EXPORT_WITH_FILES_HINT' | translate"><span class="material-icons text-[18px]">folder_zip</span> {{ 'DIGITAL_DOC.EXPORT_WITH_FILES' | translate }}</button>
       }
       @if (can('add')) {
         <button type="button" class="btn-primary" (click)="importDialog.set(true)"><span class="material-icons text-[18px]">file_upload</span> {{ 'DIGITAL_DOC.IMPORT' | translate }}</button>
@@ -90,6 +91,10 @@ const emptyFilters = (): Filters => ({
           <span class="material-icons text-[18px]">visibility</span> {{ 'DIGITAL_DOC.BULK_PUBLISH' | translate: { count: selectedCount() } }}</button>
         <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-600 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="bulkStatus(1)">
           <span class="material-icons text-[18px]">visibility_off</span> {{ 'DIGITAL_DOC.BULK_HIDE' | translate: { count: selectedCount() } }}</button>
+        @if (caps()?.content) {
+          <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="syncContent()">
+            <span class="material-icons text-[18px]">sync</span> {{ 'DIGITAL_DOC.SYNC_CONTENT' | translate: { count: selectedCount() } }}</button>
+        }
         <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="moveDialog.set(true)">
           <span class="material-icons text-[18px]">drive_file_move</span> {{ 'DIGITAL_DOC.MOVE_COLLECTION' | translate: { count: selectedCount() } }}</button>
       }
@@ -142,6 +147,18 @@ const emptyFilters = (): Filters => ({
                       @if (i.publishYear || i.publishDate || i.publisher) {
                         <div class="text-xs text-gray-500 flex items-center gap-1"><span class="material-icons text-[13px]">calendar_today</span>
                           {{ i.publishYear ?? i.publishDate }}@if (i.publisher) { <span> · {{ i.publisher }}</span> }</div>
+                      }
+                      @if (statuses().get(i.publicId); as cs) {
+                        <div class="mt-0.5 inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded" [class]="contentTone(cs)" [title]="cs.error ?? ''">
+                          <span class="material-icons text-[12px]">{{ contentIcon(cs) }}</span>
+                          @switch (cs.status) {
+                            @case ('pending') { {{ 'DIGITAL_DOC.CONTENT_PENDING' | translate }} }
+                            @case ('running') { {{ 'DIGITAL_DOC.CONTENT_RUNNING' | translate }} }
+                            @case ('done') { {{ 'DIGITAL_DOC.CONTENT_DONE' | translate: { count: cs.chunkCount } }} }
+                            @case ('no_text') { {{ 'DIGITAL_DOC.CONTENT_NO_TEXT' | translate }} }
+                            @default { {{ 'DIGITAL_DOC.CONTENT_FAILED' | translate }} }
+                          }
+                        </div>
                       }
                     </div>
                   </div>
@@ -198,6 +215,15 @@ const emptyFilters = (): Filters => ({
     @if (deleting(); as d) {
       <app-confirm-delete [busy]="busy()" message="COMMON.DELETE_CONFIRM_IRREVERSIBLE" (confirmed)="deleteOne(d)" (cancelled)="deleting.set(null)" />
     }
+    @if (syncSkipped(); as list) {
+      <app-modal title="DIGITAL_DOC.SYNC_SKIPPED_TITLE" widthClass="max-w-lg" (closed)="syncSkipped.set(null)">
+        <p class="text-sm text-gray-600 mb-2">{{ 'DIGITAL_DOC.SYNC_SKIPPED_HINT' | translate }}</p>
+        <ul class="max-h-64 overflow-y-auto text-sm divide-y divide-gray-100">
+          @for (s of list; track s.publicId) { <li class="py-1.5"><span class="font-medium">{{ s.title }}</span><div class="text-xs text-red-600">{{ s.reason }}</div></li> }
+        </ul>
+        <ng-container footer><button type="button" class="btn-primary" (click)="syncSkipped.set(null)">{{ 'COMMON.CLOSE' | translate }}</button></ng-container>
+      </app-modal>
+    }
     @if (skipped(); as list) {
       <app-modal title="DIGITAL_DOC.SKIPPED_TITLE" widthClass="max-w-lg" (closed)="skipped.set(null)">
         <p class="text-sm text-gray-600 mb-2">{{ 'DIGITAL_DOC.SKIPPED_HINT' | translate }}</p>
@@ -239,6 +265,10 @@ export class DigitalItems implements OnInit {
   protected readonly confirmDelete = signal(false);
   protected readonly deleting = signal<EbookItem | null>(null);
   protected readonly skipped = signal<ItemBulkResult['skipped'] | null>(null);
+  protected readonly syncSkipped = signal<ItemBulkResult['skipped'] | null>(null);
+  protected readonly caps = signal<ItemCapabilities | null>(null);
+  /** Trạng thái đồng bộ nội dung của các tài liệu trong trang hiện tại (theo mã công khai). */
+  protected readonly statuses = signal<Map<string, ContentStatus>>(new Map());
 
   protected readonly collectionOptions = signal<OptionItem[]>([]);
   protected readonly subjectOptions = signal<OptionItem[]>([]);
@@ -265,6 +295,7 @@ export class DigitalItems implements OnInit {
   ngOnInit(): void {
     void this.load();
     void this.loadOptions();
+    if (this.can('view')) this.itemsApi.capabilities().then((c) => this.caps.set(c)).catch(() => this.caps.set(null));
   }
 
   protected can(action: string): boolean {
@@ -357,6 +388,7 @@ export class DigitalItems implements OnInit {
       const filter = this.buildSearch();
       this.lastSearch = filter;
       this.page.set(await this.client.search({ ...filter, pageIndex: this.search.pageIndex, pageSize: this.search.pageSize }));
+      void this.loadStatuses();
       if (!this.allResults()) {
         // Giữ tích chỉ với các dòng còn tồn tại trong kết quả hiện tại của các trang đã duyệt: tải lại làm số liệu đổi nên bỏ chọn cho gọn.
         this.ticked.set(new Set([...this.ticked()].filter((id) => (this.page()?.items ?? []).some((i) => i.publicId === id))));
@@ -393,6 +425,65 @@ export class DigitalItems implements OnInit {
     this.busy.set(true);
     try {
       saveFile(await this.itemsApi.exportItemsMetadata(this.exportSelection()), `dspace-metadata-${stamp()}.zip`);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Trạng thái đồng bộ nội dung của trang hiện tại; lỗi/thiếu quyền chỉ làm mất nhãn, không ảnh hưởng danh sách. */
+  private async loadStatuses(): Promise<void> {
+    const ids = (this.page()?.items ?? []).map((i) => i.publicId);
+    if (!ids.length || !this.can('view')) {
+      this.statuses.set(new Map());
+      return;
+    }
+    try {
+      this.statuses.set(new Map((await this.itemsApi.contentStatus(ids)).map((s) => [s.itemPublicId, s])));
+    } catch {
+      this.statuses.set(new Map());
+    }
+  }
+
+  protected contentTone(s: ContentStatus): string {
+    switch (s.status) {
+      case 'done': return 'bg-emerald-50 text-emerald-700';
+      case 'failed': return 'bg-red-50 text-red-700';
+      case 'no_text': return 'bg-amber-50 text-amber-700';
+      default: return 'bg-blue-50 text-blue-700';
+    }
+  }
+
+  protected contentIcon(s: ContentStatus): string {
+    switch (s.status) {
+      case 'done': return 'check_circle';
+      case 'failed': return 'error';
+      case 'no_text': return 'warning';
+      default: return 'hourglass_top';
+    }
+  }
+
+  protected async exportWithFiles(): Promise<void> {
+    this.busy.set(true);
+    try {
+      saveFile(await this.itemsApi.exportItemsWithFiles(this.exportSelection()), `dspace-saf-${stamp()}.zip`);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async syncContent(): Promise<void> {
+    const selection = this.selection();
+    if (!selection) return;
+    this.busy.set(true);
+    try {
+      const result = await this.itemsApi.syncContent(selection);
+      if (result.queued) this.toastr.success('DIGITAL_DOC.SYNC_QUEUED', { count: result.queued });
+      if (result.skipped.length) this.syncSkipped.set(result.skipped);
+      await this.loadStatuses();
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {

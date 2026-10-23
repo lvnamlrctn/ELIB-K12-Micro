@@ -5,6 +5,23 @@ import {
   CollectionPermission, EbookItem, ExportField, ItemBulkResult, ItemImportDefaults, ItemImportResult, ItemSelection, blobRequest,
 } from '../../core/api';
 
+/** Tích hợp đang bật ở đơn vị (tra ISBN, gợi ý AI, đồng bộ nội dung, vector hóa) — nút của dịch vụ chưa cấu hình được ẩn. */
+export interface ItemCapabilities { isbn: boolean; ai: boolean; content: boolean; embedding: boolean; }
+
+export interface IsbnMetadata {
+  isbn: string; title: string | null; subtitle: string | null; authors: string[]; publisher: string | null; publishDate: string | null; pages: number | null;
+  language: string | null; description: string | null; categories: string[]; source: string;
+}
+
+export interface ClassificationSuggestion { subjectId: number | null; subjectName: string | null; topicId: number | null; topicName: string | null; keywords: string[]; }
+
+/** Trạng thái đồng bộ nội dung của một tài liệu: pending | running | done | no_text | failed. */
+export interface ContentStatus {
+  itemPublicId: string; status: string; pageCount: number; chunkCount: number; embeddedCount: number; error: string | null; syncedAt: string | null;
+}
+
+export interface ContentSyncResult { queued: number; skipped: ItemBulkResult['skipped']; }
+
 /**
  * API riêng của màn Tài liệu số (hàng loạt, xuất/nhập, ảnh bìa, phân quyền bộ sưu tập). Tách khỏi Api chung để nằm trong gói nạp lười của trang,
  * không làm phình gói khởi động của admin.
@@ -29,7 +46,17 @@ export class ItemsApi {
   exportItemsMetadata(selection: ItemSelection | null) {
     return blobRequest(firstValueFrom(this.http.post('/api/admin/digital/items/ExportMetadata', { selection }, { responseType: 'blob' })));
   }
-  importItems(kind: 'excel' | 'xml', files: File[], defaults: ItemImportDefaults, language: string | null) {
+  exportItemsWithFiles(selection: ItemSelection | null) {
+    return blobRequest(firstValueFrom(this.http.post('/api/admin/digital/items/ExportWithFiles', { selection }, { responseType: 'blob' })));
+  }
+  capabilities() { return this.get<ItemCapabilities>('/api/admin/digital/items/Capabilities'); }
+  lookupIsbn(isbn: string) { return this.get<IsbnMetadata>(`/api/admin/digital/items/LookupIsbn?isbn=${encodeURIComponent(isbn)}`); }
+  suggestClassification(title: string, description: string | null) {
+    return this.post<ClassificationSuggestion>('/api/admin/digital/items/SuggestClassification', { title, description });
+  }
+  syncContent(selection: ItemSelection) { return this.post<ContentSyncResult>('/api/admin/digital/items/SyncContent', selection); }
+  contentStatus(publicIds: string[]) { return this.post<ContentStatus[]>('/api/admin/digital/items/ContentStatus', { publicIds }); }
+  importItems(kind: 'excel' | 'xml' | 'dspace', files: File[], defaults: ItemImportDefaults, language: string | null) {
     const form = new FormData();
     for (const file of files) form.append('file', file, file.name);
     if (defaults.collectionId != null) form.append('collectionId', String(defaults.collectionId));
@@ -39,7 +66,8 @@ export class ItemsApi {
     form.append('free', String(defaults.free));
     form.append('allowDownload', String(defaults.allowDownload));
     if (language) form.append('language', language);
-    return this.post<ItemImportResult>(kind === 'excel' ? '/api/admin/digital/items/ImportExcel' : '/api/admin/digital/items/ImportXml', form);
+    const endpoint = kind === 'excel' ? 'ImportExcel' : kind === 'xml' ? 'ImportXml' : 'ImportDspace';
+    return this.post<ItemImportResult>(`/api/admin/digital/items/${endpoint}`, form);
   }
   collectionPermissions(publicId: string) { return this.get<CollectionPermission[]>(`/api/admin/digital/collections/${publicId}/permissions`); }
   saveCollectionPermissions(publicId: string, rows: CollectionPermission[]) { return this.put<CollectionPermission[]>(`/api/admin/digital/collections/${publicId}/permissions`, rows); }
