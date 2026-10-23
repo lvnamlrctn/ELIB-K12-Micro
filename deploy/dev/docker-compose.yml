@@ -45,6 +45,7 @@ services:
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD:?chạy ./init-env.sh trước}
       SPACE_DB_PASSWORD: ${SPACE_DB_PASSWORD:?chạy ./init-env.sh trước}
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:?chạy ./init-env.sh trước}
+      PORTAL_DB_PASSWORD: ${PORTAL_DB_PASSWORD:?chạy ./init-env.sh trước}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
@@ -82,6 +83,7 @@ services:
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD}
       SPACE_DB_PASSWORD: ${SPACE_DB_PASSWORD}
       PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      PORTAL_DB_PASSWORD: ${PORTAL_DB_PASSWORD}
     volumes:
       - ./postgres-init:/init:ro
     entrypoint: ["sh", "/init/01-service-databases.sh"]
@@ -173,6 +175,7 @@ services:
       Identity__Clients__svc-digital__ClientSecret: ${SVC_DIGITAL_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-space__ClientSecret: ${SVC_SPACE_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-payment__ClientSecret: ${SVC_PAYMENT_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-portal__ClientSecret: ${SVC_PORTAL_SECRET:?chạy ./init-env.sh trước}
       # Identity gọi service tenant (đọc tham số CAPTCHA/OTP của đơn vị) bằng service token của chính nó.
       Identity__Clients__svc-identity__ClientSecret: ${SVC_IDENTITY_SECRET:?chạy ./init-env.sh trước}
       ServiceClient__ClientSecret: ${SVC_IDENTITY_SECRET}
@@ -220,6 +223,7 @@ services:
       Provisioning__DeployedServices__8: digital
       Provisioning__DeployedServices__9: space
       Provisioning__DeployedServices__10: payment
+      Provisioning__DeployedServices__11: portal
 
   notification:
     build:
@@ -478,6 +482,25 @@ services:
       Database__MigrateOnStartup: "true"
       ServiceClient__ClientSecret: ${SVC_PAYMENT_SECRET}
 
+  # GĐ2: cổng thông tin / CMS (tin, trang, menu, banner, ảnh/video, liên hệ) cho OPAC — nội dung công khai qua gateway theo host đơn vị.
+  portal:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Portal/Elib.Portal.Api/Elib.Portal.Api.csproj
+        ASSEMBLY: Elib.Portal.Api
+    image: elib/portal:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__PortalDb: Host=postgres;Database=elib_portal;Username=portal_app;Password=${PORTAL_DB_PASSWORD}
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_PORTAL_SECRET}
+
   admin-web:
     build:
       context: ../..
@@ -521,6 +544,7 @@ services:
       digital: { condition: service_started }
       space: { condition: service_started }
       payment: { condition: service_started }
+      portal: { condition: service_started }
       opac-web: { condition: service_started }
     environment:
       <<: *dotnet-env

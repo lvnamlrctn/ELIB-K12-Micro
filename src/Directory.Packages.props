@@ -39,6 +39,11 @@
     <PackageVersion Include="Novell.Directory.Ldap.NETStandard" Version="4.0.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Portal">
+    <!-- Làm sạch HTML của CMS (tin, trang) trước khi lưu/hiển thị — chặn script, on*, javascript:. -->
+    <PackageVersion Include="HtmlSanitizer" Version="9.2.1039" />
+  </ItemGroup>
+
   <ItemGroup Label="Notification">
     <PackageVersion Include="MailKit" Version="4.18.1" />
     <!-- MailKit kéo theo Pkcs 10.0.0 dính GHSA-846f-f764-76mx / GHSA-2fmv-rv2c-59x7 — ghim bản đã vá (transitive pinning). -->

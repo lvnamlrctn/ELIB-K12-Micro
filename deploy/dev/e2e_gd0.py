@@ -294,7 +294,7 @@ def system_steps(sysb, accounts, admin_user):
     else:
         s, _, body = sysb.request("POST", "/api/system/tenant/tenants", token=sys_token, json_body={
             "code": TENANT_CODE, "name": "Trường demo nền tảng mới", "subdomain": SUBDOMAIN,
-            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION", "PAYMENT"]]})
+            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"]]})
         expect(s == 201, f"tạo đơn vị {TENANT_CODE}", body)
         tenant = json.loads(body)
     for _ in range(60):
@@ -380,7 +380,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
     modules = set(json.loads(body)["modules"]) if s == 200 else set()
     required = {"CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"}  # ACQUISITION: có khi quản trị nền tảng đã bán (bước 2) — không bắt buộc ở --tenant-only
-    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT"}, f"menu theo license: {sorted(modules)}", body)
+    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"}, f"menu theo license: {sorted(modules)}", body)
     s, _, body = tb.request("GET", "/api/admin/identity/users", token=token)
     expect(s == 200 and any(u["userName"] == admin_user for u in json.loads(body)["items"]), "API người dùng của đơn vị", body)
 
@@ -1247,6 +1247,14 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Thanh toán — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
 
+    print("21c. Thư viện số + cổng thông tin: duyệt đánh giá, ebook → chỉ mục tra cứu, đăng tin (HTML làm sạch), menu, liên hệ")
+    s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
+    mods = json.loads(body)["modules"] if s == 200 else []
+    if "DIGITAL" in mods and "PORTAL" in mods:
+        digital_portal_steps(tb, token, tag)
+    else:
+        print("  [BỎ QUA] đơn vị chưa có phân hệ Thư viện số / Cổng thông tin — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
+
     print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
         {"tag": "020", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "9780747532699"}]},
@@ -1551,6 +1559,63 @@ def payment_steps(tb, token, tag, card):
     expect({pay["transactionCode"], vn["transactionCode"]} <= paid_codes and totals["totals"]["paid"] >= 130000, f"đối soát: đã thu {totals.get('totals', {}).get('paid')}đ trong danh sách giao dịch")
     s, _, logs = call("POST", f"{P}/webhook-logs/Search", {"pageIndex": 1, "pageSize": 20})
     expect(s == 200 and logs.get("totalCount", 0) >= 6 and sepay_key not in json.dumps(logs), "nhật ký webhook có đủ lời gọi, không chứa khoá")
+
+
+def digital_portal_steps(tb, token, tag):
+    """21c. Luồng thật qua gateway: digital (đánh giá, ebook) → search (chỉ mục ebook qua RabbitMQ) và portal (tin đăng, menu, liên hệ ẩn danh)."""
+    D, P = "/api/admin/digital", "/api/admin/portal"
+
+    def call(method, path, body=None, authed=True):
+        s, _, text = tb.request(method, path, token=token if authed else None, json_body=body)
+        return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    # --- ebook: tạo, xuất bản → search lập chỉ mục (không dấu) trong vài giây
+    title = f"Sách điện tử thử nghiệm {tag}"
+    s, text, item = call("POST", f"{D}/items/Add", {"title": title, "author": "Tác giả E2E", "free": True, "status": 2})
+    expect(s == 201 and item.get("publicId"), "tạo tài liệu số xuất bản", text[:200])
+    found = []
+    for _ in range(40):
+        s, _, res = call("POST", "/api/opac/search/ebooks/Search", {"q": f"sach dien tu thu nghiem {tag}"}, authed=False)
+        found = res.get("items", []) if s == 200 else []
+        if found: break
+        time.sleep(1)
+    expect(len(found) == 1 and found[0]["publicId"] == item["publicId"], "ebook vào chỉ mục tra cứu (event EbookChanged → search), tìm không dấu", str(found)[:200])
+
+    # --- đánh giá: ẩn danh gửi → chờ duyệt → ChangeStatus chung bị chặn → Duyệt → hiện công khai
+    s, _, _ = call("POST", f"/api/opac/digital/browse/items/{item['publicId']}/reviews", {"rating": 5, "displayName": "Bạn đọc E2E", "content": "Hay"}, authed=False)
+    expect(s in (200, 201), "gửi đánh giá ẩn danh")
+    s, _, pub = call("GET", f"/api/opac/digital/browse/items/{item['publicId']}/reviews", authed=False)
+    expect(s == 200 and pub == [], "đánh giá mới chưa hiện công khai")
+    s, _, rev = call("POST", f"{D}/reviews/Search", {"pageIndex": 1, "pageSize": 5})
+    review = rev["items"][0]
+    s, text, _ = call("PUT", f"{D}/reviews/ChangeStatus", {"publicId": review["publicId"], "status": 2})
+    expect(s == 400 and "REVIEW_USE_APPROVE" in text, "ChangeStatus chung không duyệt được đánh giá (phải qua Approve)", text[:150])
+    s, text, _ = call("POST", f"{D}/reviews/{review['publicId']}/Approve")
+    expect(s == 200, "duyệt đánh giá", text[:150])
+    s, _, pub = call("GET", f"/api/opac/digital/browse/items/{item['publicId']}/reviews", authed=False)
+    expect(s == 200 and len(pub) == 1, "đánh giá đã duyệt hiện công khai")
+
+    # --- cổng thông tin: tin đăng, HTML làm sạch, menu mặc định theo saga
+    s, text, news = call("POST", f"{P}/news/Add", {"title": f"Tin thử nghiệm {tag}", "content": "<p>Xin chào</p><script>alert(1)</script><img src=x onerror=alert(2)>", "status": 2, "allowComment": True})
+    expect(s == 201 and news.get("content") == "<p>Xin chào</p>", "tin đăng: HTML mã độc bị làm sạch ở server", text[:200])
+    s, _, detail = call("GET", f"/api/opac/portal/news/{news['slug']}", authed=False)
+    expect(s == 200 and "<script" not in (detail.get("content") or ""), "OPAC đọc tin ẩn danh, không có script")
+    s, _, menus = call("GET", "/api/opac/portal/menus", authed=False)
+    expect(s == 200 and {m["code"] for m in menus} >= {"main", "footer"}, "menu mặc định do portal tự seed khi tạo đơn vị", str(menus)[:150])
+    s, _, page = call("POST", "/api/opac/portal/news/Search", {"language": "vi", "page": 1, "pageSize": 5, "q": f"thu nghiem {tag}"}, authed=False)
+    expect(s == 200 and any(i["slug"] == news["slug"] for i in page.get("items", [])), "tìm tin không dấu trên OPAC")
+
+    # --- liên hệ ẩn danh → cán bộ thấy → đánh dấu đã xử lý
+    s, _, _ = call("POST", "/api/opac/portal/contacts", {"name": "Bạn đọc E2E", "email": "e2e@example.com", "title": f"Hỏi {tag}", "content": "Thư viện mở cửa mấy giờ?"}, authed=False)
+    expect(s == 202, "gửi liên hệ ẩn danh", str(s))
+    s, _, listing = call("POST", f"{P}/contacts/Search", {"keyword": tag, "pageIndex": 1, "pageSize": 5})
+    expect(s == 200 and listing.get("totalCount", 0) >= 1, "cán bộ thấy liên hệ mới")
+    s, _, handled = call("POST", f"{P}/contacts/{listing['items'][0]['publicId']}/Handle", {"handleNote": "Đã trả lời"})
+    expect(s == 200 and handled.get("status") == 2, "đánh dấu liên hệ đã xử lý")
+
+    # --- dọn: ẩn tin + gỡ ebook để không làm bẩn đơn vị thử
+    call("PUT", f"{P}/news/ChangeStatus", {"publicId": news["publicId"], "status": 1})
+    call("PUT", f"{D}/items/ChangeStatus", {"publicId": item["publicId"], "status": 1})
 
 
 if __name__ == "__main__":

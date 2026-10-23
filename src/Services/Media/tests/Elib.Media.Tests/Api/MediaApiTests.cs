@@ -70,6 +70,35 @@ public sealed class MediaApiTests : IClassFixture<MediaApiFactory>, IAsyncLifeti
     }
 
     [Fact]
+    public async Task The_cms_image_library_lists_only_this_tenants_public_images_and_refuses_private_purposes()
+    {
+        var tenantId = Interlocked.Increment(ref _nextTenantId);
+        var client = Staff(tenantId);
+        async Task<Guid> Uploaded(HttpClient c, string purpose = "cms-image")
+        {
+            var t = await Ticket(c, purpose, "image/png", PngBytes.Length, "anh.png");
+            _factory.Storage.Upload(t.UploadUrl, PngBytes);
+            await Read<MediaFileDto>(await c.PostAsync(U($"/api/files/{t.FileId}/complete"), null));
+            return t.FileId;
+        }
+        var first = await Uploaded(client);
+        var second = await Uploaded(client);
+        await Ticket(client, "cms-image", "image/png", PngBytes.Length); // chưa upload xong: không có trong thư viện
+        await Uploaded(client, "bib-cover");
+        await Uploaded(Staff(Interlocked.Increment(ref _nextTenantId)));
+
+        var page = await Read<MediaFilePage>(await client.GetAsync(U("/api/files?purpose=cms-image&pageSize=1")));
+        Assert.Equal((2, 1), (page.Total, page.Items.Count));
+        Assert.Equal(second, page.Items[0].Id); // mới nhất trước
+        Assert.StartsWith($"/s3/media-public/{tenantId}/cms-image/", page.Items[0].Url, StringComparison.Ordinal);
+        var next = await Read<MediaFilePage>(await client.GetAsync(U("/api/files?purpose=cms-image&pageSize=1&page=2")));
+        Assert.Equal(first, Assert.Single(next.Items).Id);
+
+        Assert.Equal("MEDIA_LIST_PRIVATE", await ErrorCode(await client.GetAsync(U("/api/files?purpose=reader-photo"))));
+        Assert.Equal("MEDIA_PURPOSE_INVALID", await ErrorCode(await client.GetAsync(U("/api/files?purpose=khong-co"))));
+    }
+
+    [Fact]
     public async Task Batch_urls_return_only_ready_files_of_the_same_tenant()
     {
         var tenantId = Interlocked.Increment(ref _nextTenantId);

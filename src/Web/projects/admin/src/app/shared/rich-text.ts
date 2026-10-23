@@ -1,0 +1,161 @@
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewEncapsulation, effect, input, model, signal, viewChild } from '@angular/core';
+import { Editor } from '@tiptap/core';
+import Image from '@tiptap/extension-image';
+import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
+import StarterKit from '@tiptap/starter-kit';
+import { TranslatePipe } from '@ngx-translate/core';
+import { MediaFile } from '../core/api';
+import { MediaPicker } from './media-picker';
+
+/** Địa chỉ liên kết được phép chèn: http(s), mailto, tel hoặc đường dẫn nội bộ "/…" — server vẫn làm sạch lại khi lưu. */
+const SAFE_HREF = /^(https?:\/\/|mailto:|tel:|\/(?!\/))/i;
+
+/**
+ * Trình soạn nội dung CMS (TipTap, giấy phép MIT): đậm/nghiêng/gạch chân, tiêu đề, danh sách, trích dẫn, liên kết, bảng, ảnh từ thư viện ảnh của đơn vị.
+ * Giá trị là HTML. HTML này luôn được server làm sạch (danh sách thẻ cho phép) trước khi lưu — trình soạn chỉ là tiện lợi, không phải hàng rào bảo mật.
+ */
+@Component({
+  selector: 'app-rich-text',
+  encapsulation: ViewEncapsulation.None,
+  imports: [MediaPicker, TranslatePipe],
+  template: `
+    <div class="border border-gray-300 rounded-lg overflow-hidden bg-white">
+      @if (!disabled()) {
+        <div class="flex flex-wrap items-center gap-0.5 px-2 py-1 border-b border-gray-200 bg-gray-50" role="toolbar" [attr.aria-label]="'RICH.TOOLBAR' | translate">
+          @for (b of buttons; track b.key) {
+            <button type="button" class="icon-btn !w-8 !h-8" [class.bg-blue-100]="active(b.key)" [attr.aria-pressed]="active(b.key)" [attr.aria-label]="b.label | translate" [title]="b.label | translate" (click)="run(b.key)">
+              <span class="material-icons text-[18px]">{{ b.icon }}</span>
+            </button>
+          }
+        </div>
+      }
+      <div #host class="prose-editor px-3 py-2 min-h-[220px] max-h-[55vh] overflow-auto"></div>
+    </div>
+    @if (picking()) { <app-media-picker purpose="cms-image" (picked)="insertImage($event)" (closed)="picking.set(false)" /> }
+  `,
+  styles: `
+    .prose-editor .tiptap { outline: none; min-height: 200px; }
+    .prose-editor .tiptap h2 { font-size: 1.4rem; font-weight: 700; margin: 0.8em 0 0.4em; }
+    .prose-editor .tiptap h3 { font-size: 1.2rem; font-weight: 700; margin: 0.8em 0 0.4em; }
+    .prose-editor .tiptap h4 { font-size: 1.05rem; font-weight: 700; margin: 0.8em 0 0.4em; }
+    .prose-editor .tiptap ul { list-style: disc; padding-left: 1.4rem; }
+    .prose-editor .tiptap ol { list-style: decimal; padding-left: 1.4rem; }
+    .prose-editor .tiptap blockquote { border-left: 3px solid #cbd5e1; padding-left: 0.8rem; color: #475569; margin: 0.6em 0; }
+    .prose-editor .tiptap a { color: #1d4ed8; text-decoration: underline; }
+    .prose-editor .tiptap img { max-width: 100%; height: auto; }
+    .prose-editor .tiptap table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }
+    .prose-editor .tiptap td, .prose-editor .tiptap th { border: 1px solid #cbd5e1; padding: 4px 8px; min-width: 40px; vertical-align: top; }
+    .prose-editor .tiptap th { background: #f1f5f9; }
+  `,
+})
+export class RichText implements AfterViewInit, OnDestroy {
+  /** HTML (hai chiều). */
+  readonly value = model('');
+  readonly disabled = input(false);
+
+  private readonly host = viewChild.required<ElementRef<HTMLElement>>('host');
+  private editor: Editor | null = null;
+  protected readonly picking = signal(false);
+  private readonly tick = signal(0); // làm mới trạng thái nút (đậm/nghiêng…) khi con trỏ đổi
+
+  protected readonly buttons = [
+    { key: 'undo', icon: 'undo', label: 'RICH.UNDO' }, { key: 'redo', icon: 'redo', label: 'RICH.REDO' },
+    { key: 'h2', icon: 'title', label: 'RICH.H2' }, { key: 'h3', icon: 'text_fields', label: 'RICH.H3' },
+    { key: 'bold', icon: 'format_bold', label: 'RICH.BOLD' }, { key: 'italic', icon: 'format_italic', label: 'RICH.ITALIC' },
+    { key: 'underline', icon: 'format_underlined', label: 'RICH.UNDERLINE' }, { key: 'strike', icon: 'strikethrough_s', label: 'RICH.STRIKE' },
+    { key: 'bullet', icon: 'format_list_bulleted', label: 'RICH.BULLET' }, { key: 'ordered', icon: 'format_list_numbered', label: 'RICH.ORDERED' },
+    { key: 'quote', icon: 'format_quote', label: 'RICH.QUOTE' }, { key: 'link', icon: 'link', label: 'RICH.LINK' },
+    { key: 'image', icon: 'image', label: 'RICH.IMAGE' }, { key: 'table', icon: 'table_chart', label: 'RICH.TABLE' },
+    { key: 'rule', icon: 'horizontal_rule', label: 'RICH.RULE' }, { key: 'clear', icon: 'format_clear', label: 'RICH.CLEAR' },
+  ];
+
+  constructor() {
+    // Đổi bản ghi đang sửa (giá trị đến từ ngoài) thì nạp lại nội dung; gõ trong trình soạn thì không ghi đè.
+    effect(() => {
+      const next = this.value();
+      if (this.editor && next !== this.editor.getHTML()) this.editor.commands.setContent(next, { emitUpdate: false });
+    });
+    effect(() => {
+      this.editor?.setEditable(!this.disabled());
+    });
+  }
+
+  ngAfterViewInit(): void {
+    this.editor = new Editor({
+      element: this.host().nativeElement,
+      extensions: [
+        StarterKit.configure({ heading: { levels: [2, 3, 4] }, link: { openOnClick: false, autolink: false, protocols: ['http', 'https', 'mailto', 'tel'] } }),
+        Image.configure({ inline: false }),
+        Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
+      ],
+      content: this.value(),
+      editable: !this.disabled(),
+      onUpdate: ({ editor }) => this.value.set(editor.isEmpty ? '' : editor.getHTML()),
+      onSelectionUpdate: () => this.tick.update((n) => n + 1),
+      onTransaction: () => this.tick.update((n) => n + 1),
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.editor?.destroy();
+    this.editor = null;
+  }
+
+  protected active(key: string): boolean {
+    this.tick();
+    const e = this.editor;
+    if (!e) return false;
+    switch (key) {
+      case 'h2': return e.isActive('heading', { level: 2 });
+      case 'h3': return e.isActive('heading', { level: 3 });
+      case 'bold': case 'italic': case 'underline': case 'strike': return e.isActive(key);
+      case 'bullet': return e.isActive('bulletList');
+      case 'ordered': return e.isActive('orderedList');
+      case 'quote': return e.isActive('blockquote');
+      case 'link': return e.isActive('link');
+      default: return false;
+    }
+  }
+
+  protected run(key: string): void {
+    const chain = this.editor?.chain().focus();
+    if (!chain) return;
+    switch (key) {
+      case 'undo': chain.undo().run(); break;
+      case 'redo': chain.redo().run(); break;
+      case 'h2': chain.toggleHeading({ level: 2 }).run(); break;
+      case 'h3': chain.toggleHeading({ level: 3 }).run(); break;
+      case 'bold': chain.toggleBold().run(); break;
+      case 'italic': chain.toggleItalic().run(); break;
+      case 'underline': chain.toggleUnderline().run(); break;
+      case 'strike': chain.toggleStrike().run(); break;
+      case 'bullet': chain.toggleBulletList().run(); break;
+      case 'ordered': chain.toggleOrderedList().run(); break;
+      case 'quote': chain.toggleBlockquote().run(); break;
+      case 'link': this.setLink(); break;
+      case 'image': this.picking.set(true); break;
+      case 'table': chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      case 'rule': chain.setHorizontalRule().run(); break;
+      case 'clear': chain.unsetAllMarks().clearNodes().run(); break;
+    }
+  }
+
+  protected insertImage(file: MediaFile): void {
+    this.picking.set(false);
+    if (file.url) this.editor?.chain().focus().setImage({ src: file.url, alt: file.fileName }).run();
+  }
+
+  private setLink(): void {
+    const e = this.editor;
+    if (!e) return;
+    const current = (e.getAttributes('link')['href'] as string | undefined) ?? '';
+    const input = window.prompt('URL', current);
+    if (input === null) return;
+    const href = input.trim();
+    if (!href) {
+      e.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else if (SAFE_HREF.test(href)) {
+      e.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    }
+  }
+}

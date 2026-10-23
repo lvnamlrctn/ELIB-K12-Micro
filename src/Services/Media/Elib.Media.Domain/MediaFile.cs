@@ -46,6 +46,15 @@ public sealed record MediaPurpose(
     public static readonly MediaPurpose SpaceFloorplan =
         new("space-floorplan", "Ảnh sơ đồ tầng", Public: true, ["image/png", "image/jpeg", "image/webp"], 5 * MB, SystemOnly: false);
 
+    /// <summary>Ảnh của cổng thông tin (tin, banner, quảng cáo, album…) — công khai trên OPAC (portal giữ URL, cùng khuôn EbookCover).</summary>
+    public static readonly MediaPurpose CmsImage =
+        new("cms-image", "Ảnh cổng thông tin", Public: true, ["image/png", "image/jpeg", "image/webp", "image/gif"], 5 * MB, SystemOnly: false);
+
+    /// <summary>Tệp đính kèm của tin (PDF/Word) — công khai trên OPAC; nội dung kiểm bằng magic bytes như mọi mục đích khác.</summary>
+    public static readonly MediaPurpose CmsAttachment = new(
+        "cms-attachment", "Tệp đính kèm tin", Public: true,
+        ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], 20 * MB, SystemOnly: false);
+
     /// <summary>Nội dung tài liệu số — riêng tư, chỉ xem qua URL có hạn sau khi digital tự kiểm quyền mượn/chính sách.</summary>
     public static readonly MediaPurpose EbookFile =
         new("ebook-file", "Tệp tài liệu số", Public: false, ["application/pdf"], 200 * MB, SystemOnly: false);
@@ -58,7 +67,7 @@ public sealed record MediaPurpose(
         ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         50 * MB, SystemOnly: false, ServiceRequestable: true);
 
-    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile, DocumentSubmission, SpaceFloorplan];
+    public static readonly IReadOnlyList<MediaPurpose> All = [TenantLogo, Attachment, ReaderPhoto, BibCover, EbookCover, EbookFile, DocumentSubmission, SpaceFloorplan, CmsImage, CmsAttachment];
 
     public static MediaPurpose Get(string? code) =>
         All.FirstOrDefault(p => string.Equals(p.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase))

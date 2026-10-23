@@ -45,6 +45,8 @@ public sealed record MediaFileDto(Guid Id, string Purpose, string FileName, stri
 
 public sealed record DownloadDto(string Url, DateTimeOffset? ExpiresAt);
 
+public sealed record MediaFilePage(int Total, int Page, int PageSize, IReadOnlyList<MediaFileDto> Items);
+
 public sealed record FileContent(byte[] Bytes, string ContentType);
 
 public sealed record FileUrlsRequest(IReadOnlyList<Guid>? Ids);
@@ -177,6 +179,22 @@ public sealed class MediaService(IMediaDb db, IObjectStorage storage, ITenantCon
     }
 
     public async Task<MediaFileDto> GetAsync(Guid fileId, CancellationToken ct) => ToDto(await FindAsync(fileId, ct));
+
+    /// <summary>
+    /// Thư viện file đã upload của một mục đích CÔNG KHAI (ví dụ cms-image) để chọn lại thay vì upload lại — mới nhất trước. Mục đích riêng tư không liệt kê
+    /// được (ảnh bạn đọc, tài liệu số…): tên và quyền xem của chúng không thuộc về mọi cán bộ.
+    /// </summary>
+    public async Task<MediaFilePage> ListAsync(string? purposeCode, int page, int pageSize, CancellationToken ct)
+    {
+        var purpose = MediaPurpose.Get(purposeCode);
+        if (!purpose.Public) throw new BusinessRuleException("MEDIA_LIST_PRIVATE", "Chỉ liệt kê được file của mục đích công khai.");
+        var size = Math.Clamp(pageSize, 1, 60);
+        var number = Math.Max(1, page);
+        var query = db.Files.AsNoTracking().Where(f => f.Purpose == purpose.Code && f.Status == MediaFileStatus.Ready && f.IsPublic);
+        var total = await query.CountAsync(ct);
+        var rows = await query.OrderByDescending(f => f.CreatedAt).ThenByDescending(f => f.Id).Skip((number - 1) * size).Take(size).ToListAsync(ct);
+        return new MediaFilePage(total, number, size, [.. rows.Select(ToDto)]);
+    }
 
     /// <summary>URL tải: cố định với file công khai, ký có hạn với file riêng tư.</summary>
     public async Task<DownloadDto> DownloadAsync(Guid fileId, CancellationToken ct)

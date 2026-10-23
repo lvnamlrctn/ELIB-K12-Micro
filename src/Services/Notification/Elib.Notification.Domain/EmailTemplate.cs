@@ -78,6 +78,9 @@ public static class DefaultTemplates
     public const string EbookReviewApproved = "EBOOK_REVIEW_APPROVED";
     public const string EbookReviewRejected = "EBOOK_REVIEW_REJECTED";
 
+    // Cổng thông tin (portal gửi theo mã).
+    public const string PortalContactReceived = "PORTAL_CONTACT_RECEIVED";
+
     // Không gian & đặt phòng (space gửi theo mã).
     public const string SpaceBookingCreated = "SPACE_BOOKING_CREATED";
     public const string SpaceBookingApproved = "SPACE_BOOKING_APPROVED";
@@ -167,6 +170,13 @@ public static class DefaultTemplates
             """
             <p>Xin chào {{ full_name }},</p>
             <p>Đánh giá của bạn về tài liệu <strong>{{ title }}</strong> chưa được duyệt. Lý do: {{ reason }}.</p>
+            """),
+        new(PortalContactReceived, "Có liên hệ mới từ cổng thông tin", "Liên hệ mới: {{ contact_title }} — {{ tenant_name }}",
+            """
+            <p>Có liên hệ mới gửi từ cổng thông tin.</p>
+            <p><strong>Người gửi:</strong> {{ contact_name }} &lt;{{ contact_email }}&gt;</p>
+            <p><strong>Tiêu đề:</strong> {{ contact_title }}</p>
+            <p>{{ contact_content }}</p>
             """),
         new(SpaceBookingCreated, "Đã gửi yêu cầu đặt phòng", "Đã gửi yêu cầu đặt phòng — {{ tenant_name }}",
             """

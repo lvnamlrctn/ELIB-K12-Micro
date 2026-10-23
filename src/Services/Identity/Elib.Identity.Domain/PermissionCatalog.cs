@@ -23,6 +23,9 @@ public static class PermissionCatalog
     /// <summary>Duyệt yêu cầu thay đổi vượt thẩm quyền (không thuộc Crud — cấp riêng cho người có thẩm quyền).</summary>
     public const string Approve = "approve";
 
+    /// <summary>Đăng / gỡ nội dung cổng thông tin — người chỉ có quyền Sửa soạn được bản nháp nhưng không tự đăng.</summary>
+    public const string Publish = "publish";
+
     private static readonly string[] Crud = [View, Add, Edit, Delete];
     private const string ReaderGroup = "Quản lý bạn đọc";
     private const string ReaderParams = "Quản lý bạn đọc / Tham số bạn đọc";
@@ -46,6 +49,8 @@ public static class PermissionCatalog
     private const string DigitalLicense = "DIGITAL";
     private const string SpaceGroup = "Không gian & đặt phòng";
     private const string SpaceLicense = "SPACE";
+    private const string PortalGroup = "Cổng thông tin";
+    private const string PortalLicense = "PORTAL";
 
     public static readonly IReadOnlyList<PermissionModule> All =
     [
@@ -128,6 +133,18 @@ public static class PermissionCatalog
         new("DIGITAL_DIG_TYPES", "Loại tài liệu số", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_POLICIES", "Chính sách tài liệu số", DigitalParams, Crud, DigitalLicense),
         new("DIGITAL_POLICIES_BY_COLLECTION", "Chính sách theo bộ sưu tập", DigitalParams, Crud, DigitalLicense),
+
+        new("PORTAL_NEWS", "Tin tức", PortalGroup, [View, Add, Edit, Delete, Publish], PortalLicense),
+        new("PORTAL_CATEGORIES", "Chuyên mục & sự kiện tin", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_COMMENTS", "Bình luận tin", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_PAGES", "Trang tĩnh", PortalGroup, [View, Add, Edit, Delete, Publish], PortalLicense),
+        new("PORTAL_MENUS", "Menu", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_LINKS", "Liên kết", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_BANNERS", "Banner", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_ADS", "Quảng cáo", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_GALLERY", "Ảnh & video", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_CONTACTS", "Liên hệ", PortalGroup, Crud, PortalLicense),
+        new("PORTAL_COUNTER", "Lượt truy cập", PortalGroup, [View], PortalLicense),
 
         new("SPACE_BUILDINGS", "Toà nhà", SpaceGroup, Crud, SpaceLicense),
         new("SPACE_FLOORS", "Tầng", SpaceGroup, Crud, SpaceLicense),

@@ -27,6 +27,15 @@ const catalog = (path: string, config: CrudConfig) => ({
   title: config.title,
 });
 
+/** Danh mục của portal: cấu hình nạp muộn (pages/portal/catalog-route) để không phình gói khởi động. */
+const portalCatalog = (path: string, catalog: string, perm: string, title: string) => ({
+  path,
+  loadComponent: () => import('./pages/portal/catalog-route').then((m) => m.PortalCatalogRoute),
+  canActivate: [tenantGuard, permissionGuard(perm)],
+  data: { catalog },
+  title,
+});
+
 /** Danh mục cây tài liệu số (bộ sưu tập/môn loại/chủ đề) — như catalog() nhưng dùng TreeCatalogPage (có quan hệ cha/con). */
 const treeCatalog = (path: string, config: TreeCatalogConfig) => ({
   path,
@@ -35,6 +44,7 @@ const treeCatalog = (path: string, config: TreeCatalogConfig) => ({
   data: { config },
   title: config.title,
 });
+
 
 // Các màn tải theo trang (lazy) — khung admin + bảng điều khiển nằm trong bundle đầu.
 export const routes: Routes = [
@@ -201,6 +211,24 @@ export const routes: Routes = [
       { path: 'digital-reading', loadComponent: () => import('./pages/digital/reading-tracking').then((m) => m.ReadingTracking), canActivate: [tenantGuard, permissionGuard('DIGITAL_READING')], title: 'READING_PAGE.TITLE' },
       { path: 'digital-loans', loadComponent: () => import('./pages/digital/loans').then((m) => m.DigitalLoans), canActivate: [tenantGuard, permissionGuard('DIGITAL_LOANS')], title: 'DIGITAL_LOANS_PAGE.TITLE' },
       { path: 'digital-submissions', loadComponent: () => import('./pages/digital/submissions').then((m) => m.DigitalSubmissions), canActivate: [tenantGuard, permissionGuard('DIGITAL_SUBMISSIONS')], title: 'DIGITAL_SUBMISSIONS_PAGE.TITLE' },
+      // Cổng thông tin / CMS (portal)
+      { path: 'portal-news', loadComponent: () => import('./pages/portal/news').then((m) => m.PortalNewsPage), canActivate: [tenantGuard, permissionGuard('PORTAL_NEWS')], title: 'PORTAL_NEWS_PAGE.TITLE' },
+      { path: 'portal-pages', loadComponent: () => import('./pages/portal/pages').then((m) => m.PortalPages), canActivate: [tenantGuard, permissionGuard('PORTAL_PAGES')], title: 'PORTAL_PAGES_PAGE.TITLE' },
+      { path: 'portal-menus', loadComponent: () => import('./pages/portal/menus').then((m) => m.PortalMenus), canActivate: [tenantGuard, permissionGuard('PORTAL_MENUS')], title: 'PORTAL_MENUS_PAGE.TITLE' },
+      portalCatalog('portal-categories', 'categories', 'PORTAL_CATEGORIES', 'PORTAL_CAT.CATEGORIES_TITLE'),
+      portalCatalog('portal-events', 'events', 'PORTAL_CATEGORIES', 'PORTAL_CAT.EVENTS_TITLE'),
+      portalCatalog('portal-comments', 'comments', 'PORTAL_COMMENTS', 'PORTAL_CAT.COMMENTS_TITLE'),
+      portalCatalog('portal-menu-types', 'menu-types', 'PORTAL_MENUS', 'PORTAL_CAT.MENU_TYPES_TITLE'),
+      portalCatalog('portal-banners', 'banners', 'PORTAL_BANNERS', 'PORTAL_CAT.BANNERS_TITLE'),
+      portalCatalog('portal-ads', 'ads', 'PORTAL_ADS', 'PORTAL_CAT.ADS_TITLE'),
+      portalCatalog('portal-ads-groups', 'ads-groups', 'PORTAL_ADS', 'PORTAL_CAT.ADS_GROUPS_TITLE'),
+      portalCatalog('portal-albums', 'albums', 'PORTAL_GALLERY', 'PORTAL_CAT.ALBUMS_TITLE'),
+      portalCatalog('portal-photos', 'photos', 'PORTAL_GALLERY', 'PORTAL_CAT.PHOTOS_TITLE'),
+      portalCatalog('portal-videos', 'videos', 'PORTAL_GALLERY', 'PORTAL_CAT.VIDEOS_TITLE'),
+      portalCatalog('portal-links', 'links', 'PORTAL_LINKS', 'PORTAL_CAT.LINKS_TITLE'),
+      portalCatalog('portal-link-groups', 'link-groups', 'PORTAL_LINKS', 'PORTAL_CAT.LINK_GROUPS_TITLE'),
+      portalCatalog('portal-contacts', 'contacts', 'PORTAL_CONTACTS', 'PORTAL_CAT.CONTACTS_TITLE'),
+      portalCatalog('portal-contact-groups', 'contact-groups', 'PORTAL_CONTACTS', 'PORTAL_CAT.CONTACT_GROUPS_TITLE'),
       // Không gian & đặt phòng (space)
       catalog('space-buildings', SPACE_BUILDINGS),
       catalog('space-floors', SPACE_FLOORS),

@@ -9,6 +9,7 @@ using Elib.Catalog.Infrastructure;
 using Elib.Circulation.Infrastructure;
 using Elib.Digital.Infrastructure;
 using Elib.Payment.Infrastructure;
+using Elib.Portal.Infrastructure;
 using Elib.Space.Infrastructure;
 using Elib.Holdings.Infrastructure;
 using Elib.Search.Infrastructure;
@@ -83,6 +84,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             (cs, t) => new SpaceDbContext(Options<SpaceDbContext>(cs, t), t)),
         new("payment", "elib_leak_payment", ["payment_accounts", "charges", "charge_sync_states", "payment_transactions", "webhook_logs"],
             (cs, t) => new PaymentDbContext(Options<PaymentDbContext>(cs, t), t)),
+        new("portal", "elib_leak_portal", ["news_categories", "news_events", "news", "news_attachments", "news_comments", "portal_pages", "menu_types", "menus", "link_groups", "portal_links",
+                "banners", "ads_groups", "ads", "photo_albums", "photos", "videos", "contact_groups", "contacts", "counter_days"],
+            (cs, t) => new PortalDbContext(Options<PortalDbContext>(cs, t), t)),
     ];
 
     public static ServiceDatabase Get(string service) => Services.Single(s => s.Service == service);

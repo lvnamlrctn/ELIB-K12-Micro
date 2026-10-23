@@ -4,6 +4,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { LDatePipe, LNumberPipe, Language } from '../core/i18n';
 import { Api, CrudClient, CrudPage as Page, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
+import { MediaPicker } from './media-picker';
 import { PaymentDialog } from '../pages/payment/payment-dialog';
 import { ImportDialog } from './import-dialog';
 import { ToastrService } from './toastr';
@@ -26,8 +27,9 @@ export interface CrudField {
    * 'password': không bao giờ hiện giá trị cũ; để trống khi sửa = giữ nguyên (gửi null).
    * 'rows': bảng con nhiều dòng (giá trị là mảng object) theo rowFields — vd luật theo nhóm tài liệu của chính sách.
    * 'date': ngày yyyy-MM-dd (để trống = null).
+   * 'image': ảnh công khai chọn từ thư viện ảnh của đơn vị (hoặc upload mới) — giá trị là URL; mục đích media lấy từ <see cref="imagePurpose"/> (mặc định cms-image).
    */
-  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password' | 'rows' | 'date';
+  type: 'text' | 'number' | 'textarea' | 'status' | 'checkbox' | 'select' | 'multiselect' | 'password' | 'rows' | 'date' | 'image';
   /** Cột của bảng con ('rows'). */
   rowFields?: CrudRowField[];
   /** Nhãn nút thêm dòng của bảng con. */
@@ -36,6 +38,8 @@ export interface CrudField {
   options?: { value: string | number; label: string }[];
   /** Lựa chọn lấy từ API khi mở màn (vd danh sách loại kho); thêm sẵn lựa chọn trống "—". */
   optionsFrom?: (api: Api) => Promise<{ value: string | number; label: string }[]>;
+  /** Mục đích media của ô 'image' (mặc định cms-image). */
+  imagePurpose?: string;
   /** Nhãn của lựa chọn trống (mặc định "—"), vd "Mọi loại bạn đọc". */
   emptyLabel?: string;
   required?: boolean;
@@ -89,6 +93,9 @@ export interface CrudConfig {
   importable?: boolean;
   /** Nút thêm trên từng dòng (ví dụ "Kiểm tra kết nối"). */
   rowActions?: CrudRowAction[];
+  /** Ẩn nút Thêm / Sửa (bản ghi do hệ thống hay bạn đọc sinh ra, chỉ thao tác riêng + xoá). */
+  hideAdd?: boolean;
+  hideEdit?: boolean;
 }
 
 export interface CrudRowAction {
@@ -123,7 +130,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
  */
 @Component({
   selector: 'app-crud-page',
-  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, PaymentDialog],
+  imports: [FormsModule, LDatePipe, LNumberPipe, TranslatePipe, Paginator, Modal, ConfirmDelete, Loading, StatusBadge, ImportDialog, PaymentDialog, MediaPicker],
   template: `
     @let c = config();
     <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -159,7 +166,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
 
     <div class="panel flex gap-3 items-center justify-between flex-wrap">
       <div class="flex gap-2">
-        @if (can('add')) {
+        @if (can('add') && !c.hideAdd) {
           <button (click)="openAdd()" class="btn-add"><span class="material-icons text-[18px]">add</span> {{ 'COMMON.ADD_BTN' | translate }}</button>
           @if (c.importable) {
             <button (click)="importing.set(true)" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">upload_file</span> {{ 'COMMON.IMPORT_EXCEL' | translate }}</button>
@@ -236,7 +243,7 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                         </button>
                       }
                     }
-                    @if (can('edit')) {
+                    @if (can('edit') && !c.hideEdit) {
                       <button (click)="openEdit(row); $event.stopPropagation()" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate">
                         <span class="material-icons text-[18px]">edit</span>
                       </button>
@@ -298,6 +305,13 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
                   @case ('number') {
                     <input [id]="'f-' + f.key" [name]="f.key" type="number" step="any" class="input" [(ngModel)]="item[f.key]"
                            [placeholder]="(f.placeholder ?? '') | translate" [required]="!!f.required" [disabled]="locked(f, item)" />
+                  }
+                  @case ('image') {
+                    <div class="flex items-center gap-3">
+                      @if (item[f.key]) { <img [src]="$any(item[f.key])" alt="" class="h-14 w-20 object-cover rounded border border-gray-200" /> }
+                      <button type="button" class="btn-secondary" [disabled]="locked(f, item)" (click)="pickingImage.set(f)"><span class="material-icons text-[18px]">image</span> {{ 'MEDIA_PICKER.CHOOSE' | translate }}</button>
+                      @if (item[f.key]) { <button type="button" class="text-red-600 text-sm hover:underline" (click)="item[f.key] = null">{{ 'COMMON.DELETE' | translate }}</button> }
+                    </div>
                   }
                   @case ('date') {
                     <input [id]="'f-' + f.key" [name]="f.key" type="date" class="input" [(ngModel)]="item[f.key]" [required]="!!f.required" [disabled]="locked(f, item)" />
@@ -389,6 +403,9 @@ type Row = Record<string, unknown> & { publicId: string; id: number };
           </button>
         </ng-container>
       </app-modal>
+      @if (pickingImage(); as pf) {
+        <app-media-picker [purpose]="pf.imagePurpose ?? 'cms-image'" (picked)="item[pf.key] = $event.url; pickingImage.set(null)" (closed)="pickingImage.set(null)" />
+      }
     }
 
     @if (importing()) {
@@ -412,6 +429,7 @@ export class CrudPage implements OnInit {
   private readonly api = inject(Api);
   protected readonly session = inject(Session);
   protected readonly paying = signal<Row | null>(null);
+  protected readonly pickingImage = signal<CrudField | null>(null);
   private readonly toastr = inject(ToastrService);
   protected readonly language = inject(Language);
   private client!: CrudClient<Row>;

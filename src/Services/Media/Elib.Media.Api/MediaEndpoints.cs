@@ -20,6 +20,7 @@ public static class MediaEndpoints
             .AddEndpointFilter(RejectImpersonation);
         files.MapPost("/import", (ImportRequest request, MediaService s, CancellationToken ct) => s.ImportAsync(request, ct))
             .AddEndpointFilter(RejectImpersonation);
+        files.MapGet("/", (string? purpose, int? page, int? pageSize, MediaService s, CancellationToken ct) => s.ListAsync(purpose, page ?? 1, pageSize ?? 24, ct));
         files.MapGet("/{id:guid}", (Guid id, MediaService s, CancellationToken ct) => s.GetAsync(id, ct));
         files.MapGet("/{id:guid}/download", (Guid id, MediaService s, CancellationToken ct) => s.DownloadAsync(id, ct));
         files.MapPost("/urls", (FileUrlsRequest request, MediaService s, CancellationToken ct) => s.UrlsAsync(request, ct));

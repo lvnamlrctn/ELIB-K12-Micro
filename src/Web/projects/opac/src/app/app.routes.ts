@@ -14,6 +14,10 @@ export const routes: Routes = [
   { path: 'tai-khoan/callback', loadComponent: () => import('./pages/account-callback').then((m) => m.AccountCallback) },
   { path: 'dat-phong', loadComponent: () => import('./pages/space-booking').then((m) => m.SpaceBooking), title: 'OPAC.HOME.SERVICE_SPACE' },
   { path: 'tro-ly', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_AI' } },
-  { path: 'tin-tuc', loadComponent: () => import('./pages/coming-soon').then((m) => m.ComingSoon), data: { feature: 'OPAC.HOME.SERVICE_PORTAL' } },
+  { path: 'tin-tuc', loadComponent: () => import('./pages/news-list').then((m) => m.NewsList), title: 'OPAC.PORTAL.NEWS_TITLE' },
+  { path: 'tin-tuc/:slug', loadComponent: () => import('./pages/news-detail').then((m) => m.NewsDetail) },
+  { path: 'trang/:slug', loadComponent: () => import('./pages/static-page').then((m) => m.StaticPage) },
+  { path: 'lien-he', loadComponent: () => import('./pages/contact').then((m) => m.Contact), title: 'OPAC.PORTAL.CONTACT_TITLE' },
+  { path: 'hinh-anh-video', loadComponent: () => import('./pages/gallery').then((m) => m.Gallery), title: 'OPAC.PORTAL.GALLERY_TITLE' },
   { path: '**', loadComponent: () => import('./pages/not-found').then((m) => m.NotFound) },
 ];

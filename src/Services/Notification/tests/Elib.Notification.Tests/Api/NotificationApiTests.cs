@@ -87,7 +87,7 @@ public sealed class NotificationApiTests : IClassFixture<NotificationApiFactory>
         var templates = await Read<IReadOnlyList<EmailTemplateDto>>(
             await Staff(tenantId).PostAsJsonAsync("/api/email-templates/SearchAll", new CrudSearch(), Json));
         Assert.Equal([DefaultTemplates.EbookHoldReady, DefaultTemplates.EbookLoanExpired, DefaultTemplates.EbookReviewApproved, DefaultTemplates.EbookReviewRejected,
-            DefaultTemplates.EbookSubmissionApproved, DefaultTemplates.EbookSubmissionRejected, DefaultTemplates.LoginOtp, DefaultTemplates.PrintDueSoon,
+            DefaultTemplates.EbookSubmissionApproved, DefaultTemplates.EbookSubmissionRejected, DefaultTemplates.LoginOtp, DefaultTemplates.PortalContactReceived, DefaultTemplates.PrintDueSoon,
             DefaultTemplates.PrintHoldExpired, DefaultTemplates.PrintHoldReady, DefaultTemplates.PrintOverdue, DefaultTemplates.ReaderPasswordReset,
             DefaultTemplates.SpaceBookingApproved, DefaultTemplates.SpaceBookingBanned, DefaultTemplates.SpaceBookingCancelled,
             DefaultTemplates.SpaceBookingCreated, DefaultTemplates.SpaceBookingExpired, DefaultTemplates.SpaceBookingNoShow,

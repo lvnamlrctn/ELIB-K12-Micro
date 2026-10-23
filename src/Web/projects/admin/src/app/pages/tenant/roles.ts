@@ -13,6 +13,7 @@ const ACTIONS = [
   { key: 'edit', label: 'ROLE.ACTION_edit' },
   { key: 'delete', label: 'ROLE.ACTION_delete' },
   { key: 'approve', label: 'ROLE.ACTION_approve' },
+  { key: 'publish', label: 'ROLE.ACTION_publish' },
 ] as const;
 
 /** Một dòng của bảng phân quyền: tiêu đề nhóm (theo menu) hoặc một module quyền. */
@@ -151,7 +152,7 @@ interface MatrixRow {
                       @if (supports(row, a.key)) {
                         <button type="button" (click)="toggle(row, a.key)" [disabled]="!canEditMatrix()"
                                 class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 disabled:cursor-default disabled:opacity-70"
-                                [class]="isOn(row, a.key) ? (a.key === 'delete' ? 'bg-red-400' : a.key === 'approve' ? 'bg-amber-500' : 'bg-teal-500') : 'bg-gray-200'"
+                                [class]="isOn(row, a.key) ? (a.key === 'delete' ? 'bg-red-400' : a.key === 'approve' ? 'bg-amber-500' : a.key === 'publish' ? 'bg-indigo-500' : 'bg-teal-500') : 'bg-gray-200'"
                                 [title]="row.module ? (a.label | translate) : ('ROLE.WHOLE_GROUP' | translate: { action: (a.label | translate) })">
                           <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200"
                                 [class]="isOn(row, a.key) ? 'translate-x-4' : 'translate-x-0.5'"></span>

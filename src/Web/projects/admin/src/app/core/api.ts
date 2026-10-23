@@ -739,6 +739,21 @@ export interface SpaceAccessScanLogSearch extends CrudSearch { deviceId?: number
 
 // ── File (service media): upload 2 bước qua URL ký sẵn ──
 export interface UploadTicket { fileId: string; uploadUrl: string; expiresAt: string; maxBytes: number; }
+export interface MediaFilePage { total: number; page: number; pageSize: number; items: MediaFile[]; }
+
+/** Cổng thông tin (portal): tin tức — xem pages/portal/news.ts. */
+export interface PortalNews {
+  id: number; publicId: string; status: number; title: string; slug: string; brief: string | null; content: string | null; images: string | null; thumb: string | null;
+  startTime: string | null; endTime: string | null; publishedAt: string | null; categoryId: number | null; categoryName: string | null; eventId: number | null;
+  language: string | null; keyword: string | null; author: string | null; source: string | null; types: string | null; featured: boolean; allowComment: boolean;
+  totalView: number; metaTitle: string | null; metaKeyword: string | null; metaDescription: string | null; createdAt: string; updatedAt: string | null;
+}
+export interface PortalNewsSearch extends CrudSearch { categoryId?: number | null; eventId?: number | null; language?: string | null; }
+export interface PortalPageItem {
+  id: number; publicId: string; slug: string; title: string; content: string | null; language: string | null; metaDescription: string | null; status: number;
+}
+export interface PortalAttachment { id: number; publicId: string; newsId: number; name: string; url: string; fileSize: number | null; }
+
 export interface MediaFile { id: string; purpose: string; fileName: string; contentType: string; size: number; status: string; url: string | null; }
 export interface CreateTenant { code: string; name: string; subdomain: string; timeZone?: string | null; parentOrgId?: number | null; licenses: LicenseInput[]; }
 export interface RoleRef { publicId: string; name: string; }
@@ -1402,6 +1417,9 @@ export class Api {
   readingSessions(search: { ebookPublicId: string | null; keyword: string | null; from: string | null; to: string | null; pageIndex: number; pageSize: number }) {
     return this.post<ReadingSessionPage>('/api/admin/digital/reading-tracking/Search', search);
   }
+  mediaLibrary(purpose: string, page: number, pageSize: number) { return this.get<MediaFilePage>('/api/admin/media/files', { purpose, page, pageSize }); }
+  handlePortalContact(publicId: string, handleNote: string) { return this.post<unknown>(`/api/admin/portal/contacts/${publicId}/Handle`, { handleNote }); }
+  portalCounter() { return this.get<{ total: number; today: number; last7Days: number }>('/api/admin/portal/counter'); }
   approveEbookReview(publicId: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Approve`); }
   rejectEbookReview(publicId: string, reason: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Reject`, { reason }); }
 

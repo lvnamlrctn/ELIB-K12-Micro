@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Library } from '../core/library';
+import { PortalHomeBlock } from './portal-home';
 
 interface Service { module: string; title: string; text: string; icon: string; link: string; }
 
@@ -21,7 +22,7 @@ const CONTACT_KEYS = ['LIBRARY_ADDR', 'OPENHOUR', 'LIBRARY_TEL', 'LIBRARY_EMAIL'
 
 @Component({
   selector: 'opac-home',
-  imports: [FormsModule, RouterLink, TranslatePipe],
+  imports: [FormsModule, RouterLink, TranslatePipe, PortalHomeBlock],
   template: `
     <section class="bg-gradient-to-br from-blue-700 via-blue-600 to-sky-500 text-white">
       <div class="max-w-6xl mx-auto px-4 py-16 md:py-24">
@@ -37,6 +38,8 @@ const CONTACT_KEYS = ['LIBRARY_ADDR', 'OPENHOUR', 'LIBRARY_TEL', 'LIBRARY_EMAIL'
         }
       </div>
     </section>
+
+    @if (library.has('PORTAL')) { <opac-portal-home /> }
 
     <section class="max-w-6xl mx-auto px-4 py-12">
       <h2 class="text-xl font-semibold text-slate-900 mb-6">{{ 'OPAC.HOME.SERVICES_TITLE' | translate }}</h2>
