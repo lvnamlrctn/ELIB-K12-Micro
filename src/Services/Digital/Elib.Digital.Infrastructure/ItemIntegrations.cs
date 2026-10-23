@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Digital.Application;
@@ -306,8 +307,12 @@ public sealed class PdfPigTextExtractor : IPdfTextExtractor
     }
 }
 
-/// <summary>Đọc/ghi file tài liệu số qua /internal của media (service token): luồng đầy đủ, không qua URL ký công khai (/s3 chỉ có ý nghĩa với trình duyệt).</summary>
-public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContext tenant) : IMediaFileStore
+/// <summary>
+/// Đọc/ghi file tài liệu số qua /internal của media (service token): luồng đầy đủ, không qua URL ký công khai (/s3 chỉ có ý nghĩa với trình duyệt).
+/// Client này KHÔNG đi qua ServiceTokenHandler vì handler đó đệm toàn bộ nội dung vào bộ nhớ để gửi lại khi gặp 401 — với file tới 200 MB là không chấp nhận được.
+/// Token được gắn tại đây; đọc (GET) thử lại một lần khi 401, tải lên (luồng chỉ đọc được một lần) thì báo thử lại sau và lần sau lấy token mới.
+/// </summary>
+public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContext tenant, ServiceTokenProvider tokens) : IMediaFileStore
 {
     public const string HttpClientName = "elib-media-stream";
 
@@ -319,7 +324,12 @@ public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContex
         HttpResponseMessage response;
         try
         {
-            response = await clients.CreateClient(HttpClientName).GetAsync(new Uri(url, UriKind.Relative), HttpCompletionOption.ResponseHeadersRead, ct);
+            response = await SendReadAsync(url, ct);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                response.Dispose();
+                response = await SendReadAsync(url, ct, refreshToken: true);
+            }
         }
         catch (HttpRequestException)
         {
@@ -345,10 +355,13 @@ public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContex
         using var body = new StreamContent(content);
         body.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         body.Headers.ContentLength = size;
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(url, UriKind.Relative)) { Content = body };
+        var token = await tokens.GetTokenAsync(ct);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         HttpResponseMessage response;
         try
         {
-            response = await clients.CreateClient(HttpClientName).PostAsync(new Uri(url, UriKind.Relative), body, ct);
+            response = await clients.CreateClient(HttpClientName).SendAsync(request, ct);
         }
         catch (HttpRequestException)
         {
@@ -356,6 +369,11 @@ public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContex
         }
         using (response)
         {
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                tokens.Invalidate(token); // luồng đã dùng, không gửi lại được — lần tải sau dùng token mới
+                throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Kho file từ chối phiên làm việc của dịch vụ — thử lại sau.", 503);
+            }
             if (!response.IsSuccessStatusCode)
             {
                 var detail = await response.Content.ReadFromJsonAsync<ErrorBody>(ct);
@@ -363,6 +381,19 @@ public sealed class HttpMediaFileStore(IHttpClientFactory clients, ITenantContex
             }
             return (await response.Content.ReadFromJsonAsync<UploadedFile>(ct))?.FileId ?? throw new BusinessRuleException("MEDIA_UNAVAILABLE", "Kho file trả về dữ liệu không hợp lệ.", 503);
         }
+    }
+
+    private async Task<HttpResponseMessage> SendReadAsync(string url, CancellationToken ct, bool refreshToken = false)
+    {
+        var token = await tokens.GetTokenAsync(ct);
+        if (refreshToken)
+        {
+            tokens.Invalidate(token);
+            token = await tokens.GetTokenAsync(ct);
+        }
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url, UriKind.Relative));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await clients.CreateClient(HttpClientName).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
     private sealed record ErrorBody(string? Code, string? Detail);

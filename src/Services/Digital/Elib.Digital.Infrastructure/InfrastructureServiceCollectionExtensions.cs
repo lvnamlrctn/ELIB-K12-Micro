@@ -68,11 +68,10 @@ public static class InfrastructureServiceCollectionExtensions
         var mediaUrl = configuration["Media:Url"];
         if (string.IsNullOrWhiteSpace(mediaUrl)) throw new InvalidOperationException("Thiếu Media:Url (địa chỉ nội bộ của service).");
         services.AddHttpClient(HttpMediaFileStore.HttpClientName, c =>
-            {
-                c.BaseAddress = new Uri(mediaUrl.TrimEnd('/') + "/");
-                c.Timeout = TimeSpan.FromMinutes(30);
-            })
-            .AddHttpMessageHandler<ServiceTokenHandler>();
+        {
+            c.BaseAddress = new Uri(mediaUrl.TrimEnd('/') + "/");
+            c.Timeout = TimeSpan.FromMinutes(30);
+        }); // không qua ServiceTokenHandler (đệm nội dung vào bộ nhớ) — HttpMediaFileStore tự gắn token
         services.AddScoped<IMediaFileStore, HttpMediaFileStore>();
         services.AddSingleton<EbookContentSyncJob>();
         services.AddHostedService(sp => sp.GetRequiredService<EbookContentSyncJob>());

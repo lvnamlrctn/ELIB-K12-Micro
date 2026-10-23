@@ -103,12 +103,18 @@ public sealed partial class EbookContentSync(
     {
         state.Start(clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
+        var staged = new List<EbookChunk>();
         try
         {
             var files = await db.Set<EbookFile>().AsNoTracking()
                 .Where(f => f.EbookItemId == state.EbookItemId).Where(PdfFiles.Predicate)
                 .OrderBy(f => f.SortOrder).ThenBy(f => f.Id).Take(MaxFilesPerItem).Select(f => f.MediaFileId).ToListAsync(ct);
-            if (files.Count == 0) throw new BusinessRuleException("CONTENT_NO_PDF", "Tài liệu không còn file PDF.");
+            if (files.Count == 0)
+            {
+                // File PDF đã bị gỡ sau khi xếp hàng: xoá đoạn cũ để không còn tìm thấy nội dung của file không còn.
+                await ReplaceAsync(state, [], EbookContentState.Failed, 0, 0, "Tài liệu không còn file PDF.", ct);
+                return;
+            }
 
             var pages = new List<PdfPageText>();
             var pageCount = 0;
@@ -124,7 +130,7 @@ public sealed partial class EbookContentSync(
             }
 
             var pieces = Split(pages).Take(MaxChunksPerItem).ToList();
-            var chunks = new List<EbookChunk>(pieces.Count);
+            var chunks = staged;
             string? warning = null;
             var embedded = 0;
             var tryEmbed = embedder.Enabled;
@@ -162,6 +168,14 @@ public sealed partial class EbookContentSync(
         {
             LogFailed(logger, state.EbookItemId, ex);
             state.Finish(EbookContentState.Failed, 0, 0, 0, ex.Message, clock.GetUtcNow());
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Lỗi không lường trước (vd. lưu CSDL hỏng): gỡ các đoạn đang chờ lưu rồi đánh dấu lỗi — không để dòng kẹt ở Running và bị thử lại mãi.
+            LogFailed(logger, state.EbookItemId, ex);
+            foreach (var chunk in staged) db.Set<EbookChunk>().Entry(chunk).State = EntityState.Detached;
+            state.Finish(EbookContentState.Failed, 0, 0, 0, "Lỗi không lường trước khi đồng bộ nội dung — xem nhật ký dịch vụ.", clock.GetUtcNow());
             await db.SaveChangesAsync(CancellationToken.None);
         }
     }

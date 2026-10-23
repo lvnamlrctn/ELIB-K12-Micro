@@ -165,6 +165,37 @@ public sealed class ItemsContentApiTests(DigitalApiFactory factory) : DigitalTes
     }
 
     [Fact]
+    public async Task Removing_the_last_pdf_takes_its_text_out_of_search_at_once_and_adding_one_requeues_the_sync()
+    {
+        var tenantId = NewTenant();
+        var staff = Staff(tenantId);
+        var item = await AddItem(staff, "Gỡ file");
+        await AddPdf(staff, item.PublicId, Pdf("Secret blueprint of the old fortress."));
+        await Sync(staff, item.PublicId);
+        await RunJob();
+        Assert.Single(await Search(Opac(tenantId), "fortress"));
+
+        // Gỡ file PDF duy nhất: đoạn đã lập chỉ mục biến mất ngay, không đợi việc nền.
+        var file = (await Read<CrudPageOfFiles>(await staff.PostAsJsonAsync(U("/api/files/Search"), new EbookFileSearch { EbookItemPublicId = item.PublicId, PageSize = 10 }, Json))).Items.Single();
+        Assert.True((await staff.DeleteAsync(U($"/api/files/Delete/{file.PublicId}"))).IsSuccessStatusCode);
+        Assert.Empty(await Search(Opac(tenantId), "fortress"));
+        Assert.Equal("pending", (await StatusOf(staff, item.PublicId))!.Status);
+        await RunJob();
+        var status = (await StatusOf(staff, item.PublicId))!;
+        Assert.Equal(("failed", 0), (status.Status, status.ChunkCount));
+        Assert.Contains("không còn file PDF", status.Error);
+
+        // Thêm file mới: tài liệu tự xếp lại hàng đợi và nội dung mới tìm được.
+        await AddPdf(staff, item.PublicId, Pdf("Fresh chronicle of the harbour."));
+        Assert.Equal("pending", (await StatusOf(staff, item.PublicId))!.Status);
+        await RunJob();
+        Assert.Single(await Search(Opac(tenantId), "harbour"));
+        Assert.Empty(await Search(Opac(tenantId), "fortress"));
+    }
+
+    private sealed record CrudPageOfFiles(List<EbookFileDto> Items);
+
+    [Fact]
     public async Task Semantic_search_needs_the_embedder_and_ranks_by_meaning_when_it_is_on()
     {
         var tenantId = NewTenant();

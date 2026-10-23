@@ -185,6 +185,21 @@ public sealed class EbookFileResource(ICrudDbContext db, EbookStatePublisher sta
         var hasFile = change == CrudChange.Added || await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == item.Id && f.Id != entity.Id, ct);
         item.Touch(clock.GetUtcNow());
         await states.PublishAsync(item, false, ct, hasFile: hasFile);
+        await RefreshContentAsync(item, entity, change, ct);
+    }
+
+    /// <summary>
+    /// Đồng bộ nội dung đã chạy cho tài liệu này thì xếp lại hàng đợi khi thêm/xoá file. Xoá file PDF cuối cùng: gỡ ngay các đoạn đã lập chỉ mục
+    /// (không để OPAC còn trích dẫn từ file cán bộ đã gỡ, có thể là file nhầm hoặc mật) rồi để việc nền ghi trạng thái.
+    /// </summary>
+    private async Task RefreshContentAsync(EbookItem item, EbookFile file, CrudChange change, CancellationToken ct)
+    {
+        var state = await Db.Set<EbookContentState>().FirstOrDefaultAsync(s => s.EbookItemId == item.Id, ct);
+        if (state is null) return;
+        if (change == CrudChange.Deleted
+            && !await Db.Set<EbookFile>().Where(f => f.EbookItemId == item.Id && f.Id != file.Id).Where(PdfFiles.Predicate).AnyAsync(ct))
+            await Db.Set<EbookChunk>().Where(c => c.EbookItemId == item.Id).ExecuteDeleteAsync(ct);
+        state.Requeue(clock.GetUtcNow());
     }
 
     protected override string EntityName => "File tài liệu số";
