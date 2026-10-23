@@ -36,7 +36,7 @@ const RECEIPT_KEYS: Record<number, string> = { 0: 'DASH.ACQ.RECEIPT_0', 1: 'DASH
     @if (holdings) {
       <app-panel title="DASH.ACQ.STORE_FILL" sub="DASH.ACQ.STORE_FILL_SUB" icon="warehouse" iconColor="text-emerald-600" [loading]="holdings.loading()" [error]="holdings.error()" [empty]="!holdings.data()?.stores?.length" [height]="120" (retry)="holdings.load()">
         <ul class="space-y-3">
-          @for (s of holdings.data()!.stores; track s.storeId) {
+          @for (s of holdings.data()?.stores ?? []; track s.storeId) {
             <li>
               <div class="flex items-center justify-between text-sm"><span class="font-semibold text-slate-700">{{ s.name }}</span>
                 <span class="text-slate-500">{{ s.count | number }}@if (s.capacity) { / {{ s.capacity | number }} ({{ s.percent }}%) } @else { <span class="text-xs text-slate-400"> · {{ 'DASH.ACQ.NO_CAPACITY' | translate }}</span> }</span></div>

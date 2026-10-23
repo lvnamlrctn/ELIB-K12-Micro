@@ -18,8 +18,8 @@ import { Kpi, Panel, dashboardSource } from './dash-kit';
       <app-kpi icon="pending_actions" tint="bg-red-50 text-red-600" label="DASH.SPACE.PENDING" [value]="d()?.pendingRequests" [danger]="(d()?.pendingRequests ?? 0) > 0" [loading]="src.loading()" [error]="src.error()" [link]="session.can('SPACE_BOOKINGS:view') ? '/space-bookings' : null" />
     </div>
     <app-panel title="DASH.SPACE.NO_SHOW" sub="DASH.LAST_30_DAYS" icon="person_off" iconColor="text-amber-500" [loading]="src.loading()" [error]="src.error()" [empty]="!d() || d()!.noShow30.total === 0" [height]="80" (retry)="src.load()">
-      <p class="text-sm text-slate-600">{{ 'DASH.SPACE.NO_SHOW_DETAIL' | translate: { noShow: d()!.noShow30.noShow, total: d()!.noShow30.total } }}</p>
-      <p class="text-3xl font-extrabold text-slate-800 mt-2">{{ d()!.noShow30.ratePercent | number }}%</p>
+      <p class="text-sm text-slate-600">{{ 'DASH.SPACE.NO_SHOW_DETAIL' | translate: { noShow: d()?.noShow30?.noShow, total: d()?.noShow30?.total } }}</p>
+      <p class="text-3xl font-extrabold text-slate-800 mt-2">{{ d()?.noShow30?.ratePercent | number }}%</p>
     </app-panel>
   `,
 })

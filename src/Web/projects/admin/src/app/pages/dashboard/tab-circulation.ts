@@ -54,7 +54,7 @@ import { ChartView, Kpi, PALETTE, Panel, RankList, dashboardSource } from './das
         <table class="w-full text-left text-sm">
           <thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="py-2 pr-3">{{ 'DASH.TITLE_COL' | translate }}</th><th class="py-2 pr-3">{{ 'DASH.AUTHOR_COL' | translate }}</th><th class="py-2 pr-3">{{ 'DASH.STORE_COL' | translate }}</th><th class="py-2 text-right">{{ 'DASH.COPIES_COL' | translate }}</th></tr></thead>
           <tbody>
-            @for (u of d()!.unused; track u.mfn) {
+            @for (u of d()?.unused ?? []; track u.mfn) {
               <tr class="border-t border-slate-100"><td class="py-2 pr-3 font-semibold text-slate-700">{{ u.title }}</td><td class="py-2 pr-3 text-slate-500">{{ u.author }}</td><td class="py-2 pr-3 text-slate-500">{{ u.storeName }}</td><td class="py-2 text-right font-bold">{{ u.copies | number }}</td></tr>
             }
           </tbody>

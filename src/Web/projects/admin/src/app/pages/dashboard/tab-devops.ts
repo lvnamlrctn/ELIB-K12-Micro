@@ -25,7 +25,7 @@ import { Kpi, Panel, Source } from './dash-kit';
         <table class="w-full text-left text-sm">
           <thead><tr class="text-[11px] uppercase tracking-wider text-slate-400"><th class="py-2 pr-3">{{ 'DASH.OPS.SERVICE' | translate }}</th><th class="py-2 pr-3">{{ 'COMMON.STATUS' | translate }}</th><th class="py-2 text-right">{{ 'DASH.OPS.LATENCY' | translate }}</th></tr></thead>
           <tbody>
-            @for (s of d()!.services; track s.name) {
+            @for (s of d()?.services ?? []; track s.name) {
               <tr class="border-t border-slate-100">
                 <td class="py-2 pr-3 font-semibold text-slate-700">{{ s.name }}</td>
                 <td class="py-2 pr-3"><span class="inline-flex items-center gap-1.5 text-xs font-bold" [class]="s.status === 'Healthy' ? 'text-emerald-600' : 'text-red-600'">
