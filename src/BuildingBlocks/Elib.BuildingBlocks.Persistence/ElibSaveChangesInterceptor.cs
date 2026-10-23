@@ -65,6 +65,7 @@ public sealed class ElibSaveChangesInterceptor(ITenantContext tenant, ICurrentAc
 
                 case EntityState.Deleted when entry.Entity is ISoftDeletable d:
                     entry.State = EntityState.Modified;
+                    KeepOwnedUnchanged(entry);
                     d.IsDeleted = true;
                     d.DeletedAt = now;
                     d.DeletedBy = actorId;
@@ -75,6 +76,20 @@ public sealed class ElibSaveChangesInterceptor(ITenantContext tenant, ICurrentAc
                     }
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Xoá mềm đổi chủ thể từ Deleted sang Modified; các thực thể owned (cột JSON) của nó vẫn ở Deleted theo cascade và EF sẽ ném lỗi khi ghi JSON.
+    /// Chúng thuộc dòng còn tồn tại nên phải trả về Unchanged.
+    /// </summary>
+    private static void KeepOwnedUnchanged(EntityEntry owner)
+    {
+        foreach (var navigation in owner.Navigations)
+        {
+            if (!navigation.Metadata.TargetEntityType.IsOwned() || navigation.CurrentValue is null) continue;
+            var targets = navigation.Metadata.IsCollection ? ((System.Collections.IEnumerable)navigation.CurrentValue).Cast<object>() : [navigation.CurrentValue];
+            foreach (var target in targets) owner.Context.Entry(target).State = EntityState.Unchanged;
         }
     }
 

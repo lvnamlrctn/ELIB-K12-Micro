@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Elib.BuildingBlocks.Domain;
 
 namespace Elib.Digital.Domain;
@@ -27,6 +28,30 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     public string? Page { get; private set; }
     public string? OldAuthor { get; private set; }
     public string? Xml { get; private set; }
+
+    /// <summary>Tóm tắt (LRC: Abstract).</summary>
+    public string? Abstract { get; private set; }
+
+    /// <summary>Mô tả (LRC: Description).</summary>
+    public string? Description { get; private set; }
+
+    /// <summary>Tên tạp chí/báo (LRC: JournalName).</summary>
+    public string? JournalName { get; private set; }
+
+    public int? PublishDay { get; private set; }
+    public int? PublishMonth { get; private set; }
+
+    /// <summary>Năm xuất bản dạng số — suy từ <see cref="PublishDate"/> khi không nhập riêng; dùng để lọc khoảng năm.</summary>
+    public int? PublishYear { get; private set; }
+
+    /// <summary>Tác giả tách họ/tên (JSON). <see cref="Author"/> là bản ghép "; " của danh sách này để tìm kiếm và tương thích.</summary>
+    public List<EbookPerson> Authors { get; private set; } = [];
+
+    /// <summary>Người hướng dẫn (JSON). <see cref="OldAuthor"/> là bản ghép.</summary>
+    public List<EbookPerson> Advisors { get; private set; } = [];
+
+    /// <summary>Số định danh ISSN/ISMN/ISBN/URI/Gov't Doc #/khác (JSON).</summary>
+    public List<EbookIdentifier> Identifiers { get; private set; } = [];
 
     public string? Language { get; private set; }
 
@@ -101,6 +126,27 @@ public sealed class EbookItem : TenantEntity, IHasStatus
         Page = TextRules.Optional(f.Page, 50, "PAGE_INVALID", "Số trang");
         OldAuthor = TextRules.Optional(f.OldAuthor, 500, "OLD_AUTHOR_INVALID", "Người hướng dẫn");
         Xml = TextRules.Optional(f.Xml, 50_000, "XML_INVALID", "Dữ liệu XML");
+        Abstract = TextRules.Optional(f.Abstract, 20_000, "ABSTRACT_INVALID", "Tóm tắt");
+        Description = TextRules.Optional(f.Description, 20_000, "DESCRIPTION_INVALID", "Mô tả");
+        JournalName = TextRules.Optional(f.JournalName, 500, "JOURNAL_INVALID", "Tên tạp chí");
+        PublishDay = f.PublishDay is null or (>= 1 and <= 31) ? f.PublishDay : throw new BusinessRuleException("PUBLISH_DAY_INVALID", "Ngày xuất bản phải từ 1 đến 31.");
+        PublishMonth = f.PublishMonth is null or (>= 1 and <= 12) ? f.PublishMonth : throw new BusinessRuleException("PUBLISH_MONTH_INVALID", "Tháng xuất bản phải từ 1 đến 12.");
+        PublishYear = f.PublishYear is null or (>= 1000 and <= 2999) ? f.PublishYear ?? YearOf(PublishDate)
+            : throw new BusinessRuleException("PUBLISH_YEAR_INVALID", "Năm xuất bản không hợp lệ.");
+        // Có danh sách → ghép lại chuỗi phẳng; không có (người ghi cũ chỉ gửi chuỗi) → giữ chuỗi và dựng danh sách từ chuỗi, để hai bên luôn khớp.
+        if (f.Authors is not null)
+        {
+            Authors = EbookPerson.Clean(f.Authors);
+            Author = EbookPerson.Join(Authors, 500, "AUTHOR_INVALID", "Tác giả");
+        }
+        else Authors = EbookPerson.Split(Author);
+        if (f.Advisors is not null)
+        {
+            Advisors = EbookPerson.Clean(f.Advisors);
+            OldAuthor = EbookPerson.Join(Advisors, 500, "OLD_AUTHOR_INVALID", "Người hướng dẫn");
+        }
+        else Advisors = EbookPerson.Split(OldAuthor);
+        if (f.Identifiers is not null) Identifiers = EbookIdentifier.Clean(f.Identifiers);
         Language = TextRules.Optional(f.Language, 10, "LANGUAGE_INVALID", "Ngôn ngữ");
 
         CollectionId = f.CollectionId;
@@ -126,6 +172,77 @@ public sealed class EbookItem : TenantEntity, IHasStatus
         Status = StatusRules.Validate(status);
         Version++;
     }
+
+    /// <summary>Đặt riêng ảnh bìa (vd. cắt từ một trang PDF) mà không đụng các trường khác.</summary>
+    public void SetCover(string? coverUrl, string mediaPublicPrefix, long tenantId, DateTimeOffset now)
+    {
+        CoverUrl = EbookCover.Validate(coverUrl, mediaPublicPrefix, tenantId);
+        Touch(now);
+    }
+
+    /// <summary>Đổi bộ sưu tập (thao tác hàng loạt) — nội dung đổi nên tăng phiên bản.</summary>
+    public void MoveToCollection(long collectionId, DateTimeOffset now)
+    {
+        CollectionId = collectionId;
+        Touch(now);
+    }
+
+    private static readonly Regex YearPattern = new(@"(?<!\d)([12]\d{3})(?!\d)", RegexOptions.CultureInvariant);
+
+    /// <summary>Năm 1000–2999 đầu tiên trong chuỗi ngày xuất bản ("2010", "05/2010", "2010-05-01"); không có → null.</summary>
+    public static int? YearOf(string? publishDate) =>
+        publishDate is not null && YearPattern.Match(publishDate) is { Success: true } m ? int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null;
+}
+
+/// <summary>Một người (tác giả/người hướng dẫn): họ, tên, chức danh — lưu JSON trong cột của tài liệu.</summary>
+public sealed class EbookPerson
+{
+    public const int MaxCount = 50;
+    public const int MaxPart = 200;
+
+    public string? Last { get; init; }
+    public string? First { get; init; }
+    public string? Title { get; init; }
+
+    public string Display => string.Join(' ', new[] { Last, First }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    internal static List<EbookPerson> Clean(IEnumerable<EbookPerson> people)
+    {
+        var list = people.Select(p => new EbookPerson
+        {
+            Last = TextRules.Optional(p.Last, MaxPart, "PERSON_INVALID", "Họ"),
+            First = TextRules.Optional(p.First, MaxPart, "PERSON_INVALID", "Tên"),
+            Title = TextRules.Optional(p.Title, MaxPart, "PERSON_INVALID", "Chức danh"),
+        }).Where(p => p.Last is not null || p.First is not null).ToList();
+        return list.Count <= MaxCount ? list : throw new BusinessRuleException("PERSON_TOO_MANY", $"Tối đa {MaxCount} người.");
+    }
+
+    /// <summary>Tách chuỗi "A; B" của người ghi cũ: cả tên vào Last (không đoán họ/tên).</summary>
+    internal static List<EbookPerson> Split(string? flat) =>
+        string.IsNullOrWhiteSpace(flat) ? [] : [.. flat.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Take(MaxCount).Select(x => new EbookPerson { Last = x.Length <= MaxPart ? x : x[..MaxPart] })];
+
+    internal static string? Join(List<EbookPerson> people, int max, string code, string label) =>
+        TextRules.Optional(people.Count == 0 ? null : string.Join("; ", people.Select(p => p.Display)), max, code, label);
+}
+
+/// <summary>Số định danh của tài liệu (LRC: numbers).</summary>
+public sealed class EbookIdentifier
+{
+    public static readonly string[] Types = ["issn", "ismn", "isbn", "uri", "govdoc", "other"];
+    public const int MaxCount = 20;
+
+    public string Type { get; init; } = "other";
+    public string Value { get; init; } = "";
+
+    internal static List<EbookIdentifier> Clean(IEnumerable<EbookIdentifier> values)
+    {
+        var list = values.Where(v => !string.IsNullOrWhiteSpace(v.Value)).Select(v => new EbookIdentifier
+        {
+            Type = v.Type?.Trim().ToLowerInvariant() is { } type && Types.Contains(type) ? type : throw new BusinessRuleException("IDENTIFIER_TYPE_INVALID", $"Loại số định danh phải là một trong: {string.Join(", ", Types)}."),
+            Value = TextRules.Required(v.Value, 300, "IDENTIFIER_INVALID", "Số định danh"),
+        }).ToList();
+        return list.Count <= MaxCount ? list : throw new BusinessRuleException("IDENTIFIER_TOO_MANY", $"Tối đa {MaxCount} số định danh.");
+    }
 }
 
 /// <summary>Trường ghi được của tài liệu số qua màn quản trị (LRC: EbookItemRequest + EbookItemXml, không gồm MetaDataEntries — hoãn).</summary>
@@ -134,7 +251,9 @@ public sealed record EbookItemFields(
     string? Publisher = null, string? PublishDate = null, string? Keyword = null, string? OtherTitle = null, string? Page = null,
     string? OldAuthor = null, string? Xml = null, string? Language = null, bool Free = false, bool AllowDownload = false, int? PrintCopies = null,
     int? OfflineDays = null, int? Show = null, int? IndexContent = null, int? Share = null, string? CoverUrl = null, Guid? LinkedBibPublicId = null,
-    int Status = IHasStatus.Active);
+    int Status = IHasStatus.Active, string? Abstract = null, string? Description = null, string? JournalName = null, int? PublishDay = null,
+    int? PublishMonth = null, int? PublishYear = null, IReadOnlyList<EbookPerson>? Authors = null, IReadOnlyList<EbookPerson>? Advisors = null,
+    IReadOnlyList<EbookIdentifier>? Identifiers = null);
 
 /// <summary>File đính kèm của tài liệu số (LRC: EbookFile) — nội dung riêng tư ở media (mục đích ebook-file), tham chiếu bằng id file.</summary>
 public sealed class EbookFile : TenantEntity

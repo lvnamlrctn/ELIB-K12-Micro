@@ -1,106 +1,177 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import {
-  Api, BibLinkOption, CrudPage as Page, EbookFile, EbookFileSearch, EbookItem, EbookItemSearch, MetadataField, STATUS_ACTIVE, errorMessage,
-} from '../../core/api';
+import { Api, CrudPage as Page, EbookItem, EbookItemSearch, ItemBulkResult, ItemSelection, STATUS_ACTIVE, STATUS_INACTIVE, errorMessage, saveFile } from '../../core/api';
 import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
-import { ConfirmDelete, Loading, Modal, Paginator, StatusBadge } from '../../shared/ui';
-
-interface MetaRow { fieldPublicId: string; value: string; language: string }
+import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
+import { ItemCover } from './item-cover';
+import { ItemForm } from './item-form';
+import { ItemExport, ItemImport, ItemMove, OptionItem, TOGGLE_CLASS, stamp } from './item-tools';
+import { ItemsApi } from './items-api';
 
 type TreeRow = { id: number; publicId: string; name: string; parentId: number | null; sortOrder: number };
 type NamedRow = { id: number; publicId: string; name: string };
 
-interface ItemForm {
-  publicId: string | null;
-  title: string; author: string; publisher: string; publishDate: string; otherTitle: string; page: string; oldAuthor: string; keyword: string;
-  language: string; collectionId: number | null; subjectId: number | null; topicId: number | null; typeId: number | null;
-  free: boolean; allowDownload: boolean; printCopies: number | null; offlineDays: number | null; status: number;
-  coverUrl: string | null; linkedBibPublicId: string | null; linkedBibLabel: string | null;
+/** Bộ lọc của màn (năm là chuỗi từ ô chọn; ngày nộp là yyyy-MM-dd từ ô ngày). */
+interface Filters {
+  collectionId: number | null; subjectId: number | null; topicId: number | null; typeId: number | null;
+  title: string; author: string; publisher: string; status: number | null;
+  yearFrom: number | null; yearTo: number | null; submittedFrom: string; submittedTo: string;
 }
 
+const emptyFilters = (): Filters => ({
+  collectionId: null, subjectId: null, topicId: null, typeId: null, title: '', author: '', publisher: '', status: null,
+  yearFrom: null, yearTo: null, submittedFrom: '', submittedTo: '',
+});
+
 /**
- * Tài liệu số — biểu ghi (LRC: EbookItemController, quyền DIGITAL_ITEMS). Trang bespoke (không dùng CrudConfig) vì có ảnh bìa,
- * liên kết sách in và quản lý file đính kèm ngay trong màn sửa.
+ * Quản lý tài liệu số (LRC: ebook-document, quyền DIGITAL_ITEMS): bộ lọc đầy đủ, chọn nhiều dòng (hoặc cả kết quả lọc) để chuyển bộ sưu tập / xoá,
+ * xuất Excel / metadata, nhập từ Excel / XML, bật-tắt xuất bản ngay trên dòng, ảnh bìa từ PDF, quản lý file và lượt mượn theo từng tài liệu.
  */
 @Component({
   selector: 'app-digital-items',
-  imports: [FormsModule, Modal, ConfirmDelete, Loading, Paginator, StatusBadge, TranslatePipe],
+  imports: [FormsModule, RouterLink, ConfirmDelete, ItemCover, ItemExport, ItemForm, ItemImport, ItemMove, Loading, Modal, Paginator, TranslatePipe],
   template: `
-    <div class="mb-5"><h4 class="page-title">{{ 'DIGITAL_ITEMS_PAGE.TITLE' | translate }}</h4></div>
+    <div class="mb-5"><h4 class="page-title">{{ 'DIGITAL_DOC.TITLE' | translate }}</h4></div>
 
-    <div class="panel">
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
-        <div class="xl:col-span-2">
-          <label class="field-label" for="it-kw">{{ 'COMMON.SEARCH' | translate }}</label>
-          <input id="it-kw" class="input" [(ngModel)]="search.keyword" (keydown.enter)="find()" />
+    <div class="panel !p-0">
+      <button type="button" class="w-full flex items-center justify-between px-4 py-3 text-left" (click)="filtersCollapsed.set(!filtersCollapsed())" [attr.aria-expanded]="!filtersCollapsed()">
+        <span class="flex items-center gap-2 font-medium text-gray-800"><span class="material-icons text-[20px] text-blue-600">search</span> {{ 'DIGITAL_DOC.FILTERS' | translate }}</span>
+        <span class="material-icons text-gray-500">{{ filtersCollapsed() ? 'expand_more' : 'expand_less' }}</span>
+      </button>
+      @if (!filtersCollapsed()) {
+        <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <select class="input" [(ngModel)]="filters.collectionId" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.PICK_COLLECTION' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.PICK_COLLECTION' | translate }}</option>@for (o of collectionOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }</select>
+          <select class="input" [(ngModel)]="filters.subjectId" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.PICK_SUBJECT' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.PICK_SUBJECT' | translate }}</option>@for (o of subjectOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }</select>
+          <select class="input" [(ngModel)]="filters.topicId" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.PICK_TOPIC' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.PICK_TOPIC' | translate }}</option>@for (o of topicOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }</select>
+          <select class="input" [(ngModel)]="filters.typeId" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.PICK_TYPE' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.PICK_TYPE' | translate }}</option>@for (o of typeOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }</select>
+
+          <input class="input" [(ngModel)]="filters.title" (keydown.enter)="find()" [placeholder]="'DIGITAL_DOC.FILTER_TITLE' | translate" [attr.aria-label]="'DIGITAL_DOC.FILTER_TITLE' | translate" />
+          <input class="input" [(ngModel)]="filters.author" (keydown.enter)="find()" [placeholder]="'DIGITAL_DOC.FILTER_AUTHOR' | translate" [attr.aria-label]="'DIGITAL_DOC.FILTER_AUTHOR' | translate" />
+          <input class="input" [(ngModel)]="filters.publisher" (keydown.enter)="find()" [placeholder]="'DIGITAL_DOC.FILTER_PUBLISHER' | translate" [attr.aria-label]="'DIGITAL_DOC.FILTER_PUBLISHER' | translate" />
+          <select class="input" [(ngModel)]="filters.status" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.PICK_STATUS' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.PICK_STATUS' | translate }}</option>
+            <option [ngValue]="2">{{ 'DIGITAL_DOC.STATUS_PUBLISHED' | translate }}</option><option [ngValue]="1">{{ 'DIGITAL_DOC.STATUS_UNPUBLISHED' | translate }}</option></select>
+
+          <select class="input" [(ngModel)]="filters.yearFrom" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.YEAR_FROM' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.YEAR_FROM' | translate }}</option>@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
+          <select class="input" [(ngModel)]="filters.yearTo" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.YEAR_TO' | translate">
+            <option [ngValue]="null">{{ 'DIGITAL_DOC.YEAR_TO' | translate }}</option>@for (y of years; track y) { <option [ngValue]="y">{{ y }}</option> }</select>
+          <input type="date" class="input" [(ngModel)]="filters.submittedFrom" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.SUBMITTED_FROM' | translate" />
+          <input type="date" class="input" [(ngModel)]="filters.submittedTo" (ngModelChange)="find()" [attr.aria-label]="'DIGITAL_DOC.SUBMITTED_TO' | translate" />
+
+          <div class="xl:col-span-3"></div>
+          <button type="button" class="btn-primary" (click)="find()"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
         </div>
-        <div>
-          <label class="field-label" for="it-coll">{{ 'DIGITAL_CAT.COLLECTION' | translate }}</label>
-          <select id="it-coll" class="input" [(ngModel)]="search.collectionId" (change)="find()">
-            <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
-            @for (o of collectionOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }
-          </select>
-        </div>
-        <div>
-          <label class="field-label" for="it-status">{{ 'COMMON.STATUS' | translate }}</label>
-          <select id="it-status" class="input" [(ngModel)]="search.status" (change)="find()">
-            <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
-            <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
-            <option [ngValue]="1">{{ 'DIGITAL_CAT.STATUS_HIDDEN' | translate }}</option>
-          </select>
-        </div>
-        <div class="flex items-end">
-          <button (click)="find()" class="btn-primary w-full"><span class="material-icons text-[18px]">search</span> {{ 'COMMON.SEARCH_BTN' | translate }}</button>
-        </div>
-      </div>
+      }
     </div>
 
-    <div class="panel flex gap-3 items-center justify-between flex-wrap">
-      @if (can('add')) {
-        <button (click)="openCreate()" class="btn-add"><span class="material-icons text-[18px]">add</span> {{ 'COMMON.ADD_BTN' | translate }}</button>
+    <div class="panel flex flex-wrap gap-2 items-center">
+      @if (can('view')) {
+        <button type="button" class="btn-primary" [disabled]="busy()" (click)="exportDialog.set(true)"><span class="material-icons text-[18px]">file_download</span> {{ 'DIGITAL_DOC.EXPORT_EXCEL' | translate }}</button>
+        <button type="button" class="btn-primary" [disabled]="busy()" (click)="exportMetadata()"><span class="material-icons text-[18px]">download</span> {{ 'DIGITAL_DOC.EXPORT_METADATA' | translate }}</button>
       }
-      <span class="text-sm text-gray-500">{{ 'COMMON.RECORDS_N' | translate: { count: page()?.totalCount ?? 0 } }}</span>
+      @if (can('add')) {
+        <button type="button" class="btn-primary" (click)="importDialog.set(true)"><span class="material-icons text-[18px]">file_upload</span> {{ 'DIGITAL_DOC.IMPORT' | translate }}</button>
+        <button type="button" class="btn-add" (click)="formOpen.set(true)"><span class="material-icons text-[18px]">add</span> {{ 'COMMON.ADD_BTN' | translate }}</button>
+      }
+      @if (can('delete')) {
+        <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="confirmDelete.set(true)">
+          <span class="material-icons text-[18px]">close</span> {{ 'DIGITAL_DOC.DELETE_SELECTED' | translate }}</button>
+      }
+      @if (can('edit')) {
+        <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="bulkStatus(2)">
+          <span class="material-icons text-[18px]">visibility</span> {{ 'DIGITAL_DOC.BULK_PUBLISH' | translate: { count: selectedCount() } }}</button>
+        <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-600 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="bulkStatus(1)">
+          <span class="material-icons text-[18px]">visibility_off</span> {{ 'DIGITAL_DOC.BULK_HIDE' | translate: { count: selectedCount() } }}</button>
+        <button type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50" [disabled]="!selectedCount() || busy()" (click)="moveDialog.set(true)">
+          <span class="material-icons text-[18px]">drive_file_move</span> {{ 'DIGITAL_DOC.MOVE_COLLECTION' | translate: { count: selectedCount() } }}</button>
+      }
+      <span class="ml-auto text-sm text-gray-500">{{ 'COMMON.RECORDS_N' | translate: { count: page()?.totalCount ?? 0 } }}</span>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
       @if (loading()) { <app-loading /> }
+      @if (pageAllTicked() && !allResults() && (page()?.totalCount ?? 0) > (page()?.items?.length ?? 0)) {
+        <div class="px-4 py-2 bg-blue-50 text-sm text-blue-800 flex items-center gap-2">
+          {{ 'DIGITAL_DOC.PAGE_SELECTED' | translate: { count: page()!.items.length } }}
+          <button type="button" class="underline font-medium" (click)="allResults.set(true)">{{ 'DIGITAL_DOC.SELECT_ALL_RESULTS' | translate: { count: page()!.totalCount } }}</button>
+        </div>
+      }
+      @if (allResults()) {
+        <div class="px-4 py-2 bg-blue-50 text-sm text-blue-800 flex items-center gap-2">
+          {{ 'DIGITAL_DOC.ALL_RESULTS_SELECTED' | translate: { count: page()?.totalCount ?? 0 } }}
+          <button type="button" class="underline font-medium" (click)="clearSelection()">{{ 'DIGITAL_DOC.CLEAR_SELECTION' | translate }}</button>
+        </div>
+      }
       <div class="overflow-x-auto w-full">
         <table class="w-full text-left border-collapse min-w-[900px]">
           <thead><tr>
-            <th class="th">{{ 'DIGITAL_ITEMS_PAGE.TITLE_COL' | translate }}</th>
-            <th class="th w-40">{{ 'DIGITAL_CAT.COLLECTION' | translate }}</th>
-            <th class="th w-28 !text-center">{{ 'DIGITAL_ITEMS_PAGE.FREE' | translate }}</th>
-            <th class="th w-36 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
-            <th class="th w-28 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
+            <th class="th w-10 !text-center">
+              <input type="checkbox" class="rounded border-gray-300" [checked]="pageAllTicked()" [indeterminate]="somePageTicked() && !pageAllTicked()" (change)="toggleAll()" [attr.aria-label]="'DIGITAL_DOC.SELECT_PAGE' | translate" />
+            </th>
+            <th class="th w-12 !text-center">{{ 'DIGITAL_DOC.COL_STT' | translate }}</th>
+            <th class="th w-40">{{ 'DIGITAL_DOC.COLLECTION' | translate }}</th>
+            <th class="th">{{ 'DIGITAL_DOC.COL_INFO' | translate }}</th>
+            <th class="th w-24 !text-center">{{ 'DIGITAL_DOC.COL_VIEWS' | translate }}</th>
+            <th class="th w-40 !text-center">{{ 'DIGITAL_DOC.COL_FILES' | translate }}</th>
+            <th class="th w-28 !text-center">{{ 'COMMON.STATUS' | translate }}</th>
+            <th class="th w-44 !text-center">{{ 'COMMON.ACTIONS' | translate }}</th>
           </tr></thead>
           <tbody>
-            @for (i of page()?.items ?? []; track i.publicId) {
-              <tr class="hover:bg-gray-50/50">
-                <td class="td"><span class="font-medium text-gray-800">{{ i.title }}</span>
-                  @if (i.author) { <div class="text-[11px] text-gray-500">{{ i.author }}</div> }</td>
-                <td class="td text-sm">{{ i.collectionName ?? '—' }}</td>
-                <td class="td text-center">
-                  @if (i.free) { <span class="badge-info">{{ 'DIGITAL_ITEMS_PAGE.FREE' | translate }}</span> } @else { <span class="text-gray-300">—</span> }
+            @for (i of page()?.items ?? []; track i.publicId; let n = $index) {
+              <tr class="hover:bg-gray-50/50 cursor-pointer" [class.bg-blue-50]="isTicked(i)" (click)="toggleRow(i)">
+                <td class="td text-center" (click)="$event.stopPropagation()">
+                  <input type="checkbox" class="rounded border-gray-300" [checked]="isTicked(i)" (change)="toggleRow(i)" [attr.aria-label]="i.title" />
                 </td>
-                <td class="td text-center"><app-status-badge [status]="i.status" inactiveText="DIGITAL_CAT.STATUS_HIDDEN" /></td>
-                <td class="td text-center">
+                <td class="td text-center text-sm text-gray-500">{{ offset() + n + 1 }}</td>
+                <td class="td text-sm">{{ i.collectionName ?? '—' }}</td>
+                <td class="td">
+                  <div class="flex gap-3">
+                    @if (i.coverUrl) { <img [src]="i.coverUrl" class="w-10 h-14 object-cover rounded border border-gray-200 shrink-0" referrerpolicy="no-referrer" alt="" /> }
+                    @else { <div class="w-10 h-14 rounded border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0"><span class="material-icons text-gray-400">menu_book</span></div> }
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold text-blue-700 line-clamp-2">{{ i.title }}</div>
+                      @if (i.author) { <div class="text-xs text-gray-600 flex items-center gap-1"><span class="material-icons text-[13px]">person</span> {{ i.author }}</div> }
+                      @if (i.publishYear || i.publishDate || i.publisher) {
+                        <div class="text-xs text-gray-500 flex items-center gap-1"><span class="material-icons text-[13px]">calendar_today</span>
+                          {{ i.publishYear ?? i.publishDate }}@if (i.publisher) { <span> · {{ i.publisher }}</span> }</div>
+                      }
+                    </div>
+                  </div>
+                </td>
+                <td class="td text-center text-sm">{{ i.totalView || 0 }}</td>
+                <td class="td text-center" (click)="$event.stopPropagation()">
+                  <a [routerLink]="['/digital-item-files', i.publicId]" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <span class="material-icons text-[16px]">folder_open</span> {{ 'DIGITAL_DOC.MANAGE_FILES_N' | translate: { count: i.totalFile } }}</a>
+                </td>
+                <td class="td text-center" (click)="$event.stopPropagation()">
+                  <label class="relative inline-flex items-center" [class.cursor-pointer]="can('edit')">
+                    <input type="checkbox" class="sr-only peer" [checked]="i.status === 2" [disabled]="!can('edit')" (change)="setStatus(i)" [attr.aria-label]="'DIGITAL_DOC.PUBLISHED' | translate" />
+                    <span [class]="toggle"></span>
+                  </label>
+                </td>
+                <td class="td" (click)="$event.stopPropagation()">
                   <div class="flex items-center justify-center gap-1">
                     @if (can('edit')) {
-                      <button (click)="openEdit(i)" class="icon-btn bg-blue-50 text-blue-600 hover:bg-blue-100" [title]="'COMMON.EDIT' | translate">
-                        <span class="material-icons text-[18px]">edit</span></button>
+                      <button type="button" class="w-7 h-7 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 flex items-center justify-center" (click)="coverFor.set(i)" [title]="'DIGITAL_DOC.COVER_FROM_PDF' | translate"><span class="material-icons text-[15px] leading-none">image</span></button>
+                      <button type="button" class="w-7 h-7 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center" (click)="edit(i)" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[15px] leading-none">edit</span></button>
                     }
+                    <a [routerLink]="['/digital-loans']" [queryParams]="{ item: i.publicId }" class="w-7 h-7 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center" [title]="'DIGITAL_DOC.LOANS' | translate"><span class="material-icons text-[15px] leading-none">assignment_return</span></a>
                     @if (can('delete')) {
-                      <button (click)="deleting.set(i)" class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" [title]="'COMMON.DELETE' | translate">
-                        <span class="material-icons text-[18px]">delete</span></button>
+                      <button type="button" class="w-7 h-7 rounded bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center" (click)="deleting.set(i)" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[15px] leading-none">delete</span></button>
                     }
                   </div>
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="5" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
+              <tr><td colspan="8" class="py-8 text-center text-gray-500">{{ loading() ? '' : ('COMMON.NO_DATA' | translate) }}</td></tr>
             }
           </tbody>
         </table>
@@ -108,189 +179,88 @@ interface ItemForm {
       @if (page(); as p) { <app-paginator [total]="p.totalCount" [pageIndex]="search.pageIndex!" [pageSize]="search.pageSize!" (pageChange)="onPage($event)" /> }
     </div>
 
-    @if (form(); as f) {
-      <app-modal [title]="f.publicId ? 'COMMON.EDIT' : 'COMMON.ADD_BTN'" widthClass="max-w-3xl" (closed)="form.set(null)">
-        <form id="item-form" (ngSubmit)="save()" class="grid grid-cols-2 gap-4">
-          <div class="col-span-2">
-            <label class="form-label" for="f-title">{{ 'DIGITAL_ITEMS_PAGE.TITLE_COL' | translate }} <span class="text-red-500">*</span></label>
-            <input id="f-title" name="title" class="input" [(ngModel)]="f.title" required />
-          </div>
-          <div><label class="form-label" for="f-author">{{ 'DIGITAL_ITEMS_PAGE.AUTHOR' | translate }}</label><input id="f-author" name="author" class="input" [(ngModel)]="f.author" /></div>
-          <div><label class="form-label" for="f-pub">{{ 'DIGITAL_ITEMS_PAGE.PUBLISHER' | translate }}</label><input id="f-pub" name="publisher" class="input" [(ngModel)]="f.publisher" /></div>
-          <div><label class="form-label" for="f-date">{{ 'DIGITAL_ITEMS_PAGE.PUBLISH_DATE' | translate }}</label><input id="f-date" name="publishDate" class="input" [(ngModel)]="f.publishDate" /></div>
-          <div><label class="form-label" for="f-other">{{ 'DIGITAL_ITEMS_PAGE.OTHER_TITLE' | translate }}</label><input id="f-other" name="otherTitle" class="input" [(ngModel)]="f.otherTitle" /></div>
-          <div><label class="form-label" for="f-page">{{ 'DIGITAL_ITEMS_PAGE.PAGE' | translate }}</label><input id="f-page" name="page" class="input" [(ngModel)]="f.page" /></div>
-          <div><label class="form-label" for="f-old">{{ 'DIGITAL_ITEMS_PAGE.OLD_AUTHOR' | translate }}</label><input id="f-old" name="oldAuthor" class="input" [(ngModel)]="f.oldAuthor" /></div>
-          <div class="col-span-2"><label class="form-label" for="f-kw">{{ 'DIGITAL_CAT.KEYWORD' | translate }}</label><input id="f-kw" name="keyword" class="input" [(ngModel)]="f.keyword" /></div>
-
-          <div>
-            <label class="form-label" for="f-coll">{{ 'DIGITAL_CAT.COLLECTION' | translate }}</label>
-            <select id="f-coll" name="collectionId" class="input" [(ngModel)]="f.collectionId">
-              <option [ngValue]="null">—</option>
-              @for (o of collectionOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="f-subj">{{ 'DIGITAL_CAT.SUBJECTS_TITLE' | translate }}</label>
-            <select id="f-subj" name="subjectId" class="input" [(ngModel)]="f.subjectId">
-              <option [ngValue]="null">—</option>
-              @for (o of subjectOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="f-topic">{{ 'DIGITAL_CAT.TOPICS_TITLE' | translate }}</label>
-            <select id="f-topic" name="topicId" class="input" [(ngModel)]="f.topicId">
-              <option [ngValue]="null">—</option>
-              @for (o of topicOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="f-type">{{ 'DIGITAL_CAT.DIG_TYPES_TITLE' | translate }}</label>
-            <select id="f-type" name="typeId" class="input" [(ngModel)]="f.typeId">
-              <option [ngValue]="null">—</option>
-              @for (o of typeOptions(); track o.id) { <option [ngValue]="o.id">{{ o.label }}</option> }
-            </select>
-          </div>
-
-          <div><label class="form-label" for="f-lang">{{ 'DIGITAL_CAT.LANGUAGE' | translate }}</label><input id="f-lang" name="language" class="input" [(ngModel)]="f.language" placeholder="vi" /></div>
-          <div class="flex items-center gap-5 pt-6">
-            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-              <input type="checkbox" name="free" class="rounded border-gray-300" [(ngModel)]="f.free" /> {{ 'DIGITAL_ITEMS_PAGE.FREE' | translate }}
-            </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-              <input type="checkbox" name="allowDownload" class="rounded border-gray-300" [(ngModel)]="f.allowDownload" /> {{ 'DIGITAL_ITEMS_PAGE.ALLOW_DOWNLOAD' | translate }}
-            </label>
-          </div>
-          <div><label class="form-label" for="f-print">{{ 'DIGITAL_ITEMS_PAGE.PRINT_COPIES' | translate }}</label>
-            <input id="f-print" name="printCopies" type="number" min="0" class="input" [(ngModel)]="f.printCopies" [placeholder]="'DIGITAL_CAT.NO_LIMIT' | translate" /></div>
-          <div><label class="form-label" for="f-offline">{{ 'DIGITAL_ITEMS_PAGE.OFFLINE_DAYS' | translate }}</label>
-            <input id="f-offline" name="offlineDays" type="number" min="0" class="input" [(ngModel)]="f.offlineDays" [placeholder]="'DIGITAL_CAT.NO_LIMIT' | translate" /></div>
-          <div>
-            <label class="form-label" for="f-status">{{ 'COMMON.STATUS' | translate }}</label>
-            <select id="f-status" name="status" class="input" [(ngModel)]="f.status">
-              <option [ngValue]="2">{{ 'COMMON.ACTIVE' | translate }}</option>
-              <option [ngValue]="1">{{ 'DIGITAL_CAT.STATUS_HIDDEN' | translate }}</option>
-            </select>
-          </div>
-
-          <div class="col-span-2">
-            <label class="form-label">{{ 'DIGITAL_CAT.COVER' | translate }}</label>
-            <div class="flex items-center gap-3">
-              @if (f.coverUrl) { <img [src]="f.coverUrl" class="w-14 h-18 object-cover rounded border border-gray-200" referrerpolicy="no-referrer" alt="" /> }
-              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onCoverSelect($event, f)" />
-              @if (uploadingCover()) { <span class="material-icons animate-spin text-[18px] text-blue-600">autorenew</span> }
-            </div>
-          </div>
-
-          <div class="col-span-2 border border-gray-200 rounded-lg p-3">
-            <label class="form-label">{{ 'DIGITAL_ITEMS_PAGE.LINKED_BIB' | translate }}</label>
-            @if (f.linkedBibPublicId) {
-              <div class="flex items-center justify-between gap-2 text-sm">
-                <span>{{ f.linkedBibLabel }}</span>
-                <button type="button" class="text-red-600 hover:underline text-xs" (click)="unlinkBib(f)">{{ 'DIGITAL_ITEMS_PAGE.UNLINK' | translate }}</button>
-              </div>
-            } @else {
-              <div class="flex gap-2">
-                <input class="input" [(ngModel)]="bibQuery" name="bibQuery" [ngModelOptions]="{ standalone: true }" (keydown.enter)="searchBib()" [placeholder]="'DIGITAL_ITEMS_PAGE.LINK_BIB_PH' | translate" />
-                <button type="button" class="btn-secondary !py-1.5 !px-3" (click)="searchBib()">{{ 'COMMON.SEARCH_BTN' | translate }}</button>
-              </div>
-              @if (bibResults().length) {
-                <ul class="mt-2 max-h-36 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
-                  @for (b of bibResults(); track b.bibPublicId) {
-                    <li class="px-2 py-1.5 text-sm hover:bg-gray-50 cursor-pointer" (click)="pickBib(f, b)">
-                      {{ b.title }} <span class="text-gray-400 text-xs">{{ b.author }}</span>
-                    </li>
-                  }
-                </ul>
-              }
-            }
-          </div>
-
-          @if (f.publicId && metaFields().length) {
-            <div class="col-span-2 border border-gray-200 rounded-lg p-3">
-              <div class="flex items-center justify-between mb-2">
-                <label class="form-label !mb-0">{{ 'DIGITAL_ITEMS_PAGE.METADATA' | translate }}</label>
-                <button type="button" class="btn-secondary !py-1 !px-2.5" (click)="addMeta()">
-                  <span class="material-icons text-[16px]">add</span> {{ 'DIGITAL_ITEMS_PAGE.ADD_METADATA' | translate }}</button>
-              </div>
-              @for (m of metaRows; track $index) {
-                <div class="grid grid-cols-12 gap-2 mb-1.5 items-start">
-                  <select class="input col-span-4" [(ngModel)]="m.fieldPublicId" [name]="'mf' + $index" [attr.aria-label]="'DIGITAL_ITEMS_PAGE.METADATA' | translate">
-                    @for (mf of metaFields(); track mf.publicId) { <option [ngValue]="mf.publicId">{{ mf.schemaShortId }}:{{ mf.field }}{{ mf.subfield ? '.' + mf.subfield : '' }} — {{ mf.descriptionVn }}</option> }
-                  </select>
-                  <input class="input col-span-6" [(ngModel)]="m.value" [name]="'mv' + $index" maxlength="2000" [attr.aria-label]="'DIGITAL_ITEMS_PAGE.METADATA_VALUE' | translate" />
-                  <select class="input col-span-1" [(ngModel)]="m.language" [name]="'ml' + $index" aria-label="Language">
-                    <option value="">—</option><option value="vi">vi</option><option value="en">en</option>
-                  </select>
-                  <button type="button" class="icon-btn text-red-600 col-span-1" (click)="metaRows.splice($index, 1)" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[18px]">close</span></button>
-                </div>
-              }
-            </div>
-          }
-
-          @if (f.publicId) {
-            <div class="col-span-2 border border-gray-200 rounded-lg p-3">
-              <div class="flex items-center justify-between mb-2">
-                <label class="form-label !mb-0">{{ 'DIGITAL_ITEMS_PAGE.FILES' | translate }}</label>
-                <label class="btn-secondary !py-1 !px-2.5 cursor-pointer">
-                  <span class="material-icons text-[16px]">upload_file</span> {{ 'DIGITAL_ITEMS_PAGE.ADD_FILE' | translate }}
-                  <input type="file" accept="application/pdf" class="hidden" (change)="onFileSelect($event, f)" />
-                </label>
-              </div>
-              @if (uploadingFile()) { <p class="text-xs text-blue-600"><span class="material-icons animate-spin text-[14px] align-middle">autorenew</span> {{ 'DIGITAL_ITEMS_PAGE.UPLOADING' | translate }}</p> }
-              <ul class="divide-y divide-gray-100">
-                @for (file of files(); track file.publicId) {
-                  <li class="py-1.5 flex items-center justify-between text-sm">
-                    <span><span class="material-icons text-[16px] align-middle text-gray-400">picture_as_pdf</span> {{ file.description || file.fileExt || file.publicId }}
-                      @if (file.fileSize != null) { <span class="text-gray-400 text-xs ml-1">({{ (file.fileSize / 1024 / 1024).toFixed(1) }} MB)</span> }
-                    </span>
-                    <button type="button" class="text-red-600 hover:underline text-xs" (click)="deleteFile(file)">{{ 'COMMON.DELETE' | translate }}</button>
-                  </li>
-                } @empty { <li class="py-2 text-xs text-gray-400">{{ 'DIGITAL_ITEMS_PAGE.NO_FILES' | translate }}</li> }
-              </ul>
-            </div>
-          }
-        </form>
-        <ng-container footer>
-          <button type="button" (click)="form.set(null)" class="btn-secondary">{{ 'COMMON.CANCEL' | translate }}</button>
-          <button type="submit" form="item-form" [disabled]="saving()" class="btn-primary">
-            <span class="material-icons text-[16px]" [class.animate-spin]="saving()">{{ saving() ? 'autorenew' : 'save' }}</span> {{ 'COMMON.SAVE' | translate }}
-          </button>
-        </ng-container>
-      </app-modal>
+    @if (formOpen()) {
+      <app-item-form [item]="editing()" [collections]="collectionOptions()" [subjects]="subjectOptions()" [topics]="topicOptions()" [types]="typeOptions()"
+        [publisherHints]="publisherHints()" [authorHints]="authorHints()" (closed)="closeForm()" (saved)="load()" />
+    }
+    @if (coverFor(); as c) { <app-item-cover [item]="c" (closed)="coverFor.set(null)" (saved)="load()" /> }
+    @if (importDialog()) {
+      <app-item-import [collections]="collectionOptions()" [subjects]="subjectOptions()" [topics]="topicOptions()" (closed)="importDialog.set(false)" (imported)="find()" />
+    }
+    @if (exportDialog()) { <app-item-export [selection]="exportSelection()" (closed)="exportDialog.set(false)" /> }
+    @if (moveDialog()) {
+      <app-item-move [selection]="selection()!" [count]="selectedCount()" [collections]="collectionOptions()" (closed)="moveDialog.set(false)" (moved)="afterBulk()" />
     }
 
+    @if (confirmDelete()) {
+      <app-confirm-delete [busy]="busy()" message="DIGITAL_DOC.CONFIRM_BULK_DELETE" (confirmed)="bulkDelete()" (cancelled)="confirmDelete.set(false)" />
+    }
     @if (deleting(); as d) {
-      <app-confirm-delete [busy]="saving()" message="COMMON.DELETE_CONFIRM_IRREVERSIBLE" (confirmed)="doDelete(d)" (cancelled)="deleting.set(null)" />
+      <app-confirm-delete [busy]="busy()" message="COMMON.DELETE_CONFIRM_IRREVERSIBLE" (confirmed)="deleteOne(d)" (cancelled)="deleting.set(null)" />
+    }
+    @if (skipped(); as list) {
+      <app-modal title="DIGITAL_DOC.SKIPPED_TITLE" widthClass="max-w-lg" (closed)="skipped.set(null)">
+        <p class="text-sm text-gray-600 mb-2">{{ 'DIGITAL_DOC.SKIPPED_HINT' | translate }}</p>
+        <ul class="max-h-64 overflow-y-auto text-sm divide-y divide-gray-100">
+          @for (s of list; track s.publicId) { <li class="py-1.5"><span class="font-medium">{{ s.title }}</span><div class="text-xs text-red-600">{{ s.reason }}</div></li> }
+        </ul>
+        <ng-container footer><button type="button" class="btn-primary" (click)="skipped.set(null)">{{ 'COMMON.CLOSE' | translate }}</button></ng-container>
+      </app-modal>
     }
   `,
 })
 export class DigitalItems implements OnInit {
   private readonly api = inject(Api);
+  private readonly itemsApi = inject(ItemsApi);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
   private readonly client = this.api.crud<EbookItem>('items', 'digital');
-  private readonly fileClient = this.api.crud<EbookFile>('files', 'digital');
 
-  protected search: EbookItemSearch = { keyword: '', collectionId: null, status: null, pageIndex: 1, pageSize: 10 };
+  protected readonly toggle = TOGGLE_CLASS;
+  protected readonly years = Array.from({ length: new Date().getFullYear() + 1 - 1900 + 1 }, (_, i) => new Date().getFullYear() + 1 - i);
+  protected filters: Filters = emptyFilters();
+  protected search: EbookItemSearch = { pageIndex: 1, pageSize: 10 };
+  /** Bộ lọc đã dùng ở lần tải gần nhất — là "tất cả kết quả lọc" khi chọn cả kết quả và là phạm vi xuất khi không chọn dòng nào. */
+  private lastSearch: EbookItemSearch = {};
+
+  protected readonly filtersCollapsed = signal(false);
   protected readonly page = signal<Page<EbookItem> | null>(null);
   protected readonly loading = signal(false);
-  protected readonly saving = signal(false);
-  protected readonly uploadingCover = signal(false);
-  protected readonly uploadingFile = signal(false);
-  protected readonly form = signal<ItemForm | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly ticked = signal<Set<string>>(new Set());
+  protected readonly allResults = signal(false);
+
+  protected readonly formOpen = signal(false);
+  protected readonly editing = signal<EbookItem | null>(null);
+  protected readonly coverFor = signal<EbookItem | null>(null);
+  protected readonly importDialog = signal(false);
+  protected readonly exportDialog = signal(false);
+  protected readonly moveDialog = signal(false);
+  protected readonly confirmDelete = signal(false);
   protected readonly deleting = signal<EbookItem | null>(null);
-  protected readonly files = signal<EbookFile[]>([]);
-  protected readonly metaFields = signal<MetadataField[]>([]);
-  protected metaRows: MetaRow[] = [];
+  protected readonly skipped = signal<ItemBulkResult['skipped'] | null>(null);
 
-  protected readonly collectionOptions = signal<{ id: number; label: string }[]>([]);
-  protected readonly subjectOptions = signal<{ id: number; label: string }[]>([]);
-  protected readonly topicOptions = signal<{ id: number; label: string }[]>([]);
-  protected readonly typeOptions = signal<{ id: number; label: string }[]>([]);
+  protected readonly collectionOptions = signal<OptionItem[]>([]);
+  protected readonly subjectOptions = signal<OptionItem[]>([]);
+  protected readonly topicOptions = signal<OptionItem[]>([]);
+  protected readonly typeOptions = signal<OptionItem[]>([]);
 
-  protected bibQuery = '';
-  protected readonly bibResults = signal<BibLinkOption[]>([]);
+  protected readonly offset = computed(() => ((this.search.pageIndex ?? 1) - 1) * (this.search.pageSize ?? 10));
+  protected readonly publisherHints = computed(() => [...new Set((this.page()?.items ?? []).map((i) => i.publisher).filter((x): x is string => !!x))]);
+  protected readonly authorHints = computed(() => [...new Set((this.page()?.items ?? []).flatMap((i) => i.authors.map((a) => a.last ?? '')).filter(Boolean))]);
+  protected readonly pageAllTicked = computed(() => {
+    const items = this.page()?.items ?? [];
+    return items.length > 0 && (this.allResults() || items.every((i) => this.ticked().has(i.publicId)));
+  });
+  protected readonly somePageTicked = computed(() => this.allResults() || (this.page()?.items ?? []).some((i) => this.ticked().has(i.publicId)));
+  protected readonly selectedCount = computed(() => (this.allResults() ? (this.page()?.totalCount ?? 0) : this.ticked().size));
+  protected readonly selection = computed<ItemSelection | null>(() => {
+    if (this.allResults()) return { search: this.lastSearch };
+    const ids = [...this.ticked()];
+    return ids.length ? { publicIds: ids } : null;
+  });
+  /** Xuất: các dòng đã chọn; chưa chọn dòng nào thì xuất theo bộ lọc hiện tại (như LRC). */
+  protected readonly exportSelection = computed<ItemSelection>(() => this.selection() ?? { search: this.lastSearch });
 
   ngOnInit(): void {
     void this.load();
@@ -302,6 +272,8 @@ export class DigitalItems implements OnInit {
   }
 
   protected find(): void {
+    // Đổi bộ lọc thì vùng chọn cũ (kể cả "tất cả kết quả lọc") không còn đúng nữa — nếu giữ, Xoá/Chuyển sẽ tác động lên tập khác.
+    this.clearSelection();
     this.search.pageIndex = 1;
     void this.load();
   }
@@ -312,21 +284,43 @@ export class DigitalItems implements OnInit {
     void this.load();
   }
 
-  private flattenTree(rows: TreeRow[]): { id: number; label: string }[] {
+  protected isTicked(i: EbookItem): boolean {
+    return this.allResults() || this.ticked().has(i.publicId);
+  }
+
+  protected toggleRow(i: EbookItem): void {
+    if (this.allResults()) this.allResults.set(false);
+    const next = new Set(this.ticked());
+    if (!next.delete(i.publicId)) next.add(i.publicId);
+    this.ticked.set(next);
+  }
+
+  protected toggleAll(): void {
+    const items = this.page()?.items ?? [];
+    if (this.pageAllTicked()) {
+      this.clearSelection();
+      return;
+    }
+    this.ticked.set(new Set([...this.ticked(), ...items.map((i) => i.publicId)]));
+  }
+
+  protected clearSelection(): void {
+    this.allResults.set(false);
+    this.ticked.set(new Set());
+  }
+
+  private flattenTree(rows: TreeRow[]): OptionItem[] {
     const byParent = new Map<number | null, TreeRow[]>();
     for (const r of rows) {
       const k = r.parentId ?? null;
       (byParent.get(k) ?? byParent.set(k, []).get(k)!).push(r);
     }
-    const out: { id: number; label: string }[] = [];
+    const out: OptionItem[] = [];
     const walk = (parentId: number | null, depth: number) =>
-      (byParent.get(parentId) ?? [])
-        .slice()
-        .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
-        .forEach((r) => {
-          out.push({ id: r.id, label: `${'    '.repeat(depth)}${r.name}` });
-          walk(r.id, depth + 1);
-        });
+      (byParent.get(parentId) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id).forEach((r) => {
+        out.push({ id: r.id, label: `${'    '.repeat(depth)}${r.name}` });
+        walk(r.id, depth + 1);
+      });
     walk(null, 0);
     return out;
   }
@@ -348,151 +342,103 @@ export class DigitalItems implements OnInit {
     }
   }
 
-  protected openCreate(): void {
-    this.form.set({
-      publicId: null, title: '', author: '', publisher: '', publishDate: '', otherTitle: '', page: '', oldAuthor: '', keyword: '', language: 'vi',
-      collectionId: null, subjectId: null, topicId: null, typeId: null, free: false, allowDownload: false, printCopies: null, offlineDays: null,
-      status: STATUS_ACTIVE, coverUrl: null, linkedBibPublicId: null, linkedBibLabel: null,
-    });
-    this.files.set([]);
-    this.metaRows = [];
-    this.bibQuery = '';
-    this.bibResults.set([]);
+  private buildSearch(): EbookItemSearch {
+    const f = this.filters;
+    return {
+      collectionId: f.collectionId, subjectId: f.subjectId, topicId: f.topicId, typeId: f.typeId, status: f.status,
+      title: f.title.trim() || null, author: f.author.trim() || null, publisher: f.publisher.trim() || null,
+      publishYearFrom: f.yearFrom, publishYearTo: f.yearTo, submittedFrom: f.submittedFrom || null, submittedTo: f.submittedTo || null,
+    };
   }
 
-  protected async openEdit(item: EbookItem): Promise<void> {
-    this.form.set({
-      publicId: item.publicId, title: item.title, author: item.author ?? '', publisher: item.publisher ?? '', publishDate: item.publishDate ?? '',
-      otherTitle: item.otherTitle ?? '', page: item.page ?? '', oldAuthor: item.oldAuthor ?? '', keyword: item.keyword ?? '', language: item.language ?? 'vi',
-      collectionId: item.collectionId, subjectId: item.subjectId, topicId: item.topicId, typeId: item.typeId, free: item.free,
-      allowDownload: item.allowDownload, printCopies: item.printCopies, offlineDays: item.offlineDays, status: item.status, coverUrl: item.coverUrl,
-      linkedBibPublicId: item.linkedBibPublicId, linkedBibLabel: item.linkedBibPublicId,
-    });
-    this.bibQuery = '';
-    this.bibResults.set([]);
-    this.metaRows = [];
+  protected async load(): Promise<void> {
+    this.loading.set(true);
     try {
-      this.files.set((await this.fileClient.search({ ebookItemPublicId: item.publicId, pageSize: 200 } as EbookFileSearch)).items);
-      this.metaFields.set((await this.api.crud<MetadataField>('metadata-fields', 'digital').searchAll()).filter((x) => x.status === STATUS_ACTIVE));
-      if (this.metaFields().length) {
-        this.metaRows = (await this.api.ebookMetadata(item.publicId)).map((r) => ({ fieldPublicId: r.fieldPublicId, value: r.value, language: r.language ?? '' }));
+      const filter = this.buildSearch();
+      this.lastSearch = filter;
+      this.page.set(await this.client.search({ ...filter, pageIndex: this.search.pageIndex, pageSize: this.search.pageSize }));
+      if (!this.allResults()) {
+        // Giữ tích chỉ với các dòng còn tồn tại trong kết quả hiện tại của các trang đã duyệt: tải lại làm số liệu đổi nên bỏ chọn cho gọn.
+        this.ticked.set(new Set([...this.ticked()].filter((id) => (this.page()?.items ?? []).some((i) => i.publicId === id))));
       }
     } catch (e) {
       this.toastr.error(errorMessage(e));
-    }
-  }
-
-  protected addMeta(): void {
-    this.metaRows.push({ fieldPublicId: this.metaFields()[0]?.publicId ?? '', value: '', language: '' });
-  }
-
-  protected async onCoverSelect(event: Event, f: ItemForm): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    this.uploadingCover.set(true);
-    try {
-      const uploaded = await this.api.upload('ebook-cover', file);
-      f.coverUrl = uploaded.url;
-    } catch (e) {
-      this.toastr.error(errorMessage(e));
     } finally {
-      this.uploadingCover.set(false);
+      this.loading.set(false);
     }
   }
 
-  protected async searchBib(): Promise<void> {
+  protected edit(item: EbookItem): void {
+    this.editing.set(item);
+    this.formOpen.set(true);
+  }
+
+  protected closeForm(): void {
+    this.formOpen.set(false);
+    this.editing.set(null);
+  }
+
+  protected async setStatus(item: EbookItem): Promise<void> {
+    const next = item.status === STATUS_ACTIVE ? STATUS_INACTIVE : STATUS_ACTIVE;
     try {
-      this.bibResults.set(await this.api.ebookBibOptions(this.bibQuery.trim()));
+      await this.client.changeStatus(item.publicId, next);
+      item.status = next;
     } catch (e) {
       this.toastr.error(errorMessage(e));
-    }
-  }
-
-  protected pickBib(f: ItemForm, b: BibLinkOption): void {
-    f.linkedBibPublicId = b.bibPublicId;
-    f.linkedBibLabel = b.title;
-    if (!f.publicId) {
-      if (!f.title.trim()) f.title = b.title;
-      if (!f.author.trim() && b.author) f.author = b.author;
-      if (!f.publisher.trim() && b.publisher) f.publisher = b.publisher;
-      if (!f.publishDate.trim() && b.publishYear) f.publishDate = b.publishYear;
-    }
-    this.bibResults.set([]);
-  }
-
-  protected unlinkBib(f: ItemForm): void {
-    f.linkedBibPublicId = null;
-    f.linkedBibLabel = null;
-  }
-
-  protected async onFileSelect(event: Event, f: ItemForm): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file || !f.publicId) return;
-    this.uploadingFile.set(true);
-    try {
-      const uploaded = await this.api.upload('ebook-file', file);
-      const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : null;
-      await this.fileClient.add({
-        ebookItemPublicId: f.publicId, mediaFileId: uploaded.id, fileType: file.type || null, fileExt: ext, fileSize: file.size,
-        description: file.name, sortOrder: this.files().length,
-      });
-      this.files.set((await this.fileClient.search({ ebookItemPublicId: f.publicId, pageSize: 200 } as EbookFileSearch)).items);
-      this.toastr.success('COMMON.ADD_SUCCESS');
-    } catch (e) {
-      this.toastr.error(errorMessage(e));
-    } finally {
-      this.uploadingFile.set(false);
-    }
-  }
-
-  protected async deleteFile(file: EbookFile): Promise<void> {
-    try {
-      await this.fileClient.delete(file.publicId);
-      this.files.set(this.files().filter((x) => x.publicId !== file.publicId));
-      this.toastr.success('COMMON.DELETE_SUCCESS');
-    } catch (e) {
-      this.toastr.error(errorMessage(e));
-    }
-  }
-
-  protected async save(): Promise<void> {
-    const f = this.form();
-    if (!f) return;
-    if (!f.title.trim()) {
-      this.toastr.warning('DIGITAL_ITEMS_PAGE.TITLE_REQUIRED');
-      return;
-    }
-    this.saving.set(true);
-    try {
-      const body = {
-        title: f.title, author: f.author || null, publisher: f.publisher || null, publishDate: f.publishDate || null, otherTitle: f.otherTitle || null,
-        page: f.page || null, oldAuthor: f.oldAuthor || null, language: f.language || null, keyword: f.keyword || null, collectionId: f.collectionId,
-        subjectId: f.subjectId, topicId: f.topicId, typeId: f.typeId, free: f.free, allowDownload: f.allowDownload, printCopies: f.printCopies,
-        offlineDays: f.offlineDays, coverUrl: f.coverUrl, linkedBibPublicId: f.linkedBibPublicId, status: f.status,
-      };
-      if (f.publicId) {
-        await this.client.update(f.publicId, body);
-        if (this.metaFields().length) {
-          await this.api.saveEbookMetadata(f.publicId, this.metaRows.filter((m) => m.fieldPublicId && m.value.trim())
-            .map((m) => ({ fieldPublicId: m.fieldPublicId, value: m.value.trim(), language: m.language || null })));
-        }
-      } else await this.client.add(body);
-      this.toastr.success(f.publicId ? 'COMMON.UPDATE_SUCCESS' : 'COMMON.ADD_SUCCESS');
-      this.form.set(null);
       await this.load();
-    } catch (e) {
-      this.toastr.error(errorMessage(e));
-    } finally {
-      this.saving.set(false);
     }
   }
 
-  protected async doDelete(item: EbookItem): Promise<void> {
-    this.saving.set(true);
+  protected async exportMetadata(): Promise<void> {
+    this.busy.set(true);
+    try {
+      saveFile(await this.itemsApi.exportItemsMetadata(this.exportSelection()), `dspace-metadata-${stamp()}.zip`);
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async bulkStatus(status: number): Promise<void> {
+    const selection = this.selection();
+    if (!selection) return;
+    this.busy.set(true);
+    try {
+      await this.itemsApi.itemsBulkStatus(selection, status);
+      this.toastr.success('DIGITAL_DOC.BULK_STATUS_DONE');
+      this.afterBulk();
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected afterBulk(): void {
+    this.clearSelection();
+    void this.load();
+  }
+
+  protected async bulkDelete(): Promise<void> {
+    const selection = this.selection();
+    if (!selection) return;
+    this.busy.set(true);
+    try {
+      const result = await this.itemsApi.itemsBulkDelete(selection);
+      this.toastr.success('COMMON.DELETE_SUCCESS');
+      this.confirmDelete.set(false);
+      if (result.skipped.length) this.skipped.set(result.skipped);
+      this.afterBulk();
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async deleteOne(item: EbookItem): Promise<void> {
+    this.busy.set(true);
     try {
       await this.client.delete(item.publicId);
       this.toastr.success('COMMON.DELETE_SUCCESS');
@@ -501,18 +447,7 @@ export class DigitalItems implements OnInit {
     } catch (e) {
       this.toastr.error(errorMessage(e));
     } finally {
-      this.saving.set(false);
-    }
-  }
-
-  private async load(): Promise<void> {
-    this.loading.set(true);
-    try {
-      this.page.set(await this.client.search({ ...this.search, keyword: this.search.keyword?.trim() || undefined }));
-    } catch (e) {
-      this.toastr.error(errorMessage(e));
-    } finally {
-      this.loading.set(false);
+      this.busy.set(false);
     }
   }
 }

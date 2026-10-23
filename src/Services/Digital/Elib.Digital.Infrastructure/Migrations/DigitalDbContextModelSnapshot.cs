@@ -784,6 +784,11 @@ namespace Elib.Digital.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Abstract")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("abstract");
+
                     b.Property<bool>("AllowDownload")
                         .HasColumnType("boolean")
                         .HasColumnName("allow_download");
@@ -818,6 +823,11 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("description");
+
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -842,6 +852,11 @@ namespace Elib.Digital.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("JournalName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("journal_name");
 
                     b.Property<string>("Keyword")
                         .HasMaxLength(1000)
@@ -892,6 +907,18 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("publish_date");
+
+                    b.Property<int?>("PublishDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("publish_day");
+
+                    b.Property<int?>("PublishMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("publish_month");
+
+                    b.Property<int?>("PublishYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("publish_year");
 
                     b.Property<string>("Publisher")
                         .HasMaxLength(500)
@@ -975,6 +1002,9 @@ namespace Elib.Digital.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "LinkedBibPublicId")
                         .HasDatabaseName("ix_ebook_items_tenant_id_linked_bib_public_id");
+
+                    b.HasIndex("TenantId", "PublishYear")
+                        .HasDatabaseName("ix_ebook_items_tenant_id_publish_year");
 
                     b.HasIndex("TenantId", "SubjectId")
                         .HasDatabaseName("ix_ebook_items_tenant_id_subject_id");
@@ -2461,6 +2491,93 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_module_replicas_tenant_replicas_tenant_id");
+                });
+
+            modelBuilder.Entity("Elib.Digital.Domain.EbookItem", b =>
+                {
+                    b.OwnsMany("Elib.Digital.Domain.EbookIdentifier", "Identifiers", b1 =>
+                        {
+                            b1.Property<long>("EbookItemId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Type")
+                                .IsRequired();
+
+                            b1.Property<string>("Value")
+                                .IsRequired();
+
+                            b1.HasKey("EbookItemId", "__synthesizedOrdinal");
+
+                            b1.ToTable("ebook_items");
+
+                            b1
+                                .ToJson("identifiers")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EbookItemId")
+                                .HasConstraintName("fk_ebook_items_ebook_items_ebook_item_id");
+                        });
+
+                    b.OwnsMany("Elib.Digital.Domain.EbookPerson", "Advisors", b1 =>
+                        {
+                            b1.Property<long>("EbookItemId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("First");
+
+                            b1.Property<string>("Last");
+
+                            b1.Property<string>("Title");
+
+                            b1.HasKey("EbookItemId", "__synthesizedOrdinal");
+
+                            b1.ToTable("ebook_items");
+
+                            b1
+                                .ToJson("advisors")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EbookItemId")
+                                .HasConstraintName("fk_ebook_items_ebook_items_ebook_item_id");
+                        });
+
+                    b.OwnsMany("Elib.Digital.Domain.EbookPerson", "Authors", b1 =>
+                        {
+                            b1.Property<long>("EbookItemId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("First");
+
+                            b1.Property<string>("Last");
+
+                            b1.Property<string>("Title");
+
+                            b1.HasKey("EbookItemId", "__synthesizedOrdinal");
+
+                            b1.ToTable("ebook_items");
+
+                            b1
+                                .ToJson("authors")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EbookItemId")
+                                .HasConstraintName("fk_ebook_items_ebook_items_ebook_item_id");
+                        });
+
+                    b.Navigation("Advisors");
+
+                    b.Navigation("Authors");
+
+                    b.Navigation("Identifiers");
                 });
 
             modelBuilder.Entity("MassTransit.EntityFrameworkCoreIntegration.OutboxMessage", b =>

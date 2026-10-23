@@ -31,6 +31,18 @@ public sealed class EbookItemSearch : CrudSearch
     public long? SubjectId { get; set; }
     public long? TopicId { get; set; }
     public long? TypeId { get; set; }
+
+    /// <summary>Lọc theo nhan đề / tác giả / nhà xuất bản (chứa chuỗi, không phân biệt hoa thường).</summary>
+    public string? Title { get; set; }
+    public string? Author { get; set; }
+    public string? Publisher { get; set; }
+    public int? PublishYearFrom { get; set; }
+    public int? PublishYearTo { get; set; }
+
+    /// <summary>Ngày nộp (ngày lịch Việt Nam, gồm cả hai đầu).</summary>
+    public DateOnly? SubmittedFrom { get; set; }
+    public DateOnly? SubmittedTo { get; set; }
+    public bool? Free { get; set; }
 }
 
 public sealed record EbookItemDto(
@@ -38,10 +50,12 @@ public sealed record EbookItemDto(
     string? Author, string? Publisher, string? PublishDate, string? Keyword, string? OtherTitle, string? Page, string? OldAuthor, string? Xml,
     string? Language, bool Free, bool AllowDownload, int? PrintCopies, int? OfflineDays, int? Show, int? IndexContent, int? Share, int? FileVersion,
     DateTimeOffset? IndexedAt, string? ErrorMessage, int TotalView, int TotalDownload, DateTimeOffset? Submited, DateTimeOffset? LastUpdate,
-    string? CoverUrl, Guid? LinkedBibPublicId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    string? CoverUrl, Guid? LinkedBibPublicId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, string? Abstract, string? Description, string? JournalName,
+    int? PublishDay, int? PublishMonth, int? PublishYear, IReadOnlyList<EbookPerson> Authors, IReadOnlyList<EbookPerson> Advisors,
+    IReadOnlyList<EbookIdentifier> Identifiers, int TotalFile);
 
 /// <summary>Tài liệu số (LRC: EbookItemController, quyền DIGITAL_ITEMS) — trang quản trị bespoke (có file đính kèm + liên kết sách in).</summary>
-public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock, EbookStatePublisher states)
+public sealed partial class EbookItemResource(ICrudDbContext db, ITenantContext tenant, IOptions<DigitalOptions> options, TimeProvider clock, EbookStatePublisher states)
     : CrudResource<EbookItemResource, EbookItem, EbookItemSearch, EbookItemFields, EbookItemDto>(db)
 {
     private readonly DigitalOptions _options = options.Value;
@@ -54,7 +68,8 @@ public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, 
         x.Id, x.PublicId, x.Status, x.CollectionId, Db.Set<EbookCollection>().Where(c => c.Id == x.CollectionId).Select(c => c.Name).FirstOrDefault(),
         x.SubjectId, x.TopicId, x.TypeId, x.Title, x.Author, x.Publisher, x.PublishDate, x.Keyword, x.OtherTitle, x.Page, x.OldAuthor, x.Xml,
         x.Language, x.Free, x.AllowDownload, x.PrintCopies, x.OfflineDays, x.Show, x.IndexContent, x.Share, x.FileVersion, x.IndexedAt, x.ErrorMessage,
-        x.TotalView, x.TotalDownload, x.Submited, x.LastUpdate, x.CoverUrl, x.LinkedBibPublicId, x.CreatedAt, x.UpdatedAt);
+        x.TotalView, x.TotalDownload, x.Submited, x.LastUpdate, x.CoverUrl, x.LinkedBibPublicId, x.CreatedAt, x.UpdatedAt, x.Abstract, x.Description, x.JournalName,
+        x.PublishDay, x.PublishMonth, x.PublishYear, x.Authors, x.Advisors, x.Identifiers, Db.Set<EbookFile>().Count(f => f.EbookItemId == x.Id));
 
     protected override EbookItem Create(EbookItemFields request) =>
         EbookItem.Create(request, _options.MediaPublicPrefix, tenant.RequireTenantId(), clock.GetUtcNow());
@@ -68,11 +83,26 @@ public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, 
         if (search.SubjectId is { } subject) query = query.Where(x => x.SubjectId == subject);
         if (search.TopicId is { } topic) query = query.Where(x => x.TopicId == topic);
         if (search.TypeId is { } type) query = query.Where(x => x.TypeId == type);
-        if (search.Term is not { } term) return query;
+        if (search.Free is { } free) query = query.Where(x => x.Free == free);
+        if (search.PublishYearFrom is { } from) query = query.Where(x => x.PublishYear >= from);
+        if (search.PublishYearTo is { } to) query = query.Where(x => x.PublishYear <= to);
+        // Ngày nộp là ngày lịch Việt Nam: đầu ngày "từ" đến trước đầu ngày sau "đến" (gồm cả ngày "đến").
+        if (search.SubmittedFrom is { } submittedFrom) { var start = VietnamDayStart(submittedFrom); query = query.Where(x => x.Submited >= start); }
+        if (search.SubmittedTo is { } submittedTo) { var end = VietnamDayStart(submittedTo.AddDays(1)); query = query.Where(x => x.Submited < end); }
 #pragma warning disable CA1862, CA1304, CA1311 // EF dịch ToLower() sang lower() của SQL
+        if (Fold(search.Title) is { } title) query = query.Where(x => x.Title.ToLower().Contains(title));
+        if (Fold(search.Author) is { } author) query = query.Where(x => x.Author != null && x.Author.ToLower().Contains(author));
+        if (Fold(search.Publisher) is { } publisher) query = query.Where(x => x.Publisher != null && x.Publisher.ToLower().Contains(publisher));
+        if (search.Term is not { } term) return query;
         return query.Where(x => x.Title.ToLower().Contains(term) || (x.Author != null && x.Author.ToLower().Contains(term)));
 #pragma warning restore CA1862, CA1304, CA1311
     }
+
+    private static string? Fold(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+
+    /// <summary>00:00 của ngày lịch Việt Nam (UTC+7) tại UTC — ghi tham số DateTimeOffset vào Postgres phải ở UTC.</summary>
+    internal static DateTimeOffset VietnamDayStart(DateOnly day) =>
+        new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
 
     protected override async Task ValidateAsync(EbookItem entity, CancellationToken ct)
     {
@@ -96,6 +126,12 @@ public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, 
     {
         var entity = await CreateAsync(request, ct);
         await ValidateAsync(entity, ct);
+        await AddCoreAsync(entity, ct);
+        return ToDto(entity);
+    }
+
+    private async Task AddCoreAsync(EbookItem entity, CancellationToken ct)
+    {
         var strategy = Db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async token =>
         {
@@ -107,15 +143,15 @@ public sealed class EbookItemResource(ICrudDbContext db, ITenantContext tenant, 
             await Db.SaveChangesAsync(token);
             await transaction.CommitAsync(token);
         }, ct);
-        return ToDto(entity);
     }
 
     protected override async Task EnsureDeletableAsync(EbookItem entity, CancellationToken ct)
     {
-        // Metadata là con của tài liệu: xoá cùng lần lưu (không chặn xoá).
-        Db.Set<EbookMetadataValue>().RemoveRange(await Db.Set<EbookMetadataValue>().Where(v => v.EbookItemId == entity.Id).ToListAsync(ct));
+        // Kiểm tra file TRƯỚC khi đánh dấu xoá metadata: bị chặn thì không để lại thay đổi nào trong ngữ cảnh (xoá hàng loạt dùng chung một lần lưu).
         if (await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == entity.Id, ct))
             throw new ConflictException("EBOOK_ITEM_HAS_FILES", $"Tài liệu số '{entity.Title}' còn file đính kèm — xoá file trước.");
+        // Metadata là con của tài liệu: xoá cùng lần lưu (không chặn xoá).
+        Db.Set<EbookMetadataValue>().RemoveRange(await Db.Set<EbookMetadataValue>().Where(v => v.EbookItemId == entity.Id).ToListAsync(ct));
     }
 }
 

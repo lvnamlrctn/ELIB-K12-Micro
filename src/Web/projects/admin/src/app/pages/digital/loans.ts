@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import {
   Api, CrudPage as Page, EBOOK_LOAN_STATUSES, EBOOK_RESERVATION_STATUSES, EbookItem, EbookLoan, EbookLoanSearch, EbookReservation,
@@ -167,6 +168,7 @@ export class DigitalLoans implements OnInit {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
   private readonly toastr = inject(ToastrService);
+  private readonly route = inject(ActivatedRoute);
   private readonly loanClient = this.api.crud<EbookLoan>('loans', 'digital');
   private readonly reservationClient = this.api.crud<EbookReservation>('reservations', 'digital');
 
@@ -189,6 +191,12 @@ export class DigitalLoans implements OnInit {
   protected reason = '';
 
   ngOnInit(): void {
+    // Từ màn Tài liệu số ("Mượn/thu hồi"): mở sẵn với bộ lọc theo tài liệu đó.
+    const item = this.route.snapshot.queryParamMap.get('item');
+    if (item) {
+      this.loanSearch.ebookItemPublicId = item;
+      this.reservationSearch.ebookItemPublicId = item;
+    }
     void this.loadLoans();
     void this.loadReservations();
     void this.loadItems();

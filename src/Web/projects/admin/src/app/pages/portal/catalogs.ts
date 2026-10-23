@@ -109,7 +109,7 @@ export const PORTAL_ADS_GROUPS: CrudConfig = {
 
 export const PORTAL_ADS: CrudConfig = {
   title: 'PORTAL_CAT.ADS_TITLE', resource: 'ads', service: 'portal', perm: 'PORTAL_ADS', searchLabel: 'COMMON.SEARCH', searchPlaceholder: '', hasStatus: true,
-  columns: [{ key: 'name', label: 'PORTAL_CAT.NAME' }, { key: 'sortOrder', label: 'PORTAL_CAT.SORT_ORDER', type: 'number', width: '110px' }, { key: 'showTo', label: 'PORTAL_CAT.SHOW_TO', type: 'date', width: '120px' }, { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' }],
+  columns: [{ key: 'name', label: 'PORTAL_CAT.NAME' }, { key: 'sortOrder', label: 'PORTAL_CAT.SORT_ORDER', type: 'number', width: '110px' }, { key: 'showTo', label: 'PORTAL_CAT.SHOW_TO', type: 'date', width: '120px' }, { key: 'clicks', label: 'PORTAL_CAT.CLICKS', type: 'number', width: '100px' }, { key: 'status', label: 'COMMON.STATUS', type: 'status', width: '130px' }],
   fields: [
     {
       key: 'adsGroupId', label: 'PORTAL_CAT.GROUP', type: 'select', required: true,

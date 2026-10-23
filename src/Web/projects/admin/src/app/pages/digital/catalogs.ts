@@ -22,6 +22,7 @@ export const DIGITAL_COLLECTIONS: TreeCatalogConfig = {
   ],
   defaults: { language: 'vi', link: null },
   coverUpload: true,
+  permissions: true,
   modalWidth: 'max-w-xl',
 };
 

@@ -1,5 +1,6 @@
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Domain;
 using Elib.BuildingBlocks.Tenancy;
 using Elib.Contracts.Events.Digital;
 using Elib.Contracts.Events.Platform;
@@ -15,11 +16,23 @@ public static class DigitalEndpoints
 {
     public const string Module = "DIGITAL";
 
+    private static ItemImportDefaults ImportDefaults(IFormCollection form)
+    {
+        static long? Id(string? v) => long.TryParse(v, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) ? id : null;
+        static bool Flag(string? v) => string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) || v == "1";
+        return new ItemImportDefaults(Id(form["collectionId"]), Id(form["subjectId"]), Id(form["topicId"]), Flag(form["published"]), Flag(form["free"]),
+            Flag(form["allowDownload"]), string.IsNullOrWhiteSpace(form["language"]) ? null : form["language"].ToString());
+    }
+
     public static IEndpointRouteBuilder MapDigitalEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
-        api.MapCrud<EbookCollectionResource>("/collections", "DIGITAL_COLLECTIONS").WithTags("Collections");
+        var collections = api.MapCrud<EbookCollectionResource>("/collections", "DIGITAL_COLLECTIONS").WithTags("Collections");
+        collections.MapGet("/{publicId:guid}/permissions", [Permission("DIGITAL_COLLECTIONS", "view")] (Guid publicId, PolicyDigitalByCollectionResource r, CancellationToken ct)
+            => r.PermissionsAsync(publicId, ct));
+        collections.MapPut("/{publicId:guid}/permissions", [Permission("DIGITAL_COLLECTIONS", "edit")] (Guid publicId, IReadOnlyList<CollectionPermissionRow> rows, PolicyDigitalByCollectionResource r, CancellationToken ct)
+            => r.SavePermissionsAsync(publicId, rows, ct));
         api.MapCrud<EbookSubjectResource>("/subjects", "DIGITAL_SUBJECTS").WithTags("Subjects");
         api.MapCrud<EbookTopicResource>("/topics", "DIGITAL_TOPICS").WithTags("Topics");
         api.MapCrud<EbookDigTypeResource>("/dig-types", "DIGITAL_DIG_TYPES").WithTags("DigTypes");
@@ -45,6 +58,51 @@ public static class DigitalEndpoints
             => metadata.GetAsync(publicId, ct));
         items.MapPut("/{publicId:guid}/metadata", [Permission("DIGITAL_ITEMS", "edit")] (Guid publicId, EbookMetadataSave save, EbookMetadata metadata, CancellationToken ct)
             => metadata.ReplaceAsync(publicId, save, ct));
+
+        // Thao tác hàng loạt (LRC: BulkMoveCollection + xoá nhiều): chọn theo mã các dòng đã tích hoặc theo bộ lọc hiện tại.
+        items.MapPost("/Selection/Preview", [Permission("DIGITAL_ITEMS", "view")] (ItemSelection selection, EbookItemResource r, CancellationToken ct)
+            => r.PreviewSelectionAsync(selection, ct));
+        items.MapPut("/BulkMoveCollection", [Permission("DIGITAL_ITEMS", "edit")] (ItemBulkMoveRequest request, EbookItemResource r, CancellationToken ct)
+            => r.BulkMoveAsync(request, ct));
+        items.MapPut("/BulkStatus", [Permission("DIGITAL_ITEMS", "edit")] (ItemBulkStatusRequest request, EbookItemResource r, CancellationToken ct)
+            => r.BulkStatusAsync(request, ct));
+        items.MapPost("/BulkDelete", [Permission("DIGITAL_ITEMS", "delete")] (ItemSelection selection, EbookItemResource r, CancellationToken ct)
+            => r.BulkDeleteAsync(selection, ct));
+
+        items.MapPut("/{publicId:guid}/cover", [Permission("DIGITAL_ITEMS", "edit")] (Guid publicId, SetCoverRequest request, EbookItemResource r, CancellationToken ct)
+            => r.SetCoverAsync(publicId, request.CoverUrl, ct));
+
+        // Xuất/nhập (LRC: GetExportFields, ExportExcel, ExportMetaData, ImportExcel, ImportXml). Nhập dùng quyền thêm, xuất dùng quyền xem (như bạn đọc).
+        items.MapGet("/GetExportFields", [Permission("DIGITAL_ITEMS", "view")] () => EbookItemResource.ExportFields);
+        items.MapPost("/Export", [Permission("DIGITAL_ITEMS", "view")] async (ItemExportRequest request, EbookItemResource r, CancellationToken ct)
+            => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-tai-lieu.xlsx"));
+        items.MapPost("/ExportMetadata", [Permission("DIGITAL_ITEMS", "view")] async (ItemExportRequest request, EbookItemResource r, TimeProvider clock, CancellationToken ct)
+            => Results.File(await r.ExportMetadataAsync(request, ct), "application/zip", $"dspace-metadata-{clock.GetUtcNow():yyyyMMddHHmmss}.zip"));
+        items.MapPost("/ImportExcel", [Permission("DIGITAL_ITEMS", "add")] async (HttpRequest http, EbookItemResource r, CancellationToken ct) =>
+        {
+            var form = await http.ReadFormAsync(ct);
+            var file = form.Files.GetFile("file") ?? throw new BusinessRuleException("IMPORT_FILE_EMPTY", "Chưa chọn file Excel.");
+            if (file.Length is 0 or > CrudExcel.MaxFileBytes)
+                throw new BusinessRuleException("IMPORT_FILE_SIZE", $"File rỗng hoặc lớn hơn {CrudExcel.MaxFileBytes / 1024 / 1024} MB.");
+            await using var content = file.OpenReadStream();
+            return await r.ImportExcelAsync(content, ImportDefaults(form), ct);
+        }).DisableAntiforgery();
+        items.MapPost("/ImportXml", [Permission("DIGITAL_ITEMS", "add")] async (HttpRequest http, EbookItemResource r, CancellationToken ct) =>
+        {
+            var form = await http.ReadFormAsync(ct);
+            if (form.Files.Any(f => f.Length is 0 or > EbookItemResource.MaxImportXmlBytes))
+                throw new BusinessRuleException("IMPORT_FILE_SIZE", $"Mỗi file XML phải khác rỗng và không quá {EbookItemResource.MaxImportXmlBytes / 1000} KB.");
+            var files = new List<(string, Stream)>();
+            try
+            {
+                foreach (var f in form.Files.Where(f => f.Name == "file")) files.Add((f.FileName, f.OpenReadStream()));
+                return await r.ImportXmlAsync(files, ImportDefaults(form), ct);
+            }
+            finally
+            {
+                foreach (var (_, stream) in files) await stream.DisposeAsync();
+            }
+        }).DisableAntiforgery();
 
         // Ô chọn liên kết sách in của màn thêm/sửa tài liệu số (quyết định #2) — proxy sang catalog, không giữ bản sao.
         items.MapGet("/bib-options", [Permission("DIGITAL_ITEMS", "view")] (string? q, ICatalogBibLookup bibs, CancellationToken ct) =>

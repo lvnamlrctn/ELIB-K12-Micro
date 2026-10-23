@@ -89,6 +89,13 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.Property(x => x.Author).HasMaxLength(500);
             e.Property(x => x.Publisher).HasMaxLength(500);
             e.Property(x => x.PublishDate).HasMaxLength(50);
+            e.Property(x => x.JournalName).HasMaxLength(500);
+            e.Property(x => x.Abstract).HasMaxLength(20_000);
+            e.Property(x => x.Description).HasMaxLength(20_000);
+            e.OwnsMany(x => x.Authors, b => b.ToJson());
+            e.OwnsMany(x => x.Advisors, b => b.ToJson());
+            e.OwnsMany(x => x.Identifiers, b => b.ToJson());
+            e.HasIndex(x => new { x.TenantId, x.PublishYear });
             e.Property(x => x.Keyword).HasMaxLength(1000);
             e.Property(x => x.OtherTitle).HasMaxLength(1000);
             e.Property(x => x.Page).HasMaxLength(50);

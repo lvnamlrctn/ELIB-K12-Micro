@@ -1265,6 +1265,8 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     mods = json.loads(body)["modules"] if s == 200 else []
     if "DIGITAL" in mods and "PORTAL" in mods:
         digital_portal_steps(tb, token, tag)
+        print("21d. Quản lý tài liệu số như LRC: trường giàu, lọc nâng cao, chuyển bộ sưu tập hàng loạt, xuất/nhập Excel và Dublin Core, file, phân quyền bộ sưu tập")
+        digital_docs_steps(tb, token, tag)
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Thư viện số / Cổng thông tin — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
 
@@ -1575,6 +1577,101 @@ def payment_steps(tb, token, tag, card):
     expect({pay["transactionCode"], vn["transactionCode"]} <= paid_codes and totals["totals"]["paid"] >= 130000, f"đối soát: đã thu {totals.get('totals', {}).get('paid')}đ trong danh sách giao dịch")
     s, _, logs = call("POST", f"{P}/webhook-logs/Search", {"pageIndex": 1, "pageSize": 20})
     expect(s == 200 and logs.get("totalCount", 0) >= 6 and sepay_key not in json.dumps(logs), "nhật ký webhook có đủ lời gọi, không chứa khoá")
+
+
+def digital_docs_steps(tb, token, tag):
+    """21d. Tài liệu số: trường giàu (tác giả họ/tên, người hướng dẫn, số định danh), bộ lọc nâng cao, thao tác hàng loạt, xuất/nhập, file, phân quyền bộ sưu tập."""
+    D = "/api/admin/digital"
+    XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    def call(method, path, body=None):
+        s, _, text = tb.request(method, path, token=token, json_body=body)
+        return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    s, text, src = call("POST", f"{D}/collections/Add", {"name": f"Nguồn {tag}"})
+    expect(s == 201, "tạo bộ sưu tập nguồn", text[:150])
+    s, text, dst = call("POST", f"{D}/collections/Add", {"name": f"Đích {tag}"})
+    expect(s == 201, "tạo bộ sưu tập đích", text[:150])
+
+    # --- trường giàu + dữ liệu cũ chỉ có chuỗi phẳng
+    s, text, rich = call("POST", f"{D}/items/Add", {
+        "title": f"Giáo trình e2e {tag}", "collectionId": src["id"], "publishDate": "2019", "publisher": "NXB E2E",
+        "authors": [{"last": "Nguyễn", "first": "Văn A"}, {"last": "Trần", "first": "Thị B"}], "advisors": [{"last": "Lê", "first": "C", "title": "PGS.TS"}],
+        "identifiers": [{"type": "isbn", "value": "978-604-e2e"}], "abstract": "Tóm tắt e2e", "journalName": "Tạp chí e2e", "publishMonth": 11, "status": 2})
+    expect(s == 201 and rich.get("author") == "Nguyễn Văn A; Trần Thị B" and rich.get("publishYear") == 2019 and len(rich.get("authors", [])) == 2,
+           "tài liệu giàu trường: tác giả họ/tên → chuỗi ghép, năm số", text[:250])
+    s, text, legacy = call("POST", f"{D}/items/Add", {"title": f"Cũ e2e {tag}", "collectionId": src["id"], "author": "Tác giả cũ", "publishDate": "05/2010", "status": 2})
+    expect(s == 201 and legacy["authors"][0]["last"] == "Tác giả cũ" and legacy.get("publishYear") == 2010, "người ghi cũ chỉ gửi chuỗi vẫn có danh sách tác giả và năm", text[:250])
+
+    # --- lọc nâng cao
+    s, _, page = call("POST", f"{D}/items/Search", {"author": "trần thị", "publishYearFrom": 2015, "publishYearTo": 2020, "pageSize": 20})
+    expect(s == 200 and [i["title"] for i in page["items"]] == [rich["title"]], "lọc theo tác giả + khoảng năm xuất bản", str(page)[:200])
+    s, _, page = call("POST", f"{D}/items/Search", {"collectionId": src["id"], "publishYearTo": 2012, "pageSize": 20})
+    expect(s == 200 and [i["title"] for i in page["items"]] == [legacy["title"]], "lọc theo năm suy từ chuỗi ngày cũ")
+
+    # --- chọn hàng loạt: theo mã và theo bộ lọc
+    s, _, preview = call("POST", f"{D}/items/Selection/Preview", {"search": {"collectionId": src["id"]}})
+    expect(s == 200 and preview["count"] == 2, "đếm kết quả lọc làm vùng chọn", str(preview))
+    s, text, moved = call("PUT", f"{D}/items/BulkMoveCollection", {"selection": {"publicIds": [rich["publicId"]]}, "collectionId": dst["id"]})
+    expect(s == 200 and moved["updated"] == 1, "chuyển bộ sưu tập hàng loạt (theo mã)", text[:150])
+    s, _, got = call("GET", f"{D}/items/GetById/{rich['publicId']}")
+    expect(got["collectionId"] == dst["id"], "tài liệu đã sang bộ sưu tập đích")
+
+    # --- xuất Excel / metadata
+    s, h, xbytes = tb.request("POST", f"{D}/items/Export", token=token, json_body={"selection": {"search": {"collectionId": dst["id"]}}, "fields": ["title", "author", "free"]}, binary=True)
+    expect(s == 200 and xbytes[:2] == b"PK" and len(xbytes) > 500, "xuất Excel theo bộ lọc (file .xlsx)", str(s))
+    s, _, zbytes = tb.request("POST", f"{D}/items/ExportMetadata", token=token, json_body={"selection": {"publicIds": [rich["publicId"]]}}, binary=True)
+    with zipfile.ZipFile(io.BytesIO(zbytes)) as z:
+        names = z.namelist()
+        dc = z.read(names[0]).decode("utf-8")
+    expect(s == 200 and names == ["item_001/dublin_core.xml"] and "Nguyễn Văn A" in dc and "978-604-e2e" in dc, "xuất metadata Dublin Core (ZIP)", str(names))
+
+    # --- nhập Excel: dòng đúng vào, dòng lỗi báo theo dòng, các dòng khác vẫn nhập
+    book = xlsx([["Tiêu đề", "Tác giả", "Năm xuất bản", "Ngôn ngữ"], [f"Nhập e2e A {tag}", "X; Y", "2021", "English"], [f"Nhập e2e lỗi {tag}", None, None, "Klingon"], [f"Nhập e2e B {tag}", "Z", "2022", None]])
+    s, text, res = call_multipart(tb, token, f"{D}/items/ImportExcel", [("file", "nhap.xlsx", book, XLSX)], {"collectionId": str(dst["id"]), "published": "true"})
+    expect(s == 200 and res["imported"] == 2 and res["failed"] == 1 and res["errors"][0].startswith("Dòng 3:"), "nhập Excel: 2 dòng vào, dòng 3 lỗi báo đúng số dòng", text[:250])
+    s, _, page = call("POST", f"{D}/items/Search", {"title": f"nhập e2e a {tag}".lower(), "pageSize": 5})
+    imported_a = page["items"][0] if page.get("items") else {}
+    expect(imported_a.get("language") == "en" and imported_a.get("status") == 2 and len(imported_a.get("authors", [])) == 2, "dòng nhập: ngôn ngữ English → en, xuất bản, 2 tác giả")
+
+    # --- nhập Dublin Core XML: file đúng, file XXE bị từ chối theo tên
+    xml_ok = f'<dublin_core><dcvalue element="title" qualifier="none">Nhập XML e2e {tag}</dcvalue><dcvalue element="contributor" qualifier="author">Phạm Văn D</dcvalue></dublin_core>'.encode()
+    xml_evil = b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><dublin_core><dcvalue element="title" qualifier="none">&e;</dcvalue></dublin_core>'
+    s, text, res = call_multipart(tb, token, f"{D}/items/ImportXml", [("file", "tot.xml", xml_ok, "text/xml"), ("file", "xxe.xml", xml_evil, "text/xml")], {"collectionId": str(dst["id"])})
+    expect(s == 200 and res["imported"] == 1 and res["failed"] == 1 and res["errors"][0].startswith("xxe.xml:"), "nhập XML: file thường vào, file có DTD bị từ chối theo tên", text[:250])
+
+    # --- file: thêm bản ghi file → danh sách theo thứ tự → sửa mô tả/thứ tự → xoá
+    media = str(uuid.uuid4())
+    s, text, f1 = call("POST", f"{D}/files/Add", {"ebookItemPublicId": rich["publicId"], "mediaFileId": media, "type": "Document", "fileExt": "pdf", "description": "Bản chính", "sortOrder": 2})
+    expect(s == 201, "thêm file đính kèm", text[:150])
+    s, text, f2 = call("PUT", f"{D}/files/Update/{f1['publicId']}", {"ebookItemPublicId": rich["publicId"], "mediaFileId": media, "type": "attachment", "fileExt": "pdf", "description": "Phụ lục", "sortOrder": 1})
+    expect(s == 200 and f2["type"] == "attachment" and f2["description"] == "Phụ lục" and f2["sortOrder"] == 1, "sửa loại / mô tả / thứ tự file", text[:150])
+    s, _, page = call("POST", f"{D}/items/Search", {"title": rich["title"].lower(), "pageSize": 5})
+    expect(page["items"][0]["totalFile"] == 1, "danh sách hiện số file của tài liệu")
+    s, text, bulk = call("POST", f"{D}/items/BulkDelete", {"publicIds": [rich["publicId"]]})
+    expect(s == 200 and bulk["updated"] == 0 and bulk["skipped"][0]["code"] == "EBOOK_ITEM_HAS_FILES", "xoá hàng loạt bỏ qua tài liệu còn file và nêu lý do", text[:200])
+    call("DELETE", f"{D}/files/Delete/{f1['publicId']}")
+
+    # --- phân quyền bộ sưu tập theo loại bạn đọc
+    s, _, rts = call("POST", "/api/admin/patron/reader-types/SearchAll", {})
+    if s == 200 and rts:
+        rt = rts[0]["id"]
+        s, text, perms = call("PUT", f"{D}/collections/{dst['publicId']}/permissions", [{"readerTypeId": rt, "read": False, "download": True, "maxDocument": 3, "offlineDays": 7}])
+        expect(s == 200 and perms[0]["read"] is True and perms[0]["download"] is True and perms[0]["maxDocument"] == 3, "phân quyền bộ sưu tập: bật tải thì tự bật đọc", text[:200])
+        s, _, perms = call("PUT", f"{D}/collections/{dst['publicId']}/permissions", [])
+        expect(s == 200 and perms == [], "đặt lại rỗng xoá quyền theo loại")
+
+    # --- dọn: xoá tài liệu thử rồi bộ sưu tập thử
+    s, _, everything = call("POST", f"{D}/items/Search", {"pageSize": 100})
+    mine = [i["publicId"] for i in everything["items"] if tag in i["title"]]
+    if mine: call("POST", f"{D}/items/BulkDelete", {"publicIds": mine})
+    call("DELETE", f"{D}/collections/Delete/{src['publicId']}")
+    call("DELETE", f"{D}/collections/Delete/{dst['publicId']}")
+
+
+def call_multipart(tb, token, path, files, fields):
+    s, _, text = tb.request("POST", path, token=token, raw=multipart_fields(files, fields))
+    return s, text, (json.loads(text) if text.startswith(("{", "[")) else {})
 
 
 def digital_portal_steps(tb, token, tag):

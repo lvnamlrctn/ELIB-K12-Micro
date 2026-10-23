@@ -203,6 +203,7 @@ export class Menu {
           { title: 'MENU.PORTAL_LINKS', icon: 'link', link: '/portal-links', perm: 'PORTAL_LINKS' },
           { title: 'MENU.PORTAL_LINK_GROUPS', icon: 'folder_special', link: '/portal-link-groups', perm: 'PORTAL_LINKS' },
           { title: 'MENU.PORTAL_CONTACTS', icon: 'contact_mail', link: '/portal-contacts', perm: 'PORTAL_CONTACTS' },
+          { title: 'MENU.PORTAL_COUNTER', icon: 'query_stats', link: '/portal-counter', perm: 'PORTAL_COUNTER' },
           { title: 'MENU.PORTAL_CONTACT_GROUPS', icon: 'groups', link: '/portal-contact-groups', perm: 'PORTAL_CONTACTS' },
         ],
       },

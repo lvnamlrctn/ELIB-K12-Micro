@@ -54,6 +54,9 @@ public sealed record PolicyDigitalByCollectionDto(
     bool Comment, bool Download, int? OfflineDays, int? ReservationExpireHours, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Chính sách tài liệu số theo loại bạn đọc × bộ sưu tập (LRC: PolicyDigitalByCollectionController, quyền DIGITAL_POLICIES_BY_COLLECTION).</summary>
+/// <summary>Quyền của một loại bạn đọc trên một bộ sưu tập (hộp "Phân quyền" ở cây bộ sưu tập, LRC: GetPermissions/SavePermissions).</summary>
+public sealed record CollectionPermissionRow(long ReaderTypeId, bool Read, bool Download, int? MaxDocument = null, int? OfflineDays = null, int? ReservationExpireHours = null);
+
 public sealed class PolicyDigitalByCollectionResource(ICrudDbContext db)
     : CrudResource<PolicyDigitalByCollectionResource, PolicyDigitalByCollection, CrudSearch, PolicyDigitalByCollectionRequest, PolicyDigitalByCollectionDto>(db)
 {
@@ -82,6 +85,55 @@ public sealed class PolicyDigitalByCollectionResource(ICrudDbContext db)
         if (await Set.AnyAsync(x => x.CollectionId == entity.CollectionId && x.ReaderTypeId == entity.ReaderTypeId && x.Id != entity.Id, ct))
             throw new ConflictException("POLICY_EXISTS", "Đã có chính sách cho loại bạn đọc và bộ sưu tập này — sửa chính sách đó.");
     }
+
+    public async Task<IReadOnlyList<CollectionPermissionRow>> PermissionsAsync(Guid collectionPublicId, CancellationToken ct)
+    {
+        var collectionId = await CollectionIdAsync(collectionPublicId, ct);
+        return await Set.AsNoTracking().Where(x => x.CollectionId == collectionId && x.ReaderTypeId != null).OrderBy(x => x.ReaderTypeId)
+            .Select(x => new CollectionPermissionRow(x.ReaderTypeId!.Value, x.Read, x.Download, x.MaxDocument, x.OfflineDays, x.ReservationExpireHours)).ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// Đặt lại quyền theo loại bạn đọc của một bộ sưu tập: loại có trong danh sách được thêm/sửa, loại có chính sách cũ mà không còn trong danh sách thì
+    /// xoá. Chỉ đụng các dòng có loại bạn đọc cụ thể — dòng "mọi loại" (ReaderTypeId rỗng) giữ nguyên, và các trường hộp này không hiện
+    /// (số trang/dung lượng tối đa, bình luận) của dòng đã có được giữ nguyên. Bật Tải thì tự bật Đọc.
+    /// </summary>
+    public async Task<IReadOnlyList<CollectionPermissionRow>> SavePermissionsAsync(Guid collectionPublicId, IReadOnlyList<CollectionPermissionRow> rows, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var collectionId = await CollectionIdAsync(collectionPublicId, ct);
+        if (rows.Select(r => r.ReaderTypeId).Distinct().Count() != rows.Count)
+            throw new BusinessRuleException("PERMISSION_DUPLICATE", "Mỗi loại bạn đọc chỉ xuất hiện một lần.");
+        var existing = await Set.Where(x => x.CollectionId == collectionId && x.ReaderTypeId != null).ToListAsync(ct);
+        foreach (var row in rows)
+        {
+            var read = row.Read || row.Download;
+            var current = existing.FirstOrDefault(x => x.ReaderTypeId == row.ReaderTypeId);
+            if (current is null)
+            {
+                var created = PolicyDigitalByCollection.Create(row.ReaderTypeId, collectionId, null, null, row.MaxDocument, read, false, row.Download, row.OfflineDays, row.ReservationExpireHours);
+                Set.Add(created);
+                await AuditAsync(created, CrudChange.Added, ct);
+            }
+            else
+            {
+                current.Update(row.ReaderTypeId, collectionId, current.MaxPage, current.MaxSize, row.MaxDocument, read, current.Comment, row.Download, row.OfflineDays, row.ReservationExpireHours);
+                await AuditAsync(current, CrudChange.Updated, ct);
+            }
+        }
+        var kept = rows.Select(r => r.ReaderTypeId).ToHashSet();
+        foreach (var gone in existing.Where(x => !kept.Contains(x.ReaderTypeId!.Value)))
+        {
+            Set.Remove(gone); // interceptor chuyển thành xoá mềm
+            await AuditAsync(gone, CrudChange.Deleted, ct);
+        }
+        await Db.SaveChangesAsync(ct);
+        return await PermissionsAsync(collectionPublicId, ct);
+    }
+
+    private async Task<long> CollectionIdAsync(Guid publicId, CancellationToken ct) =>
+        await Db.Set<EbookCollection>().AsNoTracking().Where(c => c.PublicId == publicId).Select(c => (long?)c.Id).FirstOrDefaultAsync(ct)
+        ?? throw new NotFoundException("Bộ sưu tập", publicId);
 
     /// <summary>Chính sách áp cho bạn đọc trong một bộ sưu tập — cụ thể nhất thắng; không có thì null.</summary>
     public static PolicyDigitalByCollection? Resolve(IEnumerable<PolicyDigitalByCollection> policies, long? readerTypeId, long collectionId) =>

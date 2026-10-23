@@ -523,6 +523,9 @@ export interface ReadingSessionRow {
   lastPage: number; maxPage: number; pageCount: number; activeSeconds: number; device: string | null;
 }
 export interface ReadingSessionPage { totalCount: number; items: ReadingSessionRow[]; }
+export interface PortalCounterSummary { total: number; today: number; last7Days: number; }
+export interface PortalCounterDay { day: string; hits: number; }
+
 export interface ReadingStats {
   totals: { sessions: number; readers: number; ebooks: number; activeSeconds: number; views: number; downloads: number };
   topEbooks: { ebookPublicId: string; title: string; sessions: number; readers: number; activeSeconds: number }[];
@@ -543,8 +546,24 @@ export interface EbookItem {
   free: boolean; allowDownload: boolean; printCopies: number | null; offlineDays: number | null; totalView: number; totalDownload: number;
   submited: string | null; lastUpdate: string | null; coverUrl: string | null; linkedBibPublicId: string | null;
   createdAt: string; updatedAt: string | null;
+  abstract: string | null; description: string | null; journalName: string | null; publishDay: number | null; publishMonth: number | null; publishYear: number | null;
+  authors: EbookPerson[]; advisors: EbookPerson[]; identifiers: EbookIdentifier[]; totalFile: number; share: number | null; show: number | null; indexContent: number | null;
 }
-export interface EbookItemSearch extends CrudSearch { collectionId?: number | null; subjectId?: number | null; topicId?: number | null; typeId?: number | null; }
+export interface EbookPerson { last: string | null; first: string | null; title?: string | null; }
+export interface EbookIdentifier { type: string; value: string; }
+export interface EbookItemSearch extends CrudSearch {
+  collectionId?: number | null; subjectId?: number | null; topicId?: number | null; typeId?: number | null;
+  title?: string | null; author?: string | null; publisher?: string | null; publishYearFrom?: number | null; publishYearTo?: number | null;
+  submittedFrom?: string | null; submittedTo?: string | null; free?: boolean | null;
+}
+/** Chọn tài liệu để thao tác hàng loạt: các dòng đã tích HOẶC toàn bộ kết quả của bộ lọc. */
+export interface ItemSelection { publicIds?: string[] | null; search?: EbookItemSearch | null; }
+export interface ItemBulkResult { updated: number; skipped: { publicId: string; title: string; code: string; reason: string }[]; }
+export interface ItemImportResult { imported: number; failed: number; errors: string[]; warnings: string[]; message: string; }
+export interface ItemImportDefaults { collectionId: number | null; subjectId: number | null; topicId: number | null; published: boolean; free: boolean; allowDownload: boolean; }
+export interface CollectionPermission {
+  readerTypeId: number; read: boolean; download: boolean; maxDocument: number | null; offlineDays: number | null; reservationExpireHours: number | null;
+}
 export interface EbookFile {
   id: number; publicId: string; ebookItemPublicId: string; mediaFileId: string; type: string | null; isConvert: boolean; fileType: string | null;
   fileSize: number | null; fileExt: string | null; description: string | null; source: string | null; formatId: number | null;
@@ -898,7 +917,7 @@ export function saveFile(blob: Blob, fileName: string): void {
 }
 
 /** Yêu cầu trả file: lỗi problem+json đến dưới dạng Blob → đọc lại thành JSON để errorMessage() hiện đúng thông báo. */
-async function blobRequest(request: Promise<Blob>): Promise<Blob> {
+export async function blobRequest(request: Promise<Blob>): Promise<Blob> {
   try {
     return await request;
   } catch (e) {
@@ -1413,13 +1432,14 @@ export class Api {
   saveEbookMetadata(itemPublicId: string, values: { fieldPublicId: string; value: string; language: string | null }[]) {
     return this.put<EbookMetadataRow[]>(`/api/admin/digital/items/${itemPublicId}/metadata`, { values });
   }
+  portalCounterDays(days: number) { return this.get<PortalCounterDay[]>('/api/admin/portal/counter/days', { days }); }
   readingStatistics(range: { from: string | null; to: string | null }) { return this.post<ReadingStats>('/api/admin/digital/reading-tracking/Statistics', range); }
   readingSessions(search: { ebookPublicId: string | null; keyword: string | null; from: string | null; to: string | null; pageIndex: number; pageSize: number }) {
     return this.post<ReadingSessionPage>('/api/admin/digital/reading-tracking/Search', search);
   }
   mediaLibrary(purpose: string, page: number, pageSize: number) { return this.get<MediaFilePage>('/api/admin/media/files', { purpose, page, pageSize }); }
   handlePortalContact(publicId: string, handleNote: string) { return this.post<unknown>(`/api/admin/portal/contacts/${publicId}/Handle`, { handleNote }); }
-  portalCounter() { return this.get<{ total: number; today: number; last7Days: number }>('/api/admin/portal/counter'); }
+  portalCounter() { return this.get<PortalCounterSummary>('/api/admin/portal/counter'); }
   approveEbookReview(publicId: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Approve`); }
   rejectEbookReview(publicId: string, reason: string) { return this.post<unknown>(`/api/admin/digital/reviews/${publicId}/Reject`, { reason }); }
 

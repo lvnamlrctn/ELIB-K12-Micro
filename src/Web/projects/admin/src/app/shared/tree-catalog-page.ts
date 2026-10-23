@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Api, STATUS_ACTIVE, errorMessage } from '../core/api';
 import { Session } from '../core/session';
+import { CollectionPermissions } from './collection-permissions';
 import { ToastrService } from './toastr';
 import { ConfirmDelete, Loading, Modal, StatusBadge } from './ui';
 
@@ -25,6 +26,8 @@ export interface TreeCatalogConfig {
   defaults?: Record<string, unknown>;
   /** Hiện ô tải ảnh bìa công khai (chỉ bộ sưu tập dùng) — purpose cố định 'ebook-cover'. */
   coverUpload?: boolean;
+  /** Nút "Phân quyền" theo loại bạn đọc (chỉ bộ sưu tập) — hộp thoại đọc/ghi qua collections/{id}/permissions. */
+  permissions?: boolean;
   modalWidth?: string;
 }
 
@@ -49,7 +52,7 @@ interface TreeForm {
  */
 @Component({
   selector: 'app-tree-catalog-page',
-  imports: [FormsModule, Modal, ConfirmDelete, Loading, StatusBadge, TranslatePipe],
+  imports: [CollectionPermissions, FormsModule, Modal, ConfirmDelete, Loading, StatusBadge, TranslatePipe],
   template: `
     @let c = config();
     <div class="mb-5"><h4 class="page-title">{{ c.title | translate }}</h4></div>
@@ -121,6 +124,11 @@ interface TreeForm {
                     @if (can('add')) {
                       <button (click)="openCreate(n)" class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center" [title]="'DIGITAL_CAT.ADD_CHILD' | translate">
                         <span class="material-icons text-[15px] leading-none">add</span>
+                      </button>
+                    }
+                    @if (c.permissions && can('edit')) {
+                      <button (click)="permissionsFor.set(n)" class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 flex items-center justify-center" [title]="'DIGITAL_DOC.PERMISSION_BTN' | translate">
+                        <span class="material-icons text-[15px] leading-none">manage_accounts</span>
                       </button>
                     }
                     @if (can('edit')) {
@@ -218,6 +226,10 @@ interface TreeForm {
       </app-modal>
     }
 
+    @if (permissionsFor(); as p) {
+      <app-collection-permissions [collectionPublicId]="p.publicId" [collectionName]="p.name" (closed)="permissionsFor.set(null)" />
+    }
+
     @if (deleting(); as d) {
       <app-confirm-delete [busy]="saving()" message="DIGITAL_CAT.DELETE_CONFIRM" [messageParams]="{ name: d.name }"
                           (confirmed)="doDelete(d)" (cancelled)="deleting.set(null)" />
@@ -239,6 +251,7 @@ export class TreeCatalogPage implements OnInit {
   protected readonly uploadingCover = signal(false);
   protected readonly form = signal<TreeForm | null>(null);
   protected readonly deleting = signal<TreeNode | null>(null);
+  protected readonly permissionsFor = signal<TreeNode | null>(null);
 
   private readonly flat = computed(() => {
     const out: FlatNode[] = [];
