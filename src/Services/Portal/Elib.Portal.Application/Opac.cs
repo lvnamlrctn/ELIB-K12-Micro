@@ -86,11 +86,13 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
     private DateOnly Today => DateOnly.FromDateTime(Now.ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     // ── Tin tức ──
-    private IQueryable<News> PublishedNews(string? language)
+    /// <param name="member">true khi gọi qua đường bạn đọc đã đăng nhập (/api/reader): được xem tin của chuyên mục yêu cầu đăng nhập.</param>
+    private IQueryable<News> PublishedNews(string? language, bool member)
     {
         var now = Now;
         var query = db.Set<News>().AsNoTracking().Where(n => n.Status == IHasStatus.Active && (n.StartTime == null || n.StartTime <= now) && (n.EndTime == null || n.EndTime > now));
         if (!string.IsNullOrWhiteSpace(language)) query = query.Where(n => n.Language == null || n.Language == language);
+        if (member) return query;
         // Chuyên mục yêu cầu đăng nhập: không lộ qua đường ẩn danh.
         var restricted = db.Set<NewsCategory>().Where(c => c.RequiresLogin).Select(c => c.Id);
         return query.Where(n => n.CategoryId == null || !restricted.Contains(n.CategoryId.Value));
@@ -100,10 +102,10 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
         n.PublicId, n.Slug, n.Title, n.Brief, n.Thumb, n.Images, n.PublishedAt ?? n.CreatedAt, n.CategoryId,
         db.Set<NewsCategory>().Where(c => c.Id == n.CategoryId).Select(c => c.Name).FirstOrDefault(), n.Author, n.Featured, n.TotalView));
 
-    public async Task<OpacNewsPage> SearchNewsAsync(OpacNewsSearch search, CancellationToken ct)
+    public async Task<OpacNewsPage> SearchNewsAsync(OpacNewsSearch search, bool member, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(search);
-        var query = PublishedNews(search.Language);
+        var query = PublishedNews(search.Language, member);
         if (search.CategoryId is { } categoryId)
         {
             var ids = await CategoryBranchAsync(categoryId, ct);
@@ -123,13 +125,13 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
         return new OpacNewsPage(total, page, size, items);
     }
 
-    public async Task<OpacNewsDetail> NewsAsync(string slug, string? language, CancellationToken ct)
+    public async Task<OpacNewsDetail> NewsAsync(string slug, string? language, bool member, CancellationToken ct)
     {
-        var news = await PublishedNews(language).FirstOrDefaultAsync(n => n.Slug == slug, ct) ?? throw new NotFoundException("Tin tức", slug);
+        var news = await PublishedNews(language, member).FirstOrDefaultAsync(n => n.Slug == slug, ct) ?? throw new NotFoundException("Tin tức", slug);
         var attachments = await db.Set<NewsAttachment>().AsNoTracking().Where(a => a.NewsId == news.Id).OrderBy(a => a.Id)
             .Select(a => new OpacAttachment(a.PublicId, a.Name, a.Url, a.FileSize)).ToListAsync(ct);
         var related = news.CategoryId is { } categoryId
-            ? await NewsItems(PublishedNews(language).Where(n => n.CategoryId == categoryId && n.Id != news.Id).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).Take(5)).ToListAsync(ct)
+            ? await NewsItems(PublishedNews(language, member).Where(n => n.CategoryId == categoryId && n.Id != news.Id).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).Take(5)).ToListAsync(ct)
             : [];
         var categoryName = news.CategoryId is { } id ? await db.Set<NewsCategory>().Where(c => c.Id == id).Select(c => c.Name).FirstOrDefaultAsync(ct) : null;
         return new OpacNewsDetail(news.PublicId, news.Slug, news.Title, news.Brief, news.Content, news.Images, news.PublishedAt ?? news.CreatedAt, news.CategoryId, categoryName,
@@ -137,23 +139,24 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
     }
 
     /// <summary>Tăng lượt xem (gọi riêng sau khi mở tin — lỗi đếm không làm hỏng việc đọc).</summary>
-    public async Task ViewAsync(string slug, CancellationToken ct)
+    public async Task ViewAsync(string slug, bool member, CancellationToken ct)
     {
-        await db.Set<News>().Where(n => n.Slug == slug && n.Status == IHasStatus.Active).ExecuteUpdateAsync(s => s.SetProperty(n => n.TotalView, n => n.TotalView + 1), ct);
+        var ids = PublishedNews(null, member).Where(n => n.Slug == slug).Select(n => n.Id);
+        await db.Set<News>().Where(n => ids.Contains(n.Id)).ExecuteUpdateAsync(s => s.SetProperty(n => n.TotalView, n => n.TotalView + 1), ct);
     }
 
-    public async Task<IReadOnlyList<OpacComment>> CommentsAsync(string slug, CancellationToken ct)
+    public async Task<IReadOnlyList<OpacComment>> CommentsAsync(string slug, bool member, CancellationToken ct)
     {
-        var newsId = await db.Set<News>().Where(n => n.Slug == slug && n.Status == IHasStatus.Active).Select(n => n.Id).FirstOrDefaultAsync(ct);
+        var newsId = await PublishedNews(null, member).Where(n => n.Slug == slug).Select(n => n.Id).FirstOrDefaultAsync(ct);
         if (newsId == 0) return [];
         return await db.Set<NewsComment>().AsNoTracking().Where(c => c.NewsId == newsId && c.Status == IHasStatus.Active).OrderByDescending(c => c.CreatedAt)
             .Select(c => new OpacComment(c.PublicId, c.Name, c.Title, c.Content, c.CreatedAt)).Take(100).ToListAsync(ct);
     }
 
-    public async Task CommentAsync(string slug, OpacCommentSubmission submission, CancellationToken ct)
+    public async Task CommentAsync(string slug, OpacCommentSubmission submission, bool member, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(submission);
-        var news = await PublishedNews(null).Where(n => n.Slug == slug).Select(n => new { n.Id, n.AllowComment }).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("Tin tức", slug);
+        var news = await PublishedNews(null, member).Where(n => n.Slug == slug).Select(n => new { n.Id, n.AllowComment }).FirstOrDefaultAsync(ct) ?? throw new NotFoundException("Tin tức", slug);
         if (!news.AllowComment) throw new BusinessRuleException("COMMENTS_CLOSED", "Tin này không nhận bình luận.");
         if (!string.IsNullOrWhiteSpace(submission.Website)) return; // bot điền ô bẫy: nhận giả vờ, không lưu
         if (await db.Set<NewsComment>().CountAsync(c => c.Status == IHasStatus.Inactive, ct) >= MaxPendingComments)
@@ -162,9 +165,9 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<OpacCategory>> CategoriesAsync(string? language, CancellationToken ct)
+    public async Task<IReadOnlyList<OpacCategory>> CategoriesAsync(string? language, bool member, CancellationToken ct)
     {
-        var query = db.Set<NewsCategory>().AsNoTracking().Where(c => c.Status == IHasStatus.Active && !c.RequiresLogin);
+        var query = db.Set<NewsCategory>().AsNoTracking().Where(c => c.Status == IHasStatus.Active && (member || !c.RequiresLogin));
         if (!string.IsNullOrWhiteSpace(language)) query = query.Where(c => c.Language == null || c.Language == language);
         return await query.OrderBy(c => c.Level).ThenBy(c => c.SortOrder).ThenBy(c => c.Id)
             .Select(c => new OpacCategory(c.Id, c.Name, c.ParentId, c.Level, c.Description, c.PageTitle, c.MetaDescription)).ToListAsync(ct);
@@ -221,6 +224,16 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
         return await query.OrderBy(b => b.SortOrder).ThenBy(b => b.Id).Select(b => new OpacBanner(b.PublicId, b.Name, b.Image, b.Link, b.Width, b.Height, b.Position)).Take(20).ToListAsync(ct);
     }
 
+    /// <summary>Đếm một lượt nhấp. Chỉ quảng cáo đang hiển thị (và nhóm đang bật) mới được tính; không có thì lặng lẽ bỏ qua để không lộ quảng cáo nào tồn tại.</summary>
+    public async Task AdClickAsync(Guid publicId, CancellationToken ct)
+    {
+        var today = Today;
+        var groups = db.Set<AdsGroup>().Where(g => g.Status == IHasStatus.Active).Select(g => g.Id);
+        await db.Set<Ads>().Where(a => a.PublicId == publicId && a.Status == IHasStatus.Active && (a.ShowFrom == null || a.ShowFrom <= today) && (a.ShowTo == null || a.ShowTo >= today)
+                && groups.Contains(a.AdsGroupId))
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Clicks, a => a.Clicks + 1), ct);
+    }
+
     public async Task<IReadOnlyList<OpacAdGroup>> AdsAsync(string? language, CancellationToken ct)
     {
         var today = Today;
@@ -263,8 +276,8 @@ public sealed class OpacPortal(ICrudDbContext db, TimeProvider clock, IPublishEn
 
     public async Task<OpacHome> HomeAsync(string? language, CancellationToken ct) => new(
         await BannersAsync(BannerPositions.Home, language, ct),
-        await NewsItems(PublishedNews(language).Where(n => n.Featured).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).Take(6)).ToListAsync(ct),
-        await NewsItems(PublishedNews(language).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).ThenByDescending(n => n.Id).Take(8)).ToListAsync(ct),
+        await NewsItems(PublishedNews(language, false).Where(n => n.Featured).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).Take(6)).ToListAsync(ct),
+        await NewsItems(PublishedNews(language, false).OrderByDescending(n => n.PublishedAt ?? n.CreatedAt).ThenByDescending(n => n.Id).Take(8)).ToListAsync(ct),
         await AlbumsAsync(language, 4, ct), await VideosAsync(language, 3, ct), await LinksAsync(language, ct), await AdsAsync(language, ct));
 
     // ── Liên hệ ──

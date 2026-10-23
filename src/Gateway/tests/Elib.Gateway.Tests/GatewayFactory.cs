@@ -119,6 +119,17 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Routes:circulation-reader:Match:Path"] = "/api/opac/circulation/{**rest}",
             ["ReverseProxy:Routes:circulation-reader:Transforms:0:PathPattern"] = "/api/reader/{**rest}",
             ["ReverseProxy:Routes:circulation-reader:Metadata:Module"] = "CIRCULATION",
+            // Giống portal thật: đường ẩn danh và đường bạn đọc /member/ cùng tiền tố — đường dài hơn phải thắng.
+            ["ReverseProxy:Routes:portal-opac:ClusterId"] = "search",
+            ["ReverseProxy:Routes:portal-opac:AuthorizationPolicy"] = "anonymous",
+            ["ReverseProxy:Routes:portal-opac:Match:Path"] = "/api/opac/portal/{**rest}",
+            ["ReverseProxy:Routes:portal-opac:Transforms:0:PathPattern"] = "/api/opac/{**rest}",
+            ["ReverseProxy:Routes:portal-opac:Metadata:Module"] = "SEARCH",
+            ["ReverseProxy:Routes:portal-reader:ClusterId"] = "search",
+            ["ReverseProxy:Routes:portal-reader:AuthorizationPolicy"] = "elib-reader",
+            ["ReverseProxy:Routes:portal-reader:Match:Path"] = "/api/opac/portal/member/{**rest}",
+            ["ReverseProxy:Routes:portal-reader:Transforms:0:PathPattern"] = "/api/reader/{**rest}",
+            ["ReverseProxy:Routes:portal-reader:Metadata:Module"] = "SEARCH",
         };
         settings["Gateway:TrustedProxyNetworks:0"] = "10.0.0.0/8"; // "nginx" trong test
         foreach (var (key, value) in settings) builder.UseSetting(key, value);

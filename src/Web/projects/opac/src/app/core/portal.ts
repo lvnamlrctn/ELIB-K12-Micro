@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Language } from './i18n';
 import { Library } from './library';
+import { ReaderAuth } from './reader-auth';
 
 export interface PortalNewsItem {
   publicId: string; slug: string; title: string; brief: string | null; thumb: string | null; images: string | null; publishedAt: string; categoryId: number | null;
@@ -38,30 +39,50 @@ export interface PortalCounter { total: number; today: number; last7Days: number
 @Injectable({ providedIn: 'root' })
 export class PortalApi {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api/opac/portal';
+  private readonly readerAuth = inject(ReaderAuth);
+  private readonly pub = '/api/opac/portal';
 
-  home(lang: string) { return firstValueFrom(this.http.get<PortalHome>(`${this.base}/home`, { params: { lang } })); }
-  menus(lang: string) { return firstValueFrom(this.http.get<PortalMenu[]>(`${this.base}/menus`, { params: { lang } })); }
-  categories(lang: string) { return firstValueFrom(this.http.get<PortalCategory[]>(`${this.base}/categories`, { params: { lang } })); }
+  /** Bạn đọc đã đăng nhập đi đường /member (gateway chỉ nhận token bạn đọc) để xem thêm tin của chuyên mục yêu cầu đăng nhập; còn lại đi đường ẩn danh. */
+  /**
+   * Gọi một API tin tức: bạn đọc đã đăng nhập thử đường /member trước; token bị từ chối (hết phiên) thì quay về đường ẩn danh như khách,
+   * để trang tin không hỏng chỉ vì phiên cũ.
+   */
+  private async news$<T>(call: (base: string) => Promise<T>): Promise<T> {
+    if (!this.readerAuth.accessToken()) return call(this.pub);
+    try {
+      return await call(`${this.pub}/member`);
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && (e.status === 401 || e.status === 403)) return call(this.pub);
+      throw e;
+    }
+  }
+
+  home(lang: string) { return firstValueFrom(this.http.get<PortalHome>(`${this.pub}/home`, { params: { lang } })); }
+  menus(lang: string) { return firstValueFrom(this.http.get<PortalMenu[]>(`${this.pub}/menus`, { params: { lang } })); }
+  categories(lang: string) { return this.news$((base) => firstValueFrom(this.http.get<PortalCategory[]>(`${base}/categories`, { params: { lang } }))); }
   searchNews(body: { q?: string | null; categoryId?: number | null; language: string; page: number; pageSize: number }) {
-    return firstValueFrom(this.http.post<PortalNewsPage>(`${this.base}/news/Search`, body));
+    return this.news$((base) => firstValueFrom(this.http.post<PortalNewsPage>(`${base}/news/Search`, body)));
   }
-  news(slug: string, lang: string) { return firstValueFrom(this.http.get<PortalNewsDetail>(`${this.base}/news/${encodeURIComponent(slug)}`, { params: { lang } })); }
-  viewed(slug: string) { return firstValueFrom(this.http.post<void>(`${this.base}/news/${encodeURIComponent(slug)}/view`, {})); }
-  comments(slug: string) { return firstValueFrom(this.http.get<PortalComment[]>(`${this.base}/news/${encodeURIComponent(slug)}/comments`)); }
+  news(slug: string, lang: string) { return this.news$((base) => firstValueFrom(this.http.get<PortalNewsDetail>(`${base}/news/${encodeURIComponent(slug)}`, { params: { lang } }))); }
+  viewed(slug: string) { return this.news$((base) => firstValueFrom(this.http.post<void>(`${base}/news/${encodeURIComponent(slug)}/view`, {}))); }
+  comments(slug: string) { return this.news$((base) => firstValueFrom(this.http.get<PortalComment[]>(`${base}/news/${encodeURIComponent(slug)}/comments`))); }
   comment(slug: string, body: { name: string; email: string | null; title: string | null; content: string; website: string | null }) {
-    return firstValueFrom(this.http.post<void>(`${this.base}/news/${encodeURIComponent(slug)}/comments`, body));
+    return this.news$((base) => firstValueFrom(this.http.post<void>(`${base}/news/${encodeURIComponent(slug)}/comments`, body)));
   }
-  page(slug: string, lang: string) { return firstValueFrom(this.http.get<PortalPageContent>(`${this.base}/pages/${encodeURIComponent(slug)}`, { params: { lang } })); }
-  albums(lang: string) { return firstValueFrom(this.http.get<PortalAlbum[]>(`${this.base}/albums`, { params: { lang } })); }
-  photos(albumId: string) { return firstValueFrom(this.http.get<PortalPhoto[]>(`${this.base}/albums/${albumId}/photos`)); }
-  videos(lang: string) { return firstValueFrom(this.http.get<PortalVideo[]>(`${this.base}/videos`, { params: { lang } })); }
-  contactGroups(lang: string) { return firstValueFrom(this.http.get<PortalContactGroup[]>(`${this.base}/contact-groups`, { params: { lang } })); }
+  page(slug: string, lang: string) { return firstValueFrom(this.http.get<PortalPageContent>(`${this.pub}/pages/${encodeURIComponent(slug)}`, { params: { lang } })); }
+  albums(lang: string) { return firstValueFrom(this.http.get<PortalAlbum[]>(`${this.pub}/albums`, { params: { lang } })); }
+  photos(albumId: string) { return firstValueFrom(this.http.get<PortalPhoto[]>(`${this.pub}/albums/${albumId}/photos`)); }
+  videos(lang: string) { return firstValueFrom(this.http.get<PortalVideo[]>(`${this.pub}/videos`, { params: { lang } })); }
+  contactGroups(lang: string) { return firstValueFrom(this.http.get<PortalContactGroup[]>(`${this.pub}/contact-groups`, { params: { lang } })); }
   contact(body: { contactGroupId: number | null; name: string; email: string; mobile: string | null; address: string | null; title: string | null; content: string; website: string | null }) {
-    return firstValueFrom(this.http.post<void>(`${this.base}/contacts`, body));
+    return firstValueFrom(this.http.post<void>(`${this.pub}/contacts`, body));
   }
-  hit() { return firstValueFrom(this.http.post<PortalCounter>(`${this.base}/counter/hit`, {})); }
-  counter() { return firstValueFrom(this.http.get<PortalCounter>(`${this.base}/counter`)); }
+  /** Đếm lượt nhấp quảng cáo: sendBeacon không chặn việc mở liên kết; lỗi bỏ qua. */
+  adClick(publicId: string): void {
+    try { navigator.sendBeacon(`${this.pub}/ads/${publicId}/click`); } catch { /* chỉ là số liệu phụ */ }
+  }
+  hit() { return firstValueFrom(this.http.post<PortalCounter>(`${this.pub}/counter/hit`, {})); }
+  counter() { return firstValueFrom(this.http.get<PortalCounter>(`${this.pub}/counter`)); }
 }
 
 /**

@@ -94,6 +94,8 @@ public sealed class ContactResource(ICrudDbContext db, TimeProvider clock) : Cru
 
 public sealed record CounterSummary(long Total, long Today, long Last7Days);
 
+public sealed record CounterDayPoint(DateOnly Day, long Hits);
+
 /// <summary>Bộ đếm truy cập (LRC: Counter / PublicCounter): cộng dồn theo ngày giờ Việt Nam, không lưu IP.</summary>
 public sealed class VisitCounter(ICrudDbContext db, TimeProvider clock)
 {
@@ -121,6 +123,17 @@ public sealed class VisitCounter(ICrudDbContext db, TimeProvider clock)
         var today = Today();
         var days = await db.Set<CounterDay>().AsNoTracking().Select(c => new { c.Day, c.Hits }).ToListAsync(ct);
         return new CounterSummary(days.Sum(d => d.Hits), days.Where(d => d.Day == today).Sum(d => d.Hits), days.Where(d => d.Day > today.AddDays(-7)).Sum(d => d.Hits));
+    }
+
+    /// <summary>Lượt truy cập từng ngày lịch Việt Nam, đủ <paramref name="days"/> ngày gần nhất (ngày không có lượt = 0), cũ → mới.</summary>
+    public async Task<IReadOnlyList<CounterDayPoint>> DaysAsync(int days, CancellationToken ct)
+    {
+        days = Math.Clamp(days, 1, 366);
+        var today = Today();
+        var from = today.AddDays(1 - days);
+        var hits = (await db.Set<CounterDay>().AsNoTracking().Where(c => c.Day >= from && c.Day <= today).Select(c => new { c.Day, c.Hits }).ToListAsync(ct))
+            .ToDictionary(c => c.Day, c => c.Hits);
+        return [.. Enumerable.Range(0, days).Select(i => from.AddDays(i)).Select(d => new CounterDayPoint(d, hits.GetValueOrDefault(d)))];
     }
 
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(Vietnam).DateTime);

@@ -98,7 +98,7 @@ public sealed record AdsRequest(
 
 public sealed record AdsDto(
     long Id, Guid PublicId, long AdsGroupId, string Name, string Image, string? Link, int? Width, int? Height, int SortOrder, DateOnly? ShowFrom, DateOnly? ShowTo,
-    int Status, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    int Status, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, long Clicks = 0);
 
 /// <summary>Quảng cáo (LRC: AdsController, quyền PORTAL_ADS).</summary>
 public sealed class AdsResource(ICrudDbContext db, ITenantContext tenant, IOptions<PortalOptions> options) : CrudResource<AdsResource, Ads, AdsSearch, AdsRequest, AdsDto>(db)
@@ -110,7 +110,7 @@ public sealed class AdsResource(ICrudDbContext db, ITenantContext tenant, IOptio
     protected override string? Describe(Ads entity) => entity.Name;
 
     protected override Expression<Func<Ads, AdsDto>> Projection => x => new AdsDto(
-        x.Id, x.PublicId, x.AdsGroupId, x.Name, x.Image, x.Link, x.Width, x.Height, x.SortOrder, x.ShowFrom, x.ShowTo, x.Status, x.CreatedAt, x.UpdatedAt);
+        x.Id, x.PublicId, x.AdsGroupId, x.Name, x.Image, x.Link, x.Width, x.Height, x.SortOrder, x.ShowFrom, x.ShowTo, x.Status, x.CreatedAt, x.UpdatedAt, x.Clicks);
 
     protected override Ads Create(AdsRequest r) =>
         Ads.Create(r.AdsGroupId, r.Name, r.Image, r.Link, r.Width, r.Height, r.SortOrder, r.ShowFrom, r.ShowTo, r.Status, _options.MediaPublicPrefix, tenant.RequireTenantId());

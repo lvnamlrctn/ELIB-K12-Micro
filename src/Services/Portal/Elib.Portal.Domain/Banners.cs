@@ -116,6 +116,9 @@ public sealed class Ads : TenantEntity, IHasStatus
     public DateOnly? ShowTo { get; private set; }
     public int Status { get; private set; } = IHasStatus.Active;
 
+    /// <summary>Số lượt nhấp từ OPAC — chỉ tăng qua ExecuteUpdate ở endpoint công khai, sửa quảng cáo không đặt lại.</summary>
+    public long Clicks { get; private set; }
+
     public static Ads Create(long groupId, string? name, string? image, string? link, int? width, int? height, int sortOrder, DateOnly? showFrom, DateOnly? showTo,
         int status, string mediaPublicPrefix, long tenantId)
     {

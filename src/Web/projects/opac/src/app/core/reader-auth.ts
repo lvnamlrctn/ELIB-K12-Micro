@@ -4,7 +4,7 @@ import { User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
 import { firstValueFrom } from 'rxjs';
 
 /** API chỉ dành cho bạn đọc đã đăng nhập — chỉ các đường dẫn này mới được gắn token. */
-const READER_APIS = ['/api/opac/account/', '/api/opac/circulation/', '/api/opac/digital/', '/api/opac/payment/'];
+const READER_APIS = ['/api/opac/account/', '/api/opac/circulation/', '/api/opac/digital/', '/api/opac/payment/', '/api/opac/portal/member/'];
 
 export interface ReaderMe {
   readerPublicId: string; cardNo: string; fullName: string; email: string | null; expireDate: string | null;
@@ -78,7 +78,8 @@ export class ReaderAuth {
   }
 
   accessToken(): string | null {
-    return this.user()?.access_token ?? null;
+    const user = this.user();
+    return user && !user.expired ? user.access_token : null;
   }
 
   me(): Promise<ReaderMe> {

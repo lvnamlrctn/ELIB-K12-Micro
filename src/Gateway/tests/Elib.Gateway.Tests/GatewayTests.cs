@@ -143,6 +143,19 @@ public sealed class GatewayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Portal_member_path_goes_to_the_reader_route_and_never_to_the_anonymous_one()
+    {
+        var anonymous = _gateway.ClientFor("truong-a.thuvientn.vn");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(U("/api/opac/portal/member/news/x"))).StatusCode);
+        Assert.Equal("/api/opac/news/x", (await (await anonymous.GetAsync(U("/api/opac/portal/news/x"))).Content.ReadFromJsonAsync<Echo>())!.Path);
+
+        var member = await _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Reader(11)).GetAsync(U("/api/opac/portal/member/news/x"));
+        Assert.Equal(HttpStatusCode.OK, member.StatusCode);
+        Assert.Equal("/api/reader/news/x", (await member.Content.ReadFromJsonAsync<Echo>())!.Path);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _gateway.ClientFor("truong-a.thuvientn.vn", TestClaims.Staff(11)).GetAsync(U("/api/opac/portal/member/news/x"))).StatusCode);
+    }
+
+    [Fact]
     public async Task Reader_token_only_reaches_reader_routes_and_staff_token_only_admin_routes()
     {
         // Cùng issuer/audience: route quản trị chặn theo sub_type, không chỉ "đã đăng nhập".

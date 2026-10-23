@@ -39,6 +39,7 @@ public static class PortalEndpoints
         contacts.MapPost("/{publicId:guid}/Handle", [Permission("PORTAL_CONTACTS", "edit")] (Guid publicId, ContactRequest request, ContactResource r, ICurrentActor actor, CancellationToken ct)
             => r.HandleAsync(publicId, actor.Id, request, ct));
         api.MapGet("/counter", [Permission("PORTAL_COUNTER", "view")] (VisitCounter counter, CancellationToken ct) => counter.SummaryAsync(ct)).WithTags("Counter");
+        api.MapGet("/counter/days", [Permission("PORTAL_COUNTER", "view")] (int? days, VisitCounter counter, CancellationToken ct) => counter.DaysAsync(days ?? 30, ct)).WithTags("Counter");
         return app;
     }
 }

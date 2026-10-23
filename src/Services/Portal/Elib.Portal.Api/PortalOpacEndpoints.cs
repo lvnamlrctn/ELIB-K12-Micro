@@ -1,3 +1,4 @@
+using Elib.BuildingBlocks.Authorization;
 using Elib.Portal.Application;
 
 namespace Elib.Portal.Api;
@@ -14,19 +15,16 @@ public static class PortalOpacEndpoints
 
         opac.MapGet("/home", (string? lang, OpacPortal p, CancellationToken ct) => p.HomeAsync(lang, ct));
         opac.MapGet("/menus", (string? lang, OpacPortal p, CancellationToken ct) => p.MenusAsync(lang, ct));
-        opac.MapGet("/categories", (string? lang, OpacPortal p, CancellationToken ct) => p.CategoriesAsync(lang, ct));
-        opac.MapPost("/news/Search", (OpacNewsSearch search, OpacPortal p, CancellationToken ct) => p.SearchNewsAsync(search, ct));
-        opac.MapGet("/news/{slug}", (string slug, string? lang, OpacPortal p, CancellationToken ct) => p.NewsAsync(slug, lang, ct));
-        opac.MapPost("/news/{slug}/view", async (string slug, OpacPortal p, CancellationToken ct) =>
+        MapNews(opac, member: false);
+        // Bạn đọc đã đăng nhập (gateway: /api/opac/portal/member/** → /api/reader/**, chỉ token bạn đọc): xem thêm tin của chuyên mục yêu cầu đăng nhập.
+        var reader = app.MapGroup("/api/reader").WithTags("OpacMember")
+            .RequireAuthorization(new RequiresModuleAttribute(PortalEndpoints.Module))
+            .RequireAuthorization(new RequireReaderAttribute());
+        MapNews(reader, member: true);
+        opac.MapPost("/ads/{publicId:guid}/click", async (Guid publicId, OpacPortal p, CancellationToken ct) =>
         {
-            await p.ViewAsync(slug, ct);
+            await p.AdClickAsync(publicId, ct);
             return Results.NoContent();
-        });
-        opac.MapGet("/news/{slug}/comments", (string slug, OpacPortal p, CancellationToken ct) => p.CommentsAsync(slug, ct));
-        opac.MapPost("/news/{slug}/comments", async (string slug, OpacCommentSubmission submission, OpacPortal p, CancellationToken ct) =>
-        {
-            await p.CommentAsync(slug, submission, ct);
-            return Results.Accepted();
         });
         opac.MapGet("/pages/{slug}", (string slug, string? lang, OpacPortal p, CancellationToken ct) => p.PageAsync(slug, lang, ct));
         opac.MapGet("/banners", (string? position, string? lang, OpacPortal p, CancellationToken ct) => p.BannersAsync(position, lang, ct));
@@ -43,5 +41,24 @@ public static class PortalOpacEndpoints
         opac.MapPost("/counter/hit", (VisitCounter counter, CancellationToken ct) => counter.HitAsync(ct));
         opac.MapGet("/counter", (VisitCounter counter, CancellationToken ct) => counter.SummaryAsync(ct));
         return app;
+    }
+
+    /// <summary>Nhóm endpoint tin tức dùng chung cho đường ẩn danh và đường bạn đọc — khác nhau duy nhất ở cờ <paramref name="member"/> (truyền tường minh, không qua trạng thái ẩn).</summary>
+    private static void MapNews(RouteGroupBuilder group, bool member)
+    {
+        group.MapGet("/categories", (string? lang, OpacPortal p, CancellationToken ct) => p.CategoriesAsync(lang, member, ct));
+        group.MapPost("/news/Search", (OpacNewsSearch search, OpacPortal p, CancellationToken ct) => p.SearchNewsAsync(search, member, ct));
+        group.MapGet("/news/{slug}", (string slug, string? lang, OpacPortal p, CancellationToken ct) => p.NewsAsync(slug, lang, member, ct));
+        group.MapPost("/news/{slug}/view", async (string slug, OpacPortal p, CancellationToken ct) =>
+        {
+            await p.ViewAsync(slug, member, ct);
+            return Results.NoContent();
+        });
+        group.MapGet("/news/{slug}/comments", (string slug, OpacPortal p, CancellationToken ct) => p.CommentsAsync(slug, member, ct));
+        group.MapPost("/news/{slug}/comments", async (string slug, OpacCommentSubmission submission, OpacPortal p, CancellationToken ct) =>
+        {
+            await p.CommentAsync(slug, submission, member, ct);
+            return Results.Accepted();
+        });
     }
 }

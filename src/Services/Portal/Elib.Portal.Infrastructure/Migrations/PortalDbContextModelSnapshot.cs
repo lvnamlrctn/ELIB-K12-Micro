@@ -120,6 +120,10 @@ namespace Elib.Portal.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("ads_group_id");
 
+                    b.Property<long>("Clicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("clicks");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

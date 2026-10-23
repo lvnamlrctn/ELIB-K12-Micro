@@ -56,7 +56,7 @@ import { PortalApi, PortalHome } from '../core/portal';
         <section class="max-w-6xl mx-auto px-4 pt-8 flex flex-wrap gap-4 justify-center" [attr.aria-label]="'OPAC.PORTAL.ADS' | translate">
           @for (g of h.adGroups; track g.publicId) {
             @for (a of g.ads; track a.publicId) {
-              @if (a.link) { <a [href]="a.link" target="_blank" rel="noopener noreferrer sponsored"><img [src]="a.image" [alt]="a.name" [style.max-width.px]="a.width" class="rounded-lg" /></a> }
+              @if (a.link) { <a [href]="a.link" target="_blank" rel="noopener noreferrer sponsored" (click)="adClicked(a.publicId)"><img [src]="a.image" [alt]="a.name" [style.max-width.px]="a.width" class="rounded-lg" /></a> }
               @else { <img [src]="a.image" [alt]="a.name" [style.max-width.px]="a.width" class="rounded-lg" /> }
             }
           }
@@ -81,6 +81,8 @@ import { PortalApi, PortalHome } from '../core/portal';
 })
 export class PortalHomeBlock implements OnInit, OnDestroy {
   private readonly api = inject(PortalApi);
+
+  adClicked(publicId: string): void { this.api.adClick(publicId); }
   private readonly language = inject(Language);
 
   protected readonly home = signal<PortalHome | null>(null);
