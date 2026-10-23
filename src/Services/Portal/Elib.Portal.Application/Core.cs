@@ -32,7 +32,10 @@ public sealed class HtmlCleaner(Microsoft.Extensions.Options.IOptions<PortalOpti
         "a", "img", "figure", "figcaption", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
     ];
 
-    private static readonly string[] Attributes = ["href", "src", "alt", "title", "width", "height", "colspan", "rowspan", "target", "rel"];
+    private static readonly string[] Attributes = ["href", "src", "alt", "title", "width", "height", "colspan", "rowspan", "target", "rel", "class"];
+
+    /// <summary>Lớp CSS duy nhất được giữ lại: vị trí ảnh do trình soạn đặt (không cho style nội tuyến). Kích thước là thuộc tính width (số nguyên, kiểm bên dưới).</summary>
+    private static readonly string[] ImageClasses = ["img-left", "img-center", "img-right"];
 
     public string? Clean(string? html, long tenantId)
     {
@@ -47,6 +50,7 @@ public sealed class HtmlCleaner(Microsoft.Extensions.Options.IOptions<PortalOpti
         foreach (var scheme in (string[])["http", "https", "mailto", "tel"]) sanitizer.AllowedSchemes.Add(scheme);
         sanitizer.AllowedCssProperties.Clear();
         sanitizer.AllowedClasses.Clear();
+        foreach (var cssClass in ImageClasses) sanitizer.AllowedClasses.Add(cssClass);
         sanitizer.AllowDataAttributes = false;
         sanitizer.FilterUrl += (_, e) =>
         {
@@ -62,6 +66,13 @@ public sealed class HtmlCleaner(Microsoft.Extensions.Options.IOptions<PortalOpti
             // Ảnh bị loại nguồn (ngoài đơn vị, data:…) → bỏ luôn thẻ img, không để lại thẻ rỗng.
             if (e.Node is AngleSharp.Dom.IElement { LocalName: "img" } image && string.IsNullOrEmpty(image.GetAttribute("src")))
                 e.ReplacementNodes.Add(e.Document.CreateTextNode(string.Empty));
+            else if (e.Node is AngleSharp.Dom.IElement { LocalName: "img" } sized)
+            {
+                // Chiều rộng do kéo góc ảnh: số nguyên 16–4000 điểm ảnh; chiều cao bỏ để trình duyệt giữ tỉ lệ.
+                sized.RemoveAttribute("height");
+                if (!int.TryParse(sized.GetAttribute("width"), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var width) || width is < 16 or > 4000)
+                    sized.RemoveAttribute("width");
+            }
             else if (e.Node is AngleSharp.Dom.IElement { LocalName: "a" } link && link.GetAttribute("href") is { } href && href.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
                 link.SetAttribute("target", "_blank");

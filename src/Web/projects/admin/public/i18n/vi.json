@@ -4099,7 +4099,11 @@
     "IMAGE": "Chèn ảnh",
     "TABLE": "Chèn bảng",
     "RULE": "Đường kẻ ngang",
-    "CLEAR": "Xoá định dạng"
+    "CLEAR": "Xoá định dạng",
+    "IMG_LEFT": "Ảnh bên trái, chữ bao quanh",
+    "IMG_CENTER": "Ảnh ở giữa",
+    "IMG_RIGHT": "Ảnh bên phải, chữ bao quanh",
+    "IMG_RESET": "Kích thước gốc"
   },
   "PORTAL_NEWS_PAGE": {
     "TITLE": "Tin tức",

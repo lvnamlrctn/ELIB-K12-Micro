@@ -22,6 +22,30 @@ public sealed class HtmlCleanerTests
         Assert.Contains("colspan=\"2\"", clean, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Image_position_class_and_dragged_width_are_kept_but_other_classes_and_the_height_are_dropped()
+    {
+        var src = "/s3/media-public/42/cms-image/a.png";
+        var clean = Clean($"<p class=\"evil\"><img src=\"{src}\" class=\"img-left evil\" width=\"320\" height=\"240\" alt=\"a\"></p>");
+        Assert.Contains("class=\"img-left\"", clean, StringComparison.Ordinal);
+        Assert.Contains("width=\"320\"", clean, StringComparison.Ordinal);
+        Assert.DoesNotContain("evil", clean, StringComparison.Ordinal);
+        Assert.DoesNotContain("height", clean, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("100%")]
+    [InlineData("-5")]
+    [InlineData("9999")]
+    [InlineData("8")]
+    [InlineData("12px;x")]
+    public void An_image_width_that_is_not_a_sensible_pixel_count_is_removed(string width)
+    {
+        var clean = Clean($"<img src=\"/s3/media-public/42/cms-image/a.png\" width=\"{width}\">");
+        Assert.Contains("<img", clean, StringComparison.Ordinal);
+        Assert.DoesNotContain("width", clean, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("<script>alert(1)</script><p>a</p>", "script")]
     [InlineData("<p onclick=\"alert(1)\">a</p>", "onclick")]

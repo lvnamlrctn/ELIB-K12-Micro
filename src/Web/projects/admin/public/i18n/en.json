@@ -4099,7 +4099,11 @@
     "IMAGE": "Insert image",
     "TABLE": "Insert table",
     "RULE": "Horizontal rule",
-    "CLEAR": "Clear formatting"
+    "CLEAR": "Clear formatting",
+    "IMG_LEFT": "Image on the left, text wraps",
+    "IMG_CENTER": "Image centered",
+    "IMG_RIGHT": "Image on the right, text wraps",
+    "IMG_RESET": "Original size"
   },
   "PORTAL_NEWS_PAGE": {
     "TITLE": "News",

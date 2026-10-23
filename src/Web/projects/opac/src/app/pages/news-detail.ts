@@ -84,6 +84,9 @@ import { PortalApi, PortalComment, PortalNewsDetail } from '../core/portal';
     .portal-content :where(blockquote) { border-left: 3px solid #cbd5e1; padding-left: 1rem; color: #475569; margin: 0.8em 0; }
     .portal-content :where(a) { color: #1d4ed8; text-decoration: underline; }
     .portal-content :where(img) { max-width: 100%; height: auto; border-radius: 0.5rem; }
+    .portal-content img.img-left { float: left; margin: 0 1rem 0.5rem 0; }
+    .portal-content img.img-right { float: right; margin: 0 0 0.5rem 1rem; }
+    .portal-content img.img-center { display: block; margin: 0.5rem auto; }
     .portal-content :where(table) { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
     .portal-content :where(td, th) { border: 1px solid #cbd5e1; padding: 6px 10px; }
   `,
