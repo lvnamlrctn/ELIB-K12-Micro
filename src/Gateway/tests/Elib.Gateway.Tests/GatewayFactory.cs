@@ -59,7 +59,7 @@ public sealed class EchoBackend : IAsyncDisposable
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 }
 
-public sealed class GatewayFactory(string backendAddress) : WebApplicationFactory<Program>
+public sealed class GatewayFactory(string backendAddress, IReadOnlyDictionary<string, string>? extraSettings = null) : WebApplicationFactory<Program>
 {
     public const string SigningKey = "gateway-signing-key-for-tests-0123456789";
 
@@ -132,6 +132,7 @@ public sealed class GatewayFactory(string backendAddress) : WebApplicationFactor
             ["ReverseProxy:Routes:portal-reader:Metadata:Module"] = "SEARCH",
         };
         settings["Gateway:TrustedProxyNetworks:0"] = "10.0.0.0/8"; // "nginx" trong test
+        foreach (var (key, value) in extraSettings ?? new Dictionary<string, string>()) settings[key] = value;
         foreach (var (key, value) in settings) builder.UseSetting(key, value);
 
         builder.ConfigureTestServices(services =>

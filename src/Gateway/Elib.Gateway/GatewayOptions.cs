@@ -34,6 +34,9 @@ public sealed class GatewayOptions
     /// Không đặt 0.0.0.0/0 khi gateway nhận traffic trực tiếp từ Internet: client sẽ giả được IP để lách rate limit.
     /// </summary>
     public List<string> TrustedProxyNetworks { get; set; } = [];
+
+    /// <summary>Địa chỉ RabbitMQ management (ví dụ http://rabbitmq:15672/) cho tab DevOps; bỏ trống = suy từ Messaging:Host khi có tài khoản Messaging.</summary>
+    public string? RabbitManagementUrl { get; set; }
 }
 
 /// <summary>Metadata đặt trên route YARP (appsettings ReverseProxy:Routes:*:Metadata).</summary>

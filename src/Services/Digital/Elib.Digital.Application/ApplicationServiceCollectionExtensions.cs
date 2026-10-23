@@ -19,6 +19,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<MetadataSchemaResource>();
         services.AddCrudResource<MetadataFieldResource>();
         services.AddScoped<EbookItemTools>();
+        services.AddScoped<DigitalDashboardService>();
         services.AddScoped<EbookContentSync>();
         services.AddScoped<OpacContentSearch>();
         services.AddScoped<OpacItems>();

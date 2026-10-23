@@ -72,6 +72,9 @@ public static class CirculationEndpoints
         photos.MapPost("/Totals", [Permission("C_PHOTO", "view")] (PhotocopySearch search, PhotocopyResource r, CancellationToken ct) => r.TotalsAsync(search, ct));
         photos.MapPost("/SetPaid", [Permission("C_PHOTO", "edit")] (PhotocopyPaidRequest request, PhotocopyResource r, CancellationToken ct) => r.SetPaidAsync(request, ct));
 
+        // Bảng điều khiển (tab Lưu thông): số liệu của đơn vị, cùng quyền với báo cáo lưu thông.
+        api.MapGet("/dashboard", [Permission("CIRC_REPORT", "view")] (CirculationDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         // Báo cáo lưu thông: 11 loại như monolith, xem theo trang hoặc xuất Excel.
         var reports = api.MapGroup("/reports").WithTags("Reports");
         reports.MapPost("/Search", [Permission("CIRC_REPORT", "view")] (CirculationReportRequest request, CirculationReports r, CancellationToken ct)

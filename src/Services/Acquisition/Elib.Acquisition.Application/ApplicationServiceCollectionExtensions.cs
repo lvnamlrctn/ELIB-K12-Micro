@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<AcquisitionOptionsQuery>();
         services.AddScoped<AcquisitionExcel>();
         services.AddScoped<AcquisitionReports>();
+        services.AddScoped<AcquisitionDashboardService>();
         return services;
     }
 }

@@ -507,6 +507,19 @@
     "WD_THU": "T5",
     "WD_FRI": "T6",
     "WD_SAT": "T7",
-    "WD_SUN": "CN"
+    "WD_SUN": "CN",
+    "CHOOSE_PERIOD": "Chọn tháng, năm",
+    "M1": "Tháng 1",
+    "M2": "Tháng 2",
+    "M3": "Tháng 3",
+    "M4": "Tháng 4",
+    "M5": "Tháng 5",
+    "M6": "Tháng 6",
+    "M7": "Tháng 7",
+    "M8": "Tháng 8",
+    "M9": "Tháng 9",
+    "M10": "Tháng 10",
+    "M11": "Tháng 11",
+    "M12": "Tháng 12"
   }
 }

@@ -3,7 +3,6 @@ import { anyPermissionGuard, authGuard, permissionGuard, systemGuard, tenantGuar
 import { APPROVAL_VIEW_PERMS } from './layout/menu';
 import { Shell } from './layout/shell';
 import { Callback } from './pages/callback';
-import { Home } from './pages/home';
 import { ACADEMIC_TITLES, CURRENCIES, DEGREES, ETHNICITIES, NATIONALITIES, POSITIONS, SYSTEM_PARAMETERS } from './pages/tenant/catalogs';
 import { EMAIL_TEMPLATES } from './pages/notification/templates';
 import { CLASSES, COURSES, READER_GROUPS, READER_TYPES } from './pages/patron/catalogs';
@@ -67,7 +66,7 @@ export const routes: Routes = [
     component: Shell,
     canActivate: [authGuard],
     children: [
-      { path: '', component: Home, title: 'PAGE_TITLE.HOME' },
+      { path: '', loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard), title: 'PAGE_TITLE.HOME' },
       { path: 'change-password', loadComponent: () => import('./pages/change-password').then((m) => m.ChangePassword), title: 'CHANGE_PASSWORD.TITLE' },
       { path: 'profile', loadComponent: () => import('./pages/profile').then((m) => m.Profile), title: 'PAGE_TITLE.PROFILE' },
       // Host hệ thống

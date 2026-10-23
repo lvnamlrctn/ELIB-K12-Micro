@@ -28,6 +28,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<ContactResource>();
         services.AddScoped<OpacPortal>();
         services.AddScoped<VisitCounter>();
+        services.AddScoped<PortalDashboardService>();
         return services;
     }
 }

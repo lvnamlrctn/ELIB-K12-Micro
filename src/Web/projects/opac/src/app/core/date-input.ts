@@ -58,21 +58,40 @@ function mask(s: string): string {
       @if (open()) {
         <div class="fixed z-[70] w-64 rounded-lg border border-gray-300 bg-white shadow-lg p-2 text-sm" role="dialog" [style.top.px]="pos().top" [style.left.px]="pos().left" [attr.aria-label]="'DATE.PICK' | translate">
           <div class="flex items-center justify-between mb-1">
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.PREV_YEAR' | translate" (click)="shift(-12)"><span class="material-icons text-[18px]">keyboard_double_arrow_left</span></button>
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.PREV' | translate" (click)="shift(-1)"><span class="material-icons text-[18px]">chevron_left</span></button>
-            <span class="font-semibold">{{ 'DATE.MONTH_YEAR' | translate: { m: view().m, y: view().y } }}</span>
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.NEXT' | translate" (click)="shift(1)"><span class="material-icons text-[18px]">chevron_right</span></button>
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.NEXT_YEAR' | translate" (click)="shift(12)"><span class="material-icons text-[18px]">keyboard_double_arrow_right</span></button>
+            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.PREV' | translate" (click)="step(-1)"><span class="material-icons text-[18px]">chevron_left</span></button>
+            <button type="button" class="px-2 py-1 rounded font-semibold hover:bg-gray-100 inline-flex items-center gap-0.5" [attr.aria-label]="'DATE.CHOOSE_PERIOD' | translate" (click)="up()">
+              @if (mode() === 'day') { {{ monthNames[view().m - 1] | translate }} {{ view().y }} }
+              @else if (mode() === 'month') { {{ view().y }} }
+              @else { {{ yearStart() }} – {{ yearStart() + 23 }} }
+              <span class="material-icons text-[16px]">{{ mode() === 'year' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+            </button>
+            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.NEXT' | translate" (click)="step(1)"><span class="material-icons text-[18px]">chevron_right</span></button>
           </div>
-          <div class="grid grid-cols-7 text-center text-xs text-gray-500 mb-1">
-            @for (w of weekdays; track w) { <span class="py-1">{{ w | translate }}</span> }
-          </div>
-          <div class="grid grid-cols-7 gap-0.5 text-center">
-            @for (c of cells(); track c.key) {
-              <button type="button" class="h-8 rounded text-sm" [class.text-gray-400]="!c.inMonth" [class.bg-blue-600]="c.selected" [class.text-white]="c.selected"
-                [class.hover:bg-blue-50]="!c.selected" [class.ring-1]="c.today && !c.selected" [class.ring-blue-500]="c.today && !c.selected" (click)="pick(c)">{{ c.d }}</button>
-            }
-          </div>
+          @if (mode() === 'day') {
+            <div class="grid grid-cols-7 text-center text-xs text-gray-500 mb-1">
+              @for (w of weekdays; track w) { <span class="py-1">{{ w | translate }}</span> }
+            </div>
+            <div class="grid grid-cols-7 gap-0.5 text-center">
+              @for (c of cells(); track c.key) {
+                <button type="button" class="h-8 rounded text-sm" [class.text-gray-400]="!c.inMonth" [class.bg-blue-600]="c.selected" [class.text-white]="c.selected"
+                  [class.hover:bg-blue-50]="!c.selected" [class.ring-1]="c.today && !c.selected" [class.ring-blue-500]="c.today && !c.selected" (click)="pick(c)">{{ c.d }}</button>
+              }
+            </div>
+          } @else if (mode() === 'month') {
+            <div class="grid grid-cols-4 gap-1 text-center py-1">
+              @for (n of monthNames; track n; let i = $index) {
+                <button type="button" class="h-10 rounded text-sm" [class.bg-blue-600]="isSelectedMonth(i + 1)" [class.text-white]="isSelectedMonth(i + 1)"
+                  [class.hover:bg-blue-50]="!isSelectedMonth(i + 1)" (click)="pickMonth(i + 1)">{{ n | translate }}</button>
+              }
+            </div>
+          } @else {
+            <div class="grid grid-cols-4 gap-1 text-center py-1">
+              @for (y of years(); track y) {
+                <button type="button" class="h-9 rounded text-sm" [class.bg-blue-600]="model()?.y === y" [class.text-white]="model()?.y === y"
+                  [class.hover:bg-blue-50]="model()?.y !== y" (click)="pickYear(y)">{{ y }}</button>
+              }
+            </div>
+          }
           <div class="flex justify-between mt-2 pt-2 border-t border-gray-100 text-xs">
             <button type="button" class="text-blue-700 hover:underline" (click)="today()">{{ 'DATE.TODAY' | translate }}</button>
             <button type="button" class="text-gray-600 hover:underline" (click)="clear()">{{ 'DATE.CLEAR' | translate }}</button>
@@ -101,8 +120,13 @@ export class DateInput implements ControlValueAccessor {
   protected readonly open = signal(false);
   protected readonly bad = signal(false);
   protected readonly pos = signal({ top: 0, left: 0 });
+  /** Lịch mở ở dạng ngày; bấm tiêu đề → chọn năm → chọn tháng → quay về ngày (như bộ chọn ngày của ELIB-LRC). */
+  protected readonly mode = signal<'day' | 'month' | 'year'>('day');
+  protected readonly monthNames = ['DATE.M1', 'DATE.M2', 'DATE.M3', 'DATE.M4', 'DATE.M5', 'DATE.M6', 'DATE.M7', 'DATE.M8', 'DATE.M9', 'DATE.M10', 'DATE.M11', 'DATE.M12'];
+  protected readonly yearStart = computed(() => Math.floor(this.view().y / 24) * 24);
+  protected readonly years = computed(() => Array.from({ length: 24 }, (_, i) => this.yearStart() + i));
   protected readonly view = signal({ y: new Date().getFullYear(), m: new Date().getMonth() + 1 });
-  private readonly model = signal<{ y: number; m: number; d: number } | null>(null);
+  protected readonly model = signal<{ y: number; m: number; d: number } | null>(null);
   private time = { hh: 0, mm: 0 };
 
   private onChange: (v: string | null) => void = () => {};
@@ -158,13 +182,37 @@ export class DateInput implements ControlValueAccessor {
     const h = 330;
     const top = r.bottom + 4 + h > window.innerHeight && r.top - 4 - h > 0 ? r.top - 4 - h : r.bottom + 4;
     this.pos.set({ top, left: Math.max(4, Math.min(r.left, window.innerWidth - 260)) });
+    this.mode.set('day');
     this.open.set(true);
   }
 
-  protected shift(months: number): void {
+  /** Mũi tên trái/phải: ±1 tháng (ngày), ±1 năm (tháng), ±24 năm (năm). */
+  protected step(dir: 1 | -1): void {
     const { y, m } = this.view();
-    const dt = new Date(y, m - 1 + months, 1);
+    const months = this.mode() === 'day' ? 1 : this.mode() === 'month' ? 12 : 288;
+    const dt = new Date(y, m - 1 + dir * months, 1);
+    dt.setFullYear(Math.max(1000, dt.getFullYear()));
     this.view.set({ y: dt.getFullYear(), m: dt.getMonth() + 1 });
+  }
+
+  /** Bấm tiêu đề: ngày → chọn năm; tháng → chọn năm; năm → về chọn tháng. */
+  protected up(): void {
+    this.mode.set(this.mode() === 'year' ? 'month' : 'year');
+  }
+
+  protected pickYear(y: number): void {
+    this.view.update((v) => ({ ...v, y }));
+    this.mode.set('month');
+  }
+
+  protected pickMonth(m: number): void {
+    this.view.update((v) => ({ ...v, m }));
+    this.mode.set('day');
+  }
+
+  protected isSelectedMonth(m: number): boolean {
+    const sel = this.model();
+    return !!sel && sel.y === this.view().y && sel.m === m;
   }
 
   /** Gõ tới đâu tự chèn "/" tới đó; đủ ngày hợp lệ thì cập nhật giá trị ngay. */

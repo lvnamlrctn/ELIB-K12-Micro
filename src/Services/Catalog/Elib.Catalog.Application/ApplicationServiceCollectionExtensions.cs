@@ -10,6 +10,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<BibTypeResource>();
         services.AddCrudResource<WorksheetResource>();
         services.AddScoped<DictionaryLearner>();
+        services.AddScoped<CatalogDashboardService>();
         services.AddCrudResource<BibResource>();
         services.AddCrudResource<AuthorDictionaryResource>();
         services.AddCrudResource<PublisherDictionaryResource>();

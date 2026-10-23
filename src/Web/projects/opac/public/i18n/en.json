@@ -507,6 +507,19 @@
     "WD_THU": "Th",
     "WD_FRI": "Fr",
     "WD_SAT": "Sa",
-    "WD_SUN": "Su"
+    "WD_SUN": "Su",
+    "CHOOSE_PERIOD": "Choose month or year",
+    "M1": "Jan",
+    "M2": "Feb",
+    "M3": "Mar",
+    "M4": "Apr",
+    "M5": "May",
+    "M6": "Jun",
+    "M7": "Jul",
+    "M8": "Aug",
+    "M9": "Sep",
+    "M10": "Oct",
+    "M11": "Nov",
+    "M12": "Dec"
   }
 }

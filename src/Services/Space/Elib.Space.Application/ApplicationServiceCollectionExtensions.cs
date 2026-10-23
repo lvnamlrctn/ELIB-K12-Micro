@@ -27,6 +27,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<BookingResource>();
         services.AddScoped<SpaceExcel>();
         services.AddScoped<ReportResource>();
+        services.AddScoped<SpaceDashboardService>();
         services.AddCrudResource<AccessDeviceResource>();
         services.AddCrudResource<AccessStaffCardResource>();
         services.AddCrudResource<AccessScanLogResource>();

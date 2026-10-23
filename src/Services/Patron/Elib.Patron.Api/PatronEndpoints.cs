@@ -112,6 +112,8 @@ public static class PatronEndpoints
         // Thống kê toàn hệ thống — chỉ quản trị nền tảng (gateway /api/system/patron/** → /api/system/**).
         app.MapPost("/api/system/stats/readers", (PlatformStatsRequest request, PlatformReaderStatsService s, CancellationToken ct) => s.ReadersAsync(request, ct))
             .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
+        // Bảng điều khiển (Tổng quan): số liệu bạn đọc của đơn vị, cùng quyền xem bạn đọc.
+        app.MapGet("/api/dashboard", [Permission("READERS", "view")] (PatronDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
         readers.MapGet("/GetExportFields", [Permission("READERS", "view")] () => ReaderResource.ExportFields);
         readers.MapPost("/Export", [Permission("READERS", "view")] async (ReaderExportRequest request, ReaderResource r, CancellationToken ct)
             => Results.File(await r.ExportAsync(request, ct), CrudExcel.ContentType, "danh-sach-ban-doc.xlsx"));

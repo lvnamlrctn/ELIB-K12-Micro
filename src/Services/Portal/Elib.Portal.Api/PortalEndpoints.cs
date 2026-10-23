@@ -40,6 +40,7 @@ public static class PortalEndpoints
             => r.HandleAsync(publicId, actor.Id, request, ct));
         api.MapGet("/counter", [Permission("PORTAL_COUNTER", "view")] (VisitCounter counter, CancellationToken ct) => counter.SummaryAsync(ct)).WithTags("Counter");
         api.MapGet("/counter/days", [Permission("PORTAL_COUNTER", "view")] (int? days, VisitCounter counter, CancellationToken ct) => counter.DaysAsync(days ?? 30, ct)).WithTags("Counter");
+        api.MapGet("/dashboard", [Permission("PORTAL_COUNTER", "view")] (PortalDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
         return app;
     }
 }

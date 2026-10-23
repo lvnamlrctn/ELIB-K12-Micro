@@ -16,6 +16,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CardFeeService>();
         services.AddScoped<FaceRecognition>();
         services.AddScoped<PlatformReaderStatsService>();
+        services.AddScoped<PatronDashboardService>();
         services.AddSingleton<IReaderImportDispatcher, ReaderImportDispatcher>();
         return services;
     }

@@ -24,6 +24,9 @@ public static class CatalogEndpoints
         // Lớp thứ hai sau gateway: đơn vị chưa mua phân hệ Biên mục bị chặn ngay ở service.
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
+        // Bảng điều khiển (tab Biên mục): số liệu biểu ghi của đơn vị, cùng quyền với màn biểu ghi.
+        api.MapGet("/dashboard", [Permission("CATALOG_BIBS", "view")] (CatalogDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         var types = api.MapCrud<BibTypeResource>("/bib-types", "BIB_TYPES").WithTags("BibTypes");
         types.MapPost("/RestoreDefaults", [Permission("BIB_TYPES", "add")] async (BibTypeResource types, WorksheetResource worksheets, CancellationToken ct) =>
             Results.Ok(new { added = await types.AddMissingDefaultsAsync(ct), worksheets = await worksheets.AddMissingDefaultsAsync(ct) }));

@@ -52,6 +52,9 @@ public static class DigitalEndpoints
             => r.RejectAsync(publicId, request, actor.Id, ct));
 
         // Theo dõi đọc (LRC: ReadingTrackingController) — thủ thư xem lượt đọc và thống kê.
+        // Bảng điều khiển (tab Tài liệu số): cùng quyền xem tài liệu số.
+        api.MapGet("/dashboard", [Permission("DIGITAL_ITEMS", "view")] (DigitalDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         var reading = api.MapGroup("/reading-tracking").WithTags("ReadingTracking");
         reading.MapPost("/Search", [Permission("DIGITAL_READING", "view")] (ReadingSearch search, ReadingTracking t, CancellationToken ct) => t.SearchAsync(search, ct));
         reading.MapPost("/Statistics", [Permission("DIGITAL_READING", "view")] (ReadingStatsRequest request, ReadingTracking t, CancellationToken ct) => t.StatisticsAsync(request, ct));

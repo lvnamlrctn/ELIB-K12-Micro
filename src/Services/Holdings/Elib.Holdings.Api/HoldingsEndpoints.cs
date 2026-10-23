@@ -25,6 +25,9 @@ public static class HoldingsEndpoints
         app.MapPost("/api/system/stats/items", (PlatformStatsRequest request, PlatformItemStatsService s, CancellationToken ct) => s.ItemsAsync(request, ct))
             .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
 
+        // Bảng điều khiển (tab Bổ sung & Kho): số liệu kho in của đơn vị, cùng quyền với báo cáo sách trong kho.
+        api.MapGet("/dashboard", [Permission("STORE_BOOK_REPORT", "view")] (HoldingsDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         api.MapCrud<StoreTypeResource>("/store-types", "STORE_TYPES").WithTags("StoreTypes");
         api.MapCrud<StoreResource>("/stores", "STORES").WithTags("Stores");
 

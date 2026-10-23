@@ -71,6 +71,9 @@ public static class SpaceEndpoints
             Results.Created((string?)null, await r.AddAsync(request, ct)));
         bans.MapPost("/{publicId:guid}/Lift", [Permission("SPACE_BANS", "edit")] (Guid publicId, BanResource r, CancellationToken ct) => r.LiftAsync(publicId, ct));
 
+        // Bảng điều khiển (tab Không gian): số liệu của đơn vị, cùng quyền với báo cáo đặt phòng.
+        api.MapGet("/dashboard", [Permission("SPACE_REPORT", "view")] (SpaceDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         var reports = api.MapGroup("/reports").WithTags("Reports");
         reports.MapPost("/Search", [Permission("SPACE_REPORT", "view")] (ReportRequest request, ReportResource r, CancellationToken ct) => r.BuildAsync(request, ct));
         reports.MapPost("/Export", [Permission("SPACE_REPORT", "view")] async (ReportRequest request, ReportResource r, CancellationToken ct) =>

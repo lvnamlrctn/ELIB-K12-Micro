@@ -84,6 +84,8 @@ services.Configure<ForwardedHeadersOptions>(o =>
     foreach (var cidr in trustedProxies) o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
 });
 
+services.AddHttpClient(PlatformHealthService.HttpClientName);
+services.AddSingleton<PlatformHealthService>();
 services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 services.AddHealthChecks();
 
@@ -93,6 +95,17 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapHealthChecks("/healthz");
+// Tab DevOps: chỉ nhân viên cấp hệ thống trên host hệ thống (gateway không có tenant context nên tự kiểm host + token không thuộc đơn vị).
+app.MapGet("/api/system/health", async (HttpContext http, PlatformHealthService health, IOptions<GatewayOptions> options) =>
+{
+    var onSystemHost = options.Value.SystemHosts.Any(h => string.Equals(h, http.Request.Host.Host, StringComparison.OrdinalIgnoreCase));
+    if (!onSystemHost || http.User.FindFirstValue(ElibClaimTypes.TenantId) is { Length: > 0 })
+    {
+        await GatewayProblem.WriteAsync(http, 403, ElibErrorCodes.SystemOnly, "Chức năng chỉ dành cho quản trị hệ thống.");
+        return;
+    }
+    await http.Response.WriteAsJsonAsync(await health.CheckAsync(http.RequestAborted), http.RequestAborted);
+}).RequireAuthorization(ElibPolicies.Staff);
 // Host hệ thống: trang gốc → app Admin. Host đơn vị: "/" đi tiếp vào route opac-web (OPAC ở gốc host của thư viện).
 var systemHosts = builder.Configuration.GetSection(GatewayOptions.SectionName).Get<GatewayOptions>()?.SystemHosts ?? [];
 if (systemHosts.Count > 0)

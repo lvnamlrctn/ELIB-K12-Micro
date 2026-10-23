@@ -286,6 +286,11 @@ def system_steps(sysb, accounts, admin_user):
     me = json.loads(body)
     expect(s == 200 and me["tenantId"] is None, f"/api/me: {me['userName']} (quản trị hệ thống, buộc đổi mật khẩu={me['mustChangePassword']})")
 
+    s, _, body = sysb.request("GET", "/api/system/health", token=sys_token)
+    health = json.loads(body) if s == 200 else {}
+    expect(s == 200 and health.get("services"), "sức khoẻ nền tảng (gateway ping /ready): " + ", ".join(f"{x['name']}={x['status']}" for x in health.get("services", [])), body[:200])
+    print(f"  [THÔNG TIN]  hàng đợi _error RabbitMQ: {health.get('queues') if health.get('queues') is not None else 'không đọc được — ' + str(health.get('queuesDetail'))}")
+
     print("2. Tạo đơn vị + khởi tạo")
     s, _, body = sysb.request("GET", "/api/system/tenant/tenants?search=" + TENANT_CODE.lower(), token=sys_token)
     existing = [t for t in json.loads(body)["items"] if t["code"] == TENANT_CODE]
@@ -1271,6 +1276,24 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
         digital_content_steps(tb, token, tag)
     else:
         print("  [BỎ QUA] đơn vị chưa có phân hệ Thư viện số / Cổng thông tin — chạy một lần không kèm --tenant-only để quản trị nền tảng bán thêm")
+
+    print("21f. Bảng điều khiển: GET /dashboard của từng service phải 200 (Postgres + RLS thật, khác SQLite của test)")
+    s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
+    mods = json.loads(body)["modules"] if s == 200 else []
+    for module, service in [("CIRCULATION", "circulation"), ("HOLDINGS", "holdings"), ("CATALOG", "catalog"), ("ACQUISITION", "acquisition"),
+                            ("DIGITAL", "digital"), ("PORTAL", "portal")]:
+        if module not in mods:
+            print(f"  [BỎ QUA] {service}: đơn vị chưa có phân hệ {module}")
+            continue
+        s, _, text = tb.request("GET", f"/api/admin/{service}/dashboard", token=token)
+        expect(s == 200 and text.startswith("{"), f"dashboard {service}", f"{s} {text[:200]}")
+    s, _, text = tb.request("GET", "/api/admin/patron/dashboard", token=token)
+    expect(s == 200 and text.startswith("{"), "dashboard patron", f"{s} {text[:200]}")
+    if "SPACE" in mods:
+        s, _, text = tb.request("GET", "/api/admin/space/dashboard", token=token)
+        expect(s == 200 and text.startswith("{"), "dashboard space", f"{s} {text[:200]}")
+    s, _, text = tb.request("GET", "/api/system/health", token=token)
+    expect(s == 403, "sức khoẻ nền tảng: cán bộ đơn vị bị từ chối", f"{s} {text[:200]}")
 
     print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [

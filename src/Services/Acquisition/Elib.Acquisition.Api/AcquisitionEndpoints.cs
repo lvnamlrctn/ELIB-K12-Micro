@@ -36,6 +36,9 @@ public static class AcquisitionEndpoints
 
         MapOrders(api.MapCrud<PurchaseOrderResource>("/orders", "AB_ORDERS").WithTags("Orders"));
         MapReceipts(api.MapCrud<ReceiptResource>("/receipts", "AB_RECEIPTS").WithTags("Receipts"));
+        // Bảng điều khiển (tab Bổ sung): số liệu của đơn vị, cùng quyền với báo cáo/phiếu nhận.
+        api.MapGet("/dashboard", [Permission("AB_RECEIPTS", "view")] (AcquisitionDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
+
         MapReports(api.MapGroup("/reports").WithTags("Reports"));
         return app;
     }

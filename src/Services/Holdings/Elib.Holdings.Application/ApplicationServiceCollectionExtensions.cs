@@ -9,6 +9,7 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddCrudResource<StoreTypeResource>();
         services.AddScoped<StoreEvents>();
+        services.AddScoped<HoldingsDashboardService>();
         services.AddCrudResource<StoreResource>();
         services.AddCrudResource<ItemResource>();
         services.AddCrudResource<ExportReasonResource>();
