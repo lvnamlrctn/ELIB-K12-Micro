@@ -367,6 +367,7 @@ def mailpit_latest(to, after_id=None, wait=20):
 
 
 def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
+    credentials = accounts  # `accounts` bị dùng lại làm danh sách tài khoản bạn đọc ở các bước sau
     host = f"{SUBDOMAIN}.{DOMAIN}"
     origin = f"https://{host}"
     print(f"4. Đăng nhập trên host đơn vị — {origin} (vòng qua gateway, chưa có DNS wildcard)")
@@ -1299,7 +1300,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
 
     if sys_token and "DIGITAL" in mods:
         print("21g. Dữ liệu dùng chung: đơn vị SHARED tạo tài liệu số + từ điển → tự sao chỉ-đọc sang đơn vị; đơn vị chỉ ẩn/hiện")
-        shared_data_steps(sysb, sys_token, tb, token, accounts, tag)
+        shared_data_steps(sysb, sys_token, tb, token, credentials, tag)
 
     print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
@@ -1741,9 +1742,15 @@ def shared_data_steps(sysb, sys_token, tb, token, accounts, tag):
     expect(shared["status"] == "Active", "SHARED khởi tạo xong: Active", json.dumps(shared)[:300])
     if "SHARED_ADMIN_PASSWORD" not in accounts and "SHARED_ADMIN_TEMP" not in accounts:
         temp = "Tam" + secrets.token_hex(6) + "7"
+        admin_name = "shared-admin"
         s, _, body = sysb.request("POST", f"/api/system/identity/tenants/{shared['id']}/admins", token=sys_token,
-                                  json_body={"userName": "shared-admin", "fullName": "Quản trị dữ liệu dùng chung", "email": None, "password": temp})
-        expect(s == 201, "tạo tài khoản shared-admin", body)
+                                  json_body={"userName": admin_name, "fullName": "Quản trị dữ liệu dùng chung", "email": None, "password": temp})
+        if s != 201:  # tài khoản đã có từ lần chạy dở trước (mật khẩu chưa kịp lưu) → tạo tên khác
+            admin_name = "shared-admin-" + secrets.token_hex(2)
+            s, _, body = sysb.request("POST", f"/api/system/identity/tenants/{shared['id']}/admins", token=sys_token,
+                                      json_body={"userName": admin_name, "fullName": "Quản trị dữ liệu dùng chung", "email": None, "password": temp})
+        expect(s == 201, f"tạo tài khoản {admin_name}", body)
+        accounts["SHARED_ADMIN_USER"] = admin_name
         accounts["SHARED_ADMIN_TEMP"] = temp
         accounts["SHARED_ADMIN_URL"] = f"https://{sub}.{DOMAIN}/admin/"
         save(accounts)
@@ -1751,7 +1758,7 @@ def shared_data_steps(sysb, sys_token, tb, token, accounts, tag):
     origin = f"https://{host}"
     sb = Browser(GATEWAY, host=host, proto="https")
     password = accounts.get("SHARED_ADMIN_PASSWORD") or accounts["SHARED_ADMIN_TEMP"]
-    stoken = pkce_login(sb, origin, "shared-admin", password)
+    stoken = pkce_login(sb, origin, accounts.get("SHARED_ADMIN_USER", "shared-admin"), password)
     s, _, body = sb.request("GET", "/api/me", token=stoken)
     if json.loads(body)["mustChangePassword"]:
         new = "Demo" + secrets.token_hex(6) + "5"
