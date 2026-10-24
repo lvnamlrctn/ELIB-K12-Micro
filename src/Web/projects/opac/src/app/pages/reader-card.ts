@@ -12,9 +12,9 @@ import { LDatePipe } from '../core/i18n';
   selector: 'opac-reader-card',
   imports: [Barcode, LDatePipe, TranslatePipe],
   template: `
-    <div class="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm max-w-md" [attr.data-card]="cardNo()">
-      <div class="bg-gradient-to-r from-blue-700 to-sky-500 text-white px-5 py-3 flex items-center gap-3">
-        <span class="material-icons">local_library</span>
+    <div class="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm max-w-md" [attr.data-card]="cardNo()">
+      <div class="bg-main text-white px-5 py-3 flex items-center gap-3">
+        <i class="fas fa-building-columns"></i>
         <div class="min-w-0">
           <div class="text-xs uppercase tracking-wider opacity-90">{{ 'OPAC.MY_LIBRARY.E_CARD' | translate }}</div>
           <div class="font-semibold truncate">{{ library() }}</div>
@@ -22,9 +22,9 @@ import { LDatePipe } from '../core/i18n';
       </div>
       <div class="p-5 flex gap-4 items-start">
         <div class="min-w-0 flex-1 text-sm space-y-1">
-          <div class="text-lg font-bold text-slate-900 uppercase leading-tight">{{ fullName() }}</div>
-          <div class="text-slate-600">{{ 'OPAC.MY_LIBRARY.CARD_NO' | translate }}: <span class="font-mono font-semibold text-slate-800">{{ cardNo() }}</span></div>
-          <div [class.text-red-600]="expired()" [class.text-slate-600]="!expired()">
+          <div class="text-lg font-bold text-gray-900 uppercase leading-tight">{{ fullName() }}</div>
+          <div class="text-gray-600">{{ 'OPAC.MY_LIBRARY.CARD_NO' | translate }}: <span class="font-mono font-semibold text-gray-800">{{ cardNo() }}</span></div>
+          <div [class.text-red-600]="expired()" [class.text-gray-600]="!expired()">
             {{ 'OPAC.MY_LIBRARY.EXPIRE_DATE' | translate }}: {{ expireDate() ? (expireDate() | ldate) : ('OPAC.MY_LIBRARY.NO_EXPIRY' | translate) }}
           </div>
         </div>
@@ -37,7 +37,7 @@ import { LDatePipe } from '../core/i18n';
       </div>
       <div class="px-5 pb-4">
         <elib-barcode [value]="cardNo()" [height]="36" cssHeight="56px" />
-        <div class="text-center font-mono tracking-widest text-sm text-slate-700 mt-1">{{ cardNo() }}</div>
+        <div class="text-center font-mono tracking-widest text-sm text-gray-700 mt-1">{{ cardNo() }}</div>
       </div>
     </div>
   `,

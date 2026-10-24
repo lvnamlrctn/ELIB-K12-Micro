@@ -44,28 +44,28 @@ function mask(s: string): string {
   template: `
     <div class="relative flex gap-1">
       <div class="relative flex-1 min-w-0">
-        <input type="text" inputmode="numeric" autocomplete="off" class="w-full border border-slate-300 rounded-lg px-3 py-2 pr-9 text-sm disabled:opacity-50" [class.border-red-500]="bad()" [id]="inputId()" placeholder="dd/mm/yyyy" maxlength="10"
+        <input type="text" inputmode="numeric" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-9 text-sm disabled:opacity-50" [class.border-red-500]="bad()" [id]="inputId()" placeholder="dd/mm/yyyy" maxlength="10"
           [value]="text()" [disabled]="disabled()" [attr.aria-invalid]="bad()" [attr.aria-label]="ariaLabel() || null"
           (input)="onType($any($event.target).value, $event.target)" (blur)="commitText(); onTouched()" (keydown.enter)="commitText()" (keydown.escape)="open.set(false)" />
-        <button type="button" class="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 inline-flex items-center justify-center rounded text-slate-500 hover:bg-slate-100 disabled:opacity-50" [disabled]="disabled()" [attr.aria-label]="'DATE.PICK' | translate" [title]="'DATE.PICK' | translate" (click)="toggle()">
-          <span class="material-icons text-[18px]">calendar_today</span>
+        <button type="button" class="absolute right-1 top-1/2 -trangray-y-1/2 w-7 h-7 inline-flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 disabled:opacity-50" [disabled]="disabled()" [attr.aria-label]="'DATE.PICK' | translate" [title]="'DATE.PICK' | translate" (click)="toggle()">
+          <i class="fas fa-calendar text-[18px]"></i>
         </button>
       </div>
       @if (withTime()) {
-        <input type="text" inputmode="numeric" autocomplete="off" class="w-20 shrink-0 text-center border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="hh:mm" maxlength="5" [value]="timeText()" [disabled]="disabled()" [attr.aria-label]="'DATE.TIME' | translate"
+        <input type="text" inputmode="numeric" autocomplete="off" class="w-20 shrink-0 text-center border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="hh:mm" maxlength="5" [value]="timeText()" [disabled]="disabled()" [attr.aria-label]="'DATE.TIME' | translate"
           (input)="onTime($any($event.target).value, $event.target)" (blur)="commitTime(); onTouched()" (keydown.enter)="commitTime()" />
       }
       @if (open()) {
         <div class="fixed z-[70] w-64 rounded-lg border border-gray-300 bg-white shadow-lg p-2 text-sm" role="dialog" [style.top.px]="pos().top" [style.left.px]="pos().left" [attr.aria-label]="'DATE.PICK' | translate">
           <div class="flex items-center justify-between mb-1">
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.PREV' | translate" (click)="step(-1)"><span class="material-icons text-[18px]">chevron_left</span></button>
+            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-gray-100" [attr.aria-label]="'DATE.PREV' | translate" (click)="step(-1)"><i class="fas fa-chevron-left text-[18px]"></i></button>
             <button type="button" class="px-2 py-1 rounded font-semibold hover:bg-gray-100 inline-flex items-center gap-0.5" [attr.aria-label]="'DATE.CHOOSE_PERIOD' | translate" (click)="up()">
               @if (mode() === 'day') { {{ monthNames[view().m - 1] | translate }} {{ view().y }} }
               @else if (mode() === 'month') { {{ view().y }} }
               @else { {{ yearStart() }} – {{ yearStart() + 23 }} }
-              <span class="material-icons text-[16px]">{{ mode() === 'year' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+              <i class="fas text-[12px]" [class.fa-caret-up]="mode() === 'year'" [class.fa-caret-down]="mode() !== 'year'"></i>
             </button>
-            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-slate-100" [attr.aria-label]="'DATE.NEXT' | translate" (click)="step(1)"><span class="material-icons text-[18px]">chevron_right</span></button>
+            <button type="button" class="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-gray-100" [attr.aria-label]="'DATE.NEXT' | translate" (click)="step(1)"><i class="fas fa-chevron-right text-[18px]"></i></button>
           </div>
           @if (mode() === 'day') {
             <div class="grid grid-cols-7 text-center text-xs text-gray-500 mb-1">
@@ -73,27 +73,27 @@ function mask(s: string): string {
             </div>
             <div class="grid grid-cols-7 gap-0.5 text-center">
               @for (c of cells(); track c.key) {
-                <button type="button" class="h-8 rounded text-sm" [class.text-gray-400]="!c.inMonth" [class.bg-blue-600]="c.selected" [class.text-white]="c.selected"
-                  [class.hover:bg-blue-50]="!c.selected" [class.ring-1]="c.today && !c.selected" [class.ring-blue-500]="c.today && !c.selected" (click)="pick(c)">{{ c.d }}</button>
+                <button type="button" class="h-8 rounded text-sm" [class.text-gray-400]="!c.inMonth" [class.bg-main]="c.selected" [class.text-white]="c.selected"
+                  [class.hover:bg-blue-50]="!c.selected" [class.ring-1]="c.today && !c.selected" [class.ring-main]="c.today && !c.selected" (click)="pick(c)">{{ c.d }}</button>
               }
             </div>
           } @else if (mode() === 'month') {
             <div class="grid grid-cols-4 gap-1 text-center py-1">
               @for (n of monthNames; track n; let i = $index) {
-                <button type="button" class="h-10 rounded text-sm" [class.bg-blue-600]="isSelectedMonth(i + 1)" [class.text-white]="isSelectedMonth(i + 1)"
+                <button type="button" class="h-10 rounded text-sm" [class.bg-main]="isSelectedMonth(i + 1)" [class.text-white]="isSelectedMonth(i + 1)"
                   [class.hover:bg-blue-50]="!isSelectedMonth(i + 1)" (click)="pickMonth(i + 1)">{{ n | translate }}</button>
               }
             </div>
           } @else {
             <div class="grid grid-cols-4 gap-1 text-center py-1">
               @for (y of years(); track y) {
-                <button type="button" class="h-9 rounded text-sm" [class.bg-blue-600]="model()?.y === y" [class.text-white]="model()?.y === y"
+                <button type="button" class="h-9 rounded text-sm" [class.bg-main]="model()?.y === y" [class.text-white]="model()?.y === y"
                   [class.hover:bg-blue-50]="model()?.y !== y" (click)="pickYear(y)">{{ y }}</button>
               }
             </div>
           }
           <div class="flex justify-between mt-2 pt-2 border-t border-gray-100 text-xs">
-            <button type="button" class="text-blue-700 hover:underline" (click)="today()">{{ 'DATE.TODAY' | translate }}</button>
+            <button type="button" class="text-main hover:underline" (click)="today()">{{ 'DATE.TODAY' | translate }}</button>
             <button type="button" class="text-gray-600 hover:underline" (click)="clear()">{{ 'DATE.CLEAR' | translate }}</button>
           </div>
         </div>

@@ -11,6 +11,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IndexRebuilder>();
         services.AddScoped<OpacSearch>();
         services.AddScoped<OpacEbooks>();
+        services.AddScoped<OpacUnifiedSearch>();
         services.AddScoped<SearchStats>();
         services.AddScoped<Z3950Search>();
         services.AddScoped<OaiPmh>();

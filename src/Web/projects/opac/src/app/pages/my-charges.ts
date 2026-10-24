@@ -12,51 +12,51 @@ import { MyCharge, MyPayment, PaymentApi } from '../core/payment';
   selector: 'opac-my-charges',
   imports: [LNumberPipe, QrCode, TranslatePipe],
   template: `
-    <section class="bg-white rounded-2xl border border-slate-200 p-6 mt-6">
-      <h2 class="font-semibold text-slate-900 mb-4">{{ 'OPAC.PAYMENT.TITLE' | translate }}</h2>
+    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
+      <h2 class="font-semibold text-gray-900 mb-4">{{ 'OPAC.PAYMENT.TITLE' | translate }}</h2>
       @if (error()) { <p class="text-red-600 text-sm mb-2" role="alert">{{ error() }}</p> }
       @if (notice()) { <div class="mb-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2" role="status">{{ notice() }}</div> }
       @if (charges(); as list) {
         @if (list.length) {
-          <ul class="divide-y divide-slate-100">
+          <ul class="divide-y divide-gray-100">
             @for (c of list; track c.publicId) {
               <li class="py-3 flex items-center justify-between gap-3 flex-wrap">
-                <div class="min-w-0"><div class="font-medium text-slate-900">{{ c.label }}</div>
-                  <div class="text-sm text-slate-500">{{ c.amount | lnumber: '1.0-0' }} {{ 'OPAC.PAYMENT.CURRENCY' | translate }}</div></div>
+                <div class="min-w-0"><div class="font-medium text-gray-900">{{ c.label }}</div>
+                  <div class="text-sm text-gray-500">{{ c.amount | lnumber: '1.0-0' }} {{ 'OPAC.PAYMENT.CURRENCY' | translate }}</div></div>
                 <div class="flex gap-2">
                   @for (p of c.providers; track p) {
-                    <button type="button" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-60" [disabled]="busy()" (click)="pay(c, p)">
+                    <button type="button" class="px-3 py-1.5 rounded-lg bg-main text-white text-sm hover:bg-blue-700 disabled:opacity-60" [disabled]="busy()" (click)="pay(c, p)">
                       {{ 'OPAC.PAYMENT.PAY_WITH' | translate: { provider: p } }}</button>
                   } @empty {
-                    <span class="text-xs text-slate-500">{{ 'OPAC.PAYMENT.PAY_AT_COUNTER' | translate }}</span>
+                    <span class="text-xs text-gray-500">{{ 'OPAC.PAYMENT.PAY_AT_COUNTER' | translate }}</span>
                   }
                 </div>
               </li>
             }
           </ul>
         } @else {
-          <p class="text-slate-500 text-sm">{{ 'OPAC.PAYMENT.NONE' | translate }}</p>
+          <p class="text-gray-500 text-sm">{{ 'OPAC.PAYMENT.NONE' | translate }}</p>
         }
       } @else if (!error()) {
-        <div class="flex justify-center py-6"><span class="material-icons animate-spin text-blue-600 text-2xl">autorenew</span></div>
+        <div class="flex justify-center py-6"><i class="fas fa-circle-notch animate-spin text-main text-2xl"></i></div>
       }
     </section>
 
     @if (tx(); as t) {
       <div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-          <div class="text-sm text-slate-500">{{ t.label }}</div>
-          <div class="text-3xl font-bold text-blue-700 my-1">{{ t.amount | lnumber: '1.0-0' }} {{ 'OPAC.PAYMENT.CURRENCY' | translate }}</div>
-          <div class="font-mono text-xs text-slate-400 mb-3">{{ t.transactionCode }}</div>
+          <div class="text-sm text-gray-500">{{ t.label }}</div>
+          <div class="text-3xl font-bold text-main my-1">{{ t.amount | lnumber: '1.0-0' }} {{ 'OPAC.PAYMENT.CURRENCY' | translate }}</div>
+          <div class="font-mono text-xs text-gray-400 mb-3">{{ t.transactionCode }}</div>
           @if (t.status === 'Pending') {
-            <div class="inline-block border border-slate-200 rounded-xl p-2"><elib-qr [value]="t.qrContent" cssSize="240px" [label]="t.transactionCode" /></div>
+            <div class="inline-block border border-gray-200 rounded-xl p-2"><elib-qr [value]="t.qrContent" cssSize="240px" [label]="t.transactionCode" /></div>
             <div class="text-sm mt-2" [class.text-red-600]="left() <= 60">{{ 'OPAC.PAYMENT.EXPIRES_IN' | translate: { time: clock() } }}</div>
-            <p class="text-xs text-slate-500 mt-1">{{ (t.provider === 'VNPAY' ? 'OPAC.PAYMENT.HINT_VNPAY' : 'OPAC.PAYMENT.HINT_VIETQR') | translate }}</p>
-            @if (t.provider === 'VNPAY') { <a [href]="t.qrContent" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline text-sm">{{ 'OPAC.PAYMENT.OPEN_GATEWAY' | translate }}</a> }
+            <p class="text-xs text-gray-500 mt-1">{{ (t.provider === 'VNPAY' ? 'OPAC.PAYMENT.HINT_VNPAY' : 'OPAC.PAYMENT.HINT_VIETQR') | translate }}</p>
+            @if (t.provider === 'VNPAY') { <a [href]="t.qrContent" target="_blank" rel="noopener noreferrer" class="text-main underline text-sm">{{ 'OPAC.PAYMENT.OPEN_GATEWAY' | translate }}</a> }
           } @else {
             <p class="text-red-600 text-sm">{{ 'OPAC.PAYMENT.EXPIRED' | translate }}</p>
           }
-          <button type="button" class="mt-4 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50" (click)="close()">{{ 'OPAC.PAYMENT.CLOSE' | translate }}</button>
+          <button type="button" class="mt-4 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50" (click)="close()">{{ 'OPAC.PAYMENT.CLOSE' | translate }}</button>
         </div>
       </div>
     }

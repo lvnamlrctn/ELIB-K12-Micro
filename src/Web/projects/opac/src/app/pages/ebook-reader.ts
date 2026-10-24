@@ -23,36 +23,36 @@ const HEARTBEAT_MS = 20_000;
   selector: 'opac-ebook-reader',
   imports: [FormsModule, RouterLink, TranslatePipe],
   template: `
-    <div class="fixed inset-0 z-40 flex flex-col bg-slate-100" (contextmenu)="$event.preventDefault()">
-      <header class="flex items-center gap-2 bg-slate-900 text-white px-3 py-2 text-sm flex-wrap">
-        <a [routerLink]="['/thu-vien-so', itemId]" class="flex items-center gap-1 hover:underline"><span class="material-icons text-[18px]">arrow_back</span> {{ 'OPAC.READER.BACK' | translate }}</a>
+    <div class="fixed inset-0 z-40 flex flex-col bg-gray-100" (contextmenu)="$event.preventDefault()">
+      <header class="flex items-center gap-2 bg-gray-900 text-white px-3 py-2 text-sm flex-wrap">
+        <a [routerLink]="['/thu-vien-so', itemId]" class="flex items-center gap-1 hover:underline"><i class="fas fa-arrow-left text-[18px]"></i> {{ 'OPAC.READER.BACK' | translate }}</a>
         <div class="font-medium truncate min-w-0 flex-1">{{ item()?.title }}</div>
         @if (pages() > 0) {
           <div class="flex items-center gap-1">
-            <button type="button" class="px-2 py-1 rounded hover:bg-slate-700" [attr.aria-label]="'OPAC.READER.PREV' | translate" (click)="go(page() - 1)">‹</button>
-            <input type="number" min="1" [max]="pages()" class="w-14 rounded bg-slate-800 border border-slate-600 px-1 py-0.5 text-center" [ngModel]="page()" (change)="go(+$any($event.target).value)" [attr.aria-label]="'OPAC.READER.PAGE' | translate" />
+            <button type="button" class="px-2 py-1 rounded hover:bg-gray-700" [attr.aria-label]="'OPAC.READER.PREV' | translate" (click)="go(page() - 1)">‹</button>
+            <input type="number" min="1" [max]="pages()" class="w-14 rounded bg-gray-800 border border-gray-600 px-1 py-0.5 text-center" [ngModel]="page()" (change)="go(+$any($event.target).value)" [attr.aria-label]="'OPAC.READER.PAGE' | translate" />
             <span>/ {{ pages() }}</span>
-            <button type="button" class="px-2 py-1 rounded hover:bg-slate-700" [attr.aria-label]="'OPAC.READER.NEXT' | translate" (click)="go(page() + 1)">›</button>
+            <button type="button" class="px-2 py-1 rounded hover:bg-gray-700" [attr.aria-label]="'OPAC.READER.NEXT' | translate" (click)="go(page() + 1)">›</button>
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" class="px-2 py-1 rounded hover:bg-slate-700" [attr.aria-label]="'OPAC.READER.ZOOM_OUT' | translate" (click)="zoom(-0.2)">−</button>
+            <button type="button" class="px-2 py-1 rounded hover:bg-gray-700" [attr.aria-label]="'OPAC.READER.ZOOM_OUT' | translate" (click)="zoom(-0.2)">−</button>
             <span class="w-12 text-center">{{ zoomPercent() }}%</span>
-            <button type="button" class="px-2 py-1 rounded hover:bg-slate-700" [attr.aria-label]="'OPAC.READER.ZOOM_IN' | translate" (click)="zoom(0.2)">+</button>
+            <button type="button" class="px-2 py-1 rounded hover:bg-gray-700" [attr.aria-label]="'OPAC.READER.ZOOM_IN' | translate" (click)="zoom(0.2)">+</button>
           </div>
           @if (auth.loggedIn()) {
-            <button type="button" class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-700" (click)="addBookmark()"><span class="material-icons text-[18px]">bookmark_add</span> {{ 'OPAC.READER.BOOKMARK' | translate }}</button>
-            <button type="button" class="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-700" (click)="panel.set(!panel())"><span class="material-icons text-[18px]">bookmarks</span> {{ bookmarks().length }}</button>
+            <button type="button" class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700" (click)="addBookmark()"><i class="fas fa-bookmark text-[18px]"></i> {{ 'OPAC.READER.BOOKMARK' | translate }}</button>
+            <button type="button" class="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700" (click)="panel.set(!panel())"><i class="fas fa-bookmark text-[18px]"></i> {{ bookmarks().length }}</button>
           }
         }
       </header>
 
       <div class="flex flex-1 min-h-0">
         <div #scroller class="flex-1 overflow-auto p-4 select-none" (scroll)="onScroll()">
-          @if (loading()) { <p class="text-center text-slate-500 mt-10" role="status">{{ 'OPAC.READER.LOADING' | translate: { percent: progress() } }}</p> }
+          @if (loading()) { <p class="text-center text-gray-500 mt-10" role="status">{{ 'OPAC.READER.LOADING' | translate: { percent: progress() } }}</p> }
           @if (error(); as err) {
-            <div class="max-w-md mx-auto mt-10 bg-white rounded-xl border border-slate-200 p-6 text-center">
+            <div class="max-w-md mx-auto mt-10 bg-white rounded-xl border border-gray-200 p-6 text-center">
               <p class="text-red-600 text-sm" role="alert">{{ err }}</p>
-              @if (fallbackUrl(); as url) { <a [href]="url" target="_blank" rel="noopener noreferrer" class="inline-block mt-3 text-blue-700 underline text-sm">{{ 'OPAC.READER.OPEN_TAB' | translate }}</a> }
+              @if (fallbackUrl(); as url) { <a [href]="url" target="_blank" rel="noopener noreferrer" class="inline-block mt-3 text-main underline text-sm">{{ 'OPAC.READER.OPEN_TAB' | translate }}</a> }
             </div>
           }
           @for (n of pageNumbers(); track n) {
@@ -63,18 +63,18 @@ const HEARTBEAT_MS = 20_000;
         </div>
 
         @if (panel()) {
-          <aside class="w-64 shrink-0 bg-white border-l border-slate-200 overflow-auto p-3 text-sm">
-            <h2 class="font-semibold text-slate-900 mb-2">{{ 'OPAC.READER.BOOKMARKS' | translate }}</h2>
+          <aside class="w-64 shrink-0 bg-white border-l border-gray-200 overflow-auto p-3 text-sm">
+            <h2 class="font-semibold text-gray-900 mb-2">{{ 'OPAC.READER.BOOKMARKS' | translate }}</h2>
             <ul class="space-y-1">
               @for (b of bookmarks(); track b.publicId) {
                 <li class="flex items-start gap-1">
-                  <button type="button" class="flex-1 text-left rounded px-2 py-1 hover:bg-slate-50" (click)="go(b.page)">
+                  <button type="button" class="flex-1 text-left rounded px-2 py-1 hover:bg-gray-50" (click)="go(b.page)">
                     <span class="font-medium">{{ 'OPAC.READER.PAGE_N' | translate: { n: b.page } }}</span>
-                    @if (b.note) { <span class="block text-slate-500 text-xs">{{ b.note }}</span> }
+                    @if (b.note) { <span class="block text-gray-500 text-xs">{{ b.note }}</span> }
                   </button>
-                  <button type="button" class="text-red-600 px-1" [attr.aria-label]="'OPAC.READER.REMOVE' | translate" (click)="removeBookmark(b)"><span class="material-icons text-[16px]">close</span></button>
+                  <button type="button" class="text-red-600 px-1" [attr.aria-label]="'OPAC.READER.REMOVE' | translate" (click)="removeBookmark(b)"><i class="fas fa-xmark text-[16px]"></i></button>
                 </li>
-              } @empty { <li class="text-slate-500">{{ 'OPAC.READER.NO_BOOKMARKS' | translate }}</li> }
+              } @empty { <li class="text-gray-500">{{ 'OPAC.READER.NO_BOOKMARKS' | translate }}</li> }
             </ul>
           </aside>
         }

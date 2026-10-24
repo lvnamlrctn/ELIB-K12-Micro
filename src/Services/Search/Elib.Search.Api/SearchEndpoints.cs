@@ -34,6 +34,17 @@ public static class SearchEndpoints
             return Results.NoContent();
         });
         // Tài liệu số (metadata) — gộp vào trang kết quả tra cứu của OPAC; xem/mượn/đọc ở trang tài liệu số của digital.
+        // Một danh sách gộp sách in + tài liệu số (trang /tim-kiem của OPAC). Thống kê lượt tìm như /bibs/Search.
+        opac.MapPost("/all/Search", async (OpacAllRequest request, OpacUnifiedSearch s, SearchStats stats, CancellationToken ct) =>
+        {
+            var result = await s.SearchAsync(request, ct);
+            var asBib = new OpacSearchRequest
+            {
+                Q = request.Q, Title = request.Title, Author = request.Author, Publisher = request.Publisher, Keyword = request.Keyword,
+                Page = request.Page, Refine = request.Refine,
+            };
+            return result with { QueryId = await stats.RecordAsync(asBib, result.Total, ct) };
+        });
         opac.MapPost("/ebooks/Search", (OpacEbookSearchRequest request, OpacEbooks e, CancellationToken ct) => e.SearchAsync(request, ct));
         opac.MapGet("/bibs/{publicId:guid}", (Guid publicId, OpacSearch s, CancellationToken ct) => s.DetailAsync(publicId, ct));
         opac.MapGet("/bibs/{publicId:guid}/similar", (Guid publicId, int? size, OpacSearch s, CancellationToken ct) => s.SimilarAsync(publicId, size ?? 8, ct));

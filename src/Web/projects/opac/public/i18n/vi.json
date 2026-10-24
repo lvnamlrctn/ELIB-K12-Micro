@@ -113,14 +113,22 @@
       "LANGUAGE": "Ngôn ngữ",
       "LOGIN": "Đăng nhập",
       "LOGOUT": "Đăng xuất",
-      "MY_ACCOUNT": "Tài khoản của tôi"
+      "MY_ACCOUNT": "Tài khoản của tôi",
+      "SUBTITLE": "Thư viện điện tử",
+      "MENU": "Menu",
+      "ADMIN": "Quản trị"
     },
     "FOOTER": {
       "ADDRESS": "Địa chỉ",
       "OPEN_HOURS": "Giờ mở cửa",
       "CONTACT_INFO": "Liên hệ",
       "ADMIN": "Quản trị thư viện",
-      "POWERED_BY": "Vận hành trên nền tảng ELIB K12"
+      "POWERED_BY": "Vận hành trên nền tảng ELIB K12",
+      "QUICK_LINKS": "Liên kết nhanh",
+      "STATS": "Thống kê truy cập",
+      "TODAY": "Hôm nay",
+      "LAST_7_DAYS": "7 ngày qua",
+      "TOTAL": "Tổng lượt truy cập"
     },
     "HOME": {
       "HERO_SUBTITLE": "Tra cứu tài liệu, đọc sách số và sử dụng dịch vụ thư viện mọi lúc, mọi nơi.",
@@ -139,7 +147,17 @@
       "SERVICE_AI": "Trợ lý AI",
       "SERVICE_AI_TEXT": "Hỏi đáp, gợi ý tài liệu phù hợp.",
       "SERVICE_PORTAL": "Tin tức, sự kiện",
-      "SERVICE_PORTAL_TEXT": "Hoạt động và thông báo của thư viện."
+      "SERVICE_PORTAL_TEXT": "Hoạt động và thông báo của thư viện.",
+      "HERO_TITLE": "Tìm kiếm tài liệu",
+      "SEARCH_BY": "Tìm theo",
+      "FIELD_ALL": "Tất cả",
+      "COLLECTIONS": "Bộ sưu tập tài liệu số",
+      "SEE_MORE": "Xem thêm",
+      "DOC_COUNT": "{{count}} tài liệu",
+      "NEW_DOCS": "Tài liệu mới",
+      "NEWS_TITLE": "Tin tức & Thông báo",
+      "HOTLINE": "Hotline hỗ trợ",
+      "EMAIL": "Email liên hệ"
     },
     "COMMON": {
       "BACK_HOME": "Về trang chủ",
@@ -152,7 +170,8 @@
       "AVAILABLE_OF": "Còn {{available}}/{{copies}} bản",
       "NONE_READY": "Chưa có bản sẵn sàng ({{copies}} bản)",
       "PAGINATION": "Phân trang",
-      "PAGE_OF": "Trang {{page}} / {{pages}}"
+      "PAGE_OF": "Trang {{page}} / {{pages}}",
+      "BREADCRUMB": "Đường dẫn trang"
     },
     "COMING_SOON": {
       "FEATURE": "Chức năng",
@@ -209,7 +228,28 @@
       "EBOOKS": "Tài liệu số",
       "EBOOKS_N": "Tài liệu số ({count})",
       "EBOOKS_ALL": "Xem tất cả tài liệu số",
-      "EBOOK_FREE": "đọc miễn phí"
+      "EBOOK_FREE": "đọc miễn phí",
+      "TITLE": "Tìm kiếm tài liệu",
+      "ADV_TITLE": "Tìm kiếm nâng cao",
+      "QUICK": "Tìm nhanh",
+      "PH_TITLE": "Nhập tên tài liệu...",
+      "PH_AUTHOR": "Nhập tên tác giả...",
+      "PH_PUBLISHER": "Nhập tên nhà xuất bản...",
+      "PH_KEYWORD_FIELD": "Nhập từ khóa...",
+      "COLLECTION": "Bộ sưu tập",
+      "ALL_COLLECTIONS": "-- Tất cả bộ sưu tập --",
+      "BTN_FIND": "Tìm kiếm",
+      "BTN_CLEAR": "Xóa bộ lọc",
+      "RESULT_N": "Kết quả có: {{count}} tài liệu",
+      "TAB_ALL": "Tất cả",
+      "TAB_PRINT": "Tài liệu in",
+      "TAB_DIGITAL": "Tài liệu số",
+      "BADGE_PRINT": "In",
+      "BADGE_DIGITAL": "Số",
+      "FREE": "Miễn phí",
+      "LOGIN_TO_READ": "Cần đăng nhập",
+      "PRINT_FILTERS": "Lọc sách in",
+      "YEAR_SHORT": "Năm XB"
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Không tìm thấy tài liệu (có thể đã bị ẩn hoặc xoá).",

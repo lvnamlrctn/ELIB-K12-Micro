@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { Breadcrumb } from '../layout/breadcrumb';
 import { DigitalApi, DigitalCatalogNode, DigitalContentHit, DigitalItemSummary, DigitalPage } from '../core/digital';
 import { Language } from '../core/i18n';
 
@@ -14,44 +15,47 @@ const PAGE_SIZE = 20;
  */
 @Component({
   selector: 'opac-ebook-search',
-  imports: [FormsModule, RouterLink, TranslatePipe],
+  imports: [Breadcrumb, FormsModule, RouterLink, TranslatePipe],
   template: `
-    <section class="bg-white border-b border-slate-200">
-      <div class="max-w-6xl mx-auto px-4 py-6">
-        <form (ngSubmit)="submit()" class="flex bg-white rounded-xl border border-slate-300 focus-within:border-blue-500 overflow-hidden">
-          <span class="material-icons text-slate-400 self-center pl-3">search</span>
-          <input name="q" [(ngModel)]="q" autocomplete="off" class="flex-1 px-3 py-3 text-slate-800 outline-none min-w-0"
+    <div class="container mx-auto px-4 pt-8">
+      <opac-breadcrumb [current]="'OPAC.NAVBAR.EBOOK' | translate" />
+    </div>
+    <section class="bg-white border-y border-gray-200">
+      <div class="container mx-auto px-4 py-6">
+        <form (ngSubmit)="submit()" class="flex bg-white rounded-xl border border-gray-300 focus-within:border-main overflow-hidden">
+          <i class="fas fa-magnifying-glass text-gray-400 self-center pl-3"></i>
+          <input name="q" [(ngModel)]="q" autocomplete="off" class="flex-1 px-3 py-3 text-gray-800 outline-none min-w-0"
                  [placeholder]="'OPAC.DIGITAL.SEARCH_PH' | translate" />
-          <button type="submit" class="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium">{{ 'OPAC.SEARCH.SEARCH_BTN' | translate }}</button>
+          <button type="submit" class="px-5 bg-main hover:bg-blue-700 text-white font-medium">{{ 'OPAC.SEARCH.SEARCH_BTN' | translate }}</button>
         </form>
-        <label class="mt-3 mr-4 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
-          <input type="checkbox" class="rounded border-slate-300" [ngModel]="inContent" (ngModelChange)="setContent($event)" name="inContent" />
+        <label class="mt-3 mr-4 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+          <input type="checkbox" class="rounded border-gray-300" [ngModel]="inContent" (ngModelChange)="setContent($event)" name="inContent" />
           {{ 'OPAC.DIGITAL.IN_CONTENT' | translate }}
         </label>
-        <a routerLink="/nop-tai-lieu" class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
-          <span class="material-icons text-[18px]">upload_file</span>{{ 'OPAC.SUBMIT_DOC.NAV_LINK' | translate }}</a>
+        <a routerLink="/nop-tai-lieu" class="mt-3 inline-flex items-center gap-1.5 text-sm text-main hover:underline">
+          <i class="fas fa-file-arrow-up text-[18px]"></i>{{ 'OPAC.SUBMIT_DOC.NAV_LINK' | translate }}</a>
       </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-4 py-6 grid gap-6 md:grid-cols-[250px_1fr]">
+    <section class="container mx-auto px-4 py-6 grid gap-6 md:grid-cols-[250px_1fr]">
       <aside class="space-y-4">
-        <div class="bg-white border border-slate-200 rounded-lg p-3">
-          <div class="font-medium text-sm text-slate-800 mb-2">{{ 'OPAC.DIGITAL.COLLECTION' | translate }}</div>
-          <select class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="collectionId" (ngModelChange)="setFilter('bst', $event)">
+        <div class="bg-white border border-gray-200 rounded-lg p-3">
+          <div class="font-medium text-sm text-gray-800 mb-2">{{ 'OPAC.DIGITAL.COLLECTION' | translate }}</div>
+          <select class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="collectionId" (ngModelChange)="setFilter('bst', $event)">
             <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
             @for (c of collections(); track c.id) { <option [ngValue]="c.id">{{ indent(c.level) }}{{ c.name }}</option> }
           </select>
         </div>
-        <div class="bg-white border border-slate-200 rounded-lg p-3">
-          <div class="font-medium text-sm text-slate-800 mb-2">{{ 'OPAC.DIGITAL.SUBJECT' | translate }}</div>
-          <select class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="subjectId" (ngModelChange)="setFilter('ml', $event)">
+        <div class="bg-white border border-gray-200 rounded-lg p-3">
+          <div class="font-medium text-sm text-gray-800 mb-2">{{ 'OPAC.DIGITAL.SUBJECT' | translate }}</div>
+          <select class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="subjectId" (ngModelChange)="setFilter('ml', $event)">
             <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
             @for (s of subjects(); track s.id) { <option [ngValue]="s.id">{{ indent(s.level) }}{{ s.name }}</option> }
           </select>
         </div>
-        <div class="bg-white border border-slate-200 rounded-lg p-3">
-          <div class="font-medium text-sm text-slate-800 mb-2">{{ 'OPAC.DIGITAL.TOPIC' | translate }}</div>
-          <select class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="topicId" (ngModelChange)="setFilter('cd', $event)">
+        <div class="bg-white border border-gray-200 rounded-lg p-3">
+          <div class="font-medium text-sm text-gray-800 mb-2">{{ 'OPAC.DIGITAL.TOPIC' | translate }}</div>
+          <select class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" [ngModel]="topicId" (ngModelChange)="setFilter('cd', $event)">
             <option [ngValue]="null">{{ 'COMMON.ALL' | translate }}</option>
             @for (t of topics(); track t.id) { <option [ngValue]="t.id">{{ indent(t.level) }}{{ t.name }}</option> }
           </select>
@@ -59,7 +63,7 @@ const PAGE_SIZE = 20;
       </aside>
 
       <div>
-        <div class="text-sm text-slate-600 mb-4">
+        <div class="text-sm text-gray-600 mb-4">
           @if (loading()) { {{ 'OPAC.SEARCH.SEARCHING' | translate }} }
           @else if (result(); as r) { {{ 'OPAC.SEARCH.FOUND_N' | translate: { count: r.totalCount } }} }
         </div>
@@ -69,16 +73,16 @@ const PAGE_SIZE = 20;
         @if (inContent) {
           <ul class="space-y-3">
             @for (h of hits() ?? []; track h.publicId) {
-              <li class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition">
-                <a [routerLink]="['/thu-vien-so', h.publicId]" class="font-semibold text-slate-900 hover:text-blue-700">{{ h.title }}</a>
-                <div class="text-sm text-slate-600 mt-0.5">{{ h.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }} · {{ 'OPAC.DIGITAL.IN_CONTENT_PAGE' | translate: { page: h.page } }}</div>
-                @if (h.snippet) { <p class="mt-2 text-sm text-slate-700 bg-slate-50 border-l-4 border-blue-300 px-3 py-2 rounded-r">{{ h.snippet }}</p> }
-                @else { <p class="mt-2 text-xs text-slate-500">{{ 'OPAC.DIGITAL.IN_CONTENT_LOCKED' | translate }}</p> }
+              <li class="bg-white border border-gray-100 shadow-sm rounded-xl p-4 hover:border-main/40 transition">
+                <a [routerLink]="['/thu-vien-so', h.publicId]" class="font-semibold text-gray-900 hover:text-main">{{ h.title }}</a>
+                <div class="text-sm text-gray-600 mt-0.5">{{ h.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }} · {{ 'OPAC.DIGITAL.IN_CONTENT_PAGE' | translate: { page: h.page } }}</div>
+                @if (h.snippet) { <p class="mt-2 text-sm text-gray-700 bg-gray-50 border-l-4 border-main/40 px-3 py-2 rounded-r">{{ h.snippet }}</p> }
+                @else { <p class="mt-2 text-xs text-gray-500">{{ 'OPAC.DIGITAL.IN_CONTENT_LOCKED' | translate }}</p> }
               </li>
             } @empty {
               @if (!loading() && hits()) {
-                <li class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
-                  <span class="material-icons text-5xl text-slate-300">search_off</span>
+                <li class="bg-white border border-gray-100 shadow-sm rounded-xl p-10 text-center text-gray-500">
+                  <i class="fas fa-magnifying-glass text-5xl text-gray-300"></i>
                   <p class="mt-2">{{ (q.trim().length < 2 ? 'OPAC.DIGITAL.IN_CONTENT_MIN' : 'OPAC.SEARCH.NO_RESULT_HINT') | translate }}</p>
                 </li>
               }
@@ -87,22 +91,22 @@ const PAGE_SIZE = 20;
         } @else {
         <ul class="space-y-3">
           @for (i of result()?.items ?? []; track i.publicId) {
-            <li class="bg-white border border-slate-200 rounded-xl p-4 flex gap-4 hover:border-blue-300 transition">
+            <li class="bg-white border border-gray-100 shadow-sm rounded-xl p-4 flex gap-4 hover:border-main/40 transition">
               @if (i.coverUrl && !brokenCovers().has(i.publicId)) {
                 <img [src]="i.coverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="coverFailed(i.publicId)"
-                     class="w-14 h-20 rounded object-cover bg-slate-100 shrink-0 border border-slate-200" />
+                     class="w-14 h-20 rounded object-cover bg-gray-100 shrink-0 border border-gray-200" />
               } @else {
-                <div class="w-14 h-20 rounded bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
-                  <span class="material-icons">menu_book</span>
+                <div class="w-14 h-20 rounded bg-gradient-to-br from-gray-100 to-white text-gray-300 flex items-center justify-center shrink-0">
+                  <i class="fas fa-book"></i>
                 </div>
               }
               <div class="min-w-0 flex-1">
-                <a [routerLink]="['/thu-vien-so', i.publicId]" class="font-semibold text-slate-900 hover:text-blue-700">{{ i.title }}</a>
-                <div class="text-sm text-slate-600 mt-0.5">
+                <a [routerLink]="['/thu-vien-so', i.publicId]" class="font-semibold text-gray-900 hover:text-main">{{ i.title }}</a>
+                <div class="text-sm text-gray-600 mt-0.5">
                   {{ i.author ?? ('OPAC.COMMON.UNKNOWN_AUTHOR' | translate) }}@if (i.publisher) { · {{ i.publisher }} }@if (i.publishDate) { · {{ i.publishDate }} }
                 </div>
                 <div class="mt-2 flex items-center gap-2 flex-wrap text-xs">
-                  @if (i.collectionName) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ i.collectionName }}</span> }
+                  @if (i.collectionName) { <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{{ i.collectionName }}</span> }
                   @if (i.free) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">{{ 'OPAC.DIGITAL.FREE' | translate }}</span> }
                   @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ 'OPAC.DIGITAL.NEEDS_LOGIN' | translate }}</span> }
                 </div>
@@ -110,8 +114,8 @@ const PAGE_SIZE = 20;
             </li>
           } @empty {
             @if (!loading() && result()) {
-              <li class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-500">
-                <span class="material-icons text-5xl text-slate-300">search_off</span>
+              <li class="bg-white border border-gray-100 shadow-sm rounded-xl p-10 text-center text-gray-500">
+                <i class="fas fa-magnifying-glass text-5xl text-gray-300"></i>
                 <p class="mt-2">{{ 'OPAC.SEARCH.NO_RESULT_HINT' | translate }}</p>
               </li>
             }
@@ -122,9 +126,9 @@ const PAGE_SIZE = 20;
 
         @if (!inContent && pages() > 1) {
           <nav class="mt-6 flex items-center justify-center gap-1 text-sm">
-            <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40" [disabled]="page <= 1" (click)="go(page - 1)">{{ 'COMMON.PREV' | translate }}</button>
-            <span class="px-3 text-slate-600">{{ 'OPAC.COMMON.PAGE_OF' | translate: { page, pages: pages() } }}</span>
-            <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40" [disabled]="page >= pages()" (click)="go(page + 1)">{{ 'COMMON.NEXT' | translate }}</button>
+            <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white disabled:opacity-40" [disabled]="page <= 1" (click)="go(page - 1)">{{ 'COMMON.PREV' | translate }}</button>
+            <span class="px-3 text-gray-600">{{ 'OPAC.COMMON.PAGE_OF' | translate: { page, pages: pages() } }}</span>
+            <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white disabled:opacity-40" [disabled]="page >= pages()" (click)="go(page + 1)">{{ 'COMMON.NEXT' | translate }}</button>
           </nav>
         }
       </div>

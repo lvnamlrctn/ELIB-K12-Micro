@@ -113,14 +113,22 @@
       "LANGUAGE": "Language",
       "LOGIN": "Sign in",
       "LOGOUT": "Sign out",
-      "MY_ACCOUNT": "My account"
+      "MY_ACCOUNT": "My account",
+      "SUBTITLE": "Digital Library",
+      "MENU": "Menu",
+      "ADMIN": "Admin"
     },
     "FOOTER": {
       "ADDRESS": "Address",
       "OPEN_HOURS": "Opening hours",
       "CONTACT_INFO": "Contact",
       "ADMIN": "Library administration",
-      "POWERED_BY": "Powered by ELIB K12"
+      "POWERED_BY": "Powered by ELIB K12",
+      "QUICK_LINKS": "Quick links",
+      "STATS": "Visit statistics",
+      "TODAY": "Today",
+      "LAST_7_DAYS": "Last 7 days",
+      "TOTAL": "Total visits"
     },
     "HOME": {
       "HERO_SUBTITLE": "Search the catalogue, read e-books and use library services anytime, anywhere.",
@@ -139,7 +147,17 @@
       "SERVICE_AI": "AI assistant",
       "SERVICE_AI_TEXT": "Ask questions and get reading suggestions.",
       "SERVICE_PORTAL": "News and events",
-      "SERVICE_PORTAL_TEXT": "Library activities and announcements."
+      "SERVICE_PORTAL_TEXT": "Library activities and announcements.",
+      "HERO_TITLE": "Find documents",
+      "SEARCH_BY": "Search by",
+      "FIELD_ALL": "Everything",
+      "COLLECTIONS": "Digital collections",
+      "SEE_MORE": "See more",
+      "DOC_COUNT": "{{count}} documents",
+      "NEW_DOCS": "New documents",
+      "NEWS_TITLE": "News & announcements",
+      "HOTLINE": "Support hotline",
+      "EMAIL": "Contact email"
     },
     "COMMON": {
       "BACK_HOME": "Back to home",
@@ -152,7 +170,8 @@
       "AVAILABLE_OF": "{{available}} of {{copies}} available",
       "NONE_READY": "No copy ready ({{copies}} copies)",
       "PAGINATION": "Pagination",
-      "PAGE_OF": "Page {{page}} of {{pages}}"
+      "PAGE_OF": "Page {{page}} of {{pages}}",
+      "BREADCRUMB": "Breadcrumb"
     },
     "COMING_SOON": {
       "FEATURE": "Feature",
@@ -209,7 +228,28 @@
       "EBOOKS": "Digital items",
       "EBOOKS_N": "Digital items ({count})",
       "EBOOKS_ALL": "See all digital items",
-      "EBOOK_FREE": "free to read"
+      "EBOOK_FREE": "free to read",
+      "TITLE": "Search documents",
+      "ADV_TITLE": "Advanced search",
+      "QUICK": "Quick search",
+      "PH_TITLE": "Enter a title...",
+      "PH_AUTHOR": "Enter an author...",
+      "PH_PUBLISHER": "Enter a publisher...",
+      "PH_KEYWORD_FIELD": "Enter a keyword...",
+      "COLLECTION": "Collection",
+      "ALL_COLLECTIONS": "-- All collections --",
+      "BTN_FIND": "Search",
+      "BTN_CLEAR": "Clear filters",
+      "RESULT_N": "{{count}} results",
+      "TAB_ALL": "All",
+      "TAB_PRINT": "Print",
+      "TAB_DIGITAL": "Digital",
+      "BADGE_PRINT": "Print",
+      "BADGE_DIGITAL": "Digital",
+      "FREE": "Free",
+      "LOGIN_TO_READ": "Login required",
+      "PRINT_FILTERS": "Print filters",
+      "YEAR_SHORT": "Year"
     },
     "BOOK_DETAIL": {
       "NOT_FOUND": "Document not found (it may have been hidden or removed).",

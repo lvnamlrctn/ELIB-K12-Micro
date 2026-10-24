@@ -3,6 +3,7 @@ import { Component, effect, inject, input, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { Breadcrumb } from '../layout/breadcrumb';
 import { CirculationApi, HoldDto, HoldStatus } from '../core/circulation';
 import { DigitalApi, DigitalByBibSummary } from '../core/digital';
 import { LDatePipe, Language } from '../core/i18n';
@@ -18,58 +19,57 @@ type Tab = 'info' | 'isbd' | 'marc';
  */
 @Component({
   selector: 'opac-bib-detail',
-  imports: [LDatePipe, NgTemplateOutlet, RouterLink, TranslatePipe],
+  imports: [Breadcrumb, LDatePipe, NgTemplateOutlet, RouterLink, TranslatePipe],
   template: `
-    <div class="max-w-6xl mx-auto px-4 py-6">
-      <a routerLink="/tim-kiem" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
-        <span class="material-icons text-[18px]">arrow_back</span> {{ 'OPAC.NAVBAR.SEARCH_LINK' | translate }}</a>
+    <div class="container mx-auto px-4 py-6">
+      <opac-breadcrumb parentLabel="OPAC.NAVBAR.SEARCH_LINK" parentLink="/tim-kiem" [current]="bib()?.title" />
 
       @if (loading()) {
-        <div class="flex justify-center py-24"><span class="material-icons animate-spin text-blue-600 text-4xl">autorenew</span></div>
+        <div class="flex justify-center py-24"><i class="fas fa-circle-notch animate-spin text-main text-4xl"></i></div>
       } @else if (notFound()) {
-        <div class="text-center py-24 text-slate-600">
-          <span class="material-icons text-6xl text-slate-300">find_in_page</span>
+        <div class="text-center py-24 text-gray-600">
+          <i class="fas fa-file-lines text-6xl text-gray-300"></i>
           <p class="mt-3">{{ 'OPAC.BOOK_DETAIL.NOT_FOUND' | translate }}</p>
         </div>
       } @else if (bib(); as b) {
         <div class="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <article class="bg-white border border-slate-200 rounded-xl p-6">
+          <article class="bg-white border border-gray-100 shadow-sm rounded-xl p-6">
             <div class="flex gap-5">
               @if (b.coverUrl && !coverBroken()) {
                 <img [src]="b.coverUrl" [alt]="('OPAC.BOOK_DETAIL.COVER_OF' | translate) + ' ' + b.title" referrerpolicy="no-referrer" (error)="coverBroken.set(true)"
-                     class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0" />
+                     class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover bg-gray-100 border border-gray-200 shrink-0" />
               } @else {
-                <div class="w-24 h-32 rounded-lg bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
-                  <span class="material-icons text-4xl">menu_book</span>
+                <div class="w-24 h-32 rounded-lg bg-gradient-to-br from-gray-100 to-white text-gray-300 flex items-center justify-center shrink-0">
+                  <i class="fas fa-book text-4xl"></i>
                 </div>
               }
               <div class="min-w-0">
-                <h1 class="text-xl md:text-2xl font-bold text-slate-900">{{ b.title }}</h1>
-                @if (b.author) { <div class="mt-1 text-slate-700">{{ b.author }}</div> }
+                <h1 class="text-xl md:text-2xl font-bold text-gray-900">{{ b.title }}</h1>
+                @if (b.author) { <div class="mt-1 text-gray-700">{{ b.author }}</div> }
                 <div class="mt-3 flex gap-2 flex-wrap text-xs">
-                  @if (b.materialType) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ b.materialType }}</span> }
-                  @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">{{ 'OPAC.COMMON.NO_COPIES' | translate }}</span> }
+                  @if (b.materialType) { <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{{ b.materialType }}</span> }
+                  @if (b.copies === 0) { <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-500">{{ 'OPAC.COMMON.NO_COPIES' | translate }}</span> }
                   @else if (b.available > 0) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">{{ 'OPAC.COMMON.AVAILABLE_OF' | translate: { available: b.available, copies: b.copies } }}</span> }
                   @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ (onLoan(b) ? 'OPAC.SEARCH.ALL_BORROWED' : 'OPAC.BOOK_DETAIL.PROCESSING') | translate }}</span> }
                 </div>
                 @if (digitalMatch(); as d) {
-                  <a [routerLink]="['/thu-vien-so', d.publicId]" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-sm hover:bg-blue-100">
-                    <span class="material-icons text-[18px]">menu_book</span>{{ 'OPAC.BOOK_DETAIL.HAS_DIGITAL_COPY' | translate }}</a>
+                  <a [routerLink]="['/thu-vien-so', d.publicId]" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-main text-sm hover:bg-blue-100">
+                    <i class="fas fa-book text-[18px]"></i>{{ 'OPAC.BOOK_DETAIL.HAS_DIGITAL_COPY' | translate }}</a>
                 }
               </div>
             </div>
 
-            <div class="mt-6 flex items-end gap-1 border-b border-slate-200 text-sm flex-wrap" role="tablist">
+            <div class="mt-6 flex items-end gap-1 border-b border-gray-200 text-sm flex-wrap" role="tablist">
               @for (t of tabs; track t.key) {
                 <button type="button" role="tab" [attr.aria-selected]="tab() === t.key" (click)="openTab(t.key)"
-                        class="px-3 py-2 -mb-px border-b-2" [class]="tab() === t.key ? 'border-blue-600 text-blue-700 font-medium' : 'border-transparent text-slate-500 hover:text-slate-800'">
+                        class="px-3 py-2 -mb-px border-b-2" [class]="tab() === t.key ? 'border-main text-main font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'">
                   {{ t.label | translate }}</button>
               }
               <span class="ml-auto pb-1.5 flex gap-3 text-xs">
-                <a [href]="api.exportUrl(b.publicId, 'iso2709')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_ISO' | translate">
-                  <span class="material-icons text-[16px]">download</span>.mrc</a>
-                <a [href]="api.exportUrl(b.publicId, 'marcxml')" download class="text-blue-600 hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_MARCXML' | translate">
-                  <span class="material-icons text-[16px]">download</span>MARCXML</a>
+                <a [href]="api.exportUrl(b.publicId, 'iso2709')" download class="text-main hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_ISO' | translate">
+                  <i class="fas fa-download text-[16px]"></i>.mrc</a>
+                <a [href]="api.exportUrl(b.publicId, 'marcxml')" download class="text-main hover:underline inline-flex items-center gap-0.5" [title]="'OPAC.BOOK_DETAIL.DOWNLOAD_MARCXML' | translate">
+                  <i class="fas fa-download text-[16px]"></i>MARCXML</a>
               </span>
             </div>
 
@@ -77,19 +77,19 @@ type Tab = 'info' | 'isbd' | 'marc';
               @case ('info') {
                 <dl class="mt-4 grid sm:grid-cols-[160px_1fr] gap-x-4 gap-y-2 text-sm">
                   @for (row of rows(); track row[0]) {
-                    <dt class="text-slate-500">{{ row[0] | translate }}</dt><dd class="text-slate-800 whitespace-pre-line">{{ row[1] | translate }}</dd>
+                    <dt class="text-gray-500">{{ row[0] | translate }}</dt><dd class="text-gray-800 whitespace-pre-line">{{ row[1] | translate }}</dd>
                   }
                 </dl>
                 @if (b.summary) {
-                  <h2 class="mt-6 font-semibold text-slate-900">{{ 'OPAC.BOOK_DETAIL.SUMMARY' | translate }}</h2>
-                  <p class="mt-2 text-sm text-slate-700 whitespace-pre-line">{{ b.summary }}</p>
+                  <h2 class="mt-6 font-semibold text-gray-900">{{ 'OPAC.BOOK_DETAIL.SUMMARY' | translate }}</h2>
+                  <p class="mt-2 text-sm text-gray-700 whitespace-pre-line">{{ b.summary }}</p>
                 }
               }
               @case ('isbd') {
                 @if (marc(); as m) {
-                  <div class="mt-4 border border-slate-200 rounded-lg p-4 bg-amber-50/40 text-sm text-slate-800 font-serif space-y-2">
+                  <div class="mt-4 border border-gray-200 rounded-lg p-4 bg-amber-50/40 text-sm text-gray-800 font-serif space-y-2">
                     @for (p of m.isbd; track $index) { <p [class.indent-8]="$index === 0">{{ p }}</p> }
-                    @if (!m.isbd.length) { <p class="text-slate-500">{{ 'OPAC.BOOK_DETAIL.NO_ISBD' | translate }}</p> }
+                    @if (!m.isbd.length) { <p class="text-gray-500">{{ 'OPAC.BOOK_DETAIL.NO_ISBD' | translate }}</p> }
                   </div>
                 } @else { <ng-container [ngTemplateOutlet]="marcState" /> }
               }
@@ -98,11 +98,11 @@ type Tab = 'info' | 'isbd' | 'marc';
                   <div class="mt-4 overflow-x-auto">
                     <table class="w-full text-xs font-mono min-w-[480px]">
                       <tbody>
-                        <tr class="border-b border-slate-100"><td class="py-1 pr-3 text-slate-500 align-top">LDR</td><td></td><td class="py-1 whitespace-pre">{{ m.leader }}</td></tr>
+                        <tr class="border-b border-gray-100"><td class="py-1 pr-3 text-gray-500 align-top">LDR</td><td></td><td class="py-1 whitespace-pre">{{ m.leader }}</td></tr>
                         @for (f of m.fields; track $index) {
-                          <tr class="border-b border-slate-100">
-                            <td class="py-1 pr-3 text-blue-700 align-top">{{ f.tag }}</td>
-                            <td class="py-1 pr-3 text-slate-500 align-top whitespace-pre">{{ indicators(f) }}</td>
+                          <tr class="border-b border-gray-100">
+                            <td class="py-1 pr-3 text-main align-top">{{ f.tag }}</td>
+                            <td class="py-1 pr-3 text-gray-500 align-top whitespace-pre">{{ indicators(f) }}</td>
                             <td class="py-1 break-all">
                               @if (!f.subfields?.length) { <span class="whitespace-pre-wrap">{{ f.value }}</span> }
                               @for (s of f.subfields ?? []; track $index) { <span class="text-rose-600">&#36;{{ s.code }}</span>{{ s.value }} }
@@ -117,24 +117,24 @@ type Tab = 'info' | 'isbd' | 'marc';
             }
             <ng-template #marcState>
               @if (marcError(); as err) { <p class="mt-4 text-sm text-red-700">{{ err.key | translate: err.params }}</p> }
-              @else { <p class="mt-4 text-sm text-slate-500">{{ 'OPAC.COMMON.LOADING' | translate }}</p> }
+              @else { <p class="mt-4 text-sm text-gray-500">{{ 'OPAC.COMMON.LOADING' | translate }}</p> }
             </ng-template>
 
-            <h2 class="mt-8 font-semibold text-slate-900">{{ 'OPAC.BOOK_DETAIL.COPIES_N' | translate: { count: b.copies } }}</h2>
+            <h2 class="mt-8 font-semibold text-gray-900">{{ 'OPAC.BOOK_DETAIL.COPIES_N' | translate: { count: b.copies } }}</h2>
             @if (b.holdings.length) {
               <div class="mt-3 overflow-x-auto">
                 <table class="w-full text-sm min-w-[420px]">
-                  <thead><tr class="text-left text-slate-500 border-b border-slate-200">
+                  <thead><tr class="text-left text-gray-500 border-b border-gray-200">
                     <th class="py-2 pr-3 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_BARCODE' | translate }}</th><th class="py-2 pr-3 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_STORE' | translate }}</th><th class="py-2 font-medium">{{ 'OPAC.BOOK_DETAIL.COL_STATUS' | translate }}</th>
                   </tr></thead>
                   <tbody>
                     @for (c of b.holdings; track c.barcode) {
-                      <tr class="border-b border-slate-100">
+                      <tr class="border-b border-gray-100">
                         <td class="py-2 pr-3 font-mono">{{ c.barcode }}</td>
                         <td class="py-2 pr-3">{{ c.storeName ?? '—' }}</td>
                         <td class="py-2">
-                          <span [class]="c.status === 'available' ? 'text-green-700' : c.status === 'on-loan' ? 'text-amber-700' : 'text-slate-500'">{{ copyStatus(c.status, c.statusName) | translate }}</span>
-                          @if (c.dueAt) { <span class="text-slate-500"> — {{ 'OPAC.BOOK_DETAIL.DUE' | translate: { date: (c.dueAt | ldate) } }}</span> }
+                          <span [class]="c.status === 'available' ? 'text-green-700' : c.status === 'on-loan' ? 'text-amber-700' : 'text-gray-500'">{{ copyStatus(c.status, c.statusName) | translate }}</span>
+                          @if (c.dueAt) { <span class="text-gray-500"> — {{ 'OPAC.BOOK_DETAIL.DUE' | translate: { date: (c.dueAt | ldate) } }}</span> }
                         </td>
                       </tr>
                     }
@@ -142,19 +142,19 @@ type Tab = 'info' | 'isbd' | 'marc';
                 </table>
               </div>
             } @else {
-              <p class="mt-2 text-sm text-slate-500">{{ 'OPAC.BOOK_DETAIL.NO_COPIES' | translate }}</p>
+              <p class="mt-2 text-sm text-gray-500">{{ 'OPAC.BOOK_DETAIL.NO_COPIES' | translate }}</p>
             }
           </article>
 
           <aside class="space-y-4">
             @if (library.has('CIRCULATION')) {
-              <div class="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-                <div class="font-medium text-slate-900 mb-1">{{ 'OPAC.BOOK_DETAIL.BORROW_TITLE' | translate }}</div>
+              <div class="bg-white border border-gray-100 shadow-sm rounded-xl p-4 text-sm text-gray-600">
+                <div class="font-medium text-gray-900 mb-1">{{ 'OPAC.BOOK_DETAIL.BORROW_TITLE' | translate }}</div>
                 @if (!auth.loggedIn()) {
                   <p>{{ 'OPAC.BOOK_DETAIL.LOGIN_TO_BORROW' | translate }}</p>
-                  <button type="button" class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                  <button type="button" class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-main text-white text-sm font-medium hover:bg-blue-700"
                           (click)="auth.login(router.url)">
-                    <span class="material-icons text-[18px]">login</span>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
+                    <i class="fas fa-right-to-bracket text-[18px]"></i>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
                 } @else if (myHold(); as hold) {
                   <p [class.text-green-700]="hold.status === HoldStatus.Ready">
                     {{ (hold.status === HoldStatus.Ready ? 'OPAC.BOOK_DETAIL.HOLD_READY_PICKUP' : 'OPAC.BOOK_DETAIL.HOLD_WAITING_POSITION')
@@ -162,25 +162,25 @@ type Tab = 'info' | 'isbd' | 'marc';
                   </p>
                   @if (holdError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="holdBusy()" (click)="cancelHold()"
-                          class="mt-3 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">
+                          class="mt-3 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50">
                     {{ 'OPAC.BOOK_DETAIL.CANCEL_HOLD' | translate }}</button>
                 } @else {
                   <p>{{ 'OPAC.BOOK_DETAIL.BORROW_HINT' | translate }}</p>
                   @if (holdError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="holdBusy()" (click)="placeHold()"
-                          class="mt-3 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                          class="mt-3 px-3 py-2 rounded-lg bg-main text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                     {{ 'OPAC.BOOK_DETAIL.PLACE_HOLD' | translate }}</button>
                 }
               </div>
             }
             @if (similar().length) {
-              <div class="bg-white border border-slate-200 rounded-xl p-4">
-                <div class="font-medium text-slate-900 mb-3">{{ 'OPAC.BOOK_DETAIL.SIMILAR' | translate }}</div>
+              <div class="bg-white border border-gray-100 shadow-sm rounded-xl p-4">
+                <div class="font-medium text-gray-900 mb-3">{{ 'OPAC.BOOK_DETAIL.SIMILAR' | translate }}</div>
                 <ul class="space-y-3">
                   @for (s of similar(); track s.publicId) {
                     <li>
-                      <a [routerLink]="['/tai-lieu', s.publicId]" class="text-sm font-medium text-slate-800 hover:text-blue-700">{{ s.title }}</a>
-                      <div class="text-xs text-slate-500">{{ s.author ?? '' }}@if (s.publishYear) { · {{ s.publishYear }} }</div>
+                      <a [routerLink]="['/tai-lieu', s.publicId]" class="text-sm font-medium text-gray-800 hover:text-main">{{ s.title }}</a>
+                      <div class="text-xs text-gray-500">{{ s.author ?? '' }}@if (s.publishYear) { · {{ s.publishYear }} }</div>
                     </li>
                   }
                 </ul>

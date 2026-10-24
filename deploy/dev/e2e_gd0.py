@@ -1945,6 +1945,15 @@ def digital_portal_steps(tb, token, tag):
         time.sleep(1)
     expect(len(found) == 1 and found[0]["publicId"] == item["publicId"], "ebook vào chỉ mục tra cứu (event EbookChanged → search), tìm không dấu", str(found)[:200])
 
+    # --- tìm gộp in + số (một danh sách): số theo loại, lọc loại, trang 2 (kiểm cách Npgsql dịch thứ hạng)
+    s, _, allr = call("POST", "/api/opac/search/all/Search", {"q": f"sach dien tu thu nghiem {tag}", "pageSize": 1}, authed=False)
+    expect(s == 200 and allr.get("digitalTotal") == 1 and allr["items"][0]["kind"] == "digital" and allr["items"][0]["publicId"] == item["publicId"],
+           "tìm gộp thấy tài liệu số", str(allr)[:200])
+    s, _, only = call("POST", "/api/opac/search/all/Search", {"q": f"sach dien tu thu nghiem {tag}", "kind": "print"}, authed=False)
+    expect(s == 200 and only.get("total") == 0 and only.get("digitalTotal") == 1, "tìm gộp lọc loại in: không có, số tài liệu số vẫn đếm", str(only)[:200])
+    s, _, p2 = call("POST", "/api/opac/search/all/Search", {"q": "", "sort": "newest", "page": 2, "pageSize": 1}, authed=False)
+    expect(s == 200 and p2.get("page") == 2, "tìm gộp trang 2 (sắp mới nhất) chạy được", str(p2)[:200])
+
     # --- đánh giá: ẩn danh gửi → chờ duyệt → ChangeStatus chung bị chặn → Duyệt → hiện công khai
     s, _, _ = call("POST", f"/api/opac/digital/browse/items/{item['publicId']}/reviews", {"rating": 5, "displayName": "Bạn đọc E2E", "content": "Hay"}, authed=False)
     expect(s in (200, 201), "gửi đánh giá ẩn danh")

@@ -18,6 +18,23 @@ export interface EbookHit {
 }
 export interface EbookHits { total: number; page: number; pageSize: number; items: EbookHit[]; }
 
+/** Tìm gộp sách in + tài liệu số (một danh sách). kind: all | print | digital. */
+export interface UnifiedRequest {
+  q?: string | null; title?: string | null; author?: string | null; publisher?: string | null; keyword?: string | null;
+  yearFrom?: number | null; yearTo?: number | null; kind?: string | null; collection?: string | null; availableOnly?: boolean;
+  sort?: string | null; refine?: boolean; page: number; pageSize: number;
+}
+/** kind = print | digital. Sách in có copies/available/materialType; tài liệu số có free/hasFile/collectionName. */
+export interface UnifiedHit {
+  kind: 'print' | 'digital'; publicId: string; title: string; author: string | null; publisher: string | null; publishYear: string | null;
+  coverUrl: string | null; language: string | null; materialType: string | null; copies: number; available: number; collectionName: string | null;
+  free: boolean; hasFile: boolean; linkedBibPublicId: string | null;
+}
+export interface UnifiedResult {
+  total: number; printTotal: number; digitalTotal: number; page: number; pageSize: number; items: UnifiedHit[]; collections: Facet[];
+  queryId: string | null; elapsedMs: number;
+}
+
 export interface Bib {
   publicId: string; mfn: number; title: string; author: string | null; publisher: string | null; publishYear: string | null;
   materialType: string | null; language: string | null; ddc: string | null; isbns: string | null; summary: string | null; copies: number; available: number;
@@ -80,6 +97,7 @@ export class SearchApi {
   private readonly http = inject(HttpClient);
 
   search(body: SearchRequest) { return firstValueFrom(this.http.post<SearchResult>('/api/opac/search/bibs/Search', body)); }
+  all(body: UnifiedRequest) { return firstValueFrom(this.http.post<UnifiedResult>('/api/opac/search/all/Search', body)); }
   ebooks(q: string, pageSize = 6) { return firstValueFrom(this.http.post<EbookHits>('/api/opac/search/ebooks/Search', { q, page: 1, pageSize })); }
   detail(publicId: string) { return firstValueFrom(this.http.get<BibDetail>(`/api/opac/search/bibs/${publicId}`)); }
   similar(publicId: string) { return firstValueFrom(this.http.get<Bib[]>(`/api/opac/search/bibs/${publicId}/similar`)); }

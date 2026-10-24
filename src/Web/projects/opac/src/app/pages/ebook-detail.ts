@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
+import { Breadcrumb } from '../layout/breadcrumb';
 import {
   DigitalApi, DigitalItemDetail, DigitalLoan, DigitalLoanStatus, DigitalReservation, DigitalReservationStatus, DigitalReview,
 } from '../core/digital';
@@ -16,69 +17,68 @@ import { ReaderAuth } from '../core/reader-auth';
  */
 @Component({
   selector: 'opac-ebook-detail',
-  imports: [FormsModule, LDatePipe, RouterLink, TranslatePipe],
+  imports: [Breadcrumb, FormsModule, LDatePipe, RouterLink, TranslatePipe],
   template: `
-    <div class="max-w-5xl mx-auto px-4 py-6">
-      <a routerLink="/thu-vien-so" class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
-        <span class="material-icons text-[18px]">arrow_back</span> {{ 'OPAC.DIGITAL.BACK_TO_SEARCH' | translate }}</a>
+    <div class="container mx-auto px-4 py-8">
+      <opac-breadcrumb parentLabel="OPAC.NAVBAR.EBOOK" parentLink="/thu-vien-so" [current]="item()?.title" />
 
       @if (loading()) {
-        <div class="flex justify-center py-24"><span class="material-icons animate-spin text-blue-600 text-4xl">autorenew</span></div>
+        <div class="flex justify-center py-24"><i class="fas fa-circle-notch animate-spin text-main text-4xl"></i></div>
       } @else if (notFound()) {
-        <div class="text-center py-24 text-slate-600">
-          <span class="material-icons text-6xl text-slate-300">find_in_page</span>
+        <div class="text-center py-24 text-gray-600">
+          <i class="fas fa-file-lines text-6xl text-gray-300"></i>
           <p class="mt-3">{{ 'OPAC.DIGITAL.NOT_FOUND' | translate }}</p>
         </div>
       } @else if (item(); as it) {
         <div class="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
-          <article class="bg-white border border-slate-200 rounded-xl p-6">
+          <article class="bg-white border border-gray-100 shadow-sm rounded-xl p-6">
             <div class="flex gap-5">
               @if (it.coverUrl && !coverBroken()) {
                 <img [src]="it.coverUrl" alt="" referrerpolicy="no-referrer" (error)="coverBroken.set(true)"
-                     class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0" />
+                     class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover bg-gray-100 border border-gray-200 shrink-0" />
               } @else {
-                <div class="w-24 h-32 rounded-lg bg-gradient-to-br from-blue-100 to-sky-50 text-blue-500 flex items-center justify-center shrink-0">
-                  <span class="material-icons text-4xl">menu_book</span>
+                <div class="w-24 h-32 rounded-lg bg-gradient-to-br from-gray-100 to-white text-gray-300 flex items-center justify-center shrink-0">
+                  <i class="fas fa-book text-4xl"></i>
                 </div>
               }
               <div class="min-w-0">
                 <div class="flex items-start justify-between gap-2">
-                  <h1 class="text-xl md:text-2xl font-bold text-slate-900">{{ it.title }}</h1>
+                  <h1 class="text-xl md:text-2xl font-bold text-gray-900">{{ it.title }}</h1>
                   @if (library.has('DIGITAL') && auth.loggedIn()) {
                     <button type="button" [disabled]="favoriteBusy()" (click)="toggleFavorite(it)" [title]="(favorite() ? 'OPAC.DIGITAL.UNFAVORITE' : 'OPAC.DIGITAL.FAVORITE') | translate"
-                            class="shrink-0 text-2xl disabled:opacity-50" [class.text-rose-600]="favorite()" [class.text-slate-300]="!favorite()">
-                      <span class="material-icons">{{ favorite() ? 'favorite' : 'favorite_border' }}</span>
+                            class="shrink-0 text-2xl disabled:opacity-50" [class.text-rose-600]="favorite()" [class.text-gray-300]="!favorite()">
+                      <i [class]="favorite() ? 'fas fa-heart' : 'far fa-heart'"></i>
                     </button>
                   }
                 </div>
-                @if (it.author) { <div class="mt-1 text-slate-700">{{ it.author }}</div> }
+                @if (it.author) { <div class="mt-1 text-gray-700">{{ it.author }}</div> }
                 <div class="mt-3 flex gap-2 flex-wrap text-xs">
-                  @if (it.collectionName) { <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ it.collectionName }}</span> }
+                  @if (it.collectionName) { <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{{ it.collectionName }}</span> }
                   @if (it.free) { <span class="px-2 py-0.5 rounded bg-green-50 text-green-700">{{ 'OPAC.DIGITAL.FREE' | translate }}</span> }
                   @else { <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700">{{ 'OPAC.DIGITAL.NEEDS_LOGIN' | translate }}</span> }
                 </div>
                 @if (it.linkedBibPublicId) {
-                  <a [routerLink]="['/tai-lieu', it.linkedBibPublicId]" class="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                    <span class="material-icons text-[16px]">menu_book</span>{{ 'OPAC.DIGITAL.VIEW_PRINT_BOOK' | translate }}</a>
+                  <a [routerLink]="['/tai-lieu', it.linkedBibPublicId]" class="mt-3 inline-flex items-center gap-1 text-sm text-main hover:underline">
+                    <i class="fas fa-book text-[16px]"></i>{{ 'OPAC.DIGITAL.VIEW_PRINT_BOOK' | translate }}</a>
                 }
               </div>
             </div>
 
             <dl class="mt-6 grid sm:grid-cols-[160px_1fr] gap-x-4 gap-y-2 text-sm">
-              @for (row of rows(it); track row[0]) { <dt class="text-slate-500">{{ row[0] | translate }}</dt><dd class="text-slate-800 whitespace-pre-line">{{ row[1] }}</dd> }
+              @for (row of rows(it); track row[0]) { <dt class="text-gray-500">{{ row[0] | translate }}</dt><dd class="text-gray-800 whitespace-pre-line">{{ row[1] }}</dd> }
             </dl>
 
-            <h2 class="mt-8 font-semibold text-slate-900">{{ 'OPAC.DIGITAL.FILES' | translate }}</h2>
+            <h2 class="mt-8 font-semibold text-gray-900">{{ 'OPAC.DIGITAL.FILES' | translate }}</h2>
             @if (it.files.length) {
-              <ul class="mt-3 divide-y divide-slate-100">
+              <ul class="mt-3 divide-y divide-gray-100">
                 @for (f of it.files; track f.publicId) {
                   <li class="py-2.5 flex items-center justify-between gap-3">
-                    <span class="flex items-center gap-2 text-sm text-slate-800"><span class="material-icons text-slate-400 text-[20px]">picture_as_pdf</span>{{ f.description || f.fileExt || 'PDF' }}</span>
+                    <span class="flex items-center gap-2 text-sm text-gray-800"><i class="fas fa-file-pdf text-gray-400 text-[20px]"></i>{{ f.description || f.fileExt || 'PDF' }}</span>
                     <div class="flex items-center gap-2 shrink-0">
-                      <button type="button" class="px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 text-sm hover:bg-blue-50 disabled:opacity-50"
+                      <button type="button" class="px-3 py-1.5 rounded-lg border border-main/40 text-main text-sm hover:bg-blue-50 disabled:opacity-50"
                               [disabled]="fileBusy() === f.publicId" (click)="read(it, f)">{{ 'OPAC.DIGITAL.READ_ONLINE' | translate }}</button>
                       @if (it.allowDownload) {
-                        <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50"
+                        <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50"
                                 [disabled]="fileBusy() === f.publicId" (click)="openFile(it, f.publicId, true)">{{ 'OPAC.DIGITAL.DOWNLOAD' | translate }}</button>
                       }
                     </div>
@@ -87,63 +87,63 @@ import { ReaderAuth } from '../core/reader-auth';
               </ul>
               @if (fileError(); as err) { <p class="text-red-600 text-sm mt-2">{{ err }}</p> }
             } @else {
-              <p class="mt-2 text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_FILES' | translate }}</p>
+              <p class="mt-2 text-sm text-gray-500">{{ 'OPAC.DIGITAL.NO_FILES' | translate }}</p>
             }
 
-            <h2 class="mt-8 font-semibold text-slate-900">{{ 'OPAC.DIGITAL.REVIEWS' | translate }}</h2>
+            <h2 class="mt-8 font-semibold text-gray-900">{{ 'OPAC.DIGITAL.REVIEWS' | translate }}</h2>
             @if (reviews().length) {
-              <ul class="mt-3 divide-y divide-slate-100">
+              <ul class="mt-3 divide-y divide-gray-100">
                 @for (r of reviews(); track r.publicId) {
                   <li class="py-3">
                     <div class="flex items-center gap-2 text-sm">
-                      <span class="font-medium text-slate-900">{{ r.displayName || ('OPAC.DIGITAL.ANONYMOUS' | translate) }}</span>
+                      <span class="font-medium text-gray-900">{{ r.displayName || ('OPAC.DIGITAL.ANONYMOUS' | translate) }}</span>
                       @if (r.rating) {
                         <span class="text-amber-500 text-xs">{{ '★'.repeat(r.rating) }}{{ '☆'.repeat(5 - r.rating) }}</span>
                       }
                     </div>
-                    @if (r.content) { <p class="mt-1 text-sm text-slate-700 whitespace-pre-line">{{ r.content }}</p> }
+                    @if (r.content) { <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ r.content }}</p> }
                   </li>
                 }
               </ul>
             } @else {
-              <p class="mt-2 text-sm text-slate-500">{{ 'OPAC.DIGITAL.NO_REVIEWS' | translate }}</p>
+              <p class="mt-2 text-sm text-gray-500">{{ 'OPAC.DIGITAL.NO_REVIEWS' | translate }}</p>
             }
 
-            <form class="mt-4 border border-slate-200 rounded-lg p-4 space-y-2" (ngSubmit)="submitReview(it)">
-              <div class="font-medium text-slate-900 text-sm">{{ 'OPAC.DIGITAL.WRITE_REVIEW' | translate }}</div>
+            <form class="mt-4 border border-gray-200 rounded-lg p-4 space-y-2" (ngSubmit)="submitReview(it)">
+              <div class="font-medium text-gray-900 text-sm">{{ 'OPAC.DIGITAL.WRITE_REVIEW' | translate }}</div>
               <!-- Ô bẫy chống bot: người thật không thấy, không điền. -->
               <input type="text" [(ngModel)]="reviewWebsite" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute -left-[9999px] w-px h-px opacity-0" />
               <div class="flex gap-2 flex-wrap">
                 <input type="text" [(ngModel)]="reviewDisplayName" name="displayName" [placeholder]="'OPAC.DIGITAL.YOUR_NAME' | translate"
-                       class="flex-1 min-w-[160px] px-3 py-1.5 border border-slate-300 rounded-lg text-sm" />
-                <select [(ngModel)]="reviewRating" name="rating" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+                       class="flex-1 min-w-[160px] px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                <select [(ngModel)]="reviewRating" name="rating" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                   <option [ngValue]="null">{{ 'OPAC.DIGITAL.NO_RATING' | translate }}</option>
                   @for (n of [1, 2, 3, 4, 5]; track n) { <option [ngValue]="n">{{ n }} ★</option> }
                 </select>
               </div>
               <textarea [(ngModel)]="reviewContent" name="content" rows="2" [placeholder]="'OPAC.DIGITAL.YOUR_REVIEW' | translate"
-                        class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm"></textarea>
+                        class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"></textarea>
               @if (reviewSubmitted()) { <p class="text-green-700 text-sm">{{ 'OPAC.DIGITAL.REVIEW_SUBMITTED' | translate }}</p> }
               @if (reviewError(); as err) { <p class="text-red-600 text-sm">{{ err }}</p> }
-              <button type="submit" [disabled]="reviewBusy()" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button type="submit" [disabled]="reviewBusy()" class="px-3 py-1.5 rounded-lg bg-main text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                 {{ 'OPAC.DIGITAL.SUBMIT_REVIEW' | translate }}</button>
             </form>
           </article>
 
           <aside class="space-y-4">
             @if (library.has('DIGITAL')) {
-              <div class="bg-white border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-                <div class="font-medium text-slate-900 mb-1">{{ 'OPAC.DIGITAL.BORROW_TITLE' | translate }}</div>
+              <div class="bg-white border border-gray-100 shadow-sm rounded-xl p-4 text-sm text-gray-600">
+                <div class="font-medium text-gray-900 mb-1">{{ 'OPAC.DIGITAL.BORROW_TITLE' | translate }}</div>
                 @if (!auth.loggedIn()) {
                   <p>{{ 'OPAC.DIGITAL.LOGIN_TO_BORROW' | translate }}</p>
-                  <button type="button" class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                  <button type="button" class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-main text-white text-sm font-medium hover:bg-blue-700"
                           (click)="auth.login(router.url)">
-                    <span class="material-icons text-[18px]">login</span>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
+                    <i class="fas fa-right-to-bracket text-[18px]"></i>{{ 'OPAC.NAVBAR.LOGIN' | translate }}</button>
                 } @else if (myLoan(); as loan) {
                   <p class="text-green-700">{{ 'OPAC.DIGITAL.LOAN_ACTIVE' | translate: { date: loan.expiresAt ? (loan.expiresAt | ldate) : ('OPAC.DIGITAL.NO_LIMIT' | translate) } }}</p>
                   @if (borrowError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="borrowBusy()" (click)="returnLoan(loan)"
-                          class="mt-3 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">
+                          class="mt-3 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50">
                     {{ 'OPAC.DIGITAL.RETURN' | translate }}</button>
                 } @else if (myReservation(); as resv) {
                   <p [class.text-green-700]="resv.status === ReservationStatus.Ready">
@@ -152,18 +152,18 @@ import { ReaderAuth } from '../core/reader-auth';
                   </p>
                   @if (borrowError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <button type="button" [disabled]="borrowBusy()" (click)="cancelReservation(resv)"
-                          class="mt-3 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-50">
+                          class="mt-3 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50">
                     {{ 'OPAC.DIGITAL.CANCEL_RESERVATION' | translate }}</button>
                 } @else {
                   <p>{{ 'OPAC.DIGITAL.BORROW_HINT' | translate }}</p>
                   @if (borrowError(); as err) { <p class="text-red-600 mt-2">{{ err }}</p> }
                   <div class="mt-3 flex gap-2 flex-wrap">
                     <button type="button" [disabled]="borrowBusy()" (click)="borrow(it)"
-                            class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                            class="px-3 py-2 rounded-lg bg-main text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                       {{ 'OPAC.DIGITAL.BORROW' | translate }}</button>
                     @if (showReserve()) {
                       <button type="button" [disabled]="borrowBusy()" (click)="reserve(it)"
-                              class="px-3 py-2 rounded-lg border border-blue-300 text-blue-700 text-sm hover:bg-blue-50 disabled:opacity-50">
+                              class="px-3 py-2 rounded-lg border border-main/40 text-main text-sm hover:bg-blue-50 disabled:opacity-50">
                         {{ 'OPAC.DIGITAL.RESERVE' | translate }}</button>
                     }
                   </div>

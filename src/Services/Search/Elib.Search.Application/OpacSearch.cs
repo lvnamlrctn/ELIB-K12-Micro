@@ -72,9 +72,9 @@ public sealed class OpacSearch(ISearchDb db)
     public const int MaxPageSize = 50;
     private const int FacetSize = 15;
 
-    private IQueryable<SearchBib> Visible => db.Set<SearchBib>().AsNoTracking().Where(b => !b.Deleted && b.Status == SearchBib.OpacVisible);
+    internal IQueryable<SearchBib> Visible => db.Set<SearchBib>().AsNoTracking().Where(b => !b.Deleted && b.Status == SearchBib.OpacVisible);
 
-    private IQueryable<SearchItem> Copies => db.Set<SearchItem>().AsNoTracking().Where(i => !i.Deleted && SearchItem.OpacStatuses.Contains(i.Status));
+    internal IQueryable<SearchItem> Copies => db.Set<SearchItem>().AsNoTracking().Where(i => !i.Deleted && SearchItem.OpacStatuses.Contains(i.Status));
 
     public async Task<OpacSearchResult> SearchAsync(OpacSearchRequest request, CancellationToken ct)
     {
@@ -127,7 +127,7 @@ public sealed class OpacSearch(ISearchDb db)
             .Take(Math.Clamp(size, 1, 20)).Select(Projection).ToListAsync(ct);
     }
 
-    private IQueryable<SearchBib> Filter(OpacSearchRequest r)
+    internal IQueryable<SearchBib> Filter(OpacSearchRequest r)
     {
         var query = Visible;
         query = Match(query, r.Q, b => b.SearchText);
@@ -164,7 +164,7 @@ public sealed class OpacSearch(ISearchDb db)
     /// Mỗi điều kiện của câu truy vấn phải có trong trường: từ thường = chuỗi con (như trước); cụm "..." = nguyên cụm, đứng riêng thành
     /// từ (không khớp giữa chừng một từ). Contains thường đứng trước để PostgreSQL dùng chỉ mục trigram, điều kiện biên từ lọc lại.
     /// </summary>
-    private static IQueryable<SearchBib> Match(IQueryable<SearchBib> query, string? input, Expression<Func<SearchBib, string>> field)
+    internal static IQueryable<T> Match<T>(IQueryable<T> query, string? input, Expression<Func<T, string>> field)
     {
         foreach (var term in TextFold.Terms(input))
         {
@@ -174,7 +174,7 @@ public sealed class OpacSearch(ISearchDb db)
                 ? v => v.Contains(text) && (" " + v + " ").Contains(padded)
                 : v => v.Contains(text);
             var body = new Rebind(test.Parameters[0], field.Body).Visit(test.Body);
-            query = query.Where(Expression.Lambda<Func<SearchBib, bool>>(body, field.Parameters));
+            query = query.Where(Expression.Lambda<Func<T, bool>>(body, field.Parameters));
         }
         return query;
     }
@@ -198,7 +198,7 @@ public sealed class OpacSearch(ISearchDb db)
     };
 
 #pragma warning disable CA1845 // biểu thức EF dịch sang SQL — không dùng span
-    private Expression<Func<SearchBib, OpacBib>> Projection => b => new OpacBib(
+    internal Expression<Func<SearchBib, OpacBib>> Projection => b => new OpacBib(
         b.BibPublicId, b.Mfn, b.Title, b.Author, b.Publisher, b.PublishYear, b.MaterialType, b.Language, b.Ddc, b.Isbns,
         b.Summary != null && b.Summary.Length > 300 ? b.Summary.Substring(0, 300) + "…" : b.Summary,
         Copies.Count(i => i.Mfn == b.Mfn),

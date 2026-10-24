@@ -10,12 +10,12 @@ import { ReaderAuth } from '../core/reader-auth';
   template: `
     <div class="max-w-md mx-auto text-center py-24 px-4">
       @if (error()) {
-        <span class="material-icons text-slate-300 text-6xl">error_outline</span>
-        <p class="mt-4 text-slate-700">{{ 'OPAC.MY_LIBRARY.LOGIN_FAILED' | translate }}</p>
-        <a routerLink="/tai-khoan" class="inline-block mt-6 text-blue-600 hover:underline">{{ 'OPAC.MY_LIBRARY.LOGIN_RETRY' | translate }}</a>
+        <i class="fas fa-circle-exclamation text-gray-300 text-6xl"></i>
+        <p class="mt-4 text-gray-700">{{ 'OPAC.MY_LIBRARY.LOGIN_FAILED' | translate }}</p>
+        <a routerLink="/tai-khoan" class="inline-block mt-6 text-main hover:underline">{{ 'OPAC.MY_LIBRARY.LOGIN_RETRY' | translate }}</a>
       } @else {
-        <span class="material-icons animate-spin text-blue-600 text-4xl">autorenew</span>
-        <p class="mt-4 text-slate-600">{{ 'OPAC.LOGIN.SIGNING_IN' | translate }}</p>
+        <i class="fas fa-circle-notch animate-spin text-main text-4xl"></i>
+        <p class="mt-4 text-gray-600">{{ 'OPAC.LOGIN.SIGNING_IN' | translate }}</p>
       }
     </div>
   `,

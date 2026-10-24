@@ -36,7 +36,14 @@ export class Library {
     return this.features()?.modules.includes(module) ?? false;
   }
 
-  async load(): Promise<void> {
+  private loading: Promise<void> | null = null;
+
+  /** Tải một lần (khung OPAC và các guard của route cùng gọi, chỉ lần đầu gọi API). */
+  load(): Promise<void> {
+    return (this.loading ??= this.fetch());
+  }
+
+  private async fetch(): Promise<void> {
     try {
       const [features, parameters] = await Promise.all([
         firstValueFrom(this.http.get<Features>('/api/opac/tenant/features')),

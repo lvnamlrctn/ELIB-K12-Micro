@@ -1,9 +1,19 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
+import { Library } from './core/library';
+
+/** Trang tìm gộp cần phân hệ Tra cứu; đơn vị chỉ có Thư viện số thì chuyển sang trang thư viện số. */
+const searchGuard = async () => {
+  const library = inject(Library);
+  const router = inject(Router);
+  await library.load();
+  return library.has('SEARCH') || router.createUrlTree(['/thu-vien-so']);
+};
 
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/home').then((m) => m.Home) },
   // Chức năng của các giai đoạn sau (thư viện số, tài khoản bạn đọc…).
-  { path: 'tim-kiem', loadComponent: () => import('./pages/search').then((m) => m.Search), title: 'OPAC.HOME.SERVICE_SEARCH' },
+  { path: 'tim-kiem', canActivate: [searchGuard], loadComponent: () => import('./pages/search').then((m) => m.Search), title: 'OPAC.HOME.SERVICE_SEARCH' },
   { path: 'lien-thu-vien', loadComponent: () => import('./pages/z3950').then((m) => m.Z3950), title: 'OPAC.Z3950.TITLE' },
   { path: 'tai-lieu/:publicId', loadComponent: () => import('./pages/bib-detail').then((m) => m.BibDetail) },
   { path: 'thu-vien-so', loadComponent: () => import('./pages/ebook-search').then((m) => m.EbookSearch), title: 'OPAC.HOME.SERVICE_DIGITAL' },

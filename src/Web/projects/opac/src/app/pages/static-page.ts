@@ -5,17 +5,20 @@ import { ActivatedRoute } from '@angular/router';
 import { Language } from '../core/i18n';
 import { Library } from '../core/library';
 import { PortalApi, PortalPageContent } from '../core/portal';
+import { Breadcrumb } from '../layout/breadcrumb';
 
 /** Trang tĩnh của cổng thông tin (/trang/{mã}) — nội dung HTML đã được server làm sạch; Angular lọc lại khi gán [innerHTML]. */
 @Component({
   selector: 'opac-static-page',
+  imports: [Breadcrumb],
   template: `
     <article class="max-w-3xl mx-auto px-4 py-8">
-      @if (loading()) { <div class="flex justify-center py-20"><span class="material-icons animate-spin text-blue-600 text-3xl">autorenew</span></div> }
+      <opac-breadcrumb [current]="page()?.title" />
+      @if (loading()) { <div class="flex justify-center py-20"><i class="fas fa-circle-notch animate-spin text-main text-3xl"></i></div> }
       @else if (page(); as p) {
-        <h1 class="text-3xl font-bold text-slate-900">{{ p.title }}</h1>
-        <div class="mt-5 portal-content text-slate-800 leading-relaxed" [innerHTML]="p.content ?? ''"></div>
-      } @else if (error()) { <p class="mt-10 text-center text-slate-500" role="alert">{{ error() }}</p> }
+        <h1 class="text-3xl font-bold text-gray-900">{{ p.title }}</h1>
+        <div class="mt-5 portal-content text-gray-800 leading-relaxed" [innerHTML]="p.content ?? ''"></div>
+      } @else if (error()) { <p class="mt-10 text-center text-gray-500" role="alert">{{ error() }}</p> }
     </article>
   `,
   styles: `
