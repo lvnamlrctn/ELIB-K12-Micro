@@ -24,6 +24,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddCrudDbContext<CirculationDbContext>(ServiceName);
         services.AddTenantReplica<CirculationDbContext>(ServiceName);
         services.AddTenantReplicaBootstrap<CirculationDbContext>(configuration);
+        services.AddMemoryCache();
+        services.AddScoped<ICirculationSettings, HttpCirculationSettings>();
         services.AddScoped<ITenantSeeder, CirculationTenantSeeder>();
 
         // Bản sao chưa có bạn đọc/bản sách/biểu ghi → hỏi service gốc qua /internal (service token).

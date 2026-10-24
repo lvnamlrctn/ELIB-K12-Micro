@@ -25,7 +25,7 @@ public sealed record CirculationReport(
 
 public sealed record CirculationReportFile(string FileName, byte[] Content);
 
-public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant, TimeProvider clock, IHttpContextAccessor http)
+public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant, TimeProvider clock, IHttpContextAccessor http, ICirculationSettings settings)
 {
     public const int RowCap = 5000;
     public const int TopN = 50;
@@ -164,10 +164,11 @@ public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant,
             .Take(RowCap).ToListAsync(ct);
         var names = await NamesAsync(list, ct);
         var places = await PlaceNamesAsync(ct);
+        var method = (await settings.GetAsync(ct)).OverdueMethod;
         var rows = list.Select((l, i) => (IReadOnlyList<string>)
         [
             Num(i + 1), l.Barcode, names.Title(l.Mfn), names.Reader(l.ReaderPublicId, l.CardNo), Day(l.LoanedAt), Day(l.DueAt),
-            l.CircPlaceId is { } p ? places.GetValueOrDefault(p, "") : "", .. overdueOnly ? [Num(l.OverdueDays(now))] : Array.Empty<string>(),
+            l.CircPlaceId is { } p ? places.GetValueOrDefault(p, "") : "", .. overdueOnly ? [Num(l.OverdueDays(now, method))] : Array.Empty<string>(),
         ]).ToList();
         string[] headers = ["STT", "Đăng ký cá biệt", "Nhan đề", "Người mượn", "Ngày mượn", "Hạn trả", "Điểm lưu thông"];
         return (overdueOnly ? [.. headers, "Số ngày quá hạn"] : headers, rows, null);
@@ -181,10 +182,11 @@ public sealed class CirculationReports(ICrudDbContext db, ITenantContext tenant,
         var list = await query.OrderByDescending(l => l.ReturnedAt).ThenByDescending(l => l.Id).Take(lateOnly ? RowCap * 4 : RowCap).ToListAsync(ct);
         if (lateOnly) list = [.. list.Where(l => l.OverdueDays(l.ReturnedAt!.Value) > 0).Take(RowCap)];
         var names = await NamesAsync(list, ct);
+        var method = (await settings.GetAsync(ct)).OverdueMethod;
         var rows = list.Select((l, i) => (IReadOnlyList<string>)
         [
             Num(i + 1), l.Barcode, names.Title(l.Mfn), names.Reader(l.ReaderPublicId, l.CardNo), Day(l.LoanedAt),
-            .. lateOnly ? [Day(l.DueAt), Day(l.ReturnedAt!.Value), Num(l.OverdueDays(l.ReturnedAt.Value))] : new[] { Day(l.ReturnedAt!.Value) },
+            .. lateOnly ? [Day(l.DueAt), Day(l.ReturnedAt!.Value), Num(l.OverdueDays(l.ReturnedAt.Value, method))] : new[] { Day(l.ReturnedAt!.Value) },
         ]).ToList();
         return (lateOnly
             ? ["STT", "Đăng ký cá biệt", "Nhan đề", "Người mượn", "Ngày mượn", "Hạn trả", "Ngày trả", "Số ngày trễ"]

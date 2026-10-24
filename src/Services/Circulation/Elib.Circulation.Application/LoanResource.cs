@@ -94,7 +94,7 @@ public static class LoanApprovals
 /// </summary>
 public sealed class LoanResource(
     ICrudDbContext db, Replicas replicas, LoanPublisher publisher, HoldAllocator holds, HoldResource holdList, ApprovalService approvals, ICurrentActor actor,
-    TimeProvider clock, CrudAuditContext? auditContext = null)
+    TimeProvider clock, ICirculationSettings settings, CrudAuditContext? auditContext = null)
     : CrudResource<LoanResource, Loan, LoanSearch, LoanNoteRequest, LoanDto>(db)
 {
     public const int MaxCheckout = 200;
@@ -264,10 +264,11 @@ public sealed class LoanResource(
         await PublishAsync(loan, ct);
         var item = await Db.Set<ItemReplica>().FirstOrDefaultAsync(i => i.ItemPublicId == loan.ItemPublicId, ct);
         var next = item is null ? null : await holds.AssignNextAsync(item, ct, returningLoan: loan.PublicId);
-        await Record(loan, CrudChange.Updated, $"Trả ĐKCB {loan.Barcode} — thẻ {loan.CardNo}" + (loan.OverdueDays(now) is > 0 and var d ? $", quá hạn {d} ngày" : "")
+        var method = (await settings.GetAsync(ct)).OverdueMethod;
+        await Record(loan, CrudChange.Updated, $"Trả ĐKCB {loan.Barcode} — thẻ {loan.CardNo}" + (loan.OverdueDays(now, method) is > 0 and var d ? $", quá hạn {d} ngày" : "")
             + (next is null ? "" : $"; giữ cho đặt mượn thẻ {next.CardNo}"), ct);
         await Db.SaveChangesAsync(ct);
-        return new ReturnResult((await ToDtosAsync([loan], ct))[0], loan.OverdueDays(now), next is null ? null : await holdList.GetAsync(next.Id, ct));
+        return new ReturnResult((await ToDtosAsync([loan], ct))[0], loan.OverdueDays(now, method), next is null ? null : await holdList.GetAsync(next.Id, ct));
     }
 
     /// <summary>
@@ -288,7 +289,7 @@ public sealed class LoanResource(
         var oldDue = loan.DueAt;
         var now = clock.GetUtcNow();
         long? bibType = policy.BibTypeRules.Count == 0 ? null : (await replicas.BibTypesAsync([loan.Mfn], ct)).GetValueOrDefault(loan.Mfn);
-        loan.Renew(now, policy, bibType);
+        loan.Renew(now, policy, bibType, (await settings.GetAsync(ct)).RenewFromToday);
         Db.Set<LoanRenewal>().Add(new LoanRenewal
         {
             LoanPublicId = loan.PublicId, ReaderPublicId = loan.ReaderPublicId, CircPlaceId = loan.CircPlaceId, RenewedAt = now,

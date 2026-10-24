@@ -2,10 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import { Preferences } from '../../core/preferences';
 import { ReportMeta, vnDateLine } from '../../core/report-meta';
-import { Session } from '../../core/session';
-import { HEADER_PREF } from '../holdings/labels';
 
 /** sessionStorage: bản in báo cáo — màn báo cáo ghi trước khi mở trang in (dùng chung mọi báo cáo, không riêng bổ sung). */
 export const ACQ_PRINT_KEY = 'elib.print.acq-report';
@@ -35,8 +32,6 @@ export function openReportPrint(router: Router, job: AcqPrintJob): boolean {
   void router.navigateByUrl('/print/report');
   return true;
 }
-
-interface Header { parent: string; library: string; }
 
 /**
  * In báo cáo bổ sung theo mẫu giấy (ELIB-LRC: AcquisitionListPrint, StoreAllocationPrint, AccessionRegisterPrint, NewBookCatalog):
@@ -81,8 +76,8 @@ interface Header { parent: string; library: string; }
   template: `
     <div class="no-print sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-wrap">
       <a [routerLink]="job()?.backUrl ?? '/ab-reports'" class="btn-secondary !py-1.5 !px-3"><span class="material-icons text-[18px]">arrow_back</span> {{ job()?.backLabel ?? ('ACQ_REPORT.TITLE' | translate) }}</a>
-      <input class="input !w-64" [ngModel]="header().parent" (ngModelChange)="setHeader({ parent: $event })" [placeholder]="'LABELS_PAGE.HEADER_PARENT' | translate" />
-      <input class="input !w-64" [ngModel]="header().library" (ngModelChange)="setHeader({ library: $event })" [placeholder]="'LABELS_PAGE.HEADER_LIBRARY' | translate" />
+      <input class="input !w-64" [ngModel]="meta.parent()" (ngModelChange)="meta.setParent($event)" [placeholder]="'LABELS_PAGE.HEADER_PARENT' | translate" />
+      <input class="input !w-64" [ngModel]="meta.library()" (ngModelChange)="meta.setLibrary($event)" [placeholder]="'LABELS_PAGE.HEADER_LIBRARY' | translate" />
       <input class="input !w-44" [ngModel]="meta.place()" (ngModelChange)="meta.setPlace($event)" [placeholder]="'REPORT_PRINT.PLACE' | translate" [attr.aria-label]="'REPORT_PRINT.PLACE' | translate" />
       <span class="flex-1"></span>
       <button type="button" class="btn-primary" [disabled]="!job()" (click)="print()"><span class="material-icons text-[18px]">print</span> {{ 'ACQ_REPORT.PRINT' | translate }}</button>
@@ -91,8 +86,8 @@ interface Header { parent: string; library: string; }
       <div class="sheet">
         <div class="head">
           <div class="org">
-            @if (header().parent) { <div class="parent">{{ header().parent }}</div> }
-            <div class="lib">{{ header().library }}</div>
+            @if (meta.parent()) { <div class="parent">{{ meta.parent() }}</div> }
+            <div class="lib">{{ meta.library() }}</div>
           </div>
           <div></div>
         </div>
@@ -152,30 +147,20 @@ interface Header { parent: string; library: string; }
   `,
 })
 export class AcquisitionReportPrint implements OnInit {
-  private readonly prefs = inject(Preferences);
-  private readonly session = inject(Session);
 
   protected readonly maxRows = ACQ_PRINT_MAX_ROWS;
   protected readonly job = signal<AcqPrintJob | null>(null);
-  protected readonly header = signal<Header>({ parent: '', library: '' });
   protected readonly meta = inject(ReportMeta);
   protected readonly dateLine = vnDateLine();
 
   ngOnInit(): void {
-    this.header.set({ parent: '', library: this.session.features()?.name ?? '' });
-    this.prefs.watch<Header>(HEADER_PREF, (h) => this.header.set({ parent: h?.parent ?? '', library: h?.library ?? '' }));
+    this.meta.resetEdits();
     try {
       const job = JSON.parse(sessionStorage.getItem(ACQ_PRINT_KEY) ?? 'null') as AcqPrintJob | null;
       if (job && Array.isArray(job.rows)) this.job.set(job);
     } catch {
       /* chưa có báo cáo để in — hiện trang trống */
     }
-  }
-
-  protected setHeader(change: Partial<Header>): void {
-    this.header.update((h) => ({ ...h, ...change }));
-    this.prefs.set(HEADER_PREF, this.header());
-    this.meta.parent.set(this.header().parent); // Excel xuất sau đó gửi đúng cơ quan chủ quản vừa sửa
   }
 
   protected print(): void {

@@ -4,9 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { Barcode } from '../../../../../shared/barcode';
 import { Api, ITEM_STATUSES, ItemLabel, ItemLabelRequest, Store, errorMessage } from '../../core/api';
-import { Preferences } from '../../core/preferences';
 import { ReportMeta } from '../../core/report-meta';
-import { Session } from '../../core/session';
 import { ToastrService } from '../../shared/toastr';
 
 /** sessionStorage: nhãn cần in — màn chọn nhãn ghi trước khi mở trang in. */
@@ -147,8 +145,6 @@ export class Labels implements OnInit {
 
   private readonly api = inject(Api);
   private readonly router = inject(Router);
-  private readonly session = inject(Session);
-  private readonly prefs = inject(Preferences);
   private readonly reportMeta = inject(ReportMeta);
   private readonly toastr = inject(ToastrService);
 
@@ -163,15 +159,15 @@ export class Labels implements OnInit {
   protected readonly labels = signal<ItemLabel[]>([]);
   protected readonly loading = signal(false);
   protected readonly loaded = signal(false);
-  protected readonly header = signal<LabelHeader>({ parent: '', library: '' });
+  /** Cơ quan chủ quản / tên thư viện điền sẵn từ tham số của đơn vị (sửa tại chỗ chỉ áp dụng cho phiên này). */
+  protected readonly header = computed<LabelHeader>(() => ({ parent: this.reportMeta.parent(), library: this.reportMeta.library() }));
   protected readonly pages = computed(() => Math.ceil((this.labels().length + this.skip) / LABELS_PER_PAGE));
   protected request: ItemLabelRequest = { barcodeFrom: '', barcodeTo: '', mfn: null, storeId: null, itemStatus: null };
   protected list = '';
   protected skip = 0;
 
   async ngOnInit(): Promise<void> {
-    this.header.set({ parent: '', library: this.session.features()?.name ?? '' });
-    this.prefs.watch<LabelHeader>(HEADER_PREF, (h) => this.header.set({ parent: h?.parent ?? '', library: h?.library ?? '' }));
+    this.reportMeta.resetEdits();
     const handed = this.takeHandedBarcodes();
     const mfn = Number(this.mfn());
     if (handed.length) {
@@ -200,9 +196,8 @@ export class Labels implements OnInit {
   }
 
   protected setHeader(change: Partial<LabelHeader>): void {
-    this.header.update((h) => ({ ...h, ...change }));
-    this.prefs.set(HEADER_PREF, this.header());
-    this.reportMeta.parent.set(this.header().parent);
+    if (change.parent !== undefined) this.reportMeta.setParent(change.parent);
+    if (change.library !== undefined) this.reportMeta.setLibrary(change.library);
   }
 
   protected async load(): Promise<void> {

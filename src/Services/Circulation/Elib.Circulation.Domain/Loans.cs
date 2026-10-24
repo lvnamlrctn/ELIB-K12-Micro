@@ -151,7 +151,7 @@ public sealed class Loan : TenantEntity
     /// Gia hạn (monolith: Renew). Mặc định (C_RENEW_DATE = 0): hạn mới = hạn cũ + số ngày gia hạn; lượt đã quá hạn thì tính từ hôm
     /// nay để không gia hạn xong vẫn quá hạn. Chính sách "gia hạn tính từ hôm nay" (C_RENEW_DATE = 1): hạn mới = hôm nay + số ngày.
     /// </summary>
-    public void Renew(DateTimeOffset now, LoanPolicy policy, long? bibTypeId = null)
+    public void Renew(DateTimeOffset now, LoanPolicy policy, long? bibTypeId = null, bool renewFromToday = false)
     {
         ArgumentNullException.ThrowIfNull(policy);
         if (!IsOpen) throw new BusinessRuleException("LOAN_ALREADY_RETURNED", $"ĐKCB {Barcode} đã trả, không gia hạn được.");
@@ -159,7 +159,7 @@ public sealed class Loan : TenantEntity
             throw new BusinessRuleException("RENEW_LIMIT", max == 0
                 ? "Chính sách lưu thông không cho gia hạn."
                 : $"Bạn đọc đã gia hạn đủ số lần cho phép ({max} lần).");
-        DueAt = (DueAt > now && !policy.RenewFromToday ? DueAt : now).AddDays(policy.RenewDays);
+        DueAt = (DueAt > now && !(policy.RenewFromToday || renewFromToday) ? DueAt : now).AddDays(policy.RenewDays);
         RenewCount++;
         Version++;
     }
@@ -174,13 +174,33 @@ public sealed class Loan : TenantEntity
     public bool IsOverdue(DateTimeOffset now) => IsOpen && DueAt < now;
 
     /// <summary>Số ngày quá hạn tính theo ngày lịch Việt Nam (trả trong ngày hết hạn = không quá hạn).</summary>
-    public int OverdueDays(DateTimeOffset now) => Math.Max(0, LocalDate(ReturnedAt ?? now).DayNumber - LocalDate(DueAt).DayNumber);
+    public int OverdueDays(DateTimeOffset now, OverdueMethod method = OverdueMethod.Calendar)
+    {
+        var due = LocalDate(DueAt);
+        var end = LocalDate(ReturnedAt ?? now);
+        if (method == OverdueMethod.Calendar) return Math.Max(0, end.DayNumber - due.DayNumber);
+        var days = 0;
+        for (var d = due.AddDays(1); d <= end; d = d.AddDays(1))
+            if (!IsSkipped(d.DayOfWeek, method)) days++;
+        return days;
+    }
+
+    private static bool IsSkipped(DayOfWeek day, OverdueMethod method) =>
+        day == DayOfWeek.Sunday || (method == OverdueMethod.SkipWeekends && day == DayOfWeek.Saturday);
 
     public static DateOnly LocalDate(DateTimeOffset at) => DateOnly.FromDateTime(at.UtcDateTime.AddHours(7));
 
     /// <summary>0 giờ ngày <paramref name="date"/> giờ Việt Nam, biểu diễn ở UTC (Npgsql chỉ ghi/so sánh timestamptz offset 0).</summary>
     public static DateTimeOffset VietnamStart(DateOnly date) =>
         new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
+}
+
+/// <summary>Cách đếm số ngày quá hạn (tham số đơn vị OVERDUE_METHOD): 0 mọi ngày lịch; 1 bỏ Thứ bảy + Chủ nhật; 2 bỏ Chủ nhật.</summary>
+public enum OverdueMethod
+{
+    Calendar = 0,
+    SkipWeekends = 1,
+    SkipSundays = 2,
 }
 
 /// <summary>Bản sao bạn đọc từ patron (ReaderChanged) — docs 04: PatronReplica.</summary>

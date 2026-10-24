@@ -135,16 +135,7 @@ public sealed class TenantDefaults(ITenantDb db)
 {
     public async Task<int> SeedAsync(long tenantId, CancellationToken ct)
     {
-        var added = 0;
-
-        var codes = await db.SystemParameters.IgnoreQueryFilters().Where(p => p.TenantId == tenantId).Select(p => p.Code).ToListAsync(ct);
-        foreach (var d in ParameterCatalog.All.Where(d => !codes.Contains(d.Code)))
-        {
-            var parameter = SystemParameter.FromDefinition(d);
-            parameter.TenantId = tenantId;
-            db.SystemParameters.Add(parameter);
-            added++;
-        }
+        var added = await SeedParametersAsync(tenantId, ct);
 
         var currencies = await db.Currencies.IgnoreQueryFilters().Where(c => c.TenantId == tenantId).Select(c => c.Code).ToListAsync(ct);
         foreach (var (code, name, rate) in ReferenceDefaults.Currencies.Where(c => !currencies.Contains(c.Code)))
@@ -159,6 +150,21 @@ public sealed class TenantDefaults(ITenantDb db)
         added += await SeedNamesAsync(db.Ethnicities, tenantId, ReferenceDefaults.Ethnicities, ct);
         added += await SeedNamesAsync(db.Degrees, tenantId, ReferenceDefaults.Degrees, ct);
         added += await SeedNamesAsync(db.Positions, tenantId, ReferenceDefaults.Positions, ct);
+        return added;
+    }
+
+    /// <summary>Chỉ bổ sung tham số còn thiếu trong <see cref="ParameterCatalog"/> (kể cả dòng đã xoá mềm — không chép lại).</summary>
+    public async Task<int> SeedParametersAsync(long tenantId, CancellationToken ct)
+    {
+        var added = 0;
+        var codes = await db.SystemParameters.IgnoreQueryFilters().Where(p => p.TenantId == tenantId).Select(p => p.Code).ToListAsync(ct);
+        foreach (var d in ParameterCatalog.All.Where(d => !codes.Contains(d.Code)))
+        {
+            var parameter = SystemParameter.FromDefinition(d);
+            parameter.TenantId = tenantId;
+            db.SystemParameters.Add(parameter);
+            added++;
+        }
         return added;
     }
 

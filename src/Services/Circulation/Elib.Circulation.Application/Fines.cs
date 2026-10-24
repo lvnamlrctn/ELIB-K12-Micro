@@ -192,7 +192,7 @@ public static class FineApprovals
 /// </summary>
 public sealed class FineTicketResource(
     ICrudDbContext db, Replicas replicas, LoanPublisher loans, FineReasonResource fineReasons, ICurrentActor actor, TimeProvider clock,
-    ApprovalService approvals, IPublishEndpoint publisher, ITenantContext tenantContext, CrudAuditContext? auditContext = null)
+    ApprovalService approvals, IPublishEndpoint publisher, ITenantContext tenantContext, ICirculationSettings settings, CrudAuditContext? auditContext = null)
     : CrudResource<FineTicketResource, FineTicket, FineTicketSearch, FineTicketCreateRequest, FineTicketDto>(db)
 {
     public const int MaxLines = 200;
@@ -344,11 +344,13 @@ public sealed class FineTicketResource(
             ?? throw new BusinessRuleException("FINE_REASON_MISSING", "Thiếu lý do phạt \"Quá hạn\" (QUAHAN) — thêm trong danh mục lý do phạt.");
         var lost = reasons.FirstOrDefault(r => r.Code == FineReason.LostCode) ?? reasons.FirstOrDefault(r => r.ItemStatus == Loan.LostStatus);
         var policies = await Db.Set<LoanPolicy>().AsNoTracking().ToListAsync(ct);
+        var method = (await settings.GetAsync(ct)).OverdueMethod;
         foreach (var loan in candidates)
         {
             if (loan.IsOverdue(now))
             {
-                var days = loan.OverdueDays(now);
+                var days = loan.OverdueDays(now, method);
+                if (days == 0) continue; // quá hạn theo lịch nhưng toàn ngày được miễn đếm (vd. cuối tuần) — chưa phạt
                 var rate = LoanPolicyResource.Resolve(policies, reader.ReaderTypeId, request.CircPlaceId ?? loan.CircPlaceId).FinePerDay;
                 ticket.AddLine(overdue, days * rate, loan, null, null, days);
             }
@@ -733,7 +735,7 @@ public sealed class FineTicketResource(
         var loan = await Db.Set<Loan>().Where(x => x.ReaderPublicId == ticket.ReaderPublicId && x.ReturnedAt == null && x.Barcode.ToUpper() == key)
             .FirstOrDefaultAsync(ct);
 #pragma warning restore CA1862, CA1304, CA1311
-        if (loan is not null) return ticket.AddLine(reason, change.Amount, loan, null, null, loan.OverdueDays(clock.GetUtcNow()));
+        if (loan is not null) return ticket.AddLine(reason, change.Amount, loan, null, null, loan.OverdueDays(clock.GetUtcNow(), (await settings.GetAsync(ct)).OverdueMethod));
         var item = await replicas.ItemAsync(barcode, ct) ?? throw new BusinessRuleException("ITEM_NOT_FOUND", $"Không tìm thấy ĐKCB \"{barcode}\".");
         return ticket.AddLine(reason, change.Amount, null, item.Barcode, item.Mfn, 0);
     }

@@ -266,6 +266,12 @@ public sealed class CatalogApiTests : IClassFixture<TenantApiFactory>, IAsyncLif
         Assert.Contains("bi-mat", identityParams["READER_AUTH_CONFIG"], StringComparison.Ordinal);
         Assert.Equal("1", identityParams["READER_LOGIN_OTP_ENABLED"]);
         Assert.DoesNotContain("SLOGAN", identityParams.Keys);
+
+        // Tham số lưu thông (cách gia hạn, cách đếm ngày quá hạn) có mặc định; tên cơ quan chủ quản/địa danh in báo cáo là tham số công khai.
+        var circulation = await Read<Dictionary<string, string?>>(await service.GetAsync(U($"/internal/tenants/{tenant.Id}/parameters?service=circulation")));
+        Assert.Equal(("0", "0"), (circulation["C_RENEW_DATE"], circulation["OVERDUE_METHOD"]));
+        var header = await Read<IReadOnlyList<PublicParameterDto>>(await opac.GetAsync(U("/api/public/parameters?codes=PARENTLIBRARY,GEOGRAPHIC")));
+        Assert.Equal(["GEOGRAPHIC", "PARENTLIBRARY"], header.Select(p => p.Code).Order());
         Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(U($"/internal/tenants/{tenant.Id}/parameters"))).StatusCode);
     }
 

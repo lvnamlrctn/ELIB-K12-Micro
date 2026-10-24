@@ -32,6 +32,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<BrandingOptions>(configuration.GetSection(BrandingOptions.SectionName));
         services.AddScoped<IModuleLicenseSource, TenantLicenseSource>();
         services.AddHostedService<ProvisioningSweeper>();
+        services.AddHostedService<ParameterBackfillRunner>();
         services.AddHealthChecks().AddDbContextCheck<TenantDbContext>("db", tags: [ElibHealthTags.Ready]);
         return services;
     }

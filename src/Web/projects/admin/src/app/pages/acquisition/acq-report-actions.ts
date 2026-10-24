@@ -4,9 +4,9 @@ import { TranslateService } from '@ngx-translate/core';
 import {
   AcqAccessionRow, AcqLabelQuantityRow, AcqListPage, AcqLookupRow, AcqNewBookRow, AcqReportName, AcqReportRequest, Api, ItemLabel, saveFile,
 } from '../../core/api';
-import { Preferences } from '../../core/preferences';
+import { ReportMeta } from '../../core/report-meta';
 import { ToastrService } from '../../shared/toastr';
-import { HEADER_PREF, LABEL_BARCODES_KEY, LabelJob, PRINT_KEY as LABEL_PRINT_KEY } from '../holdings/labels';
+import { LABEL_BARCODES_KEY, LabelJob, PRINT_KEY as LABEL_PRINT_KEY } from '../holdings/labels';
 import { ACQ_PRINT_KEY, ACQ_PRINT_MAX_ROWS, AcqPrintJob, AcqPrintSection } from './report-print';
 
 export type AcqReportKind = 'list' | 'lookup' | 'allocation' | 'register' | 'newbooks';
@@ -35,7 +35,7 @@ export class AcqReportActions {
   private readonly router = inject(Router);
   private readonly toastr = inject(ToastrService);
   private readonly i18n = inject(TranslateService);
-  private readonly prefs = inject(Preferences);
+  private readonly meta = inject(ReportMeta);
 
   async export(kind: AcqReportKind, body: AcqReportRequest): Promise<void> {
     const r = ACQ_REPORTS.find((x) => x.kind === kind)!;
@@ -92,9 +92,7 @@ export class AcqReportActions {
       return;
     }
     if (labels.length >= MAX_CLASS_LABELS) this.toastr.warning('ACQ_REPORT.LABELS_TRUNCATED', { max: MAX_CLASS_LABELS });
-    let header = { parent: '', library: '' };
-    this.prefs.watch<{ parent: string; library: string }>(HEADER_PREF, (h) => { header = { parent: h?.parent ?? '', library: h?.library ?? '' }; });
-    const job: LabelJob = { kind: 'spine', labels, header, skip: 0 };
+    const job: LabelJob = { kind: 'spine', labels, header: { parent: this.meta.parent(), library: this.meta.library() }, skip: 0 };
     try {
       sessionStorage.setItem(LABEL_PRINT_KEY, JSON.stringify(job));
     } catch {

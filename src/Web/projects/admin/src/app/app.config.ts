@@ -8,7 +8,7 @@ import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
-import { reportMetaInterceptor } from './core/report-meta';
+import { ReportMeta, reportMetaInterceptor } from './core/report-meta';
 import { Language, languageInterceptor } from './core/i18n';
 import { TranslatedTitleStrategy } from './core/title';
 
@@ -24,6 +24,8 @@ export const appConfig: ApplicationConfig = {
     // Từ điển public/i18n/{vi,en}.json — khoá theo ELIB-LRC (MENU.*, COMMON.*, READER.*…); thiếu khoá ở en thì dùng vi.
     provideTranslateService({ fallbackLang: 'vi', loader: provideTranslateHttpLoader({ prefix: 'i18n/', suffix: '.json' }) }),
     provideAppInitializer(() => inject(Language).init()),
+    // Dựng sớm để tham số đầu/cuối báo cáo đã tải khi bấm xuất Excel đầu tiên.
+    provideAppInitializer(() => void inject(ReportMeta)),
     { provide: TitleStrategy, useExisting: TranslatedTitleStrategy },
   ],
 };

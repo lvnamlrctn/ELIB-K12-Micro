@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Persistence;
+using Elib.BuildingBlocks.Tenancy;
 using Elib.BuildingBlocks.Testing;
 using Elib.Contracts.Events.Catalog;
 using Elib.Contracts.Events.Holdings;
@@ -41,6 +42,9 @@ public sealed class CirculationApiFactory : WebApplicationFactory<Program>
     /// <summary>Đồng hồ của service — test tua tới để có lượt quá hạn.</summary>
     public TestClock Clock { get; } = new(DateTimeOffset.UtcNow);
 
+    /// <summary>Tham số lưu thông theo đơn vị (đơn vị chưa đặt = mặc định).</summary>
+    public ConcurrentDictionary<long, CirculationSettings> Settings { get; } = new();
+
     public IEnumerable<T> PublishedOf<T>() => Published.OfType<T>();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -70,6 +74,8 @@ public sealed class CirculationApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IModuleLicenseSource>(Licenses);
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+            services.RemoveAll<ICirculationSettings>();
+            services.AddScoped<ICirculationSettings>(sp => new FakeCirculationSettings(Settings, sp.GetRequiredService<ITenantContext>()));
             services.RemoveAll<IReplicaSources>();
             services.AddSingleton<IReplicaSources>(Sources);
             services.RemoveAll<IReaderPasswordChecker>();
@@ -189,4 +195,10 @@ public sealed class FakeReaderPasswords : IReaderPasswordChecker
         Task.FromResult(Passwords.TryGetValue((tenantId, cardNo.Trim().ToUpperInvariant()), out var expected)
             ? expected == password ? "valid" : "invalid"
             : "no-patron");
+}
+
+internal sealed class FakeCirculationSettings(ConcurrentDictionary<long, CirculationSettings> settings, ITenantContext tenant) : ICirculationSettings
+{
+    public Task<CirculationSettings> GetAsync(CancellationToken ct) =>
+        Task.FromResult(settings.GetValueOrDefault(tenant.RequireTenantId(), CirculationSettings.Default));
 }
