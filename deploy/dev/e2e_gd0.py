@@ -1855,7 +1855,7 @@ def serials_steps(tb, token, tag, book):
 
     def call(method, path, body=None):
         st, _, text = tb.request(method, S + path, token=token, json_body=body)
-        return st, text, (json.loads(text) if text[:1] in "{[" else {})
+        return st, text, (json.loads(text) if text[:1] in ("{", "[") else {})
 
     s, text, freqs = call("POST", "/frequencies/SearchAll", {})
     freqs = freqs if isinstance(freqs, list) else freqs.get("items", [])
