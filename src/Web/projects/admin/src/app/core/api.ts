@@ -32,6 +32,10 @@ export interface ItemPlatformStats {
   tenantId: number; titles: number; copies: number; added: number; available: number; unshelved: number; onLoan: number; outOfStore: number;
   lost: number; liquidated: number;
 }
+export interface DigitalPlatformStats {
+  tenantId: number; titles: number; published: number; files: number; storageBytes: number; activeLoans: number; pendingReservations: number;
+  added: number; views: number; downloads: number; readSessions: number; readers: number; loans: number; reservations: number;
+}
 export interface Tenant extends TenantSummary {
   timeZone: string; parentOrgId: number | null; version: number;
   provisioningStartedAt: string | null; provisioningError: string | null;
@@ -548,6 +552,8 @@ export interface EbookItem {
   createdAt: string; updatedAt: string | null;
   abstract: string | null; description: string | null; journalName: string | null; publishDay: number | null; publishMonth: number | null; publishYear: number | null;
   authors: EbookPerson[]; advisors: EbookPerson[]; identifiers: EbookIdentifier[]; totalFile: number; share: number | null; show: number | null; indexContent: number | null;
+  /** Bản sao tài liệu dùng chung từ đơn vị SHARED: chỉ đọc; đơn vị chỉ ẩn/hiện được (hiddenByTenant). */
+  isReplica: boolean; hiddenByTenant: boolean;
 }
 export interface EbookPerson { last: string | null; first: string | null; title?: string | null; }
 export interface EbookIdentifier { type: string; value: string; }
@@ -998,6 +1004,7 @@ export class Api {
   platformReaderStats(body: PlatformStatsRequest) { return this.post<ReaderPlatformStats[]>('/api/system/patron/stats/readers', body); }
   platformCirculationStats(body: PlatformStatsRequest) { return this.post<CirculationPlatformStats>('/api/system/circulation/stats/circulation', body); }
   platformItemStats(body: PlatformStatsRequest) { return this.post<ItemPlatformStats[]>('/api/system/holdings/stats/items', body); }
+  platformDigitalStats(body: PlatformStatsRequest) { return this.post<DigitalPlatformStats[]>('/api/system/digital/stats/digital', body); }
   async tenantCount(status?: TenantState) {
     return (await this.get<PagedResult<TenantSummary>>('/api/system/tenant/tenants', { status, page: 1, pageSize: 1 })).total;
   }

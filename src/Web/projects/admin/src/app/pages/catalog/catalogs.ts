@@ -10,6 +10,7 @@ function dictionary(resource: string, perm: string, title: string, withDescripti
       ...(withDescription ? [{ key: 'description', label: 'DICTIONARY.DESCRIPTION' }] : []),
       { key: 'useCount', label: 'DICTIONARY.USE_COUNT', type: 'number', width: '120px' },
       { key: 'autoAdded', label: 'DICTIONARY.AUTO_ADDED', type: 'bool', width: '130px' },
+      { key: 'isReplica', label: 'COMMON.SHARED', type: 'bool', width: '110px' },
     ],
     fields: [
       { key: 'value', label: 'DICTIONARY.VALUE', type: 'text', required: true },
@@ -31,7 +32,7 @@ export const DIC_CLASSES = dictionary('dic-classes', 'DIC_CLASSES', 'DICTIONARY.
 export const ISBD_CONFIGS: CrudConfig = {
   title: 'ISBD_CONFIG.TITLE', resource: 'isbd-configs', service: 'catalog', perm: 'CONFIG_ISBD',
   searchLabel: 'ISBD_CONFIG.SEARCH_LABEL', searchPlaceholder: '',
-  columns: [{ key: 'bibTypeId', label: 'ISBD_CONFIG.BIB_TYPE', type: 'lookup' }],
+  columns: [{ key: 'bibTypeId', label: 'ISBD_CONFIG.BIB_TYPE', type: 'lookup' }, { key: 'isReplica', label: 'COMMON.SHARED', type: 'bool', width: '110px' }],
   fields: [
     {
       key: 'bibTypeId', label: 'ISBD_CONFIG.BIB_TYPE', type: 'select', required: true,

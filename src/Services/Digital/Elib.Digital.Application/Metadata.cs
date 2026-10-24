@@ -146,6 +146,7 @@ public sealed class EbookMetadata(ICrudDbContext db, TimeProvider clock, EbookSt
         ArgumentNullException.ThrowIfNull(save);
         if (save.Values.Count > MaxValues) throw new BusinessRuleException("METADATA_TOO_MANY", $"Tối đa {MaxValues} giá trị metadata cho một tài liệu.");
         var item = await db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId, ct) ?? throw new NotFoundException("Tài liệu số", itemPublicId);
+        if (item.IsReplica) throw EbookItem.ReadOnly(item.Title);
 
         var fieldIds = save.Values.Select(v => v.FieldPublicId).Distinct().ToList();
         var fields = await db.Set<MetadataField>().Where(f => fieldIds.Contains(f.PublicId)).ToDictionaryAsync(f => f.PublicId, ct);

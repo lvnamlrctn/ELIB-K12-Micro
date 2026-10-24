@@ -96,6 +96,8 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
             e.OwnsMany(x => x.Advisors, b => b.ToJson());
             e.OwnsMany(x => x.Identifiers, b => b.ToJson());
             e.HasIndex(x => new { x.TenantId, x.PublishYear });
+            // Bản sao tài liệu dùng chung: mỗi tài liệu gốc (đơn vị SHARED) có đúng một bản sao ở mỗi đơn vị.
+            e.HasIndex(x => new { x.TenantId, x.SourcePublicId }).IsUnique().HasFilter("source_public_id IS NOT NULL AND is_deleted = false");
             e.Property(x => x.Keyword).HasMaxLength(1000);
             e.Property(x => x.OtherTitle).HasMaxLength(1000);
             e.Property(x => x.Page).HasMaxLength(50);
@@ -112,6 +114,8 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
         modelBuilder.Entity<EbookFile>(e =>
         {
             e.ToTable("ebook_files");
+            e.Ignore(x => x.IsReplica);
+            e.HasIndex(x => new { x.TenantId, x.SourcePublicId }).IsUnique().HasFilter("source_public_id IS NOT NULL AND is_deleted = false");
             e.Property(x => x.Type).HasMaxLength(50);
             e.Property(x => x.FileType).HasMaxLength(50);
             e.Property(x => x.FileExt).HasMaxLength(20);
@@ -242,6 +246,7 @@ public sealed class DigitalDbContext(DbContextOptions<DigitalDbContext> options,
         });
 
         modelBuilder.AddTenantReplica();
+        modelBuilder.AddSharedSync();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
     }

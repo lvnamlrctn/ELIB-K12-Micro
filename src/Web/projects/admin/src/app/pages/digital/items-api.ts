@@ -13,6 +13,9 @@ export interface IsbnMetadata {
   language: string | null; description: string | null; categories: string[]; source: string;
 }
 
+/** Đồng bộ dữ liệu dùng chung (chỉ đơn vị SHARED): lần chạy gần nhất của bộ chạy nền. */
+export interface SharedSyncStatus { isShared: boolean; lastRunAt: string | null; applied: number; pending: number; failed: number; error: string | null; }
+
 export interface ClassificationSuggestion { subjectId: number | null; subjectName: string | null; topicId: number | null; topicName: string | null; keywords: string[]; }
 
 /** Trạng thái đồng bộ nội dung của một tài liệu: pending | running | done | no_text | failed. */
@@ -34,6 +37,10 @@ export class ItemsApi {
   private post<T>(url: string, body: unknown = {}): Promise<T> { return firstValueFrom(this.http.post<T>(url, body)); }
   private put<T>(url: string, body: unknown): Promise<T> { return firstValueFrom(this.http.put<T>(url, body)); }
 
+  setItemHidden(publicId: string, hidden: boolean) { return this.put<EbookItem>(`/api/admin/digital/items/${publicId}/Hidden`, { hidden }); }
+  /** 403 NOT_SHARED_TENANT với đơn vị thường — gọi này chỉ để biết đơn vị hiện tại có phải SHARED không. */
+  sharedSyncStatus() { return this.get<SharedSyncStatus>('/api/admin/digital/shared-sync/Status'); }
+  sharedSyncRun() { return this.post<SharedSyncStatus>('/api/admin/digital/shared-sync/Run'); }
   setItemCover(publicId: string, coverUrl: string | null) { return this.put<EbookItem>(`/api/admin/digital/items/${publicId}/cover`, { coverUrl }); }
   itemSelectionCount(selection: ItemSelection) { return this.post<{ count: number }>('/api/admin/digital/items/Selection/Preview', selection); }
   itemsMoveCollection(selection: ItemSelection, collectionId: number) { return this.put<ItemBulkResult>('/api/admin/digital/items/BulkMoveCollection', { selection, collectionId }); }

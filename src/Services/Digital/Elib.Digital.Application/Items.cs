@@ -52,7 +52,7 @@ public sealed record EbookItemDto(
     DateTimeOffset? IndexedAt, string? ErrorMessage, int TotalView, int TotalDownload, DateTimeOffset? Submited, DateTimeOffset? LastUpdate,
     string? CoverUrl, Guid? LinkedBibPublicId, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, string? Abstract, string? Description, string? JournalName,
     int? PublishDay, int? PublishMonth, int? PublishYear, IReadOnlyList<EbookPerson> Authors, IReadOnlyList<EbookPerson> Advisors,
-    IReadOnlyList<EbookIdentifier> Identifiers, int TotalFile);
+    IReadOnlyList<EbookIdentifier> Identifiers, int TotalFile, bool IsReplica, bool HiddenByTenant);
 
 /// <summary>Tài liệu số (LRC: EbookItemController, quyền DIGITAL_ITEMS) — trang quản trị bespoke (có file đính kèm + liên kết sách in).</summary>
 public sealed partial class EbookItemResource(
@@ -70,7 +70,7 @@ public sealed partial class EbookItemResource(
         x.SubjectId, x.TopicId, x.TypeId, x.Title, x.Author, x.Publisher, x.PublishDate, x.Keyword, x.OtherTitle, x.Page, x.OldAuthor, x.Xml,
         x.Language, x.Free, x.AllowDownload, x.PrintCopies, x.OfflineDays, x.Show, x.IndexContent, x.Share, x.FileVersion, x.IndexedAt, x.ErrorMessage,
         x.TotalView, x.TotalDownload, x.Submited, x.LastUpdate, x.CoverUrl, x.LinkedBibPublicId, x.CreatedAt, x.UpdatedAt, x.Abstract, x.Description, x.JournalName,
-        x.PublishDay, x.PublishMonth, x.PublishYear, x.Authors, x.Advisors, x.Identifiers, Db.Set<EbookFile>().Count(f => f.EbookItemId == x.Id));
+        x.PublishDay, x.PublishMonth, x.PublishYear, x.Authors, x.Advisors, x.Identifiers, Db.Set<EbookFile>().Count(f => f.EbookItemId == x.Id), x.IsReplica, x.HiddenByTenant);
 
     protected override EbookItem Create(EbookItemFields request) =>
         EbookItem.Create(request, _options.MediaPublicPrefix, tenant.RequireTenantId(), clock.GetUtcNow());
@@ -148,6 +148,7 @@ public sealed partial class EbookItemResource(
 
     protected override async Task EnsureDeletableAsync(EbookItem entity, CancellationToken ct)
     {
+        if (entity.IsReplica) throw EbookItem.ReadOnly(entity.Title);
         // Kiểm tra file TRƯỚC khi đánh dấu xoá metadata: bị chặn thì không để lại thay đổi nào trong ngữ cảnh (xoá hàng loạt dùng chung một lần lưu).
         if (await Db.Set<EbookFile>().AnyAsync(f => f.EbookItemId == entity.Id, ct))
             throw new ConflictException("EBOOK_ITEM_HAS_FILES", $"Tài liệu số '{entity.Title}' còn file đính kèm — xoá file trước.");
@@ -204,6 +205,9 @@ public sealed class EbookFileResource(ICrudDbContext db, EbookStatePublisher sta
 
     protected override string EntityName => "File tài liệu số";
 
+    protected override Task EnsureDeletableAsync(EbookFile entity, CancellationToken ct) =>
+        entity.IsReplica ? throw EbookItem.ReadOnly(entity.Description ?? "file") : Task.CompletedTask;
+
     protected override string? Describe(EbookFile entity) => entity.FileExt is { } ext ? $"file #{entity.Id}.{ext}" : $"file #{entity.Id}";
 
     protected override Expression<Func<EbookFile, EbookFileDto>> Projection => x => new EbookFileDto(
@@ -219,8 +223,10 @@ public sealed class EbookFileResource(ICrudDbContext db, EbookStatePublisher sta
     protected override async Task<EbookFile> CreateAsync(EbookFileRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var itemId = await Db.Set<EbookItem>().Where(i => i.PublicId == request.EbookItemPublicId).Select(i => i.Id).FirstOrDefaultAsync(ct);
-        if (itemId == 0) throw new NotFoundException("Tài liệu số", request.EbookItemPublicId);
+        var item = await Db.Set<EbookItem>().AsNoTracking().Where(i => i.PublicId == request.EbookItemPublicId).Select(i => new { i.Id, i.Title, i.IsReplica }).FirstOrDefaultAsync(ct);
+        if (item is null) throw new NotFoundException("Tài liệu số", request.EbookItemPublicId);
+        if (item.IsReplica) throw EbookItem.ReadOnly(item.Title);
+        var itemId = item.Id;
         return EbookFile.Create(itemId, request.MediaFileId, ToFields(request));
     }
 

@@ -13,6 +13,20 @@ public sealed class EbookItem : TenantEntity, IHasStatus
 
     public int Status { get; private set; } = IHasStatus.Active;
 
+    /// <summary>
+    /// Bản sao CHỈ ĐỌC của tài liệu dùng chung do đơn vị SHARED quản lý (đồng bộ tự động, xem SharedEbookDataset): nội dung/trạng thái/file không sửa được ở đơn vị;
+    /// đơn vị chỉ ẩn/hiện (<see cref="HiddenByTenant"/>), mượn/đặt trước/đếm lượt theo chính sách của mình.
+    /// </summary>
+    public bool IsReplica { get; private set; }
+
+    /// <summary>Đơn vị chủ (SHARED) và PublicId của tài liệu gốc — khoá upsert của đồng bộ; chỉ đặt qua <see cref="CreateReplica"/>.</summary>
+    public long? SourceTenantId { get; private set; }
+
+    public Guid? SourcePublicId { get; private set; }
+
+    /// <summary>Đơn vị tự ẩn bản sao khỏi OPAC/tìm kiếm; đồng bộ KHÔNG ghi đè.</summary>
+    public bool HiddenByTenant { get; private set; }
+
     public long? CollectionId { get; private set; }
     public long? SubjectId { get; private set; }
     public long? TopicId { get; private set; }
@@ -110,11 +124,66 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     public static EbookItem Create(EbookItemFields fields, string mediaPublicPrefix, long tenantId, DateTimeOffset now)
     {
         var item = new EbookItem { Submited = now };
-        item.Update(fields, mediaPublicPrefix, tenantId, now);
+        item.Fill(fields, mediaPublicPrefix, tenantId, now);
         return item;
     }
 
+    /// <summary>Tạo bản sao chỉ-đọc từ tài liệu gốc ở đơn vị chủ — chỉ đồng bộ dùng; ảnh bìa phải thuộc kho công khai của đơn vị chủ.</summary>
+    public static EbookItem CreateReplica(EbookItemFields fields, string mediaPublicPrefix, long sourceTenantId, Guid sourcePublicId, DateTimeOffset? submited, DateTimeOffset now)
+    {
+        var item = new EbookItem { Submited = submited ?? now, IsReplica = true, SourceTenantId = sourceTenantId, SourcePublicId = sourcePublicId };
+        item.Fill(fields, mediaPublicPrefix, sourceTenantId, now);
+        return item;
+    }
+
+    /// <summary>Áp nội dung mới của tài liệu gốc lên bản sao (đồng bộ). Không đụng bộ đếm, <see cref="HiddenByTenant"/>.</summary>
+    public void ApplyReplica(EbookItemFields fields, string mediaPublicPrefix, DateTimeOffset? submited, DateTimeOffset now)
+    {
+        if (!IsReplica || SourceTenantId is not { } source) throw new InvalidOperationException("Chỉ áp dụng cho bản sao dùng chung.");
+        if (submited is not null) Submited = submited;
+        Fill(fields, mediaPublicPrefix, source, now);
+    }
+
+    /// <summary>Các trường ghi được của tài liệu — đồng bộ dữ liệu dùng chung đọc từ tài liệu gốc ở đơn vị chủ để dựng bản sao.</summary>
+    public EbookItemFields ToFields() => new(
+        Title, CollectionId, SubjectId, TopicId, TypeId, Author, Publisher, PublishDate, Keyword, OtherTitle, Page, OldAuthor, Xml, Language, Free, AllowDownload,
+        PrintCopies, OfflineDays, Show, IndexContent, Share, CoverUrl, LinkedBibPublicId, Status, Abstract, Description, JournalName, PublishDay, PublishMonth,
+        PublishYear, Authors, Advisors, Identifiers);
+
+    /// <summary>Tài liệu gốc bị xoá → bản sao ngừng xuất bản (giữ lượt mượn/đặt trước đang có).</summary>
+    public void RetireReplica()
+    {
+        if (!IsReplica) throw new InvalidOperationException("Chỉ áp dụng cho bản sao dùng chung.");
+        if (Status == IHasStatus.Inactive) return;
+        Status = IHasStatus.Inactive;
+        Version++;
+    }
+
+    /// <summary>Đơn vị ẩn/hiện bản sao — nội dung đổi nên tăng phiên bản (search bỏ/nhận lại).</summary>
+    public void SetHidden(bool hidden, DateTimeOffset now)
+    {
+        if (!IsReplica) throw new BusinessRuleException("NOT_SHARED_REPLICA", "Chỉ ẩn/hiện được tài liệu dùng chung; tài liệu của đơn vị dùng trạng thái xuất bản.", 409);
+        if (HiddenByTenant == hidden) return;
+        HiddenByTenant = hidden;
+        Touch(now);
+    }
+
+    /// <summary>Bản sao tài liệu dùng chung là chỉ đọc ở đơn vị (mã <c>SHARED_READ_ONLY</c>).</summary>
+    public static BusinessRuleException ReadOnly(string title) =>
+        new("SHARED_READ_ONLY", $"Tài liệu '{title}' là tài liệu dùng chung do quản trị hệ thống quản lý — đơn vị chỉ ẩn/hiện được.", 403);
+
+    private void EnsureWritable()
+    {
+        if (IsReplica) throw ReadOnly(Title);
+    }
+
     public void Update(EbookItemFields f, string mediaPublicPrefix, long tenantId, DateTimeOffset now)
+    {
+        EnsureWritable();
+        Fill(f, mediaPublicPrefix, tenantId, now);
+    }
+
+    private void Fill(EbookItemFields f, string mediaPublicPrefix, long tenantId, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(f);
         Title = TextRules.Required(f.Title, 1000, "TITLE_INVALID", "Nhan đề");
@@ -162,13 +231,14 @@ public sealed class EbookItem : TenantEntity, IHasStatus
         Share = f.Share;
         CoverUrl = EbookCover.Validate(f.CoverUrl, mediaPublicPrefix, tenantId);
         LinkedBibPublicId = f.LinkedBibPublicId;
-        if (Status != f.Status) ChangeStatus(f.Status);
+        if (Status != f.Status) Status = StatusRules.Validate(f.Status);
         LastUpdate = now;
         Version++;
     }
 
     public void ChangeStatus(int status)
     {
+        EnsureWritable();
         Status = StatusRules.Validate(status);
         Version++;
     }
@@ -176,6 +246,7 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     /// <summary>Đặt riêng ảnh bìa (vd. cắt từ một trang PDF) mà không đụng các trường khác.</summary>
     public void SetCover(string? coverUrl, string mediaPublicPrefix, long tenantId, DateTimeOffset now)
     {
+        EnsureWritable();
         CoverUrl = EbookCover.Validate(coverUrl, mediaPublicPrefix, tenantId);
         Touch(now);
     }
@@ -183,6 +254,7 @@ public sealed class EbookItem : TenantEntity, IHasStatus
     /// <summary>Đổi bộ sưu tập (thao tác hàng loạt) — nội dung đổi nên tăng phiên bản.</summary>
     public void MoveToCollection(long collectionId, DateTimeOffset now)
     {
+        EnsureWritable();
         CollectionId = collectionId;
         Touch(now);
     }
@@ -279,14 +351,44 @@ public sealed class EbookFile : TenantEntity
     public string? CheckSumAlgorithm { get; private set; }
     public int SortOrder { get; private set; }
 
+    /// <summary>File của bản sao tài liệu dùng chung: id file gốc ở đơn vị chủ (khoá upsert) và đơn vị chủ giữ nội dung — không copy PDF.</summary>
+    public Guid? SourcePublicId { get; private set; }
+
+    public long? SourceTenantId { get; private set; }
+
+    public bool IsReplica => SourcePublicId is not null;
+
     public static EbookFile Create(long ebookItemId, Guid mediaFileId, EbookFileFields fields)
     {
         var file = new EbookFile { EbookItemId = ebookItemId, MediaFileId = mediaFileId };
-        file.Update(fields);
+        file.Fill(fields);
         return file;
     }
 
+    public EbookFileFields ToFields() => new(Type, IsConvert, FileType, FileSize, FileExt, Description, Source, FormatId, CheckSumAlgorithm, SortOrder);
+
+    public static EbookFile CreateReplica(long ebookItemId, Guid mediaFileId, EbookFileFields fields, long sourceTenantId, Guid sourcePublicId)
+    {
+        var file = new EbookFile { EbookItemId = ebookItemId, MediaFileId = mediaFileId, SourceTenantId = sourceTenantId, SourcePublicId = sourcePublicId };
+        file.Fill(fields);
+        return file;
+    }
+
+    /// <summary>Áp thay đổi của file gốc lên file bản sao (đồng bộ).</summary>
+    public void ApplyReplica(Guid mediaFileId, EbookFileFields fields)
+    {
+        if (!IsReplica) throw new InvalidOperationException("Chỉ áp dụng cho file bản sao dùng chung.");
+        MediaFileId = mediaFileId;
+        Fill(fields);
+    }
+
     public void Update(EbookFileFields f)
+    {
+        if (IsReplica) throw EbookItem.ReadOnly(Description ?? "file");
+        Fill(f);
+    }
+
+    private void Fill(EbookFileFields f)
     {
         ArgumentNullException.ThrowIfNull(f);
         Type = TextRules.Optional(f.Type, 50, "FILE_TYPE_INVALID", "Loại file");

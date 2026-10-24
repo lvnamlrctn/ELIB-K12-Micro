@@ -72,6 +72,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             e.Property(x => x.Value).HasMaxLength(DictionaryTerm.MaxValueLength);
             e.Property(x => x.Key).HasMaxLength(DictionaryTerm.MaxValueLength);
             e.Property(x => x.Description).HasMaxLength(DictionaryTerm.MaxDescriptionLength);
+            e.Property(x => x.IsReplica).HasDefaultValue(false);
             e.HasIndex(x => new { x.TenantId, x.Kind, x.Key }).IsUnique().HasFilter("is_deleted = false");
         });
 
@@ -79,11 +80,13 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
         {
             e.ToTable("isbd_configs");
             e.OwnsMany(x => x.Rules, b => b.ToJson("rules"));
+            e.Property(x => x.IsReplica).HasDefaultValue(false);
             e.HasIndex(x => new { x.TenantId, x.BibTypeId }).IsUnique().HasFilter("is_deleted = false");
             e.HasOne<BibType>().WithMany().HasForeignKey(x => x.BibTypeId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.AddTenantReplica();
+        modelBuilder.AddSharedSync();
         modelBuilder.AddElibOutbox();
         base.OnModelCreating(modelBuilder);
     }

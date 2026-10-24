@@ -41,6 +41,29 @@ public sealed class DictionaryTerm : TenantEntity
     public int UseCount { get; private set; }
     public bool AutoAdded { get; private set; }
 
+    /// <summary>Bản sao chỉ đọc của mục từ điển dùng chung (đơn vị SHARED) — do đồng bộ ghi, đơn vị không sửa/xoá được.</summary>
+    public bool IsReplica { get; private set; }
+
+    public const string ReadOnlyCode = "SHARED_READ_ONLY";
+    public const string ReadOnlyMessage = "Mục này là dữ liệu dùng chung của hệ thống — chỉ đọc.";
+
+    /// <summary>Bản sao từ đơn vị dùng chung; <see cref="UseCount"/> luôn 0 (đơn vị tự đếm riêng nếu cần).</summary>
+    public static DictionaryTerm CreateReplica(string kind, string value, string? description)
+    {
+        _ = DictionaryKinds.Module(kind);
+        var term = new DictionaryTerm { Kind = kind };
+        term.Apply(value, description);
+        term.IsReplica = true;
+        return term;
+    }
+
+    /// <summary>Cập nhật bản sao theo dữ liệu gốc (chỉ đồng bộ gọi).</summary>
+    public void ApplyReplica(string value, string? description)
+    {
+        if (!IsReplica) throw new InvalidOperationException("Chỉ áp dụng cho bản sao.");
+        Apply(value, description);
+    }
+
     public static DictionaryTerm Create(string kind, string value, string? description, bool autoAdded = false)
     {
         _ = DictionaryKinds.Module(kind);
@@ -52,13 +75,19 @@ public sealed class DictionaryTerm : TenantEntity
 
     public void Update(string value, string? description)
     {
+        if (IsReplica) throw new BusinessRuleException(ReadOnlyCode, ReadOnlyMessage);
+        Apply(value, description);
+        AutoAdded = false;
+    }
+
+    private void Apply(string value, string? description)
+    {
         var v = Normalize(value);
         Value = v.Length is > 0 and <= MaxValueLength ? v : throw new BusinessRuleException("DICTIONARY_VALUE_INVALID", $"Giá trị bắt buộc, tối đa {MaxValueLength} ký tự.");
         Key = KeyOf(v);
         var d = description?.Trim();
         Description = string.IsNullOrEmpty(d) ? null
             : d.Length <= MaxDescriptionLength ? d : throw new BusinessRuleException("DICTIONARY_DESCRIPTION_INVALID", $"Diễn giải tối đa {MaxDescriptionLength} ký tự.");
-        AutoAdded = false;
     }
 
     public void Used(int times = 1) => UseCount = Math.Max(0, UseCount + times);
@@ -116,6 +145,24 @@ public sealed class IsbdConfig : TenantEntity
     public long BibTypeId { get; private set; }
     public List<IsbdRule> Rules { get; private set; } = [];
 
+    /// <summary>Bản sao chỉ đọc của cấu hình ISBD dùng chung — chỉ lấp loại biểu ghi đơn vị chưa tự cấu hình.</summary>
+    public bool IsReplica { get; private set; }
+
+    public static IsbdConfig CreateReplica(long bibTypeId, IEnumerable<IsbdRule>? rules)
+    {
+        var config = new IsbdConfig();
+        config.Apply(bibTypeId, rules);
+        config.IsReplica = true;
+        return config;
+    }
+
+    /// <summary>Cập nhật bản sao theo dữ liệu gốc (chỉ đồng bộ gọi).</summary>
+    public void ApplyReplica(IEnumerable<IsbdRule>? rules)
+    {
+        if (!IsReplica) throw new InvalidOperationException("Chỉ áp dụng cho bản sao.");
+        Apply(BibTypeId, rules);
+    }
+
     public static IsbdConfig Create(long bibTypeId, IEnumerable<IsbdRule>? rules)
     {
         var config = new IsbdConfig();
@@ -124,6 +171,12 @@ public sealed class IsbdConfig : TenantEntity
     }
 
     public void Update(long bibTypeId, IEnumerable<IsbdRule>? rules)
+    {
+        if (IsReplica) throw new BusinessRuleException(DictionaryTerm.ReadOnlyCode, DictionaryTerm.ReadOnlyMessage);
+        Apply(bibTypeId, rules);
+    }
+
+    private void Apply(long bibTypeId, IEnumerable<IsbdRule>? rules)
     {
         BibTypeId = bibTypeId > 0 ? bibTypeId : throw new BusinessRuleException("BIB_TYPE_REQUIRED", "Chọn loại biểu ghi.");
         var list = (rules ?? []).Select(IsbdRule.Validate).ToList();

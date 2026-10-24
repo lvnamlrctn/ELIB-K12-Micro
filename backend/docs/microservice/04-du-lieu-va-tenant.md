@@ -32,6 +32,10 @@
 - **Dữ liệu dùng chung** (`TenantId = null`), ví dụ danh mục MARC chuẩn, từ điển quốc gia/ngôn ngữ, template thông báo mặc định:
   - Đặt ở bảng **riêng** với hậu tố `_shared`, không trộn `null` vào bảng nghiệp vụ.
   - Đơn vị có thể ghi đè bằng bản riêng (truy vấn theo thứ tự: tenant trước, shared sau).
+- **Dữ liệu dùng chung THỰC TẾ (đã hiện thực, thay cho phương án `_shared` ở trên):** một **đơn vị chủ** mang mã dành riêng `SHARED` (đơn vị thường, có admin và host riêng — quản trị nền tảng đăng nhập vào đó, dùng nguyên các màn hiện có) giữ dữ liệu **gốc**: tài liệu số (Digital), từ điển và cấu hình ISBD (Catalog). Không dùng `TenantId = 0/null`, không đổi RLS.
+  - Mỗi đơn vị khác (Active, có license phân hệ) nhận **bản sao thật**, chỉ đọc: cột `is_replica` (Catalog) hoặc `is_replica/source_tenant_id/source_public_id/hidden_by_tenant` (Digital); mượn, đặt trước, chính sách, bộ đếm, Search chạy như dữ liệu thường của đơn vị. File PDF **không sao chép**: bản sao giữ `MediaFileId` + `SourceTenantId` (chỉ khi nguồn đúng là SHARED).
+  - Đồng bộ bằng `SharedSyncRunner<TDbContext>` (BuildingBlocks.TenantReplica): đọc dữ liệu gốc một lần ở ngữ cảnh hệ thống, ghi từng đơn vị trong scope riêng; tiến độ theo (đơn vị, bộ dữ liệu) ở bảng `shared_sync_states` (mốc = `max(UpdatedAt ?? CreatedAt, DeletedAt)` của gốc, chồng 5 giây); chạy 10 phút/lần, tối đa 40 đơn vị/lượt, hoặc ngay khi bấm "Đồng bộ ngay" (`POST /api/shared-sync/Run`, chỉ đơn vị SHARED). Bộ dữ liệu cài `ISharedDataset`.
+  - Đơn vị chỉ đọc + **ẩn/hiện** tài liệu chung (`PUT /api/items/{id}/Hidden`; ẩn → `EbookChanged` inactive để Search bỏ). Dòng riêng của đơn vị luôn thắng khi trùng khoá (từ điển `(Kind, Key)`, ISBD theo `BibType.Code`).
 - **Quyền đọc chéo đơn vị** (cấp Sở/Phòng xem các trường trực thuộc; thay `ReadOnlyPolicy` hiện nay):
   - Token mang claim `tenant_scope = [list]` hoặc `tenant_scope = org:<orgId>` do `identity` tính từ cây `Orgs` của `tenant`.
   - Service bật `app.cross_tenant` **chỉ cho truy vấn đọc** qua `ITenantContext.ReadAcross(scope)`, và filter đổi thành `tenant_id = ANY(scope)`.

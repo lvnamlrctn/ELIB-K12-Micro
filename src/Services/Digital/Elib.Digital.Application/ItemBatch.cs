@@ -14,6 +14,8 @@ public sealed record ItemSelectionPreview(int Count);
 
 public sealed record SetCoverRequest(string? CoverUrl);
 
+public sealed record SetHiddenRequest(bool Hidden);
+
 public sealed record ItemBulkMoveRequest(ItemSelection Selection, long CollectionId);
 
 public sealed record ItemBulkStatusRequest(ItemSelection Selection, int Status);
@@ -33,6 +35,17 @@ public sealed partial class EbookItemResource
     {
         var item = await LoadAsync(publicId, ct);
         item.SetCover(coverUrl, _options.MediaPublicPrefix, tenant.RequireTenantId(), clock.GetUtcNow());
+        await OnSavingAsync(item, CrudChange.Updated, ct);
+        await AuditAsync(item, CrudChange.Updated, ct);
+        await Db.SaveChangesAsync(ct);
+        return ToDto(item);
+    }
+
+    /// <summary>Đơn vị ẩn/hiện tài liệu dùng chung (bản sao). Ẩn → search nhận trạng thái không xuất bản; đồng bộ không ghi đè cờ này.</summary>
+    public async Task<EbookItemDto> SetHiddenAsync(Guid publicId, bool hidden, CancellationToken ct)
+    {
+        var item = await LoadAsync(publicId, ct);
+        item.SetHidden(hidden, clock.GetUtcNow());
         await OnSavingAsync(item, CrudChange.Updated, ct);
         await AuditAsync(item, CrudChange.Updated, ct);
         await Db.SaveChangesAsync(ct);
@@ -97,6 +110,11 @@ public sealed partial class EbookItemResource
             {
                 foreach (var item in await Set.Where(x => chunk.Contains(x.PublicId)).ToListAsync(token))
                 {
+                    if (item.IsReplica)
+                    {
+                        skipped.Add(new ItemSkipped(item.PublicId, item.Title, "SHARED_READ_ONLY", "Tài liệu dùng chung do quản trị hệ thống quản lý — đơn vị chỉ ẩn/hiện được."));
+                        continue;
+                    }
                     if (await apply(item, token) is { } skip)
                     {
                         skipped.Add(skip);

@@ -22,6 +22,46 @@ namespace Elib.Digital.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Elib.BuildingBlocks.TenantReplica.SharedSyncState", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Dataset")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("dataset");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("Watermark")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("watermark");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shared_sync_states");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_shared_sync_states_tenant_id");
+
+                    b.HasIndex("TenantId", "Dataset")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shared_sync_states_tenant_id_dataset");
+
+                    b.ToTable("shared_sync_states", (string)null);
+                });
+
             modelBuilder.Entity("Elib.BuildingBlocks.TenantReplica.TenantModuleReplica", b =>
                 {
                     b.Property<long>("TenantId")
@@ -936,6 +976,14 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasColumnType("character varying(250)")
                         .HasColumnName("source");
 
+                    b.Property<Guid?>("SourcePublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_public_id");
+
+                    b.Property<long?>("SourceTenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_tenant_id");
+
                     b.Property<long>("TenantId")
                         .HasColumnType("bigint")
                         .HasColumnName("tenant_id");
@@ -965,6 +1013,11 @@ namespace Elib.Digital.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "EbookItemId")
                         .HasDatabaseName("ix_ebook_files_tenant_id_ebook_item_id");
+
+                    b.HasIndex("TenantId", "SourcePublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_files_tenant_id_source_public_id")
+                        .HasFilter("source_public_id IS NOT NULL AND is_deleted = false");
 
                     b.ToTable("ebook_files", (string)null);
                 });
@@ -1035,6 +1088,10 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("free");
 
+                    b.Property<bool>("HiddenByTenant")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hidden_by_tenant");
+
                     b.Property<int?>("IndexContent")
                         .HasColumnType("integer")
                         .HasColumnName("index_content");
@@ -1046,6 +1103,10 @@ namespace Elib.Digital.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsReplica")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_replica");
 
                     b.Property<string>("JournalName")
                         .HasMaxLength(500)
@@ -1127,6 +1188,14 @@ namespace Elib.Digital.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("show");
 
+                    b.Property<Guid?>("SourcePublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_public_id");
+
+                    b.Property<long?>("SourceTenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_tenant_id");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -1199,6 +1268,11 @@ namespace Elib.Digital.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "PublishYear")
                         .HasDatabaseName("ix_ebook_items_tenant_id_publish_year");
+
+                    b.HasIndex("TenantId", "SourcePublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ebook_items_tenant_id_source_public_id")
+                        .HasFilter("source_public_id IS NOT NULL AND is_deleted = false");
 
                     b.HasIndex("TenantId", "SubjectId")
                         .HasDatabaseName("ix_ebook_items_tenant_id_subject_id");

@@ -110,7 +110,8 @@
     "UNSAVED_TITLE": "Unsaved changes",
     "UNSAVED_MESSAGE": "You have unsaved changes. Leaving this page will discard them.",
     "UNSAVED_LEAVE": "Leave and discard",
-    "UNSAVED_STAY": "Stay"
+    "UNSAVED_STAY": "Stay",
+    "SHARED": "Shared"
   },
   "DATATABLE": {
     "SEARCH": "Search:",
@@ -2885,7 +2886,22 @@
     "HIDE_EMPTY": "Hide libraries without data",
     "EXPORT": "Export CSV",
     "LOAD_FAILED": "Could not load figures",
-    "TENANTS_FAILED": "Could not load the library list"
+    "TENANTS_FAILED": "Could not load the library list",
+    "TAB_DIGITAL": "Digital library",
+    "DIGITAL_HINT": "Storage is the sum of the declared file sizes (not real storage usage); additions follow the submission date; active loans are unreturned and unexpired.",
+    "DIGITAL_TITLES": "Titles",
+    "DIGITAL_PUBLISHED": "Published",
+    "DIGITAL_ADDED": "Added",
+    "DIGITAL_FILES": "Files",
+    "DIGITAL_STORAGE": "Storage (MB)",
+    "DIGITAL_VIEWS": "Views",
+    "DIGITAL_DOWNLOADS": "Downloads",
+    "DIGITAL_SESSIONS": "Reading sessions",
+    "DIGITAL_READERS": "Readers",
+    "DIGITAL_LOANS": "Loans",
+    "DIGITAL_ACTIVE_LOANS": "Active loans",
+    "DIGITAL_RESERVATIONS": "Reservations",
+    "DIGITAL_PENDING_RESERVATIONS": "Pending reservations"
   },
   "SEARCH_STATS_PAGE": {
     "TITLE": "Search statistics (OPAC)",
@@ -4409,7 +4425,16 @@
     "AI_NEEDS_TITLE": "Enter the title before asking the AI",
     "AI_NOTHING": "The AI made no suggestion",
     "IMPORT_HINT_DSPACE": "A .zip in DSpace Simple Archive layout: each folder is a document with dublin_core.xml, an optional contents list and the PDF files. Other file types are skipped.",
-    "IMPORT_PICK_DSPACE": "Click to choose a .zip file"
+    "IMPORT_PICK_DSPACE": "Click to choose a .zip file",
+    "SHARED_SOURCE": "Shared-data source unit",
+    "SHARED_LAST": "Last run {{at}} — applied to {{applied}} units, {{pending}} pending, {{failed}} failed. Documents here are copied (read-only) to every unit automatically.",
+    "SHARED_NOT_RUN": "No sync run since the service started (runs automatically every 10 minutes).",
+    "SHARED_RUN": "Sync now",
+    "SHARED_QUEUED": "Sync requested.",
+    "SHARED_BADGE": "Shared",
+    "SHARED_HIDDEN": "Hidden",
+    "SHARED_HIDE": "Hide from this unit's OPAC",
+    "SHARED_SHOW": "Show on OPAC again"
   },
   "DATE": {
     "PICK": "Pick a date",

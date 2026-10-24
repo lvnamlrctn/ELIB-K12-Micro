@@ -1,4 +1,5 @@
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.TenantReplica;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Elib.Digital.Application;
@@ -20,6 +21,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<MetadataFieldResource>();
         services.AddScoped<EbookItemTools>();
         services.AddScoped<DigitalDashboardService>();
+        services.AddScoped<PlatformDigitalStatsService>();
+        services.AddSharedDataset<SharedEbookDataset>();
+        services.AddScoped<SharedSyncControl>();
         services.AddScoped<EbookContentSync>();
         services.AddScoped<OpacContentSearch>();
         services.AddScoped<OpacItems>();

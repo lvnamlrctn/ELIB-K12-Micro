@@ -9,7 +9,7 @@ namespace Elib.Catalog.Application;
 public sealed record DictionaryRequest(string Value, string? Description = null);
 
 public sealed record DictionaryDto(
-    long Id, Guid PublicId, string Kind, string Value, string? Description, int UseCount, bool AutoAdded, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    long Id, Guid PublicId, string Kind, string Value, string? Description, int UseCount, bool AutoAdded, bool IsReplica, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Gợi ý trong trình biên mục: giá trị + diễn giải (khung phân loại).</summary>
 public sealed record DictionarySuggestion(string Value, string? Description);
@@ -27,7 +27,7 @@ public abstract class DictionaryResource<TSelf>(ICrudDbContext db)
     protected override string? Describe(DictionaryTerm entity) => entity.Value;
 
     protected override Expression<Func<DictionaryTerm, DictionaryDto>> Projection =>
-        x => new DictionaryDto(x.Id, x.PublicId, x.Kind, x.Value, x.Description, x.UseCount, x.AutoAdded, x.CreatedAt, x.UpdatedAt);
+        x => new DictionaryDto(x.Id, x.PublicId, x.Kind, x.Value, x.Description, x.UseCount, x.AutoAdded, x.IsReplica, x.CreatedAt, x.UpdatedAt);
 
     protected override DictionaryTerm Create(DictionaryRequest r) => DictionaryTerm.Create(Kind, r.Value, r.Description);
 
@@ -45,6 +45,9 @@ public abstract class DictionaryResource<TSelf>(ICrudDbContext db)
 
     protected override IOrderedQueryable<DictionaryTerm> Order(IQueryable<DictionaryTerm> query) =>
         Kind == DictionaryKinds.Class ? query.OrderBy(x => x.Value) : query.OrderByDescending(x => x.UseCount).ThenBy(x => x.Value);
+
+    protected override Task EnsureDeletableAsync(DictionaryTerm entity, CancellationToken ct) =>
+        entity.IsReplica ? throw new BusinessRuleException(DictionaryTerm.ReadOnlyCode, DictionaryTerm.ReadOnlyMessage) : Task.CompletedTask;
 
     protected override async Task ValidateAsync(DictionaryTerm entity, CancellationToken ct)
     {
@@ -115,7 +118,8 @@ public sealed class DictionaryLearner(ICrudDbContext db)
             {
                 var existing = await set.Where(t => chunk.Contains(t.Key)).ToListAsync(ct);
                 foreach (var term in existing)
-                    if (counts.Remove((term.Kind, term.Key), out var hit)) term.Used(hit.Count);
+                    // Bản sao dùng chung (IsReplica) là "đã có": không thêm trùng, không ghi số lần dùng.
+                    if (counts.Remove((term.Kind, term.Key), out var hit) && !term.IsReplica) term.Used(hit.Count);
             }
             foreach (var ((kind, _), (value, count)) in counts)
             {
@@ -151,7 +155,7 @@ public sealed class DictionaryLearner(ICrudDbContext db)
 
 public sealed record IsbdConfigRequest(long BibTypeId, IReadOnlyList<IsbdRule> Rules);
 
-public sealed record IsbdConfigDto(long Id, Guid PublicId, long BibTypeId, IReadOnlyList<IsbdRule> Rules, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+public sealed record IsbdConfigDto(long Id, Guid PublicId, long BibTypeId, IReadOnlyList<IsbdRule> Rules, bool IsReplica, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
 
 /// <summary>Cấu hình ISBD theo loại biểu ghi (monolith: ConfigIsbd + IsbdField + IsbdSubfield, quyền CONFIG_ISBD). Mỗi loại một cấu hình.</summary>
 public sealed class IsbdConfigResource(ICrudDbContext db) : CrudResource<IsbdConfigResource, IsbdConfig, CrudSearch, IsbdConfigRequest, IsbdConfigDto>(db)
@@ -161,11 +165,40 @@ public sealed class IsbdConfigResource(ICrudDbContext db) : CrudResource<IsbdCon
     protected override string? Describe(IsbdConfig entity) => $"loại biểu ghi {entity.BibTypeId}: {entity.Rules.Count} quy tắc";
 
     protected override Expression<Func<IsbdConfig, IsbdConfigDto>> Projection =>
-        x => new IsbdConfigDto(x.Id, x.PublicId, x.BibTypeId, x.Rules, x.CreatedAt, x.UpdatedAt);
+        x => new IsbdConfigDto(x.Id, x.PublicId, x.BibTypeId, x.Rules, x.IsReplica, x.CreatedAt, x.UpdatedAt);
 
     protected override IsbdConfig Create(IsbdConfigRequest r) => IsbdConfig.Create(r.BibTypeId, r.Rules);
 
     protected override void Update(IsbdConfig entity, IsbdConfigRequest r) => entity.Update(r.BibTypeId, r.Rules);
+
+    /// <summary>
+    /// Đơn vị tạo cấu hình riêng cho loại đang có bản sao dùng chung → bỏ bản sao trước (unique theo loại). Bản sao bị xoá và lưu riêng một bước TRƯỚC khi
+    /// thêm cấu hình (soft-delete và insert cùng lô có thể bị sắp xếp ngược → vi phạm unique); cấu hình mới đã được kiểm hợp lệ trước khi xoá.
+    /// </summary>
+    protected override async Task<IsbdConfig> CreateAsync(IsbdConfigRequest request, CancellationToken ct)
+    {
+        var config = Create(request);
+        await RemoveReplicaAsync(config.BibTypeId, ct);
+        return config;
+    }
+
+    protected override async Task UpdateAsync(IsbdConfig entity, IsbdConfigRequest request, CancellationToken ct)
+    {
+        if (entity.IsReplica) throw new BusinessRuleException(DictionaryTerm.ReadOnlyCode, DictionaryTerm.ReadOnlyMessage);
+        if (request.BibTypeId != entity.BibTypeId) await RemoveReplicaAsync(request.BibTypeId, ct);
+        Update(entity, request);
+    }
+
+    protected override Task EnsureDeletableAsync(IsbdConfig entity, CancellationToken ct) =>
+        entity.IsReplica ? throw new BusinessRuleException(DictionaryTerm.ReadOnlyCode, DictionaryTerm.ReadOnlyMessage) : Task.CompletedTask;
+
+    private async Task RemoveReplicaAsync(long bibTypeId, CancellationToken ct)
+    {
+        var replicas = await Set.Where(x => x.BibTypeId == bibTypeId && x.IsReplica).ToListAsync(ct);
+        if (replicas.Count == 0) return;
+        Set.RemoveRange(replicas);
+        await Db.SaveChangesAsync(ct);
+    }
 
     protected override IOrderedQueryable<IsbdConfig> Order(IQueryable<IsbdConfig> query) => query.OrderBy(x => x.BibTypeId);
 

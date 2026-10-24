@@ -68,7 +68,8 @@ public sealed class EbookStatePublisher(ICrudDbContext db, IPublishEndpoint publ
             Free = item.Free,
             HasFile = hasFile.Value,
             LinkedBibPublicId = item.LinkedBibPublicId,
-            Status = item.Status,
+            // Bản sao đơn vị đã ẩn thì search coi như không xuất bản (nhận Version mới để bỏ bản đang hiện).
+            Status = item.HiddenByTenant ? IHasStatus.Inactive : item.Status,
             Deleted = deleted,
             Version = item.Version + (deleted ? 1 : 0),
         };

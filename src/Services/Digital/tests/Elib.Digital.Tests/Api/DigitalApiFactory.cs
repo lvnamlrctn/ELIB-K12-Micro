@@ -186,9 +186,13 @@ public sealed class FakeMediaFileAccess : IMediaFileAccess
 {
     public ConcurrentQueue<Guid> Requested { get; } = new();
 
-    public Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, CancellationToken ct)
+    /// <summary>Đơn vị nguồn được truyền theo từng lần xin URL (null = đơn vị hiện tại).</summary>
+    public ConcurrentQueue<long?> RequestedSourceTenants { get; } = new();
+
+    public Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, long? sourceTenantId, CancellationToken ct)
     {
         Requested.Enqueue(mediaFileId);
+        RequestedSourceTenants.Enqueue(sourceTenantId);
         return Task.FromResult(new EbookFileUrl($"https://media.test/signed/{mediaFileId:N}", DateTimeOffset.UtcNow.AddMinutes(5)));
     }
 }

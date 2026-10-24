@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<KeywordDictionaryResource>();
         services.AddCrudResource<ClassDictionaryResource>();
         services.AddCrudResource<IsbdConfigResource>();
+        services.AddScoped<SharedSyncControl>();
         return services;
     }
 }

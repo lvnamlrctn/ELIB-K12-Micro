@@ -25,7 +25,7 @@ public sealed class ReaderBookmarks(ICrudDbContext db)
     public async Task<BookmarkDto> SaveAsync(Guid readerPublicId, BookmarkRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var item = await db.Set<EbookItem>().AsNoTracking().Where(i => i.PublicId == request.EbookPublicId && i.Status == IHasStatus.Active).Select(i => new { i.Id }).FirstOrDefaultAsync(ct)
+        var item = await db.Set<EbookItem>().AsNoTracking().Where(i => i.PublicId == request.EbookPublicId && i.Status == IHasStatus.Active && !i.HiddenByTenant).Select(i => new { i.Id }).FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException("Tài liệu số", request.EbookPublicId);
         var mine = db.Set<EbookBookmark>().Where(b => b.EbookItemId == item.Id && b.ReaderPublicId == readerPublicId);
         var bookmark = await mine.FirstOrDefaultAsync(b => b.Page == request.Page, ct);

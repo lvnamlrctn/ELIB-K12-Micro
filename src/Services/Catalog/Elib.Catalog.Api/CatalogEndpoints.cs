@@ -77,6 +77,11 @@ public static class CatalogEndpoints
         isbd.MapPost("/Preview", [Permission("CONFIG_ISBD", "view")] (IsbdPreviewRequest request, IsbdConfigResource r, CancellationToken ct)
             => r.PreviewAsync(request, ct));
 
+        // Đồng bộ dữ liệu dùng chung (chỉ đơn vị mã SHARED): xem trạng thái và chạy ngay.
+        var sharedSync = api.MapGroup("/shared-sync").WithTags("SharedSync");
+        sharedSync.MapGet("/Status", [PermissionAny("CONFIG_ISBD:edit", "DIC_AUTHORS:edit")] (SharedSyncControl c, CancellationToken ct) => c.StatusAsync(ct));
+        sharedSync.MapPost("/Run", [PermissionAny("CONFIG_ISBD:edit", "DIC_AUTHORS:edit")] (SharedSyncControl c, CancellationToken ct) => c.RunAsync(ct));
+
         // OPAC (gateway: /api/opac/catalog/** → /api/opac/**, công khai theo host đơn vị, license SEARCH ở gateway): xem MARC/ISBD và
         // tải biểu ghi (.mrc / MARCXML) — chỉ biểu ghi đang hiện trên OPAC.
         var opac = app.MapGroup("/api/opac/bibs").WithTags("Opac").AllowAnonymous();

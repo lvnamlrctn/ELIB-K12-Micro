@@ -24,6 +24,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddCrudDbContext<DigitalDbContext>(ServiceName);
         services.AddTenantReplica<DigitalDbContext>(ServiceName);
         services.AddTenantReplicaBootstrap<DigitalDbContext>(configuration);
+        services.AddSharedSync<DigitalDbContext>(); // đồng bộ tài liệu số dùng chung từ đơn vị SHARED
         services.AddScoped<ITenantSeeder, DigitalTenantSeeder>();
 
         // Bản sao chưa có bạn đọc → hỏi patron qua /internal (service token).

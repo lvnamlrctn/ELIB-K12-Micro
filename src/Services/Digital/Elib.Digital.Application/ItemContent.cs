@@ -31,7 +31,8 @@ public sealed partial class EbookItemResource
         var ids = await ResolveIdsAsync(selection, ct);
         if (ids.Count > MaxContentSync)
             throw new BusinessRuleException("SELECTION_TOO_MANY", $"Mỗi lần đồng bộ nội dung tối đa {MaxContentSync} tài liệu — hãy thu hẹp bộ lọc.");
-        var items = await Set.AsNoTracking().Where(x => ids.Contains(x.PublicId)).Select(x => new { x.Id, x.PublicId, x.Title }).ToListAsync(ct);
+        // Bản sao tài liệu dùng chung không lập chỉ mục nội dung ở đơn vị (file ở kho đơn vị chủ) — bỏ qua.
+        var items = await Set.AsNoTracking().Where(x => ids.Contains(x.PublicId) && !x.IsReplica).Select(x => new { x.Id, x.PublicId, x.Title }).ToListAsync(ct);
         var internalIds = items.Select(x => x.Id).ToList();
         var withPdf = (await Db.Set<EbookFile>().AsNoTracking().Where(f => internalIds.Contains(f.EbookItemId)).Where(PdfFiles.Predicate)
             .Select(f => f.EbookItemId).Distinct().ToListAsync(ct)).ToHashSet();
@@ -280,7 +281,7 @@ public sealed class OpacContentSearch(ICrudDbContext db, ITextEmbedder embedder)
         if (q.Length < 2 || q.Length > 200) throw new BusinessRuleException("CONTENT_QUERY_INVALID", "Câu tìm phải từ 2 đến 200 ký tự.");
         var take = Math.Clamp(request.Take, 1, MaxTake);
         var items = db.Set<EbookItem>().AsNoTracking();
-        if (!staff) items = items.Where(i => i.Status == IHasStatus.Active);
+        if (!staff) items = items.Where(i => i.Status == IHasStatus.Active && !i.HiddenByTenant);
         var visible = db.Set<EbookChunk>().AsNoTracking().Join(items, c => c.EbookItemId, i => i.Id, (c, i) => new { Chunk = c, Item = i });
 
         List<(long ItemId, int Page, string Text, double Score)> best;

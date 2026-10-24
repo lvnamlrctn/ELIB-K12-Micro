@@ -37,7 +37,7 @@ public sealed class OpacItems(ICrudDbContext db)
     public async Task<CrudPage<OpacItemSummary>> SearchAsync(OpacItemSearch search, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(search);
-        var query = db.Set<EbookItem>().AsNoTracking().Where(x => x.Status == IHasStatus.Active);
+        var query = db.Set<EbookItem>().AsNoTracking().Where(x => x.Status == IHasStatus.Active && !x.HiddenByTenant);
         if (search.CollectionId is { } collection) query = query.Where(x => x.CollectionId == collection);
         if (search.SubjectId is { } subject) query = query.Where(x => x.SubjectId == subject);
         if (search.TopicId is { } topic) query = query.Where(x => x.TopicId == topic);
@@ -64,7 +64,7 @@ public sealed class OpacItems(ICrudDbContext db)
 
     public async Task<OpacItemDetail> GetAsync(Guid publicId, CancellationToken ct)
     {
-        var item = await db.Set<EbookItem>().AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == publicId && x.Status == IHasStatus.Active, ct)
+        var item = await db.Set<EbookItem>().AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == publicId && x.Status == IHasStatus.Active && !x.HiddenByTenant, ct)
             ?? throw new NotFoundException("Tài liệu số", publicId);
         var collectionName = item.CollectionId is { } c
             ? await db.Set<EbookCollection>().AsNoTracking().Where(x => x.Id == c).Select(x => x.Name).FirstOrDefaultAsync(ct) : null;
@@ -85,7 +85,7 @@ public sealed class OpacItems(ICrudDbContext db)
     /// <summary>Tài liệu số liên kết với một biểu ghi sách in (nếu có và đã Xuất bản) — cho trang chi tiết sách in ở catalog hiện
     /// banner "Có bản điện tử". Null nếu không có liên kết hoặc tài liệu chưa xuất bản.</summary>
     public Task<EbookByBibSummary?> FindByLinkedBibAsync(Guid bibPublicId, CancellationToken ct) =>
-        db.Set<EbookItem>().AsNoTracking().Where(x => x.LinkedBibPublicId == bibPublicId && x.Status == IHasStatus.Active)
+        db.Set<EbookItem>().AsNoTracking().Where(x => x.LinkedBibPublicId == bibPublicId && x.Status == IHasStatus.Active && !x.HiddenByTenant)
             .Select(x => new EbookByBibSummary(x.PublicId, x.Title, x.Free)).FirstOrDefaultAsync(ct);
 }
 

@@ -5,7 +5,7 @@ import { Api, PlatformStatsRequest, TenantSummary, errorMessage, saveFile } from
 import { LNumberPipe, Language } from '../../core/i18n';
 import { DateInput } from '../../shared/date-input';
 
-type Tab = 'readers' | 'loans' | 'fines' | 'items';
+type Tab = 'readers' | 'loans' | 'fines' | 'items' | 'digital';
 /** now: số liệu hiện tại (không theo kỳ lọc); money: tiền (đồng). */
 interface Col { key: string; label: string; now?: boolean; money?: boolean; }
 type Values = Partial<Record<string, number>>;
@@ -44,6 +44,21 @@ const COLUMNS: Record<Tab, Col[]> = {
     { key: 'lost', label: 'PLATFORM_STATS.ITEMS_LOST', now: true },
     { key: 'liquidated', label: 'PLATFORM_STATS.LIQUIDATED', now: true },
   ],
+  digital: [
+    { key: 'titles', label: 'PLATFORM_STATS.DIGITAL_TITLES', now: true },
+    { key: 'published', label: 'PLATFORM_STATS.DIGITAL_PUBLISHED', now: true },
+    { key: 'added', label: 'PLATFORM_STATS.DIGITAL_ADDED' },
+    { key: 'files', label: 'PLATFORM_STATS.DIGITAL_FILES', now: true },
+    { key: 'storageMb', label: 'PLATFORM_STATS.DIGITAL_STORAGE', now: true },
+    { key: 'views', label: 'PLATFORM_STATS.DIGITAL_VIEWS' },
+    { key: 'downloads', label: 'PLATFORM_STATS.DIGITAL_DOWNLOADS' },
+    { key: 'readSessions', label: 'PLATFORM_STATS.DIGITAL_SESSIONS' },
+    { key: 'readers', label: 'PLATFORM_STATS.DIGITAL_READERS' },
+    { key: 'loans', label: 'PLATFORM_STATS.DIGITAL_LOANS' },
+    { key: 'activeLoans', label: 'PLATFORM_STATS.DIGITAL_ACTIVE_LOANS', now: true },
+    { key: 'reservations', label: 'PLATFORM_STATS.DIGITAL_RESERVATIONS' },
+    { key: 'pendingReservations', label: 'PLATFORM_STATS.DIGITAL_PENDING_RESERVATIONS', now: true },
+  ],
 };
 
 const TABS: { key: Tab; label: string; icon: string; hint?: string }[] = [
@@ -51,6 +66,7 @@ const TABS: { key: Tab; label: string; icon: string; hint?: string }[] = [
   { key: 'loans', label: 'PLATFORM_STATS.TAB_LOANS', icon: 'swap_horiz' },
   { key: 'fines', label: 'PLATFORM_STATS.TAB_FINES', icon: 'gavel', hint: 'PLATFORM_STATS.FINES_HINT' },
   { key: 'items', label: 'PLATFORM_STATS.TAB_ITEMS', icon: 'menu_book', hint: 'PLATFORM_STATS.ITEMS_HINT' },
+  { key: 'digital', label: 'PLATFORM_STATS.TAB_DIGITAL', icon: 'auto_stories', hint: 'PLATFORM_STATS.DIGITAL_HINT' },
 ];
 
 /**
@@ -202,7 +218,7 @@ export class PlatformStats implements OnInit {
   protected readonly hideEmpty = signal(false);
   protected readonly sort = signal<string>('');
   /** Số liệu theo nguồn: readers | loans | fines | items → đơn vị → giá trị. */
-  private readonly data = signal<Record<Tab, Map<number, Values>>>({ readers: new Map(), loans: new Map(), fines: new Map(), items: new Map() });
+  private readonly data = signal<Record<Tab, Map<number, Values>>>({ readers: new Map(), loans: new Map(), fines: new Map(), items: new Map(), digital: new Map() });
   protected readonly errors = signal<Record<string, string | null>>({});
   protected from = '';
   protected to = '';
@@ -289,6 +305,8 @@ export class PlatformStats implements OnInit {
         this.put('fines', r.fines);
       }, fail('loans')),
       this.api.platformItemStats(body).then((r) => this.put('items', r), fail('items')),
+      // Dung lượng server trả theo byte → hiển thị MB (1 chữ số thập phân).
+      this.api.platformDigitalStats(body).then((r) => this.put('digital', r.map((x) => ({ ...x, storageMb: Math.round((x.storageBytes / 1048576) * 10) / 10 }))), fail('digital')),
     ]);
     this.loading.set(false);
   }

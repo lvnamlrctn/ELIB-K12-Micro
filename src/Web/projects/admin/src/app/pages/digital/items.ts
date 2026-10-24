@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -9,7 +10,7 @@ import { ConfirmDelete, Loading, Modal, Paginator } from '../../shared/ui';
 import { ItemCover } from './item-cover';
 import { ItemForm } from './item-form';
 import { ItemExport, ItemImport, ItemMove, OptionItem, TOGGLE_CLASS, stamp } from './item-tools';
-import { ContentStatus, ItemCapabilities, ItemsApi } from './items-api';
+import { ContentStatus, ItemCapabilities, ItemsApi, SharedSyncStatus } from './items-api';
 import { DateInput } from '../../shared/date-input';
 
 type TreeRow = { id: number; publicId: string; name: string; parentId: number | null; sortOrder: number };
@@ -33,9 +34,25 @@ const emptyFilters = (): Filters => ({
  */
 @Component({
   selector: 'app-digital-items',
-  imports: [DateInput, FormsModule, RouterLink, ConfirmDelete, ItemCover, ItemExport, ItemForm, ItemImport, ItemMove, Loading, Modal, Paginator, TranslatePipe],
+  imports: [DatePipe, DateInput, FormsModule, RouterLink, ConfirmDelete, ItemCover, ItemExport, ItemForm, ItemImport, ItemMove, Loading, Modal, Paginator, TranslatePipe],
   template: `
     <div class="mb-5"><h4 class="page-title">{{ 'DIGITAL_DOC.TITLE' | translate }}</h4></div>
+    @if (shared(); as sh) {
+      <div class="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-indigo-900">
+        <span class="material-icons text-[20px]">hub</span>
+        <div class="flex-1 min-w-[16rem]">
+          <div class="font-semibold">{{ 'DIGITAL_DOC.SHARED_SOURCE' | translate }}</div>
+          <div class="text-xs text-indigo-800">
+            @if (sh.lastRunAt) { {{ 'DIGITAL_DOC.SHARED_LAST' | translate: { at: (sh.lastRunAt | date: 'dd/MM/yyyy HH:mm'), applied: sh.applied, pending: sh.pending, failed: sh.failed } }} }
+            @else { {{ 'DIGITAL_DOC.SHARED_NOT_RUN' | translate }} }
+            @if (sh.error) { <span class="text-red-700"> · {{ sh.error }}</span> }
+          </div>
+        </div>
+        @if (can('edit')) {
+          <button type="button" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50" [disabled]="busy()" (click)="runShared()">{{ 'DIGITAL_DOC.SHARED_RUN' | translate }}</button>
+        }
+      </div>
+    }
 
     <div class="panel !p-0">
       <button type="button" class="w-full flex items-center justify-between px-4 py-3 text-left" (click)="filtersCollapsed.set(!filtersCollapsed())" [attr.aria-expanded]="!filtersCollapsed()">
@@ -144,6 +161,12 @@ const emptyFilters = (): Filters => ({
                     @else { <div class="w-10 h-14 rounded border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0"><span class="material-icons text-gray-400">menu_book</span></div> }
                     <div class="min-w-0">
                       <div class="text-sm font-semibold text-blue-700 line-clamp-2">{{ i.title }}</div>
+                      @if (i.isReplica) {
+                        <div class="mt-0.5 flex flex-wrap gap-1">
+                          <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700"><span class="material-icons text-[12px]">hub</span>{{ 'DIGITAL_DOC.SHARED_BADGE' | translate }}</span>
+                          @if (i.hiddenByTenant) { <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600"><span class="material-icons text-[12px]">visibility_off</span>{{ 'DIGITAL_DOC.SHARED_HIDDEN' | translate }}</span> }
+                        </div>
+                      }
                       @if (i.author) { <div class="text-xs text-gray-600 flex items-center gap-1"><span class="material-icons text-[13px]">person</span> {{ i.author }}</div> }
                       @if (i.publishYear || i.publishDate || i.publisher) {
                         <div class="text-xs text-gray-500 flex items-center gap-1"><span class="material-icons text-[13px]">calendar_today</span>
@@ -171,18 +194,21 @@ const emptyFilters = (): Filters => ({
                 </td>
                 <td class="td text-center" (click)="$event.stopPropagation()">
                   <label class="relative inline-flex items-center" [class.cursor-pointer]="can('edit')">
-                    <input type="checkbox" class="sr-only peer" [checked]="i.status === 2" [disabled]="!can('edit')" (change)="setStatus(i)" [attr.aria-label]="'DIGITAL_DOC.PUBLISHED' | translate" />
+                    <input type="checkbox" class="sr-only peer" [checked]="i.status === 2" [disabled]="!can('edit') || i.isReplica" (change)="setStatus(i)" [attr.aria-label]="'DIGITAL_DOC.PUBLISHED' | translate" />
                     <span [class]="toggle"></span>
                   </label>
                 </td>
                 <td class="td" (click)="$event.stopPropagation()">
                   <div class="flex items-center justify-center gap-1">
-                    @if (can('edit')) {
+                    @if (can('edit') && i.isReplica) {
+                      <button type="button" class="w-7 h-7 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center" (click)="toggleHidden(i)"
+                        [title]="(i.hiddenByTenant ? 'DIGITAL_DOC.SHARED_SHOW' : 'DIGITAL_DOC.SHARED_HIDE') | translate"><span class="material-icons text-[15px] leading-none">{{ i.hiddenByTenant ? 'visibility' : 'visibility_off' }}</span></button>
+                    } @else if (can('edit')) {
                       <button type="button" class="w-7 h-7 rounded bg-purple-50 text-purple-600 hover:bg-purple-100 flex items-center justify-center" (click)="coverFor.set(i)" [title]="'DIGITAL_DOC.COVER_FROM_PDF' | translate"><span class="material-icons text-[15px] leading-none">image</span></button>
                       <button type="button" class="w-7 h-7 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center" (click)="edit(i)" [title]="'COMMON.EDIT' | translate"><span class="material-icons text-[15px] leading-none">edit</span></button>
                     }
                     <a [routerLink]="['/digital-loans']" [queryParams]="{ item: i.publicId }" class="w-7 h-7 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center" [title]="'DIGITAL_DOC.LOANS' | translate"><span class="material-icons text-[15px] leading-none">assignment_return</span></a>
-                    @if (can('delete')) {
+                    @if (can('delete') && !i.isReplica) {
                       <button type="button" class="w-7 h-7 rounded bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center" (click)="deleting.set(i)" [title]="'COMMON.DELETE' | translate"><span class="material-icons text-[15px] leading-none">delete</span></button>
                     }
                   </div>
@@ -254,6 +280,8 @@ export class DigitalItems implements OnInit {
   protected readonly page = signal<Page<EbookItem> | null>(null);
   protected readonly loading = signal(false);
   protected readonly busy = signal(false);
+  /** Trạng thái đồng bộ dữ liệu dùng chung — chỉ có ở đơn vị SHARED (đơn vị khác nhận 403 → null). */
+  protected readonly shared = signal<SharedSyncStatus | null>(null);
   protected readonly ticked = signal<Set<string>>(new Set());
   protected readonly allResults = signal(false);
 
@@ -297,6 +325,8 @@ export class DigitalItems implements OnInit {
     void this.load();
     void this.loadOptions();
     if (this.can('view')) this.itemsApi.capabilities().then((c) => this.caps.set(c)).catch(() => this.caps.set(null));
+    // Chỉ đơn vị SHARED có trạng thái đồng bộ; đơn vị khác không gọi (tránh 403 mỗi lần mở trang).
+    if (this.can('edit') && this.session.features()?.code === 'SHARED') this.itemsApi.sharedSyncStatus().then((s) => this.shared.set(s.isShared ? s : null)).catch(() => this.shared.set(null));
   }
 
   protected can(action: string): boolean {
@@ -409,6 +439,27 @@ export class DigitalItems implements OnInit {
   protected closeForm(): void {
     this.formOpen.set(false);
     this.editing.set(null);
+  }
+
+  protected async toggleHidden(item: EbookItem): Promise<void> {
+    try {
+      const updated = await this.itemsApi.setItemHidden(item.publicId, !item.hiddenByTenant);
+      item.hiddenByTenant = updated.hiddenByTenant;
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    }
+  }
+
+  protected async runShared(): Promise<void> {
+    this.busy.set(true);
+    try {
+      this.shared.set(await this.itemsApi.sharedSyncRun());
+      this.toastr.success('DIGITAL_DOC.SHARED_QUEUED');
+    } catch (e) {
+      this.toastr.error(errorMessage(e));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async setStatus(item: EbookItem): Promise<void> {

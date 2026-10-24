@@ -18,7 +18,7 @@ public sealed class ReaderReading(ICrudDbContext db, EbookLoanResource loans, Ti
     public async Task<ReadProgressDto> BeatAsync(Guid readerPublicId, ReadBeatRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var item = await db.Set<EbookItem>().AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == request.EbookPublicId && x.Status == IHasStatus.Active, ct)
+        var item = await db.Set<EbookItem>().AsNoTracking().FirstOrDefaultAsync(x => x.PublicId == request.EbookPublicId && x.Status == IHasStatus.Active && !x.HiddenByTenant, ct)
             ?? throw new NotFoundException("Tài liệu số", request.EbookPublicId);
         if (!item.Free && !await loans.ValidateAccessAsync(item.Id, readerPublicId, ct))
             throw new BusinessRuleException("EBOOK_NOT_BORROWED", "Bạn chưa mượn tài liệu này hoặc đã hết hạn mượn.", 403);

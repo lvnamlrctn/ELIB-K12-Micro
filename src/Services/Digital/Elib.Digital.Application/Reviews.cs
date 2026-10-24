@@ -112,7 +112,7 @@ public sealed class OpacReviews(ICrudDbContext db)
     public async Task<OpacReviewSummary> SubmitAsync(Guid itemPublicId, OpacReviewSubmission submission, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(submission);
-        var itemId = await db.Set<EbookItem>().Where(i => i.PublicId == itemPublicId && i.Status == IHasStatus.Active).Select(i => i.Id).FirstOrDefaultAsync(ct);
+        var itemId = await db.Set<EbookItem>().Where(i => i.PublicId == itemPublicId && i.Status == IHasStatus.Active && !i.HiddenByTenant).Select(i => i.Id).FirstOrDefaultAsync(ct);
         if (itemId == 0) throw new NotFoundException("Tài liệu số", itemPublicId);
 
         // Bot điền ô bẫy → giả vờ nhận để không dò được, nhưng không lưu gì.
@@ -159,7 +159,7 @@ public sealed class ReaderFavorites(ICrudDbContext db)
     /// <summary>Thêm yêu thích — vô hại nếu gọi lại khi đã có (idempotent, LRC's AddFavoriteAsync cũng trả bản ghi cũ nếu trùng).</summary>
     public async Task AddAsync(Guid itemPublicId, Guid readerPublicId, CancellationToken ct)
     {
-        var itemId = await db.Set<EbookItem>().Where(i => i.PublicId == itemPublicId && i.Status == IHasStatus.Active).Select(i => i.Id).FirstOrDefaultAsync(ct);
+        var itemId = await db.Set<EbookItem>().Where(i => i.PublicId == itemPublicId && i.Status == IHasStatus.Active && !i.HiddenByTenant).Select(i => i.Id).FirstOrDefaultAsync(ct);
         if (itemId == 0) throw new NotFoundException("Tài liệu số", itemPublicId);
         if (await db.Set<EbookFavorite>().AnyAsync(f => f.EbookItemId == itemId && f.ReaderPublicId == readerPublicId, ct)) return;
 

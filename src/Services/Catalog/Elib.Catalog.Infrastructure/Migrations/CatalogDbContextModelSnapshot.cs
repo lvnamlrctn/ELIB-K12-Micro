@@ -22,6 +22,46 @@ namespace Elib.Catalog.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Elib.BuildingBlocks.TenantReplica.SharedSyncState", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Dataset")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("dataset");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<long>("TenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("Watermark")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("watermark");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shared_sync_states");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_shared_sync_states_tenant_id");
+
+                    b.HasIndex("TenantId", "Dataset")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shared_sync_states_tenant_id_dataset");
+
+                    b.ToTable("shared_sync_states", (string)null);
+                });
+
             modelBuilder.Entity("Elib.BuildingBlocks.TenantReplica.TenantModuleReplica", b =>
                 {
                     b.Property<long>("TenantId")
@@ -383,6 +423,12 @@ namespace Elib.Catalog.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsReplica")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_replica");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -471,6 +517,12 @@ namespace Elib.Catalog.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsReplica")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_replica");
 
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uuid")

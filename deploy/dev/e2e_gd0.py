@@ -289,6 +289,8 @@ def system_steps(sysb, accounts, admin_user):
     s, _, body = sysb.request("GET", "/api/system/health", token=sys_token)
     health = json.loads(body) if s == 200 else {}
     expect(s == 200 and health.get("services"), "sức khoẻ nền tảng (gateway ping /ready): " + ", ".join(f"{x['name']}={x['status']}" for x in health.get("services", [])), body[:200])
+    s, _, body = sysb.request("POST", "/api/system/digital/stats/digital", token=sys_token, json_body={"tenantIds": [], "from": None, "to": None})
+    expect(s == 200 and isinstance(json.loads(body), list), "thống kê tài liệu số toàn hệ thống (sysadmin)", f"{s} {body[:200]}")
     print(f"  [THÔNG TIN]  hàng đợi _error RabbitMQ: {health.get('queues') if health.get('queues') is not None else 'không đọc được — ' + str(health.get('queuesDetail'))}")
 
     print("2. Tạo đơn vị + khởi tạo")
@@ -1295,6 +1297,10 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, text = tb.request("GET", "/api/system/health", token=token)
     expect(s == 403, "sức khoẻ nền tảng: cán bộ đơn vị bị từ chối", f"{s} {text[:200]}")
 
+    if sys_token and "DIGITAL" in mods:
+        print("21g. Dữ liệu dùng chung: đơn vị SHARED tạo tài liệu số + từ điển → tự sao chỉ-đọc sang đơn vị; đơn vị chỉ ẩn/hiện")
+        shared_data_steps(sysb, sys_token, tb, token, accounts, tag)
+
     print("22. OPAC mở rộng: MARC/ISBD, ảnh bìa, thống kê tra cứu, Z39.50, giới hạn lượt tra cứu")
     s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
         {"tag": "020", "ind1": " ", "ind2": " ", "subfields": [{"code": "a", "value": "9780747532699"}]},
@@ -1713,6 +1719,123 @@ def make_pdf(text):
     for offset in offsets:
         out += f"{offset:010d} 00000 n \n".encode()
     return out + f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+
+
+def shared_data_steps(sysb, sys_token, tb, token, accounts, tag):
+    """21g. Đơn vị chủ SHARED (đơn vị thường mã SHARED) → bản sao chỉ đọc ở mọi đơn vị có license; đơn vị ẩn/hiện được."""
+    code, sub = "SHARED", "shared"
+    s, _, body = sysb.request("GET", "/api/system/tenant/tenants?search=shared", token=sys_token)
+    found = [t for t in json.loads(body)["items"] if t["code"] == code]
+    if found:
+        shared = found[0]; step("đơn vị SHARED đã có từ lần chạy trước")
+    else:
+        s, _, body = sysb.request("POST", "/api/system/tenant/tenants", token=sys_token, json_body={
+            "code": code, "name": "Dữ liệu dùng chung toàn hệ thống", "subdomain": sub, "licenses": [{"moduleCode": m} for m in ["CATALOG", "DIGITAL"]]})
+        expect(s == 201, "tạo đơn vị SHARED", body)
+        shared = json.loads(body)
+    for _ in range(60):
+        s, _, body = sysb.request("GET", f"/api/system/tenant/tenants/{shared['publicId']}", token=sys_token)
+        shared = json.loads(body)
+        if shared["status"] != "Provisioning": break
+        time.sleep(1)
+    expect(shared["status"] == "Active", "SHARED khởi tạo xong: Active", json.dumps(shared)[:300])
+    if "SHARED_ADMIN_PASSWORD" not in accounts and "SHARED_ADMIN_TEMP" not in accounts:
+        temp = "Tam" + secrets.token_hex(6) + "7"
+        s, _, body = sysb.request("POST", f"/api/system/identity/tenants/{shared['id']}/admins", token=sys_token,
+                                  json_body={"userName": "shared-admin", "fullName": "Quản trị dữ liệu dùng chung", "email": None, "password": temp})
+        expect(s == 201, "tạo tài khoản shared-admin", body)
+        accounts["SHARED_ADMIN_TEMP"] = temp
+        accounts["SHARED_ADMIN_URL"] = f"https://{sub}.{DOMAIN}/admin/"
+        save(accounts)
+    host = f"{sub}.{DOMAIN}"
+    origin = f"https://{host}"
+    sb = Browser(GATEWAY, host=host, proto="https")
+    password = accounts.get("SHARED_ADMIN_PASSWORD") or accounts["SHARED_ADMIN_TEMP"]
+    stoken = pkce_login(sb, origin, "shared-admin", password)
+    s, _, body = sb.request("GET", "/api/me", token=stoken)
+    if json.loads(body)["mustChangePassword"]:
+        new = "Demo" + secrets.token_hex(6) + "5"
+        s, _, body = sb.request("POST", "/api/me/password", token=stoken, json_body={"currentPassword": password, "newPassword": new})
+        expect(s == 204, "shared-admin đổi mật khẩu lần đầu", body)
+        accounts["SHARED_ADMIN_PASSWORD"] = new
+        accounts.pop("SHARED_ADMIN_TEMP", None)
+        save(accounts)
+
+    D, C = "/api/admin/digital", "/api/admin/catalog"
+
+    def sj(method, path, body=None):
+        st, _, text = sb.request(method, path, token=stoken, json_body=body)
+        return st, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    def tj(method, path, body=None):
+        st, _, text = tb.request(method, path, token=token, json_body=body)
+        return st, text, (json.loads(text) if text.startswith(("{", "[")) else {})
+
+    s, text, _ = tj("GET", f"{D}/shared-sync/Status")
+    expect(s == 403 and "NOT_SHARED_TENANT" in text, "đơn vị thường không xem được đồng bộ dữ liệu dùng chung", text[:200])
+    s, text, st0 = sj("GET", f"{D}/shared-sync/Status")
+    expect(s == 200 and st0.get("isShared") is True, "đơn vị SHARED xem được trạng thái đồng bộ", text[:200])
+
+    title = f"Tài liệu dùng chung e2e {tag}"
+    term = f"e2e-chung-{tag}"
+    s, text, gitem = sj("POST", f"{D}/items/Add", {"title": title, "author": "Tác giả chung", "free": True, "status": 2})
+    expect(s == 201, "SHARED tạo tài liệu số gốc", text[:200])
+    s, text, _ = sj("POST", f"{C}/dic-keywords/Add", {"value": term})
+    expect(s == 201, "SHARED tạo mục từ điển từ khoá gốc", text[:200])
+    for service in ("digital", "catalog"):
+        s, text, _ = sj("POST", f"/api/admin/{service}/shared-sync/Run")
+        expect(s == 200, f"yêu cầu đồng bộ ngay ({service})", text[:200])
+
+    replica = None
+    for _ in range(90):
+        s, _, page = tj("POST", f"{D}/items/Search", {"title": title, "pageSize": 5})
+        rows = [r for r in page.get("items", []) if r["title"] == title]
+        if rows:
+            replica = rows[0]; break
+        time.sleep(2)
+    expect(replica is not None, "đơn vị nhận bản sao tài liệu dùng chung (đồng bộ nền)")
+    expect(replica["isReplica"] is True and replica["hiddenByTenant"] is False, "bản sao có cờ Dùng chung, chưa ẩn", json.dumps(replica)[:200])
+    s, text, terms = tj("POST", f"{C}/dic-keywords/Search", {"search": term, "pageSize": 5})
+    expect(s == 200 and any(t["value"] == term and t["isReplica"] for t in terms.get("items", [])), "đơn vị nhận mục từ điển dùng chung", text[:200])
+
+    s, text, _ = tj("PUT", f"{D}/items/Update/{replica['publicId']}", {"title": "Sửa trộm"})
+    expect(s in (403, 409) and "SHARED_READ_ONLY" in text, "đơn vị không sửa được bản sao", f"{s} {text[:200]}")
+    s, text, _ = tj("DELETE", f"{D}/items/Delete/{replica['publicId']}")
+    expect(s in (403, 409) and "SHARED_READ_ONLY" in text, "đơn vị không xoá được bản sao", f"{s} {text[:200]}")
+
+    s, text, hid = tj("PUT", f"{D}/items/{replica['publicId']}/Hidden", {"hidden": True})
+    expect(s == 200 and hid["hiddenByTenant"] is True, "đơn vị ẩn bản sao", text[:200])
+    s, _, _ = tb.request("GET", f"/api/opac/digital/browse/items/{replica['publicId']}")
+    expect(s == 404, f"OPAC không còn thấy tài liệu đã ẩn ({s})")
+    s, text, _ = tj("PUT", f"{D}/items/{replica['publicId']}/Hidden", {"hidden": False})
+    expect(s == 200, "đơn vị hiện lại bản sao", text[:200])
+    s, _, _ = tb.request("GET", f"/api/opac/digital/browse/items/{replica['publicId']}")
+    expect(s == 200, f"OPAC thấy lại tài liệu ({s})")
+
+    # Gốc sửa → bản sao cập nhật; gốc xoá → bản sao ngừng hiển thị
+    s, text, _ = sj("PUT", f"{D}/items/Update/{gitem['publicId']}", {"title": title + " (sửa)", "author": "Tác giả chung", "free": True, "status": 2})
+    expect(s == 200, "SHARED sửa tài liệu gốc", text[:200])
+    time.sleep(6)  # mốc đồng bộ chồng 5 giây: lần chạy kế tiếp mới thấy thay đổi cùng giây
+    sj("POST", f"{D}/shared-sync/Run")
+    updated = False
+    for _ in range(90):
+        s, _, page = tj("POST", f"{D}/items/Search", {"title": title + " (sửa)", "pageSize": 5})
+        if any(r["title"] == title + " (sửa)" for r in page.get("items", [])):
+            updated = True; break
+        time.sleep(2)
+    expect(updated, "bản sao cập nhật theo tài liệu gốc")
+
+    s, text, _ = sj("DELETE", f"{D}/items/Delete/{gitem['publicId']}")
+    expect(s in (200, 204), "SHARED xoá tài liệu gốc", text[:200])
+    time.sleep(6)
+    sj("POST", f"{D}/shared-sync/Run")
+    gone = False
+    for _ in range(90):
+        s, _, _ = tb.request("GET", f"/api/opac/digital/browse/items/{replica['publicId']}")
+        if s == 404:
+            gone = True; break
+        time.sleep(2)
+    expect(gone, "gốc bị xoá → bản sao không còn trên OPAC của đơn vị")
 
 
 def digital_content_steps(tb, token, tag):

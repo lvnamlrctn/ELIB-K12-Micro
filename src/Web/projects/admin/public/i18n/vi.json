@@ -110,7 +110,8 @@
     "UNSAVED_TITLE": "Chưa lưu thay đổi",
     "UNSAVED_MESSAGE": "Bạn có thay đổi chưa lưu. Rời khỏi trang này thì các thay đổi sẽ mất.",
     "UNSAVED_LEAVE": "Rời trang, bỏ thay đổi",
-    "UNSAVED_STAY": "Ở lại"
+    "UNSAVED_STAY": "Ở lại",
+    "SHARED": "Dùng chung"
   },
   "DATATABLE": {
     "SEARCH": "Tìm kiếm:",
@@ -2885,7 +2886,22 @@
     "HIDE_EMPTY": "Ẩn đơn vị chưa có số liệu",
     "EXPORT": "Xuất CSV",
     "LOAD_FAILED": "Không tải được số liệu",
-    "TENANTS_FAILED": "Không tải được danh sách đơn vị"
+    "TENANTS_FAILED": "Không tải được danh sách đơn vị",
+    "TAB_DIGITAL": "Tài liệu số",
+    "DIGITAL_HINT": "Dung lượng là tổng kích thước khai báo của các file (không phải dung lượng thật trên kho lưu trữ); tài liệu bổ sung theo ngày nộp; đang mượn tính các lượt chưa trả và chưa hết hạn.",
+    "DIGITAL_TITLES": "Đầu tài liệu",
+    "DIGITAL_PUBLISHED": "Đang xuất bản",
+    "DIGITAL_ADDED": "Bổ sung",
+    "DIGITAL_FILES": "Số file",
+    "DIGITAL_STORAGE": "Dung lượng (MB)",
+    "DIGITAL_VIEWS": "Lượt xem",
+    "DIGITAL_DOWNLOADS": "Lượt tải",
+    "DIGITAL_SESSIONS": "Phiên đọc",
+    "DIGITAL_READERS": "Bạn đọc đọc",
+    "DIGITAL_LOANS": "Lượt mượn",
+    "DIGITAL_ACTIVE_LOANS": "Đang mượn",
+    "DIGITAL_RESERVATIONS": "Đặt trước",
+    "DIGITAL_PENDING_RESERVATIONS": "Đặt trước đang chờ"
   },
   "SEARCH_STATS_PAGE": {
     "TITLE": "Thống kê tra cứu (OPAC)",
@@ -4409,7 +4425,16 @@
     "AI_NEEDS_TITLE": "Nhập nhan đề trước khi nhờ AI gợi ý",
     "AI_NOTHING": "AI không đưa ra gợi ý nào",
     "IMPORT_HINT_DSPACE": "Một file .zip theo chuẩn DSpace Simple Archive: mỗi thư mục là một tài liệu gồm dublin_core.xml, contents (tuỳ chọn) và các file PDF. File khác PDF bị bỏ qua.",
-    "IMPORT_PICK_DSPACE": "Click để chọn file .zip"
+    "IMPORT_PICK_DSPACE": "Click để chọn file .zip",
+    "SHARED_SOURCE": "Đơn vị chủ dữ liệu dùng chung",
+    "SHARED_LAST": "Lần chạy cuối {{at}} — đã áp dụng {{applied}} đơn vị, còn chờ {{pending}}, lỗi {{failed}}. Tài liệu ở đây tự được sao (chỉ đọc) sang mọi đơn vị.",
+    "SHARED_NOT_RUN": "Chưa có lượt đồng bộ nào từ khi dịch vụ khởi động (chạy tự động mỗi 10 phút).",
+    "SHARED_RUN": "Đồng bộ ngay",
+    "SHARED_QUEUED": "Đã yêu cầu đồng bộ.",
+    "SHARED_BADGE": "Dùng chung",
+    "SHARED_HIDDEN": "Đã ẩn",
+    "SHARED_HIDE": "Ẩn khỏi OPAC của đơn vị",
+    "SHARED_SHOW": "Hiện lại trên OPAC"
   },
   "DATE": {
     "PICK": "Chọn ngày",

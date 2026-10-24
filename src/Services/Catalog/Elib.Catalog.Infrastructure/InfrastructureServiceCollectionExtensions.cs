@@ -24,6 +24,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddTenantReplica<CatalogDbContext>(ServiceName);
         services.AddTenantReplicaBootstrap<CatalogDbContext>(configuration);
         services.AddScoped<ITenantSeeder, CatalogTenantSeeder>();
+        // Dữ liệu dùng chung từ đơn vị SHARED (từ điển, ISBD) → bản sao chỉ đọc ở mọi đơn vị.
+        services.AddSharedSync<CatalogDbContext>();
+        services.AddSharedDataset<DictionarySharedDataset>();
+        services.AddSharedDataset<IsbdSharedDataset>();
         services.Configure<CatalogOptions>(configuration.GetSection(CatalogOptions.SectionName));
         services.AddHttpClient<ICoverLookup, CoverLookup>(CoverLookup.HttpClientName, c =>
         {

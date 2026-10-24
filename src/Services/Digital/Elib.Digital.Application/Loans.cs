@@ -219,7 +219,7 @@ public sealed class EbookLoanResource(ICrudDbContext db, TimeProvider clock, Ebo
     /// </summary>
     public async Task<EbookLoanDto> BorrowAsync(Guid itemPublicId, Guid readerPublicId, CancellationToken ct)
     {
-        var item = await Db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active, ct)
+        var item = await Db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active && !x.HiddenByTenant, ct)
             ?? throw new NotFoundException("Tài liệu số", itemPublicId);
         var reader = await Db.Set<PatronReplica>().AsNoTracking().FirstOrDefaultAsync(r => r.ReaderPublicId == readerPublicId, ct);
         var byCollection = await allocator.ByCollectionPolicyAsync(reader?.ReaderTypeId, item.CollectionId, ct);
@@ -408,7 +408,7 @@ public sealed class EbookReservationResource(ICrudDbContext db, TimeProvider clo
     /// </summary>
     public async Task<EbookReservationDto> ReserveAsync(Guid itemPublicId, Guid readerPublicId, CancellationToken ct)
     {
-        var item = await Db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active, ct)
+        var item = await Db.Set<EbookItem>().FirstOrDefaultAsync(x => x.PublicId == itemPublicId && x.Status == IHasStatus.Active && !x.HiddenByTenant, ct)
             ?? throw new NotFoundException("Tài liệu số", itemPublicId);
         var now = clock.GetUtcNow();
 

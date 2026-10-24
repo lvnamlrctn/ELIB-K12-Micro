@@ -149,9 +149,9 @@ public sealed class HttpMediaFileAccess(IHttpClientFactory clients, ITenantConte
 
     private sealed record DownloadResponse(string Url, DateTimeOffset? ExpiresAt);
 
-    public async Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, CancellationToken ct)
+    public async Task<EbookFileUrl> SignedUrlAsync(Guid mediaFileId, long? sourceTenantId, CancellationToken ct)
     {
-        var url = $"internal/tenants/{tenant.RequireTenantId()}/files/{mediaFileId}/download";
+        var url = $"internal/tenants/{sourceTenantId ?? tenant.RequireTenantId()}/files/{mediaFileId}/download";
         HttpResponseMessage response;
         try
         {

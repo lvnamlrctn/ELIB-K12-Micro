@@ -159,7 +159,8 @@ public sealed partial class EbookItemResource
         if (rows.Count > MaxDspaceItems)
             throw new BusinessRuleException("EXPORT_TOO_MANY_ROWS", $"Xuất kèm file tối đa {MaxDspaceItems} tài liệu một lần — chọn ít hơn.");
         var ids = rows.Select(r => r.Item.Id).ToList();
-        var files = (await Db.Set<EbookFile>().AsNoTracking().Where(f => ids.Contains(f.EbookItemId)).Where(PdfFiles.Predicate)
+        // File của tài liệu dùng chung nằm ở kho đơn vị chủ — gói xuất của đơn vị chỉ mang metadata cho các tài liệu đó.
+        var files = (await Db.Set<EbookFile>().AsNoTracking().Where(f => ids.Contains(f.EbookItemId) && f.SourcePublicId == null).Where(PdfFiles.Predicate)
             .OrderBy(f => f.SortOrder).ThenBy(f => f.Id).ToListAsync(ct)).GroupBy(f => f.EbookItemId).ToDictionary(g => g.Key, g => g.ToList());
         var fileCount = files.Values.Sum(v => v.Count);
         if (fileCount > MaxDspaceExportFiles) throw new BusinessRuleException("EXPORT_TOO_MANY_FILES", $"Có {fileCount} file — vượt giới hạn {MaxDspaceExportFiles} file một lần xuất.");

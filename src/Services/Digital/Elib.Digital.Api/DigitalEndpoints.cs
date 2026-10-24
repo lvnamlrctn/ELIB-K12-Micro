@@ -31,6 +31,10 @@ public static class DigitalEndpoints
 
     public static IEndpointRouteBuilder MapDigitalEndpoints(this IEndpointRouteBuilder app)
     {
+        // Thống kê toàn hệ thống — chỉ quản trị nền tảng (gateway /api/system/digital/** → /api/system/**).
+        app.MapPost("/api/system/stats/digital", async (PlatformStatsRequest request, PlatformDigitalStatsService s, CancellationToken ct) => await s.BuildAsync(request, ct))
+            .WithTags("PlatformStats").RequireAuthorization(new RequireSystemContextAttribute());
+
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
         var collections = api.MapCrud<EbookCollectionResource>("/collections", "DIGITAL_COLLECTIONS").WithTags("Collections");
@@ -55,6 +59,10 @@ public static class DigitalEndpoints
         // Bảng điều khiển (tab Tài liệu số): cùng quyền xem tài liệu số.
         api.MapGet("/dashboard", [Permission("DIGITAL_ITEMS", "view")] (DigitalDashboardService s, CancellationToken ct) => s.BuildAsync(ct)).WithTags("Dashboard");
 
+        // Đồng bộ dữ liệu dùng chung (chỉ đơn vị SHARED): xem trạng thái lượt chạy gần nhất và yêu cầu chạy ngay.
+        api.MapGet("/shared-sync/Status", [Permission("DIGITAL_ITEMS", "edit")] (SharedSyncControl c, CancellationToken ct) => c.StatusAsync(ct)).WithTags("SharedSync");
+        api.MapPost("/shared-sync/Run", [Permission("DIGITAL_ITEMS", "edit")] (SharedSyncControl c, CancellationToken ct) => c.RunAsync(ct)).WithTags("SharedSync");
+
         var reading = api.MapGroup("/reading-tracking").WithTags("ReadingTracking");
         reading.MapPost("/Search", [Permission("DIGITAL_READING", "view")] (ReadingSearch search, ReadingTracking t, CancellationToken ct) => t.SearchAsync(search, ct));
         reading.MapPost("/Statistics", [Permission("DIGITAL_READING", "view")] (ReadingStatsRequest request, ReadingTracking t, CancellationToken ct) => t.StatisticsAsync(request, ct));
@@ -77,6 +85,8 @@ public static class DigitalEndpoints
         items.MapPost("/BulkDelete", [Permission("DIGITAL_ITEMS", "delete")] (ItemSelection selection, EbookItemResource r, CancellationToken ct)
             => r.BulkDeleteAsync(selection, ct));
 
+        items.MapPut("/{publicId:guid}/Hidden", [Permission("DIGITAL_ITEMS", "edit")] (Guid publicId, SetHiddenRequest request, EbookItemResource r, CancellationToken ct)
+            => r.SetHiddenAsync(publicId, request.Hidden, ct));
         items.MapPut("/{publicId:guid}/cover", [Permission("DIGITAL_ITEMS", "edit")] (Guid publicId, SetCoverRequest request, EbookItemResource r, CancellationToken ct)
             => r.SetCoverAsync(publicId, request.CoverUrl, ct));
 
