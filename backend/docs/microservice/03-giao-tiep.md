@@ -68,7 +68,7 @@ ingress-nginx (TLS *.thuvientn.vn)
 | `BibPublished` / `BibUpdated` / `BibDeleted` | catalog | search, holdings, circulation, acquisition, digital | Index lại; cập nhật snapshot nhan đề, tác giả, phân loại |
 | `AuthorityUpdated` | catalog | search | Index lại các biểu ghi dùng tiêu đề chuẩn |
 | `OrderPlaced` / `ReceiptCompleted` | acquisition | holdings, reporting | Holdings tạo bản sách (barcode) chờ xử lý từ phiếu nhận |
-| `IssueReceived` | serials | holdings, search | Kỳ ấn phẩm mới về kho |
+| `IssueReceived` | — | — | **Không dùng.** Đã triển khai `serials` (đợt báo tạp chí): đóng tập gọi HTTP đồng bộ `/internal/tenants/{id}/serial-items/Register|Remove` của holdings (service token, idempotent theo `SerialBindingPublicId`) để biết ngay kết quả (trùng ĐKCB, thiếu biểu ghi) và quay lui được trong cùng yêu cầu — event bất đồng bộ không làm được. `BibChanged` (catalog) → `BibSnapshot` của serials; nhà cung cấp lấy qua HTTP `/internal/tenants/{id}/suppliers` của acquisition (tuỳ chọn: đơn vị không có Bổ sung thì danh sách rỗng) |
 | `ItemAdded` / `ItemUpdated` / `ItemStatusChanged` / `ItemRemoved` | holdings | circulation, search, reporting | Cập nhật `ItemReplica` (barcode, kho, điểm lưu thông, loại tài liệu, trạng thái vật lý) |
 | `LoanCreated` / `LoanRenewed` / `LoanReturned` | circulation | holdings, search, reporting, school, notification | Tình trạng sẵn có trên OPAC, thống kê, huy hiệu, biên nhận |
 | `LoanDueSoon` / `LoanOverdue` | circulation | notification | Nhắc hạn, báo quá hạn |

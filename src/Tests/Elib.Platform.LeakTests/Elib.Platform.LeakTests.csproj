@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\Services\Catalog\Elib.Catalog.Infrastructure\Elib.Catalog.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Holdings\Elib.Holdings.Infrastructure\Elib.Holdings.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Acquisition\Elib.Acquisition.Infrastructure\Elib.Acquisition.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Serials\Elib.Serials.Infrastructure\Elib.Serials.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Circulation\Elib.Circulation.Infrastructure\Elib.Circulation.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Search\Elib.Search.Infrastructure\Elib.Search.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Digital\Elib.Digital.Infrastructure\Elib.Digital.Infrastructure.csproj" />

@@ -1219,6 +1219,10 @@ namespace Elib.Holdings.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("receipt_public_id");
 
+                    b.Property<Guid?>("SerialBindingPublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("serial_binding_public_id");
+
                     b.Property<Guid?>("ShelfPublicId")
                         .HasColumnType("uuid")
                         .HasColumnName("shelf_public_id");
@@ -1284,6 +1288,9 @@ namespace Elib.Holdings.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ReceiptPublicId")
                         .HasDatabaseName("ix_items_tenant_id_receipt_public_id");
+
+                    b.HasIndex("TenantId", "SerialBindingPublicId")
+                        .HasDatabaseName("ix_items_tenant_id_serial_binding_public_id");
 
                     b.HasIndex("TenantId", "ShelfPublicId")
                         .HasDatabaseName("ix_items_tenant_id_shelf_public_id");

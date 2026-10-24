@@ -75,6 +75,9 @@ public sealed class Item : TenantEntity
     /// <summary>Dòng phiếu nhận — số ĐKCB của một dòng không vượt số bản nhận của dòng đó.</summary>
     public Guid? ReceiptLinePublicId { get; private set; }
 
+    /// <summary>Tập đóng báo/tạp chí (serials) đã tạo bản này — null nếu không phải bản của tập đóng.</summary>
+    public Guid? SerialBindingPublicId { get; private set; }
+
     /// <summary>Lượt mượn gần nhất (circulation sở hữu, nhận qua LoanChanged) — chỉ để hiển thị "đang mượn", không tăng Version.</summary>
     public Guid? LoanPublicId { get; private set; }
 
@@ -98,6 +101,9 @@ public sealed class Item : TenantEntity
 
     /// <summary>Gắn bản mới đăng ký với dòng phiếu nhận (đăng ký cá biệt từ màn phiếu nhận của phân hệ bổ sung).</summary>
     public void AttachReceipt(Guid receiptPublicId, Guid linePublicId) => (ReceiptPublicId, ReceiptLinePublicId) = (receiptPublicId, linePublicId);
+
+    /// <summary>Gắn bản mới đăng ký với tập đóng báo/tạp chí (serials gọi /internal khi đóng tập).</summary>
+    public void AttachSerialBinding(Guid bindingPublicId) => SerialBindingPublicId = bindingPublicId;
 
     public void Update(long? storeId, string? note)
     {

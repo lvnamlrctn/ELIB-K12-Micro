@@ -51,7 +51,9 @@ flowchart TB
   digital -->|EbookPublished, EbookTextExtracted| search
   search -->|RetrieveChunks gRPC| ai
   space -->|MatchFace gRPC| ai
-  serials -->|IssueReceived| holdings
+  serials -->|"HTTP /internal: serial-items Register/Remove"| holdings
+  serials -->|"HTTP /internal: suppliers (tuỳ chọn)"| acquisition
+  catalog -->|BibChanged| serials
 ```
 
 ## 3. Quyết định sở hữu cho các điểm coupling

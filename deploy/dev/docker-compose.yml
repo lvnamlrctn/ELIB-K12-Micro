@@ -42,6 +42,7 @@ services:
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?chạy ./init-env.sh trước}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD:?chạy ./init-env.sh trước}
       ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD:?chạy ./init-env.sh trước}
+      SERIALS_DB_PASSWORD: ${SERIALS_DB_PASSWORD:?chạy ./init-env.sh trước}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD:?chạy ./init-env.sh trước}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD:?chạy ./init-env.sh trước}
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD:?chạy ./init-env.sh trước}
@@ -80,6 +81,7 @@ services:
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
       HOLDINGS_DB_PASSWORD: ${HOLDINGS_DB_PASSWORD}
       ACQUISITION_DB_PASSWORD: ${ACQUISITION_DB_PASSWORD}
+      SERIALS_DB_PASSWORD: ${SERIALS_DB_PASSWORD}
       CIRCULATION_DB_PASSWORD: ${CIRCULATION_DB_PASSWORD}
       SEARCH_DB_PASSWORD: ${SEARCH_DB_PASSWORD}
       DIGITAL_DB_PASSWORD: ${DIGITAL_DB_PASSWORD}
@@ -172,6 +174,7 @@ services:
       Identity__Clients__svc-catalog__ClientSecret: ${SVC_CATALOG_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-holdings__ClientSecret: ${SVC_HOLDINGS_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-acquisition__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
+      Identity__Clients__svc-serials__ClientSecret: ${SVC_SERIALS_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-circulation__ClientSecret: ${SVC_CIRCULATION_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-search__ClientSecret: ${SVC_SEARCH_SECRET:?chạy ./init-env.sh trước}
       Identity__Clients__svc-digital__ClientSecret: ${SVC_DIGITAL_SECRET:?chạy ./init-env.sh trước}
@@ -226,6 +229,7 @@ services:
       Provisioning__DeployedServices__9: space
       Provisioning__DeployedServices__10: payment
       Provisioning__DeployedServices__11: portal
+      Provisioning__DeployedServices__12: serials
 
   notification:
     build:
@@ -373,6 +377,28 @@ services:
       ServiceClient__ClientSecret: ${SVC_ACQUISITION_SECRET:?chạy ./init-env.sh trước}
       Catalog__Url: http://catalog:8080
       Holdings__Url: http://holdings:8080
+
+  # GĐ2: báo/tạp chí — loại ấn phẩm, tần suất, mẫu đánh số, đăng ký đặt báo, nhận kỳ, đóng tập (ĐKCB tạo ở holdings qua /internal), báo cáo.
+  serials:
+    build:
+      <<: *service-build
+      args:
+        PROJECT: Services/Serials/Elib.Serials.Api/Elib.Serials.Api.csproj
+        ASSEMBLY: Elib.Serials.Api
+    image: elib/serials:dev
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+      identity: { condition: service_started }
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__SerialsDb: Host=postgres;Database=elib_serials;Username=serials_app;Password=${SERIALS_DB_PASSWORD};Maximum Pool Size=8
+      Database__MigrateOnStartup: "true"
+      ServiceClient__ClientSecret: ${SVC_SERIALS_SECRET:?chạy ./init-env.sh trước}
+      Catalog__Url: http://catalog:8080
+      Holdings__Url: http://holdings:8080
+      Acquisition__Url: http://acquisition:8080
 
   # GĐ1: lưu thông — điểm lưu thông, chính sách, mượn/trả/gia hạn; bản sao bạn đọc/bản sách/biểu ghi (thiếu thì hỏi service gốc).
   circulation:
@@ -548,6 +574,7 @@ services:
       catalog: { condition: service_started }
       holdings: { condition: service_started }
       acquisition: { condition: service_started }
+      serials: { condition: service_started }
       circulation: { condition: service_started }
       search: { condition: service_started }
       digital: { condition: service_started }

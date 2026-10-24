@@ -2,6 +2,7 @@ using Elib.Acquisition.Application;
 using Elib.Acquisition.Domain;
 using Elib.BuildingBlocks.Authorization;
 using Elib.BuildingBlocks.Crud;
+using Elib.BuildingBlocks.Tenancy;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Elib.Acquisition.Api;
@@ -16,6 +17,13 @@ public static class AcquisitionEndpoints
 
     public static IEndpointRouteBuilder MapAcquisitionEndpoints(this IEndpointRouteBuilder app)
     {
+        // Nội bộ: serials chọn nhà cung cấp cho đăng ký đặt báo (không qua gateway, chỉ service token; không đòi license ACQUISITION — chưa dùng thì rỗng).
+        app.MapGet("/internal/tenants/{tenantId:long}/suppliers", async (long tenantId, ITenantContext tenant, InternalSuppliers s, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await s.ListAsync(ct);
+        }).WithTags("Internal").RequireAuthorization(new RequireServiceCallerAttribute());
+
         var api = app.MapGroup("/api").RequireAuthorization(new RequiresModuleAttribute(Module));
 
         api.MapCrud<SourceResource>("/sources", "AB_SOURCES").WithTags("Sources");

@@ -301,7 +301,7 @@ def system_steps(sysb, accounts, admin_user):
     else:
         s, _, body = sysb.request("POST", "/api/system/tenant/tenants", token=sys_token, json_body={
             "code": TENANT_CODE, "name": "Trường demo nền tảng mới", "subdomain": SUBDOMAIN,
-            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"]]})
+            "licenses": [{"moduleCode": m} for m in ["CATALOG", "HOLDINGS", "CIRCULATION", "SEARCH", "ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL", "SERIALS"]]})
         expect(s == 201, f"tạo đơn vị {TENANT_CODE}", body)
         tenant = json.loads(body)
     for _ in range(60):
@@ -312,7 +312,7 @@ def system_steps(sysb, accounts, admin_user):
     steps = ", ".join(f"{p['service']}={p['status']}" for p in tenant["provisioningSteps"])
     expect(tenant["status"] == "Active", f"saga khởi tạo xong: Active ({steps})", json.dumps(tenant))
     owned = {l["moduleCode"] for l in tenant["licenses"]}
-    missing = [m for m in ["ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL"] if m not in owned]
+    missing = [m for m in ["ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL", "SERIALS"] if m not in owned]
     if missing:  # đơn vị từ lần chạy trước: bán thêm các phân hệ mới
         s, _, body = sysb.request("PUT", f"/api/system/tenant/tenants/{tenant['publicId']}/licenses", token=sys_token, json_body={
             "licenses": [{"moduleCode": m} for m in sorted(owned) + missing]})
@@ -390,7 +390,7 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, body = tb.request("GET", "/api/admin/tenant/features", token=token)
     modules = set(json.loads(body)["modules"]) if s == 200 else set()
     required = {"CATALOG", "CIRCULATION", "HOLDINGS", "SEARCH"}  # ACQUISITION: có khi quản trị nền tảng đã bán (bước 2) — không bắt buộc ở --tenant-only
-    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL", "SPACE"}, f"menu theo license: {sorted(modules)}", body)
+    expect(required <= modules <= required | {"ACQUISITION", "PAYMENT", "DIGITAL", "PORTAL", "SPACE", "SERIALS"}, f"menu theo license: {sorted(modules)}", body)
     s, _, body = tb.request("GET", "/api/admin/identity/users", token=token)
     expect(s == 200 and any(u["userName"] == admin_user for u in json.loads(body)["items"]), "API người dùng của đơn vị", body)
 
@@ -1298,6 +1298,10 @@ def tenant_steps(sysb, sys_token, tenant, accounts, admin_user):
     s, _, text = tb.request("GET", "/api/system/health", token=token)
     expect(s == 403, "sức khoẻ nền tảng: cán bộ đơn vị bị từ chối", f"{s} {text[:200]}")
 
+    if "SERIALS" in mods:
+        print("21h. Báo – tạp chí (service serials): danh mục mặc định, đăng ký, sinh kỳ, nhận kỳ, khiếu nại, thống kê, báo cáo, dashboard")
+        serials_steps(tb, token, tag, book)
+
     if sys_token and "DIGITAL" in mods:
         print("21g. Dữ liệu dùng chung: đơn vị SHARED tạo tài liệu số + từ điển → tự sao chỉ-đọc sang đơn vị; đơn vị chỉ ẩn/hiện")
         shared_data_steps(sysb, sys_token, tb, token, credentials, tag)
@@ -1843,6 +1847,77 @@ def shared_data_steps(sysb, sys_token, tb, token, accounts, tag):
             gone = True; break
         time.sleep(2)
     expect(gone, "gốc bị xoá → bản sao không còn trên OPAC của đơn vị")
+
+
+def serials_steps(tb, token, tag, book):
+    """21h. Báo – tạp chí: Postgres + RLS thật (khác SQLite của test)."""
+    S = "/api/admin/serials"
+
+    def call(method, path, body=None):
+        st, _, text = tb.request(method, S + path, token=token, json_body=body)
+        return st, text, (json.loads(text) if text[:1] in "{[" else {})
+
+    s, text, freqs = call("POST", "/frequencies/SearchAll", {})
+    freqs = freqs if isinstance(freqs, list) else freqs.get("items", [])
+    expect(s == 200 and len(freqs) >= 1, "tần suất mặc định đã seed cho đơn vị", text[:200])
+    s, text, pats = call("POST", "/patterns/SearchAll", {})
+    pats = pats if isinstance(pats, list) else pats.get("items", [])
+    expect(s == 200 and len(pats) >= 1, "mẫu đánh số mặc định đã seed", text[:200])
+    month = next((f for f in freqs if f.get("unit") == 3), freqs[0])
+    title = f"Tạp chí E2E {tag}"
+    s, text, sub = call("POST", "/subscriptions/Add", {"title": title, "issn": "1234-5678", "frequencyId": month["id"], "patternId": pats[0]["id"],
+                                                          "firstIssueDate": "2026-01-01", "startX": 1, "startY": 1, "graceDays": 0, "status": 1})
+    expect(s == 201 and sub.get("publicId"), "tạo đăng ký đặt báo (nhập tay nhan đề/ISSN)", text[:200])
+    s, text, gen = call("POST", "/issues/Predict", {"subscriptionPublicId": sub["publicId"], "count": 4})
+    expect(s == 200 and gen.get("generated") == 4, "sinh 4 kỳ dự kiến", text[:200])
+    s, text, again = call("POST", "/issues/Predict", {"subscriptionPublicId": sub["publicId"], "count": 4})
+    expect(s == 200 and again.get("generated") == 4, "sinh tiếp 4 kỳ kế (không trùng số đã có)", text[:200])
+    first = gen["issues"][0]["publicId"]
+    s, text, _ = call("POST", "/issues/Receive", {"publicId": first})
+    expect(s == 200, "nhận kỳ đầu", text[:200])
+    s, text, _ = call("POST", "/issues/Claim", {"publicId": first})
+    expect(s in (400, 409) and "ISSUE" in text.upper(), "khiếu nại kỳ đã nhận bị chặn", f"{s} {text[:200]}")
+    s, text, st = call("GET", f"/issues/Statistics/{sub['publicId']}")
+    expect(s == 200 and st.get("total") == 8 and st.get("received") == 1, "thống kê kỳ", text[:200])
+    s, text, _ = call("POST", f"/subscriptions/Approve/{sub['publicId']}")
+    expect(s in (400, 409) and "SERIAL_BIB_REQUIRED" in text, "duyệt khi chưa liên kết biểu ghi bị chặn", f"{s} {text[:200]}")
+
+    # Đóng tập: biểu ghi catalog → snapshot ở serials → liên kết → nhận 2 kỳ → đóng tập tạo ĐKCB THẬT ở holdings → xoá tập gỡ ĐKCB
+    C, H = "/api/admin/catalog", "/api/admin/holdings"
+    s, _, body = tb.request("POST", f"{C}/bibs/Add", token=token, json_body={"bibTypeId": book["id"], "fields": [
+        {"tag": "245", "ind1": "1", "ind2": "0", "subfields": [{"code": "a", "value": f"Tạp chí đóng tập {tag}"}]}]})
+    expect(s == 201, "biên mục biểu ghi đầu báo", body[:200])
+    bib = json.loads(body)
+    found = []
+    for _ in range(40):
+        st, text, found = call("POST", "/bibs/Lookup", {"keyword": f"Tạp chí đóng tập {tag}"})
+        if st == 200 and isinstance(found, list) and any(b.get("mfn") == bib["mfn"] for b in found): break
+        time.sleep(1)
+    expect(isinstance(found, list) and any(b.get("mfn") == bib["mfn"] for b in found), "biểu ghi vào bản sao của serials (BibChanged)", str(found)[:200])
+    s, text, _ = call("POST", f"/subscriptions/LinkBib/{sub['publicId']}/{bib['publicId']}")
+    expect(s == 200, "liên kết đăng ký với biểu ghi", text[:200])
+    for issue in gen["issues"][1:3]:
+        s, text, _ = call("POST", "/issues/Receive", {"publicId": issue["publicId"]})
+        expect(s == 200, "nhận kỳ để đóng tập", text[:200])
+    accession = f"TC-{tag}"
+    s, text, binding = call("POST", "/bindings/Add", {"subscriptionPublicId": sub["publicId"], "issueIds": [i["publicId"] for i in gen["issues"][:3]],
+                                                      "accessionNo": accession, "volumeTitle": f"Tập 1 {tag}"})
+    expect(s == 201 and binding.get("publicId"), "đóng tập 3 kỳ đã nhận", text[:300])
+    s, _, body = tb.request("POST", f"{H}/items/Search", token=token, json_body={"barcodeFrom": accession, "barcodeTo": accession, "pageSize": 5})
+    items = json.loads(body).get("items", []) if s == 200 else []
+    expect(any(i.get("barcode") == accession for i in items), "ĐKCB của tập đóng có thật ở holdings (qua service token)", body[:300])
+    s, text, _ = call("POST", "/bindings/Add", {"subscriptionPublicId": sub["publicId"], "issueIds": [gen["issues"][0]["publicId"]], "accessionNo": accession + "-2"})
+    expect(s in (400, 409), "một kỳ chỉ thuộc một tập", f"{s} {text[:200]}")
+    s, text, _ = call("DELETE", f"/bindings/Delete/{binding['publicId']}")
+    expect(s in (200, 204), "xoá tập đóng", text[:200])
+    s, _, body = tb.request("POST", f"{H}/items/Search", token=token, json_body={"barcodeFrom": accession, "barcodeTo": accession, "pageSize": 5})
+    expect(s == 200 and not any(i.get("barcode") == accession for i in json.loads(body).get("items", [])), "ĐKCB của tập đã gỡ khỏi holdings")
+    s, text, rep = call("POST", "/reports/ReceivedSummary", {"pageIndex": 1, "pageSize": 20})
+    expect(s == 200, "báo cáo tổng hợp nhận", text[:200])
+    s, text, _ = call("GET", "/dashboard")
+    expect(s == 200 and text.startswith("{"), "dashboard serials", text[:200])
+    s, text, _ = call("DELETE", f"/subscriptions/Delete/{sub['publicId']}")
+    expect(s in (200, 204), "xoá đăng ký thử", text[:200])
 
 
 def digital_content_steps(tb, token, tag):

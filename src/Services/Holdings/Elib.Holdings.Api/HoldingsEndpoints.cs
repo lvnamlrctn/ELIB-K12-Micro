@@ -104,6 +104,20 @@ public static class HoldingsEndpoints
                 await r.RemoveAsync(receiptPublicId, itemPublicId, ct);
             return Results.NoContent();
         });
+        // Nội bộ: serials tạo / gỡ ĐKCB của tập đóng báo-tạp chí (quyền SERIAL_BINDING kiểm tra ở serials). Idempotent theo mã tập đóng.
+        var serialItems = app.MapGroup("/internal/tenants/{tenantId:long}/serial-items").WithTags("Internal")
+            .RequireAuthorization(new RequireServiceCallerAttribute()).AddEndpointFilter<ActingAsFilter>();
+        serialItems.MapPost("/Register", async (long tenantId, SerialItemRegisterRequest request, ITenantContext tenant, SerialItems r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                return await r.RegisterAsync(request, ct);
+        });
+        serialItems.MapDelete("/{bindingPublicId:guid}", async (long tenantId, Guid bindingPublicId, ITenantContext tenant, SerialItems r, CancellationToken ct) =>
+        {
+            using (tenant.Use(tenantId))
+                await r.RemoveAsync(bindingPublicId, ct);
+            return Results.NoContent();
+        });
         items.MapGet("/Statuses", () => ItemStatus.Names.Select(s => new { code = s.Key, name = s.Value }));
         api.MapStoreOperationEndpoints();
         api.MapApprovals();

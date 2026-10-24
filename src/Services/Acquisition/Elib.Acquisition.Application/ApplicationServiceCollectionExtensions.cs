@@ -14,6 +14,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddCrudResource<PurchaseOrderResource>();
         services.AddCrudResource<ReceiptResource>();
         services.AddScoped<BibSnapshots>();
+        services.AddScoped<InternalSuppliers>();
         services.AddScoped<AcquisitionOptionsQuery>();
         services.AddScoped<AcquisitionExcel>();
         services.AddScoped<AcquisitionReports>();

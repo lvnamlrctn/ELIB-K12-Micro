@@ -59,7 +59,7 @@
 ### GĐ2 — Đủ phân hệ chính
 
 - `acquisition`: đặt mua, nhận, ngân sách/quỹ, nhà cung cấp, báo cáo bổ sung → `ReceiptCompleted` → holdings.
-- `serials`: ấn phẩm định kỳ, kỳ phát hành, đóng tập.
+- `serials`: ấn phẩm định kỳ, kỳ phát hành, đóng tập — **đã triển khai** (loại ấn phẩm, tần suất, mẫu đánh số, đăng ký đặt báo, nhận kỳ/khiếu nại/ghép số, đóng tập tạo ĐKCB ở holdings qua HTTP `/internal`, báo cáo). Quyền giữ mã monolith (MAGAZINE_TYPES, FREQUENCIES, PATTERNS, SUBSCRIPTIONS, SERIAL_ISSUES, SERIAL_RECEIPTS) + SERIAL_BINDING, SERIAL_REPORT. OPAC báo tạp chí để đợt sau.
 - `digital` + `digital-indexer`: tài liệu số, bộ sưu tập, chính sách, mượn số, trang đọc, theo dõi đọc, đánh giá, nộp tài liệu. Indexer viết lại trên nền `ebook-indexer`, nhận việc qua RabbitMQ và không còn đọc DB trực tiếp.
 - `search`: index ebook + chunk/vector, tìm kiếm hợp nhất.
 - `payment`: VietQR/VNPAY/Sepay, saga thu phí, đối soát, tài khoản nhận theo đơn vị; tab Phí/Nợ trên OPAC.

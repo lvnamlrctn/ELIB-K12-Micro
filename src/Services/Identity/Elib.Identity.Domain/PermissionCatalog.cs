@@ -37,6 +37,8 @@ public static class PermissionCatalog
     private const string HoldingsLicense = "HOLDINGS";
     private const string CirculationGroup = "Lưu thông";
     private const string CirculationLicense = "CIRCULATION";
+    private const string SerialsGroup = "Ấn phẩm định kỳ";
+    private const string SerialsLicense = "SERIALS";
     private const string AcquisitionGroup = "Bổ sung";
     private const string AcquisitionParams = "Bổ sung / Tham số bổ sung";
     private const string AcquisitionLicense = "ACQUISITION";
@@ -100,6 +102,15 @@ public static class PermissionCatalog
         new("SUPPLIERS", "Nhà cung cấp", AcquisitionParams, Crud, AcquisitionLicense),
         new("BUDGETS", "Kinh phí", AcquisitionParams, Crud, AcquisitionLicense),
         new("FUNDS", "Quỹ", AcquisitionParams, Crud, AcquisitionLicense),
+
+        new("MAGAZINE_TYPES", "Loại ấn phẩm", SerialsGroup, Crud, SerialsLicense),
+        new("FREQUENCIES", "Tần suất xuất bản", SerialsGroup, Crud, SerialsLicense),
+        new("PATTERNS", "Mẫu đánh số kỳ", SerialsGroup, Crud, SerialsLicense),
+        new("SUBSCRIPTIONS", "Đăng ký đặt báo/tạp chí", SerialsGroup, Crud, SerialsLicense),
+        new("SERIAL_ISSUES", "Nhận kỳ", SerialsGroup, Crud, SerialsLicense),
+        new("SERIAL_RECEIPTS", "Tìm phiếu nhận kỳ", SerialsGroup, Crud, SerialsLicense),
+        new("SERIAL_BINDING", "Đóng tập báo/tạp chí", SerialsGroup, Crud, SerialsLicense),
+        new("SERIAL_REPORT", "Báo cáo báo/tạp chí", SerialsGroup, [View], SerialsLicense),
 
         new("BORROW", "Mượn/Trả", CirculationGroup, [View, Add, Edit, Approve], CirculationLicense),
         new("REQUEST_BOOKS", "Yêu cầu mượn", CirculationGroup, [View, Add, Edit], CirculationLicense),

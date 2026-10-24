@@ -154,6 +154,20 @@ export class Menu {
         ],
       },
       {
+        title: 'MENU.SERIALS',
+        icon: 'auto_stories',
+        module: 'SERIALS',
+        children: [
+          { title: 'MENU.SUBSCRIPTIONS', icon: 'newspaper', link: '/serial-subscriptions', perm: 'SUBSCRIPTIONS' },
+          { title: 'MENU.SERIAL_ISSUES', icon: 'move_to_inbox', link: '/serial-issues', permAny: ['SERIAL_ISSUES:view', 'SERIAL_RECEIPTS:view'] },
+          { title: 'MENU.SERIAL_BINDING', icon: 'collections_bookmark', link: '/serial-bindings', perm: 'SERIAL_BINDING' },
+          { title: 'MENU.SERIAL_REPORT', icon: 'assessment', link: '/serial-reports', perm: 'SERIAL_REPORT' },
+          { title: 'MENU.MAGAZINE_TYPES', icon: 'category', link: '/serial-types', perm: 'MAGAZINE_TYPES' },
+          { title: 'MENU.FREQUENCIES', icon: 'event_repeat', link: '/serial-frequencies', perm: 'FREQUENCIES' },
+          { title: 'MENU.PATTERNS', icon: 'pin', link: '/serial-patterns', perm: 'PATTERNS' },
+        ],
+      },
+      {
         title: 'MENU.DIGITAL_GROUP',
         icon: 'menu_book',
         module: 'DIGITAL',

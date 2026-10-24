@@ -44,6 +44,7 @@ public sealed class HoldingsDbContext(DbContextOptions<HoldingsDbContext> option
             e.HasIndex(x => new { x.TenantId, x.StoreId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.ReceiptPublicId });
             e.HasIndex(x => new { x.TenantId, x.ReceiptLinePublicId });
+            e.HasIndex(x => new { x.TenantId, x.SerialBindingPublicId });
             e.HasIndex(x => new { x.TenantId, x.ShelfPublicId });
             e.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
         });

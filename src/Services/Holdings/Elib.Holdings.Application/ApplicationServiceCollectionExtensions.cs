@@ -24,6 +24,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<MapShelvingResource>();
         services.AddScoped<ReceiptSnapshots>();
         services.AddScoped<ReceiptItems>();
+        services.AddScoped<SerialItems>();
         services.AddScoped<ReceiptItemReports>();
         services.AddScoped<ItemEvents>();
         services.AddScoped<HoldingsExcel>();

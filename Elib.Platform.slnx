@@ -81,6 +81,13 @@
     <Project Path="src/Services/Acquisition/Elib.Acquisition.Infrastructure/Elib.Acquisition.Infrastructure.csproj" />
     <Project Path="src/Services/Acquisition/tests/Elib.Acquisition.Tests/Elib.Acquisition.Tests.csproj" />
   </Folder>
+  <Folder Name="/Services/Serials/">
+    <Project Path="src/Services/Serials/Elib.Serials.Api/Elib.Serials.Api.csproj" />
+    <Project Path="src/Services/Serials/Elib.Serials.Application/Elib.Serials.Application.csproj" />
+    <Project Path="src/Services/Serials/Elib.Serials.Domain/Elib.Serials.Domain.csproj" />
+    <Project Path="src/Services/Serials/Elib.Serials.Infrastructure/Elib.Serials.Infrastructure.csproj" />
+    <Project Path="src/Services/Serials/tests/Elib.Serials.Tests/Elib.Serials.Tests.csproj" />
+  </Folder>
   <Folder Name="/Services/Digital/">
     <Project Path="src/Services/Digital/Elib.Digital.Api/Elib.Digital.Api.csproj" />
     <Project Path="src/Services/Digital/Elib.Digital.Application/Elib.Digital.Application.csproj" />

@@ -72,6 +72,7 @@ public sealed class IdentityApiFactory : WebApplicationFactory<Program>
             ["Identity:Clients:svc-catalog:ClientSecret"] = "catalog-secret-for-tests",
             ["Identity:Clients:svc-holdings:ClientSecret"] = "holdings-secret-for-tests",
             ["Identity:Clients:svc-acquisition:ClientSecret"] = "acquisition-secret-for-tests",
+            ["Identity:Clients:svc-serials:ClientSecret"] = "serials-secret-for-tests",
             ["Identity:Clients:svc-circulation:ClientSecret"] = "circulation-secret-for-tests",
             ["Identity:Clients:svc-search:ClientSecret"] = "search-secret-for-tests",
             ["Identity:Clients:svc-digital:ClientSecret"] = "digital-secret-for-tests",
